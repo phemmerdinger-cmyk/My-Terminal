@@ -157,7 +157,8 @@ function cleanItem(it, srcKey, ticker) {
   // Google News appends " - Publisher" to titles
   if (it.link.includes("news.google.com")) {
     title = title.replace(/\s+-\s+[^-]+$/, "");
-    if (it.publisher && !new RegExp(src.name.split(" ")[0], "i").test(it.publisher)) return null;
+    const who = { wsj: /wall street journal|\bwsj\b/i, yahoo: /yahoo/i, cnbc: /cnbc/i, morningstar: /morningstar/i, seekingalpha: /seeking ?alpha/i }[srcKey];
+    if (it.publisher && who && !who.test(it.publisher)) return null;
   }
   // Google News descriptions are just HTML link lists — drop them
   const summary = it.link.includes("news.google.com") ? "" : it.summary;
