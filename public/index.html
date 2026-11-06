@@ -549,11 +549,12 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 /* paper trading (computer only) */
 @media (max-width:760px){ nav.tabs button[data-tab=trade]{display:none!important} }
 .pt-lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
-.pt-bar{display:flex;align-items:center;gap:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex-wrap:wrap}
+.pt-bar{display:flex;align-items:center;gap:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex-wrap:wrap}
 .pt-bar > div{display:flex;flex-direction:column;gap:3px}
 .pt-bar b{font-family:var(--mono);font-size:15px;font-weight:500}
 .pt-bar .pt-bv b{font-size:22px}
-.pt-spark{flex:1;min-width:140px;max-width:320px;margin-left:auto}
+.pt-spark{flex:1 1 80px;min-width:0;max-width:300px;margin-left:auto}
+.pt-spark:empty{visibility:hidden}
 .pt-plus{width:40px;height:40px;border-radius:50%;border:0;background:var(--amber);color:#fff;font-size:26px;line-height:1;cursor:pointer;font-weight:300;flex:none}
 .pt-add{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:12px 16px;margin-top:-8px}
 .pt-add[hidden]{display:none}
@@ -2364,7 +2365,8 @@ function ptCheckOrders(){
   if(ch){ ptDayTick(); ptSave(); }
   return ch;
 }
-function ptOnQuotes(){ ptCheckOrders(); ptDayTick(); if(S.tab==="trade"){ renderTrade(); ptChartLive(); } }
+let ptRetryAt=0;
+function ptOnQuotes(){ ptCheckOrders(); ptDayTick(); if(S.tab==="trade"){ renderTrade(); ptChartLive(); if(S.pt.sym&&!ptSeries&&Date.now()-ptRetryAt>20000){ ptRetryAt=Date.now(); ptLoadChart(); } } } // retry the chart if it failed while the server was waking up
 
 /* ----- chart with trade markers ----- */
 let ptc=null, ptSeries=null, ptVol=null, ptCandles=[], ptLines=[], ptLinesSig="", ptChartKey="";
@@ -2498,7 +2500,7 @@ function renderTrade(){
 }
 function ptBuild(){
   const sym=S.pt.sym, q=sym?ptQ(sym):null, amt=+$("ptAmt").value, lim=+$("ptPx").value;
-  if(!sym) return {err:"Search a ticker first."}; if(!q) return {err:"Waiting for a live price…"};
+  if(!sym) return {err:"Search a ticker first.",quiet:true}; if(!q) return {err:"Waiting for a live price…"};
   if(!(amt>0)) return {err:S.pt.mode==="usd"?"Enter a dollar amount.":"Enter how many shares.",quiet:true};
   if(S.pt.type!=="market"&&!(lim>0)) return {err:`Enter the ${S.pt.type} price.`};
   const o={id:"o"+Date.now(),sym,side:S.pt.side,type:S.pt.type,t:Date.now(),status:"open"};
@@ -2511,7 +2513,7 @@ function ptEstimate(){
   if(S.pt.confirm) return;
   const b=ptBuild(), el=$("ptEst"), go=$("ptGo"), side=S.pt.side;
   go.className="btn pt-go "+side; go.textContent=`Review ${S.pt.type!=="market"?S.pt.type+" ":""}${side==="buy"&&S.pt.sym&&ptHeld(S.pt.sym)<0?"cover":side}`;
-  const h=b.err?(b.quiet?"":`<span class="err">${esc(b.err)}</span>`):`About <b>${num(b.sh,4)} shares</b> for <b>$${fmt(b.cost)}</b>${S.pt.type!=="market"?` when the price ${S.pt.type==="limit"?(side==="buy"?"falls to":"rises to"):(side==="buy"?"rises to":"falls to")} $${fmt(b.px)}`:` at $${fmt(b.px)}`}`;
+  const h=b.err?(b.quiet?"":b.err.startsWith("Waiting")?esc(b.err):`<span class="err">${esc(b.err)}</span>`):`About <b>${num(b.sh,4)} shares</b> for <b>$${fmt(b.cost)}</b>${S.pt.type!=="market"?` when the price ${S.pt.type==="limit"?(side==="buy"?"falls to":"rises to"):(side==="buy"?"rises to":"falls to")} $${fmt(b.px)}`:` at $${fmt(b.px)}`}`;
   if(el.innerHTML!==h) el.innerHTML=h;
 }
 function ptPick(sym){ sym=String(sym||"").trim().toUpperCase(); if(!sym) return; if(window.cryptoFix) sym=cryptoFix(sym);
