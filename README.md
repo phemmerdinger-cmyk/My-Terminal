@@ -1,4 +1,4 @@
-# My Terminal: your personal live stock news hub
+# Peter's Finance Terminal
 
 A real, self-hosted website that pulls **live headlines** from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and The Wall Street Journal, along with **live prices**. It also gives you charts, a portfolio tracker, price alerts and **Claude predictions**.
 
@@ -9,7 +9,8 @@ No database, no build step and **no dependencies**. All you need is Node.js 18 o
 | Tab | What it does |
 |---|---|
 | **News** | One live feed from all 5 outlets. Refreshes every 60s and flags new stories. Each headline is tagged positive or negative and labeled with your tickers. Filter by source, ticker or keyword. Optional desktop alerts. |
-| **Data** | Watchlist heatmap and a sortable table: price, day range, 52-week range, volume, 1W/1M/3M/YTD/1Y returns and a news-mood gauge. Also an S&P sector heatmap and indexes, rates and commodities. |
+| **Markets** | Watchlist heatmap and table, S&P sectors, indexes, Treasury yields, bond funds, crypto, popular ETFs, mutual funds, futures and currencies. |
+| **Research** | A Yahoo Finance-style page for any stock, ETF, mutual fund, crypto, index or future: Summary, Statistics, Financials (income statement, balance sheet, cash flow, annual and quarterly), Analysis, Holders, Holdings, Performance, Profile and News. |
 | **Charts** | Interactive candlestick or line charts with volume for any ticker (1D → 5Y), plus period stats and 1-month mini charts for your whole watchlist. |
 | **Portfolio** | Enter your holdings to see live value, today's P/L, total P/L and allocation. Set price alerts ("TSLA rises above 300"). |
 | **✦ Claude Predictions** | Search any stock for Claude's outlook: stance, confidence, 1–2 week and 3–6 month ranges, bull and bear case, and catalysts. Includes a whole-market outlook and an **Ask Claude** box that knows your watchlist and portfolio. |

@@ -55,10 +55,14 @@ const SOURCES = {
   wsj: {
     name: "Wall Street Journal",
     domain: "wsj.com",
+    // WSJ's own RSS feeds have gone stale, so fresh WSJ headlines come via Google News
     market: [
+      gnews("site:wsj.com markets when:2d"),
+      gnews("site:wsj.com stocks when:2d"),
+      gnews("site:wsj.com economy when:2d"),
+      gnews("site:wsj.com business when:2d"),
+      gnews("site:wsj.com tech when:2d"),
       "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
-      "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml",
-      "https://feeds.a.dj.com/rss/RSSWSJD.xml",
     ],
     ticker: (t) => [gnews(`${base(t)} ${kind(t)} site:wsj.com when:7d`)],
   },
@@ -173,13 +177,14 @@ async function loadSource(srcKey, urls, ticker) {
   const src = SOURCES[srcKey];
   const results = await Promise.allSettled(urls.map(fetchFeed));
   let items = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  let ok = results.some((r) => r.status === "fulfilled" && r.value.length);
+  const fresh = (list) => list.some((i) => i.time && i.time > Date.now() - 3 * 86400e3);
+  let ok = results.some((r) => r.status === "fulfilled" && r.value.length && fresh(r.value));
   // Fallback: if the outlet's own feed failed, use Google News for that site
   if (!ok) {
     const q = ticker ? `${base(ticker)} ${kind(ticker)} site:${src.domain} when:7d` : `site:${src.domain} stocks when:2d`;
     try {
-      items = await fetchFeed(gnews(q));
-      ok = items.length > 0;
+      items = items.concat(await fetchFeed(gnews(q)));
+      ok = fresh(items);
     } catch {}
   }
   return { ok, items: items.map((i) => cleanItem(i, srcKey, ticker)).filter(Boolean) };
@@ -212,10 +217,12 @@ async function getNews(tickers) {
       if (new RegExp(`(^|[\\s($])${b.replace(/[.^=]/g, "\\$&")}([\\s),:'’]|$)`).test(it.title)) it.tickers.push(t);
     }
   }
-  const items = [...byId.values()]
+  const recent = [...byId.values()]
     .filter((i) => !i.time || i.time > Date.now() - 1000 * 60 * 60 * 24 * 21)
-    .sort((a, b) => (b.time || 0) - (a.time || 0))
-    .slice(0, 400);
+    .sort((a, b) => (b.time || 0) - (a.time || 0));
+  // Keep a fair share from every outlet (stories about your tickers always stay)
+  const per = {};
+  const items = recent.filter((i) => { per[i.source] = (per[i.source] || 0) + 1; return i.tickers.length || per[i.source] <= 90; }).slice(0, 500);
   return {
     updated: Date.now(),
     sources: Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, { name: s.name, ok: !!status[k] }])),
