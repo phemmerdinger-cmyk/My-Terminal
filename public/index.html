@@ -546,9 +546,18 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 #feed .tags .tg{white-space:nowrap}
 #feed .item p{margin-top:5px}
 
-/* paper trading (phone app only) */
-nav.tabs button[data-tab=trade]{display:none}
-@media (max-width:760px){ nav.tabs button[data-tab=trade]{display:flex} }
+/* paper trading (computer only) */
+@media (max-width:760px){ nav.tabs button[data-tab=trade]{display:none!important} }
+.pt-grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start;margin-top:18px}
+.pt-left{position:sticky;top:96px}
+.pt-left .h{margin-top:0}
+.pt-right h2.h{margin-top:24px} .pt-right h2.h:first-child{margin-top:0}
+.pt-stats{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))!important}
+.pt-acct{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:6px 28px;align-items:center}
+.pt-acct > .pt-top,.pt-acct > .pt-val,.pt-acct > .pt-sub,.pt-acct > .pt-mini{grid-column:1}
+.pt-acct > #ptCurve{grid-column:2;grid-row:1 / span 4;margin:0}
+.pt-acct > .pt-add{grid-column:1 / -1}
+@media (max-width:1000px){ .pt-grid,.pt-acct{grid-template-columns:minmax(0,1fr)} .pt-acct > #ptCurve{grid-column:1;grid-row:auto} .pt-left{position:static} }
 .pt-acct{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:6px}
 .pt-top{display:flex;justify-content:space-between;align-items:center}
 .pt-lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
@@ -732,7 +741,7 @@ nav.tabs button[data-tab=trade]{display:none}
     </section>
 
     <!-- PREDICTIONS -->
-    <!-- PAPER TRADING (phone app only) -->
+    <!-- PAPER TRADING (computer only) -->
     <section id="tab-trade" class="pad" hidden>
       <div class="pt-acct">
         <div class="pt-top"><span class="pt-lbl">Paper account value</span><button class="pt-plus" id="ptPlus" type="button" title="Add money">+</button></div>
@@ -747,6 +756,7 @@ nav.tabs button[data-tab=trade]{display:none}
         </form>
       </div>
 
+      <div class="pt-grid"><div class="pt-left">
       <h2 class="h">Trade</h2>
       <form class="pt-ticket" id="ptForm" autocomplete="off">
         <input class="field" id="ptSym" placeholder="Search a stock, ETF or crypto" maxlength="15" style="text-transform:uppercase">
@@ -760,6 +770,7 @@ nav.tabs button[data-tab=trade]{display:none}
         <div class="pt-est" id="ptEst"></div>
         <button class="btn pt-go" id="ptGo">Review</button>
       </form>
+      </div><div class="pt-right">
 
       <h2 class="h">Positions</h2>
       <div id="ptPos"></div>
@@ -774,8 +785,9 @@ nav.tabs button[data-tab=trade]{display:none}
       <h2 class="h">Activity</h2>
       <div id="ptHist"></div>
 
+      </div></div>
       <div style="margin:28px 0 10px;text-align:center"><button class="btn ghost" id="ptReset" type="button">Reset paper account</button></div>
-      <div class="disc">Practice only. No real money is used. Orders fill at the latest live price; outside market hours stocks fill at the last traded price. Limit and stop orders are checked every 15 seconds while the app is open. This account is saved on this phone.</div>
+      <div class="disc">Practice only. No real money is used. Orders fill at the latest live price; outside market hours stocks fill at the last traded price. Limit and stop orders are checked every 15 seconds while the app is open. This account is saved in this browser on this computer.</div>
     </section>
 
     <section id="tab-predict" class="pad" hidden>
@@ -2231,10 +2243,10 @@ setInterval(()=>{ if(S.sync.code&&!document.hidden) syncPull(); },20000);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.sync.code) syncPull(); });
 syncUI(); if(S.sync.code) syncPull();
 
-/* ---------- PAPER TRADING (phone app only) ---------- */
+/* ---------- PAPER TRADING (computer only) ---------- */
 const PT_START=100000, PT_MAX_ADD=1000000;
 const etDate=(t=Date.now())=>new Date(t).toLocaleDateString("en-CA",{timeZone:"America/New_York"}); // YYYY-MM-DD
-const isApp=()=>matchMedia("(max-width:760px)").matches;
+const isApp=()=>!matchMedia("(max-width:760px)").matches; // paper trading: computer only
 function ptFresh(){ const t=Date.now(); return {v:1,created:t,cash:PT_START,deposited:PT_START,pos:{},orders:[],log:[{k:"dep",t,amt:PT_START}],realized:0,closed:[],days:{[etDate(t)]:{start:PT_START,end:PT_START,dep:0}},spx0:null}; }
 let PA=store.get("paper",null); if(!PA||PA.v!==1) PA=ptFresh();
 const ptSave=()=>store.set("paper",PA);
