@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: my-terminal
+    runtime: node
+    plan: free
+    buildCommand: "echo no build step"
+    startCommand: "node server.js"
+    healthCheckPath: /api/health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: NODE_VERSION
+        value: "22"

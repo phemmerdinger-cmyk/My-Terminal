@@ -1,0 +1,9 @@
+{
+  "name": "my-terminal",
+  "version": "1.0.0",
+  "description": "Personal live stock news hub: Yahoo Finance, CNBC, Morningstar, Seeking Alpha and WSJ, with charts, portfolio, alerts and Claude predictions",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=22" },
+  "license": "MIT"
+}
