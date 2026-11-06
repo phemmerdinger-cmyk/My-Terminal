@@ -518,8 +518,32 @@ async function basicSummary(sym) {
     summaryDetail: { previousClose: q.prevClose, dayLow: q.dayLow, dayHigh: q.dayHigh, fiftyTwoWeekLow: q.low52, fiftyTwoWeekHigh: q.high52, volume: q.volume, marketCap: val.MarketCap, trailingPE: val.PeRatio, forwardPE: val.ForwardPeRatio, priceToSalesTrailing12Months: val.PsRatio },
     defaultKeyStatistics: { enterpriseValue: val.EnterpriseValue, pegRatio: val.PegRatio, priceToBook: val.PbRatio, enterpriseToRevenue: val.EnterprisesValueRevenueRatio, enterpriseToEbitda: val.EnterprisesValueEBITDARatio },
   };
-  if (FINNHUB && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym) && !isCrypto(sym)) await addFinnhub(sym, out).catch(() => {});
+  await Promise.all([
+    FINNHUB && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym) && !isCrypto(sym) ? addFinnhub(sym, out).catch(() => {}) : null,
+    !isCrypto(sym) && !/[\^=]/.test(sym) ? addWikipedia(q.name, out).catch(() => {}) : null,
+  ]);
   return out;
+}
+
+// Company / fund description from Wikipedia (free, no key)
+const WIKI_UA = { "User-Agent": "MyTerminal/1.0 (personal stock dashboard)", Accept: "application/json" };
+async function addWikipedia(name, out) {
+  if (!name) return;
+  return cached("wiki:" + name, 7 * 86400e3, async () => {
+    const clean = name.replace(/,? (Inc|Corp|Corporation|Co|Ltd|plc|Holdings|Class [A-C])\.?$/i, "").trim();
+    for (const q of [name, clean + " company", clean]) {
+      const s = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&limit=1&namespace=0&format=json&search=${encodeURIComponent(q)}`, { headers: WIKI_UA, signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+      const title = s && s[1] && s[1][0];
+      if (!title) continue;
+      const sum = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, { headers: WIKI_UA, signal: AbortSignal.timeout(8000) }).then((r) => r.json());
+      const text = sum && sum.type !== "disambiguation" && sum.extract;
+      const looksRight = text && /compan|corporation|fund|trust|bank|firm|manufactur|retail|conglomerate|exchange-traded|holding|technolog|pharma|insur|airline|motor|energy|semiconductor|software|platform|maker|brand/i.test(text);
+      if (looksRight) return { text, url: sum.content_urls && sum.content_urls.desktop && sum.content_urls.desktop.page };
+    }
+    return null;
+  }).then((w) => {
+    if (w) out.assetProfile = { ...(out.assetProfile || {}), longBusinessSummary: w.text, descriptionSource: "Wikipedia", descriptionUrl: w.url };
+  });
 }
 
 // Finnhub free endpoints fill in what Yahoo won't share: profile, key metrics, analyst trends, earnings
@@ -530,8 +554,9 @@ async function fh(path) {
 }
 async function addFinnhub(sym, out) {
   const fsym = sym.replace("-", ".");
-  const [prof, met, rec, earn] = await Promise.allSettled([
+  const [prof, met, rec, earn, ins, tgt] = await Promise.allSettled([
     fh(`/stock/profile2?symbol=${fsym}`), fh(`/stock/metric?symbol=${fsym}&metric=all`), fh(`/stock/recommendation?symbol=${fsym}`), fh(`/stock/earnings?symbol=${fsym}`),
+    fh(`/stock/insider-transactions?symbol=${fsym}`), fh(`/stock/price-target?symbol=${fsym}`),
   ]).then((r) => r.map((x) => (x.status === "fulfilled" ? x.value : null)));
   const m = (met && met.metric) || {};
   const pc = (x) => (x == null ? undefined : x / 100);
@@ -539,7 +564,7 @@ async function addFinnhub(sym, out) {
   const sd = out.summaryDetail, ks = out.defaultKeyStatistics;
   if (prof && prof.name) {
     out.price.longName = prof.name;
-    out.assetProfile = { sector: prof.finnhubIndustry, industry: prof.finnhubIndustry, country: prof.country, website: prof.weburl, phone: prof.phone };
+    out.assetProfile = { ...(out.assetProfile || {}), sector: prof.finnhubIndustry, industry: prof.finnhubIndustry, country: prof.country, website: prof.weburl, phone: prof.phone, ipo: prof.ipo };
     sd.marketCap = sd.marketCap ?? mil(prof.marketCapitalization);
     ks.sharesOutstanding = mil(prof.shareOutstanding);
   }
@@ -569,6 +594,17 @@ async function addFinnhub(sym, out) {
   }
   if (Array.isArray(earn) && earn.length) {
     out.earningsHistory = { history: earn.slice(0, 8).reverse().map((e) => ({ quarter: Date.parse(e.period) / 1000, epsEstimate: e.estimate, epsActual: e.actual, epsDifference: e.surprise, surprisePercent: pc(e.surprisePercent) })) };
+  }
+  if (tgt && tgt.targetMean) {
+    Object.assign(out.financialData, { targetHighPrice: tgt.targetHigh, targetLowPrice: tgt.targetLow, targetMeanPrice: tgt.targetMean, targetMedianPrice: tgt.targetMedian, currentPrice: out.price.regularMarketPrice });
+  }
+  if (ins && Array.isArray(ins.data) && ins.data.length) {
+    const CODES = { P: "Buy", S: "Sale", A: "Grant/award", M: "Option exercise", F: "Tax withholding", G: "Gift", D: "Disposition", C: "Conversion", X: "Option exercise" };
+    out.insiderTransactions = ins.data
+      .filter((t) => t.transactionDate)
+      .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate))
+      .slice(0, 25)
+      .map((t) => ({ name: t.name, date: t.transactionDate, type: CODES[t.transactionCode] || t.transactionCode || "", change: t.change, shares: t.share, price: t.transactionPrice }));
   }
   out.source = "Yahoo Finance + Finnhub";
 }
