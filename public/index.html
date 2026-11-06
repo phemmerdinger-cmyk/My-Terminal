@@ -259,29 +259,6 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .sugg b{font-family:var(--mono);color:var(--amber)}
 .sugg .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
 .sugg .ty{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
-/* DAY TRADING */
-.pt-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px}
-.pt-head{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
-.pt-quote{font-family:var(--mono);font-size:22px}
-.pt-quote small{font-size:13px;margin-left:6px}
-#ptChart{height:380px;border:1px solid var(--line);border-radius:8px;background:var(--panel);position:relative}
-.pt-legend{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;font-family:var(--mono)}
-.pt-legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
-.ticket{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.ticket label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.ticket select{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:7px 10px;color:var(--text)}
-.ticket details{font-size:12px;color:var(--muted)} .ticket summary{cursor:pointer;margin-bottom:6px}
-.side-seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
-.side-seg button{background:var(--panel2);border:0;padding:9px;cursor:pointer;font-weight:600;color:var(--muted)}
-.side-seg button.on.buy{background:var(--up);color:#06150d} .side-seg button.on.sell{background:var(--down);color:#1a0508}
-.qty-quick{display:flex;gap:6px} .qty-quick button{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:5px 0;font-size:12px;cursor:pointer;color:var(--muted)}
-.qty-quick button:hover{color:var(--text);border-color:var(--amber)}
-.est{font-size:12px;color:var(--muted);font-family:var(--mono);min-height:16px}
-#ptSubmit.sell{background:var(--down);color:#fff} #ptSubmit.buy{background:var(--up);color:#06150d}
-.pt-picks{display:flex;flex-wrap:wrap;gap:6px}
-.pt-picks span{font-family:var(--mono);font-size:12px;border:1px solid var(--line2);border-radius:5px;padding:4px 8px;cursor:pointer}
-.pt-picks span:hover{border-color:var(--amber)}
-@media (max-width:1100px){.pt-grid{grid-template-columns:1fr}}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -383,7 +360,6 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
   <button data-tab="news">News<span class="k" id="newsCount"></span></button>
   <button data-tab="data">Markets</button>
   <button data-tab="research">Research</button>
-  <button data-tab="trade">Day Trading</button>
   <button data-tab="portfolio">Portfolio</button>
   <button data-tab="predict" class="claude">✦ Claude Predictions</button>
 </nav>
@@ -468,56 +444,6 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
       </div>
     </section>
 
-    <!-- DAY TRADING (paper) -->
-    <section id="tab-trade" class="pad" hidden>
-      <div class="kpis" id="ptKpis"></div>
-      <div class="pt-grid">
-        <div>
-          <div class="pt-head">
-            <form id="ptSymForm" style="display:flex;gap:6px"><input class="field" id="ptSym" autocomplete="off" placeholder="Ticker, e.g. NVDA" style="width:160px;text-transform:uppercase"><button class="btn ghost">Load</button></form>
-            <div id="ptQuote" class="pt-quote"></div>
-            <div class="seg" id="ptRange"><button data-pt-range="intraday" class="on">1m · Today</button><button data-pt-range="intraday5">5m · 5 days</button></div>
-          </div>
-          <div id="ptChart"></div>
-          <div class="pt-legend"><span><i style="background:#ff9e1b"></i>VWAP</span><span id="ptLevels"></span></div>
-          <h2 class="h" style="margin-top:20px">Open positions</h2>
-          <div class="tbl-wrap"><table id="ptPos"></table></div>
-          <h2 class="h" style="margin-top:20px">Working orders</h2>
-          <div class="tbl-wrap"><table id="ptOrders"></table></div>
-          <h2 class="h" style="margin-top:20px">Trade history</h2>
-          <div class="tbl-wrap"><table id="ptHist"></table></div>
-        </div>
-        <div>
-          <div class="ticket" id="ptTicket">
-            <div class="side-seg"><button data-side="buy" class="on buy">Buy</button><button data-side="sell" class="sell">Sell / Short</button></div>
-            <label>Order type<select id="ptType"><option value="market">Market</option><option value="limit">Limit</option><option value="stop">Stop</option></select></label>
-            <label id="ptPxRow" hidden>Price<input class="field" id="ptPx" type="number" step="any" min="0"></label>
-            <label>Quantity
-              <div style="display:flex;gap:6px"><input class="field" id="ptQty" type="number" step="any" min="0" placeholder="Shares"><select id="ptQtyMode"><option value="sh">Shares</option><option value="usd">Dollars</option></select></div>
-            </label>
-            <div class="qty-quick"><button data-qpct="0.1">10%</button><button data-qpct="0.25">25%</button><button data-qpct="0.5">50%</button><button data-qpct="1">Max</button></div>
-            <details><summary>Bracket: auto take-profit / stop-loss</summary>
-              <label>Take profit at +%<input class="field" id="ptTp" type="number" step="any" min="0" placeholder="e.g. 3"></label>
-              <label>Stop loss at −%<input class="field" id="ptSl" type="number" step="any" min="0" placeholder="e.g. 1.5"></label>
-            </details>
-            <div class="est" id="ptEst"></div>
-            <button class="btn" id="ptSubmit" style="width:100%;padding:11px">Buy</button>
-            <div class="disc" style="margin-top:8px">Paper trading: fake money, real live prices. Market orders fill at the latest price. Shorting is allowed.</div>
-          </div>
-          <div class="card" style="margin:14px 0 0">
-            <h2 class="h" style="margin:0 0 8px">Account</h2>
-            <form id="ptFundForm" style="display:flex;gap:6px"><input class="field" id="ptFundAmt" type="number" step="any" min="1" placeholder="Amount, e.g. 50000"><button class="btn">+ Add funds</button></form>
-            <div class="qty-quick" style="margin-top:8px"><button data-fund="10000">+$10K</button><button data-fund="100000">+$100K</button><button data-fund="1000000">+$1M</button></div>
-            <div style="display:flex;gap:6px;margin-top:12px"><button class="btn ghost" id="ptFlatten" style="flex:1">Close all positions</button><button class="btn ghost" id="ptReset" style="flex:1">Reset account</button></div>
-          </div>
-          <div class="card" style="margin:14px 0 0">
-            <h2 class="h" style="margin:0 0 8px">Quick picks · most active</h2>
-            <div id="ptPicks" class="pt-picks"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- PORTFOLIO -->
     <section id="tab-portfolio" class="pad" hidden>
       <div class="kpis" id="kpis"></div>
@@ -591,7 +517,7 @@ const PALETTE = ["#ff9e1b","#3b82f6","#21c37a","#8b5cf6","#e11d48","#14b8a6","#e
 // Typing a coin's symbol adds the crypto (Yahoo uses COIN-USD)
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
-const TABS = ["news","data","research","trade","portfolio","predict"];
+const TABS = ["news","data","research","portfolio","predict"];
 const MK = {
   mkBonds:[["^IRX","13-week T-bill"],["^FVX","5-year Treasury"],["^TNX","10-year Treasury"],["^TYX","30-year Treasury"]],
   mkBondFunds:[["AGG","US Aggregate Bond"],["BND","Total Bond Market"],["TLT","20+ Yr Treasury"],["IEF","7-10 Yr Treasury"],["SHY","1-3 Yr Treasury"],["TIP","TIPS"],["LQD","Investment-Grade Corp"],["HYG","High-Yield Corp"],["MUB","Municipal Bonds"],["BNDX","International Bond"]],
@@ -674,14 +600,13 @@ function setTab(t){
   if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
   if(t==="research"){ renderResearch(); }
-  if(t==="trade"){ ptLoad(S.pt.sym); if(!S.movers) loadMovers(); }
   if(t==="predict"){ renderPredict(); if(!S.preds.MARKET && hasKey()) runPredict("MARKET"); }
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
 async function loadQuotes(){
-  const syms=[...new Set([...INDEXES.map(i=>i[0]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol),...SECTORS.map(s=>s[0]),...(S.rq&&S.rq.sym?[S.rq.sym]:[]),...(typeof PT!=="undefined"?[S.pt.sym,...Object.keys(PT.positions),...PT.orders.map(o=>o.sym)]:[])])];
+  const syms=[...new Set([...INDEXES.map(i=>i[0]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol),...SECTORS.map(s=>s[0]),...(S.rq&&S.rq.sym?[S.rq.sym]:[])])];
   try{
     const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(",")));
     const prev=S.quotes; S.quotes={...S.quotes,...j.quotes};
@@ -689,7 +614,6 @@ async function loadQuotes(){
     if(S.tab==="data") renderData();
     if(S.tab==="portfolio") renderPortfolio();
     if(S.tab==="research"&&S.rq.sym) renderResearchHead();
-    if(typeof PT!=="undefined"){ if(S.tab==="trade") renderTrade(); else ptCheckOrders(); }
     if(S.tab==="research"&&S.rq.sub==="chart"){ renderMinis(); }
   }catch(e){ console.warn("quotes",e); }
 }
@@ -1407,131 +1331,6 @@ attachSuggest("hSym",()=>$("hSh").focus());
 attachSuggest("aSym",()=>$("aPx").focus());
 
 
-/* ---------- DAY TRADING: paper account ---------- */
-const PT0={cash:100000,deposits:100000,positions:{},orders:[],history:[],dayStart:null,dayEquity:100000};
-let PT=store.get("paper",null)||JSON.parse(JSON.stringify(PT0));
-const ptSave=()=>store.set("paper",PT);
-S.pt={sym:store.get("ptSym","NVDA"),side:"buy",range:"intraday",candles:[]};
-const ptPx=s=>{const q=S.quotes[s]; return q&&!q.error?q.price:null;};
-function ptEquity(){ let v=PT.cash; for(const [s,p] of Object.entries(PT.positions)){ const px=ptPx(s)??p.avg; v+=p.qty*px; } return v; }
-function ptNewDay(){ const d=new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"}); if(PT.dayStart!==d){ PT.dayStart=d; PT.dayEquity=ptEquity(); ptSave(); } }
-function ptFill(sym,qty,price,why){ // qty>0 buy, <0 sell
-  const p=PT.positions[sym]||{qty:0,avg:0}; let realized=0;
-  if(p.qty===0||Math.sign(p.qty)===Math.sign(qty)){ const nq=p.qty+qty; p.avg=(p.avg*Math.abs(p.qty)+price*Math.abs(qty))/Math.abs(nq); p.qty=nq; }
-  else { const closing=Math.min(Math.abs(qty),Math.abs(p.qty)); realized=(price-p.avg)*closing*Math.sign(p.qty); const rest=Math.abs(qty)-closing; p.qty+=Math.sign(qty)*closing; if(rest>0){ p.qty=Math.sign(qty)*rest; p.avg=price; } }
-  PT.cash-=qty*price;
-  if(Math.abs(p.qty)<1e-9) delete PT.positions[sym]; else PT.positions[sym]=p;
-  PT.history.unshift({t:Date.now(),sym,side:qty>0?"Buy":"Sell",qty:Math.abs(qty),price,realized,why:why||""});
-  PT.history=PT.history.slice(0,300); ptSave();
-  toast(`Paper ${qty>0?"bought":"sold"} ${num(Math.abs(qty),4)} ${sym} @ ${fmt(price)}${realized?` · P/L ${realized>=0?"+":"−"}$${fmt(Math.abs(realized))}`:""}`);
-}
-function ptCheckOrders(){
-  let hit=false;
-  for(const o of [...PT.orders]){ const px=ptPx(o.sym); if(px==null) continue;
-    const go=o.type==="limit"?(o.qty>0?px<=o.price:px>=o.price):(o.qty>0?px>=o.price:px<=o.price);
-    if(!go) continue;
-    PT.orders=PT.orders.filter(x=>x.id!==o.id);
-    if(o.oco) PT.orders=PT.orders.filter(x=>x.oco!==o.oco);
-    ptFill(o.sym,o.qty,o.type==="limit"?o.price:px,o.label||o.type); hit=true;
-  }
-  if(hit){ ptSave(); if(S.tab==="trade") renderTrade(); }
-}
-function ptPlace(){
-  const sym=S.pt.sym, px=ptPx(sym); if(px==null) return toast("Waiting for a live price for "+sym+".");
-  const type=$("ptType").value, lim=+$("ptPx").value, mode=$("ptQtyMode").value; let q=+$("ptQty").value;
-  if(!(q>0)) return toast("Enter a quantity.");
-  const ref=type==="market"?px:lim; if(type!=="market"&&!(lim>0)) return toast("Enter a "+type+" price.");
-  let shares=mode==="usd"?q/ref:q; shares=+shares.toFixed(4); if(!(shares>0)) return toast("Quantity is too small.");
-  const signed=S.pt.side==="buy"?shares:-shares;
-  const cur=PT.positions[sym]?.qty||0, after=cur+signed;
-  const opening=cur!==0&&after!==0&&Math.sign(after)!==Math.sign(cur)?Math.abs(after):Math.max(0,Math.abs(after)-Math.abs(cur));
-  if(opening*ref>PT.cash+1e-6) return toast("Not enough cash. Use + Add funds to top up.");
-  const tp=+$("ptTp").value, sl=+$("ptSl").value;
-  if(type==="market"){ ptFill(sym,signed,+(px*(1+Math.sign(signed)*0.0002)).toFixed(4),"market"); }
-  else { PT.orders.push({id:Date.now(),sym,qty:signed,type,price:lim,label:type}); toast(`${type==="limit"?"Limit":"Stop"} order placed: ${signed>0?"buy":"sell"} ${num(shares,4)} ${sym} @ ${fmt(lim)}`); }
-  if(tp>0||sl>0){ const base=type==="market"?px:lim, dir=Math.sign(signed), oco="b"+Date.now();
-    if(tp>0) PT.orders.push({id:Date.now()+1,sym,qty:-signed,type:"limit",price:+(base*(1+dir*tp/100)).toFixed(2),label:"take-profit",oco});
-    if(sl>0) PT.orders.push({id:Date.now()+2,sym,qty:-signed,type:"stop",price:+(base*(1-dir*sl/100)).toFixed(2),label:"stop-loss",oco}); }
-  ptSave(); $("ptQty").value=""; renderTrade();
-}
-function ptEst(){
-  const px=ptPx(S.pt.sym), type=$("ptType").value, q=+$("ptQty").value, mode=$("ptQtyMode").value, ref=type==="market"?px:+$("ptPx").value;
-  $("ptPxRow").hidden=type==="market";
-  const b=$("ptSubmit"); b.className="btn "+(S.pt.side==="buy"?"buy":"sell"); b.textContent=`${S.pt.side==="buy"?"Buy":"Sell / Short"} ${S.pt.sym}${type!=="market"?" ("+type+")":""}`;
-  if(!(q>0)||!ref){ $("ptEst").textContent=px?`Cash available: $${fmt(PT.cash)}`:""; return; }
-  const sh=mode==="usd"?q/ref:q; $("ptEst").textContent=`≈ ${num(sh,4)} shares · $${fmt(sh*ref)} · cash after: ${(()=>{const c=PT.cash-(S.pt.side==="buy"?1:-1)*sh*ref; return (c<0?"−$":"$")+fmt(Math.abs(c))+(c<0?" (not enough cash)":"");})()}`;
-}
-let ptChartObj=null, ptCandle=null, ptVwap=null, ptVol=null;
-async function ptLoadChart(){
-  const s=S.pt.sym, r=S.pt.range;
-  try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=${r}`); if(S.pt.sym!==s) return; S.pt.candles=h.candles; }catch{ S.pt.candles=[]; }
-  ptDrawChart();
-}
-function ptDrawChart(){
-  const c=S.pt.candles||[]; const el=$("ptChart");
-  if(!window.LightweightCharts){ el.innerHTML=c.length?`<div style="padding:10px;height:100%">${spark(c.map(x=>x.close),"100%",360)}</div>`:'<div class="empty">No intraday data.</div>'; return; }
-  if(!ptChartObj){ el.innerHTML=""; ptChartObj=LightweightCharts.createChart(el,{autoSize:true,layout:{background:{type:"solid",color:"#12151a"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},grid:{vertLines:{color:"#1c2129"},horzLines:{color:"#1c2129"}},rightPriceScale:{borderColor:"#2d3540"},timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false},crosshair:{mode:0},localization:{timeFormatter:t=>new Date(t*1000).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})}});
-    ptCandle=ptChartObj.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
-    ptVwap=ptChartObj.addLineSeries({color:"#ff9e1b",lineWidth:1.5,priceLineVisible:false,lastValueVisible:false});
-    ptVol=ptChartObj.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}}); ptVol.priceScale().applyOptions({scaleMargins:{top:.82,bottom:0}}); }
-  ptCandle.setData(c.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
-  let pv=0,vv=0,day=""; const vw=[];
-  for(const x of c){ const d=new Date(x.time*1000).toLocaleDateString("en-US",{timeZone:"America/New_York"}); if(d!==day){day=d;pv=0;vv=0;} const tp=(x.high+x.low+x.close)/3; pv+=tp*(x.volume||0); vv+=(x.volume||0); if(vv) vw.push({time:x.time,value:pv/vv}); }
-  ptVwap.setData(vw);
-  ptVol.setData(c.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(33,195,122,.35)":"rgba(255,77,94,.35)"})));
-  // mark position entry and working orders as price lines
-  (ptCandle._lines||[]).forEach(l=>ptCandle.removePriceLine(l)); ptCandle._lines=[];
-  const pos=PT.positions[S.pt.sym]; if(pos) ptCandle._lines.push(ptCandle.createPriceLine({price:pos.avg,color:"#3b82f6",lineWidth:1,lineStyle:2,axisLabelVisible:true,title:"Entry"}));
-  PT.orders.filter(o=>o.sym===S.pt.sym).forEach(o=>ptCandle._lines.push(ptCandle.createPriceLine({price:o.price,color:o.label==="stop-loss"?"#ff4d5e":o.label==="take-profit"?"#21c37a":"#8b95a3",lineWidth:1,lineStyle:1,axisLabelVisible:true,title:o.label})));
-  if(c.length){ const hi=Math.max(...c.map(x=>x.high)), lo=Math.min(...c.map(x=>x.low)); $("ptLevels").textContent=`High ${fmt(hi)} · Low ${fmt(lo)} · VWAP ${vw.length?fmt(vw[vw.length-1].value):"—"}`; }
-}
-function renderTrade(){
-  ptNewDay(); ptCheckOrders();
-  const eq=ptEquity(), pl=eq-PT.deposits, dayPl=eq-PT.dayEquity;
-  const today=PT.history.filter(h=>new Date(h.t).toLocaleDateString("en-US",{timeZone:"America/New_York"})===PT.dayStart);
-  const closed=PT.history.filter(h=>h.realized); const wins=closed.filter(h=>h.realized>0).length;
-  const posVal=Object.entries(PT.positions).reduce((a,[s,p])=>a+Math.abs(p.qty*(ptPx(s)??p.avg)),0);
-  $("ptKpis").innerHTML=[["Account value","$"+fmt(eq),""],["Today",`<span class="${cls(dayPl)}">${dayPl>=0?"+":"−"}$${fmt(Math.abs(dayPl))}</span>`,`<small style="color:var(--dim)">${today.length} trades today</small>`],
-    ["Total P/L",`<span class="${cls(pl)}">${pl>=0?"+":"−"}$${fmt(Math.abs(pl))}</span>`,`<small style="color:var(--dim)">vs $${fmt(PT.deposits)} added</small>`],
-    ["Cash",`$${fmt(PT.cash)}`,`<small style="color:var(--dim)">$${fmt(posVal)} in positions</small>`],["Win rate",closed.length?Math.round(wins/closed.length*100)+"%":"—",`<small style="color:var(--dim)">${closed.length} closed trades</small>`]]
-    .map(([k,v,x])=>`<div class="kpi"><span>${k}</span><b>${v}</b>${x}</div>`).join("");
-  const q=S.quotes[S.pt.sym];
-  $("ptQuote").innerHTML=q&&!q.error?`<b style="color:var(--amber)">${esc(S.pt.sym)}</b> ${fmt(q.price)}<small class="${cls(q.changePct)}">${q.change>=0?"+":""}${fmt(q.change)} (${pct(q.changePct)})</small>`:`<b style="color:var(--amber)">${esc(S.pt.sym)}</b> <small>loading…</small>`;
-  const pos=Object.entries(PT.positions);
-  $("ptPos").innerHTML=pos.length?`<thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Avg</th><th>Last</th><th>Unrealized</th><th></th></tr></thead><tbody>${pos.map(([s,p])=>{const px=ptPx(s)??p.avg, u=(px-p.avg)*p.qty, up=(px/p.avg-1)*100*Math.sign(p.qty);
-    return `<tr><td class="sym-cell" data-pt-load="${esc(s)}" style="cursor:pointer">${esc(s)}</td><td style="font-family:var(--sans)" class="${p.qty>0?"up":"down"}">${p.qty>0?"Long":"Short"}</td><td>${num(Math.abs(p.qty),4)}</td><td>${fmt(p.avg)}</td><td>${fmt(px)}</td><td class="${cls(u)}">${u>=0?"+":"−"}$${fmt(Math.abs(u))} (${pct(up)})</td><td><button class="btn ghost" style="padding:3px 10px;font-size:12px" data-pt-close="${esc(s)}">Close</button></td></tr>`;}).join("")}</tbody>`
-    :'<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:16px">No open positions. Pick a ticker and place a trade.</td></tr></tbody>';
-  $("ptOrders").innerHTML=PT.orders.length?`<thead><tr><th>Symbol</th><th>Order</th><th>Qty</th><th>Trigger</th><th>Last</th><th></th></tr></thead><tbody>${PT.orders.map(o=>`<tr><td class="sym-cell">${esc(o.sym)}</td><td style="font-family:var(--sans);text-align:left">${o.qty>0?"Buy":"Sell"} · ${esc(o.label)}</td><td>${num(Math.abs(o.qty),4)}</td><td>${fmt(o.price)}</td><td>${fmt(ptPx(o.sym))}</td><td><button class="del" data-pt-cancel="${o.id}" title="Cancel">✕</button></td></tr>`).join("")}</tbody>`
-    :'<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:16px">No working orders.</td></tr></tbody>';
-  $("ptHist").innerHTML=PT.history.length?`<thead><tr><th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Realized P/L</th><th>Type</th></tr></thead><tbody>${PT.history.slice(0,40).map(h=>`<tr><td style="text-align:left">${new Date(h.t).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</td><td class="sym-cell">${esc(h.sym)}</td><td class="${h.side==="Buy"?"up":"down"}" style="font-family:var(--sans)">${h.side}</td><td>${num(h.qty,4)}</td><td>${fmt(h.price)}</td><td class="${cls(h.realized)}">${h.realized?(h.realized>=0?"+":"−")+"$"+fmt(Math.abs(h.realized)):"—"}</td><td style="font-family:var(--sans);color:var(--muted)">${esc(h.why)}</td></tr>`).join("")}</tbody>`
-    :'<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:16px">Your trades will show up here.</td></tr></tbody>';
-  const picks=(S.movers?.active||[]).slice(0,10).map(x=>x.symbol); const base=["SPY","QQQ","NVDA","TSLA","AMD","PLTR","AAPL","META","SOFI","COIN"];
-  $("ptPicks").innerHTML=[...new Set([...picks,...base])].slice(0,14).map(s=>`<span data-pt-load="${esc(s)}">${esc(s)}</span>`).join("");
-  ptEst();
-}
-function ptLoad(sym){ S.pt.sym=normSym(sym); store.set("ptSym",S.pt.sym); $("ptSym").value=""; if(!S.quotes[S.pt.sym]) api("/api/quotes?symbols="+encodeURIComponent(S.pt.sym)).then(j=>{S.quotes={...S.quotes,...j.quotes}; renderTrade();}).catch(()=>{}); renderTrade(); ptLoadChart(); }
-$("ptSymForm").onsubmit=e=>{ e.preventDefault(); const s=normSym($("ptSym").value); if(!/^[A-Z0-9.\-^=]{1,12}$/.test(s)) return toast("Enter a valid ticker."); ptLoad(s); };
-attachSuggest("ptSym",submit("ptSymForm"));
-$("ptTicket").addEventListener("click",e=>{
-  const sd=e.target.closest("[data-side]"); if(sd){ S.pt.side=sd.dataset.side; document.querySelectorAll(".side-seg button").forEach(b=>b.classList.toggle("on",b===sd)); ptEst(); return; }
-  const qp=e.target.closest("[data-qpct]"); if(qp){ const px=ptPx(S.pt.sym); if(!px) return; const f=+qp.dataset.qpct; const cur=PT.positions[S.pt.sym]?.qty||0;
-    if(S.pt.side==="sell"&&cur>0&&f===1){ $("ptQtyMode").value="sh"; $("ptQty").value=+cur.toFixed(4); } else { $("ptQtyMode").value="usd"; $("ptQty").value=Math.floor(PT.cash*f*100)/100; } ptEst(); return; }
-});
-["ptType","ptQty","ptQtyMode","ptPx"].forEach(id=>$(id).addEventListener("input",ptEst));
-$("ptSubmit").onclick=ptPlace;
-$("ptFundForm").onsubmit=e=>{ e.preventDefault(); const a=+$("ptFundAmt").value; if(!(a>0)) return toast("Enter an amount to add."); PT.cash+=a; PT.deposits+=a; PT.dayEquity+=a; ptSave(); $("ptFundAmt").value=""; toast(`Added $${fmt(a)} of practice money.`); renderTrade(); };
-document.addEventListener("click",e=>{
-  const f=e.target.closest("[data-fund]"); if(f){ const a=+f.dataset.fund; PT.cash+=a; PT.deposits+=a; PT.dayEquity+=a; ptSave(); toast(`Added $${fmt(a)} of practice money.`); renderTrade(); return; }
-  const l=e.target.closest("[data-pt-load]"); if(l){ ptLoad(l.dataset.ptLoad); return; }
-  const c=e.target.closest("[data-pt-close]"); if(c){ const s=c.dataset.ptClose, p=PT.positions[s], px=ptPx(s); if(p&&px!=null){ PT.orders=PT.orders.filter(o=>o.sym!==s||!o.oco); ptFill(s,-p.qty,px,"close"); renderTrade(); } return; }
-  const x=e.target.closest("[data-pt-cancel]"); if(x){ PT.orders=PT.orders.filter(o=>String(o.id)!==x.dataset.ptCancel); ptSave(); renderTrade(); return; }
-  const r=e.target.closest("[data-pt-range]"); if(r){ S.pt.range=r.dataset.ptRange; document.querySelectorAll("#ptRange button").forEach(b=>b.classList.toggle("on",b===r)); ptLoadChart(); return; }
-});
-$("ptFlatten").onclick=()=>{ let n=0; for(const [s,p] of Object.entries(PT.positions)){ const px=ptPx(s); if(px!=null){ ptFill(s,-p.qty,px,"close all"); n++; } } PT.orders=[]; ptSave(); renderTrade(); if(!n) toast("No open positions."); };
-$("ptReset").onclick=()=>{ if(!$("ptReset").dataset.arm){ $("ptReset").dataset.arm="1"; $("ptReset").textContent="Click again to reset"; setTimeout(()=>{ delete $("ptReset").dataset.arm; $("ptReset").textContent="Reset account"; },3000); return; }
-  PT=JSON.parse(JSON.stringify(PT0)); ptSave(); delete $("ptReset").dataset.arm; $("ptReset").textContent="Reset account"; toast("Paper account reset to $100,000."); renderTrade(); };
-setInterval(()=>{ if(S.tab==="trade") ptLoadChart(); },30000);
-
 /* ---------- COMMAND BAR ---------- */
 let cmdSel=0, cmdItems=[];
 function openCmd(){ $("cmd").hidden=false; $("cmdInput").value=""; cmdResults=[]; buildCmd(); $("cmdInput").focus(); }
@@ -1548,7 +1347,7 @@ function buildCmd(){
     if(!S.wl.includes(v)) items.push([`Add ${v} to watchlist`,"Watchlist",()=>{S.wl.push(v);store.set("wl",S.wl);renderWL();loadQuotes();loadNews();toast(v+" added to your watchlist");}]);
     items.push([`Set a price alert for ${v}`,"Portfolio",()=>{setTab("portfolio");$("aSym").value=v;$("aPx").focus();}]);
   }
-  [["News","news"],["Markets","data"],["Research","research"],["Day Trading","trade"],["Portfolio","portfolio"],["Claude Predictions","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
+  [["News","news"],["Markets","data"],["Research","research"],["Portfolio","portfolio"],["Claude Predictions","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
   cmdItems=items; cmdSel=0; drawCmd();
 }
 function drawCmd(){ $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||'<div style="color:var(--muted)">Type a company name or ticker, like Apple or VFIAX</div>'; }
@@ -1600,7 +1399,7 @@ $("addForm").onsubmit=e=>{
 
 /* ---------- real-time price stream (when the server has a Finnhub key) ---------- */
 let es=null, streamKey="", streamOn=false, paintPending=false, prevPaint={};
-function streamSyms(){ return [...new Set([...(typeof PT!=="undefined"?[S.pt.sym,...Object.keys(PT.positions)]:[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
+function streamSyms(){ return [...new Set([...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
 function startStream(){
   if(!streamOn||!("EventSource" in window)) return;
   const syms=streamSyms(), key=syms.join(",");
@@ -1621,8 +1420,7 @@ function startStream(){
     S.lastTick=Date.now(); S.streaming=true;
     if(!paintPending){ paintPending=true; requestAnimationFrame(()=>{ paintPending=false;
       renderTape(); renderWL(prevPaint); renderMovers(); checkAlerts();
-      if(S.tab==="data") renderData(); if(S.tab==="portfolio") renderPortfolio();  if(S.tab==="research"&&S.rq.sym) renderResearchHead();
-      if(typeof PT!=="undefined"){ if(S.tab==="trade"){ renderTrade(); const t=d[S.pt.sym], c=S.pt.candles; if(t&&c&&c.length&&ptCandle){ const last=c[c.length-1]; last.close=t.p; last.high=Math.max(last.high,t.p); last.low=Math.min(last.low,t.p); try{ ptCandle.update({time:last.time,open:last.open,high:last.high,low:last.low,close:last.close}); }catch{} } } else ptCheckOrders(); } }); }
+      if(S.tab==="data") renderData(); if(S.tab==="portfolio") renderPortfolio();  if(S.tab==="research"&&S.rq.sym) renderResearchHead(); }); }
   };
   es.onerror=()=>{ S.streaming=false; }; // EventSource reconnects by itself
 }
