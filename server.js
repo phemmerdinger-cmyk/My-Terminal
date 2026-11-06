@@ -663,6 +663,57 @@ async function financials(sym, freq) {
   });
 }
 
+// ---------------------------------------------------------------- market movers & earnings calendar
+const UNIVERSE = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AVGO","BRK-B","JPM","LLY","V","UNH","XOM","MA","JNJ","PG","HD","COST","ORCL","ABBV","WMT","BAC","NFLX","CRM","KO","CVX","AMD","PEP","MRK","ADBE","TMO","CSCO","ACN","MCD","LIN","ABT","WFC","DIS","INTC","QCOM","TXN","IBM","GE","CAT","AMGN","PFE","NOW","INTU","UBER","PLTR","GS","MS","BA","NKE","SBUX","PYPL","COIN","SHOP","SNOW","MU","ARM","SMCI","RIVN","SOFI","HOOD","F","GM","T","VZ"];
+async function movers() {
+  return cached("movers", 2 * 60_000, async () => {
+    const pick = (q) => ({ symbol: q.symbol, name: q.shortName || q.longName || q.symbol, price: q.regularMarketPrice, changePct: q.regularMarketChangePercent, volume: q.regularMarketVolume, marketCap: q.marketCap });
+    try {
+      const ids = ["day_gainers", "day_losers", "most_actives"];
+      const res = await Promise.all(ids.map((id) => yget(`https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?scrIds=${id}&count=10&formatted=false`)));
+      const lists = res.map((j) => ((j.finance && j.finance.result && j.finance.result[0] && j.finance.result[0].quotes) || []).map(pick));
+      if (lists.every((l) => l.length)) return { source: "Yahoo Finance screeners", gainers: lists[0], losers: lists[1], active: lists[2] };
+    } catch {}
+    // Fallback: rank 70 of the biggest US stocks ourselves
+    const qs = (await getQuotes(UNIVERSE)).quotes;
+    const list = Object.values(qs).filter((q) => !q.error && q.changePct != null).map((q) => ({ symbol: q.symbol, name: q.name, price: q.price, changePct: q.changePct, volume: q.volume }));
+    return {
+      source: "70 largest US stocks",
+      gainers: [...list].sort((a, b) => b.changePct - a.changePct).slice(0, 10),
+      losers: [...list].sort((a, b) => a.changePct - b.changePct).slice(0, 10),
+      active: [...list].sort((a, b) => (b.volume || 0) - (a.volume || 0)).slice(0, 10),
+    };
+  });
+}
+
+async function earningsCalendar(symbols) {
+  const from = new Date().toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 30 * 86400e3).toISOString().slice(0, 10);
+  const all = FINNHUB
+    ? await cached("ecal:" + from, 3600e3, async () => ((await fh(`/calendar/earnings?from=${from}&to=${to}`)).earningsCalendar || []))
+    : [];
+  const mine = new Set(symbols.map((s) => s.replace("-", ".")));
+  const big = new Set(UNIVERSE.map((s) => s.replace("-", ".")));
+  const row = (e) => ({ symbol: e.symbol.replace(".", "-"), date: e.date, hour: e.hour, epsEstimate: e.epsEstimate, revenueEstimate: e.revenueEstimate, quarter: e.quarter, year: e.year });
+  let yours = all.filter((e) => mine.has(e.symbol)).map(row);
+  // Without Finnhub (or for symbols it lacks), fall back to Yahoo's calendarEvents
+  const missing = symbols.filter((s) => !yours.some((y) => y.symbol === s) && /^[A-Z][A-Z.\-]{0,6}$/.test(s) && !isCrypto(s)).slice(0, 12);
+  if (missing.length) {
+    const extra = await Promise.allSettled(missing.map(async (s) => {
+      const d = await summary(s);
+      const ed = d.calendarEvents && d.calendarEvents.earnings && d.calendarEvents.earnings.earningsDate;
+      const t = Array.isArray(ed) && ed[0];
+      if (t && t * 1000 >= Date.now() - 86400e3 && t * 1000 < Date.now() + 60 * 86400e3) {
+        return { symbol: s, date: new Date(t * 1000).toISOString().slice(0, 10), epsEstimate: d.calendarEvents.earnings.earningsAverage, revenueEstimate: d.calendarEvents.earnings.revenueAverage };
+      }
+    }));
+    yours = yours.concat(extra.map((x) => x.status === "fulfilled" && x.value).filter(Boolean));
+  }
+  const notable = all.filter((e) => big.has(e.symbol) && !mine.has(e.symbol)).map(row);
+  const byDate = (a, b) => a.date.localeCompare(b.date);
+  return { updated: Date.now(), source: FINNHUB ? "Finnhub" : "Yahoo Finance", yours: yours.sort(byDate), notable: notable.sort(byDate).slice(0, 40) };
+}
+
 // ---------------------------------------------------------------- live streaming prices (Finnhub)
 // With FINNHUB_API_KEY set (free at finnhub.io), the server keeps one WebSocket to
 // Finnhub and streams every trade to open browsers via Server-Sent Events.
@@ -731,7 +782,7 @@ function openStream(req, res, syms) {
 }
 
 // ---------------------------------------------------------------- http
-const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon" };
+const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
 function parseList(v, max) {
   return [...new Set(String(v || "").toUpperCase().split(",").map((s) => s.trim()).filter((s) => TICKER_RE.test(s)))].slice(0, max);
@@ -780,6 +831,12 @@ http
         try {
           return send(res, 200, u.pathname === "/api/summary" ? await summary(s) : await financials(s, u.searchParams.get("freq")));
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/movers") {
+        try { return send(res, 200, await movers()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/earnings") {
+        try { return send(res, 200, await earningsCalendar(parseList(u.searchParams.get("symbols"), 40))); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/stream") {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
