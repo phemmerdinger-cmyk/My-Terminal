@@ -315,6 +315,64 @@ nav.tabs .ti{display:none}
 .wl-car{display:none;transition:transform .15s;font-size:10px;margin-left:4px}
 @media (max-width:760px){ .wl-car{display:inline-block} }
 .more-tags{font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+/* ASK CLAUDE everywhere */
+.ac-fab{position:fixed;right:20px;bottom:20px;z-index:30;background:var(--claude);color:#fff;border:0;border-radius:999px;padding:12px 18px;font-weight:600;font-size:14px;cursor:pointer;box-shadow:0 8px 28px rgba(0,0,0,.45)}
+.ac-fab:hover{filter:brightness(1.08)}
+.ac-panel{position:fixed;right:20px;bottom:20px;z-index:31;width:min(420px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden}
+.ac-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.ac-head .who{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--claude);font-weight:700}
+.ac-head .who i{width:12px;height:12px;border-radius:50%;background:var(--claude);display:inline-block}
+.ac-where{font-size:12px;color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-x{background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px}
+.ac-thread{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.ac-msg{max-width:92%;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.55;white-space:pre-wrap}
+.ac-msg.me{align-self:flex-end;background:var(--panel2);border:1px solid var(--line2)}
+.ac-msg.ai{align-self:flex-start;background:rgba(217,119,87,.08);border:1px solid rgba(217,119,87,.25)}
+.ac-msg small{display:block;color:var(--dim);font-size:11px;margin-top:6px}
+.ac-empty{color:var(--muted);font-size:13px;line-height:1.6}
+.ac-chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 8px}
+.ac-input{margin:0 14px 14px}
+.ac-input textarea{width:100%;min-height:52px;resize:none;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:12px 52px 12px 12px;font:inherit;color:inherit;outline:none}
+.ac-input textarea:focus{border-color:var(--claude)}
+
+/* bigger, easier tapping on phones */
+@media (max-width:760px){
+  html,body{font-size:15px}
+  .ac-fab{right:14px;bottom:84px;padding:13px 16px}
+  .ac-fab span{display:none}
+  .ac-panel{right:0;left:0;bottom:0;top:0;width:100%;height:100%;border-radius:0;z-index:40}
+  .btn{padding:12px 16px;font-size:15px;min-height:44px}
+  .btn.ghost{min-height:44px}
+  .chip,.dd-btn{padding:10px 14px;font-size:14px;min-height:42px}
+  select.dd-btn{padding:10px 12px}
+  .seg button{padding:11px 13px;font-size:14px}
+  .field,.add input,.search,.inline-form select,.ticket select{padding:12px 12px;font-size:16px;min-height:46px}
+  .subnav button{padding:13px 14px;font-size:15px}
+  .iconbtn{min-height:40px;min-width:40px}
+  .cmd-btn{min-height:40px;min-width:44px;justify-content:center}
+  .wl li{padding:12px 14px}
+  .wl .sym{font-size:15px} .wl .px{font-size:15px}
+  th,td{padding:12px 12px;font-size:14px}
+  .item{padding:14px 16px} .item h3{font-size:16px}
+  .tg{font-size:12px;padding:3px 7px}
+  .dd-menu label,.pf-item,.ctx button,.cmd-list div,.sugg div{padding:12px 12px;font-size:15px}
+  .del{font-size:18px;padding:6px 10px}
+  .heat div{padding:14px 12px}
+  .kpi b{font-size:20px}
+  .rs-actions{width:100%} .rs-actions .btn{flex:1 1 auto}
+  .inline-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .inline-form .field,.inline-form select{width:100%;min-width:0;flex:none}
+  .inline-form .btn{grid-column:1/-1}
+  #alertForm{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr)}
+  .pf-bar{display:grid;grid-template-columns:minmax(0,1fr) auto}
+  .pf-btn{width:100%;justify-content:space-between}
+  .kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .disc{overflow-wrap:anywhere}
+  main,.wrap>*{min-width:0}
+  .ask-send{width:40px;height:40px}
+  .mini{padding:14px}
+}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -331,7 +389,7 @@ nav.tabs .ti{display:none}
 .earn-list .s{font-family:var(--mono);color:var(--amber);font-weight:600}
 .earn-list .e{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .earn-list .mine{color:var(--claude);font-size:10px;font-weight:700;letter-spacing:.06em}
-@media (max-width:900px){.mk-top{grid-template-columns:1fr}}
+@media (max-width:900px){.mk-top{grid-template-columns:minmax(0,1fr)}}
 /* MARKETS extra tables */
 .mk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:18px}
 .mk-grid table th:nth-child(2),.mk-grid table td:nth-child(2){text-align:left}
@@ -375,9 +433,9 @@ nav.tabs .ti{display:none}
 .prose{line-height:1.65;color:var(--muted);font-size:14px;max-width:900px}
 .rs-err{padding:30px;text-align:center;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;line-height:1.6}
 .cmd-list .ty{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--line2);border-radius:3px;padding:1px 6px;color:var(--muted)}
-@media (max-width:1180px){.rs-cols{grid-template-columns:1fr}}
+@media (max-width:1180px){.rs-cols{grid-template-columns:minmax(0,1fr)}}
 
-@media (max-width:1180px){.two{grid-template-columns:1fr}}
+@media (max-width:1180px){.two{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1180px){.news-grid{grid-template-columns:minmax(0,1fr)}.news-side{display:none}}
 @media (max-width:760px){
   .wrap{grid-template-columns:minmax(0,1fr)}
@@ -561,6 +619,13 @@ nav.tabs .ti{display:none}
 </div>
 <div class="toast" id="toast"></div>
 <div class="ctx" id="ctx" hidden></div>
+<button class="ac-fab" id="acFab" title="Ask Claude about this page">✦ <span>Ask Claude</span></button>
+<div class="ac-panel" id="acPanel" hidden>
+  <div class="ac-head"><span class="who"><i></i>Ask Claude</span><span class="ac-where" id="acWhere"></span><button class="ac-x" id="acClose" aria-label="Close">✕</button></div>
+  <div class="ac-thread" id="acThread"></div>
+  <div class="ac-chips" id="acChips"></div>
+  <div class="ask-box ac-input"><textarea id="acInput" rows="2" placeholder="Ask about what you're looking at…"></textarea><button class="ask-send" id="acSend" aria-label="Send">↑</button></div>
+</div>
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
 <script>
@@ -666,6 +731,7 @@ function setTab(t){
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
   TABS.forEach(k=>$("tab-"+k).hidden=k!==t);
+  if(typeof acRender==="function"&&!$("acPanel").hidden) acRender();
   if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
   if(t==="research"){ renderResearch(); }
@@ -1481,6 +1547,72 @@ attachSuggest("predInput",submit("predForm"));
 attachSuggest("hSym",()=>$("hAmt").focus());
 attachSuggest("aSym",()=>$("aPx").focus());
 
+
+
+/* ---------- ASK CLAUDE on every page ---------- */
+S.ac={thread:[],busy:false};
+const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",predict:"Claude Predictor"};
+function acContext(){
+  const L=[]; const t=S.tab;
+  L.push(`Section: ${TAB_NAMES[t]||t}`);
+  if(t==="news"){
+    L.push(`Filters: ${S.view==="all"?"all news":S.view==="mine"?"my stocks":S.view}, timeline ${NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]}, sources ${Object.keys(SRC).filter(k=>!S.srcOff.has(k)).map(k=>SRC[k].name).join(", ")}`);
+    filtered().slice(0,30).forEach(i=>L.push(`- [${SRC[i.source].name}${i.time?", "+new Date(i.time).toISOString().slice(0,16).replace("T"," "):""}] ${i.title}`));
+  } else if(t==="data"){
+    const m=$("mood").innerText.replace(/\s+/g," ").slice(0,300); L.push("Market mood panel: "+m);
+    const mv=S.movers; if(mv&&!mv.error){ L.push("Top gainers: "+(mv.gainers||[]).slice(0,6).map(x=>`${x.symbol} ${pct(x.changePct)}`).join(", ")); L.push("Top losers: "+(mv.losers||[]).slice(0,6).map(x=>`${x.symbol} ${pct(x.changePct)}`).join(", ")); }
+    L.push("Sectors: "+SECTORS.map(([sym,n])=>{const q=S.quotes[sym];return q&&!q.error?`${n} ${pct(q.changePct)}`:""}).filter(Boolean).join(", "));
+    if(S.earn&&!S.earn.error) L.push("Upcoming earnings: "+[...S.earn.yours,...S.earn.notable].slice(0,12).map(x=>`${x.symbol} ${x.date}`).join(", "));
+  } else if(t==="research"&&S.rq.sym){
+    const s=S.rq.sym, d=S.rq.sum||{}, q=S.quotes[s]||{}, sd=d.summaryDetail||{}, fd=d.financialData||{}, ks=d.defaultKeyStatistics||{};
+    L.push(`Looking at ${d.price?.longName||q.name||s} (${s}), viewing the ${S.rq.sub} section`);
+    L.push(`Price ${fmt(q.price)} (${pct(q.changePct)} today), 52w ${fmt(sd.fiftyTwoWeekLow??q.low52)}-${fmt(sd.fiftyTwoWeekHigh??q.high52)}, market cap ${money(sd.marketCap)}, P/E ${num(sd.trailingPE)}, fwd P/E ${num(sd.forwardPE)}, EPS ${num(ks.trailingEps)}, beta ${num(sd.beta)}`);
+    if(fd.recommendationKey) L.push(`Analysts: ${fd.recommendationKey}, target ${fmt(fd.targetMeanPrice)}, revenue growth ${fp(fd.revenueGrowth)}, profit margin ${fp(fd.profitMargins)}`);
+    const f=S.rq.fin[S.rq.finFreq]; if(f&&f.periods){ ["TotalRevenue","NetIncome","FreeCashFlow"].forEach(k=>{ const r=[...(f.income||[]),...(f.cash||[])].find(x=>x.key===k); if(r) L.push(`${k} (${f.periods.join(", ")}): ${r.values.map(v=>money(v)).join(", ")}`); }); }
+    const nn=(S.news?.items||[]).filter(i=>i.tickers.includes(s)).slice(0,10); nn.forEach(i=>L.push(`- [${SRC[i.source].name}] ${i.title}`));
+  } else if(t==="portfolio"){
+    const pf=S.pfs.find(p=>p.id===S.pfActive); L.push(`Portfolio "${pf.name}"`);
+    pf.holdings.forEach(h=>{ const q=S.quotes[h.symbol]; const v=q&&!q.error?h.shares*q.price:null; L.push(`- ${h.symbol}: invested $${fmt(h.shares*h.cost)}, now ${v!=null?"$"+fmt(v):"?"} (${v!=null?pct((v/(h.shares*h.cost)-1)*100):"?"}), today ${q&&!q.error?pct(q.changePct):"?"}, sector ${sectorOf(h.symbol)}`); });
+  } else if(t==="predict"){
+    Object.entries(S.preds).filter(([,p])=>p&&p.stance).forEach(([k,p])=>L.push(`Prediction shown for ${k}: ${p.stance} (${p.confidence}%) — ${p.headline}`));
+  }
+  const prev=S.ac.thread.slice(-4).map(m=>`${m.me?"I asked":"You answered"}: ${m.text.slice(0,600)}`);
+  if(prev.length) L.push("\nEarlier in this chat:\n"+prev.join("\n"));
+  return L.join("\n");
+}
+function acChips(){
+  const t=S.tab, s=S.rq?.sym;
+  const map={
+    news:["Summarize the most important headlines here","What news could move my stocks?","Any red flags in today's news?"],
+    data:["What's driving the market today?","Explain the market mood score","Which sectors look strongest right now?"],
+    research:s?[`Is ${s} a good buy right now?`,`Explain ${s}'s financials simply`,`What are the biggest risks for ${s}?`]:["How do I read a stock's key stats?"],
+    portfolio:["Portfolio check-up","Am I too concentrated anywhere?","Which holding is the riskiest?"],
+    predict:["How is my portfolio positioned for the week ahead?","Summarize today's market in 5 bullets","Which stocks on my watchlist have notable news?"],
+  };
+  return map[t]||map.news;
+}
+function acRender(){
+  $("acWhere").textContent="on "+(TAB_NAMES[S.tab]||"")+(S.tab==="research"&&S.rq?.sym?" · "+S.rq.sym:"");
+  $("acThread").innerHTML=S.ac.thread.length?S.ac.thread.map(m=>`<div class="ac-msg ${m.me?"me":"ai"}">${esc(m.text)}${m.meta?`<small>${esc(m.meta)}</small>`:""}</div>`).join("")+(S.ac.busy?'<div class="ac-msg ai"><span class="spin"></span>Thinking…</div>':"")
+    :`<div class="ac-empty">${hasKey()?"Ask anything about what you're looking at. Claude sees this page, your watchlist and your portfolio.":"Claude isn't switched on yet. It turns on once an Anthropic API key is saved in your Render settings."}</div>`;
+  $("acChips").innerHTML=acChips().map(q=>`<span class="chip" data-acq="${esc(q)}">${esc(q)}</span>`).join("");
+  $("acThread").scrollTop=$("acThread").scrollHeight;
+}
+async function acSend(q){
+  q=(q||$("acInput").value).trim(); if(!q||S.ac.busy) return;
+  if(!hasKey()) return toast("Claude isn't switched on yet.");
+  $("acInput").value=""; S.ac.thread.push({me:true,text:q}); S.ac.busy=true; acRender();
+  try{
+    const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port,context:acContext()})});
+    S.ac.thread.push({me:false,text:j.answer,meta:`${TAB_NAMES[S.tab]} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`});
+  }catch(e){ S.ac.thread.push({me:false,text:"Sorry, I couldn't answer that: "+e.message}); }
+  S.ac.busy=false; acRender();
+}
+$("acFab").onclick=()=>{ $("acPanel").hidden=false; $("acFab").hidden=true; acRender(); setTimeout(()=>$("acInput").focus(),50); };
+$("acClose").onclick=()=>{ $("acPanel").hidden=true; $("acFab").hidden=false; };
+$("acSend").onclick=()=>acSend();
+$("acInput").onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); acSend(); } };
+$("acChips").onclick=e=>{ const c=e.target.closest("[data-acq]"); if(c) acSend(c.dataset.acq); };
 
 /* ---------- COMMAND BAR ---------- */
 let cmdSel=0, cmdItems=[];
