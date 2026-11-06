@@ -623,6 +623,8 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pt-bracket label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
 .pt-bracket em{display:block;margin-top:2px;font-style:normal;text-transform:none;letter-spacing:0;color:var(--amber);cursor:pointer;font-weight:500}
 .pt-bracket .field{height:38px!important;font-size:14px!important;padding:8px 10px!important}
+.pt-sep{width:1px;align-self:stretch;background:var(--line2);margin:0 2px}
+#ptRange{flex-wrap:wrap}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -798,7 +800,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
         <div class="pt-chartbox">
           <div class="pt-chead"><div id="ptHead"></div><div class="pt-tools"><span class="pt-cd" id="ptCd"></span><div class="seg" id="ptRange"></div></div></div>
           <div id="ptChart"></div>
-          <div class="pt-legend"><span class="up">▲ Buy / Cover</span><span class="down">▼ Sell / Short</span><span>- - Your average cost</span><span>··· Open orders</span><span style="color:#ff9f43">— Resistance</span><span style="color:#22c3e6">— Support</span></div>
+          <div class="pt-legend"><span class="up">▲ Buy / Cover</span><span class="down">▼ Sell / Short</span><span>- - Your average cost</span><span>··· Open orders</span><span>Seconds charts: bars from before you opened them are 1-minute</span><span style="color:#ff9f43">— Resistance</span><span style="color:#22c3e6">— Support</span></div>
         </div>
         <form class="pt-ticket" id="ptForm" autocomplete="off">
           <input class="field" id="ptSym" placeholder="Search a stock, ETF or crypto" maxlength="15" style="text-transform:uppercase">
@@ -2288,10 +2290,12 @@ const isApp=()=>!matchMedia("(max-width:760px)").matches; // paper trading: comp
 function ptFresh(){ const t=Date.now(); return {v:1,created:t,cash:PT_START,deposited:PT_START,pos:{},orders:[],log:[{k:"dep",t,amt:PT_START}],realized:0,closed:[],days:{[etDate(t)]:{start:PT_START,end:PT_START,dep:0}},spx0:null}; }
 let PA=store.get("paper",null); if(!PA||PA.v!==1) PA=ptFresh();
 const ptSave=()=>store.set("paper",PA);
-const PT_RANGES=[["intraday","1m"],["1d","5m"],["5d","15m"],["1mo","1H"],["1y","1D"],["5y","1W"]];
+const PT_RANGES=[["live5","5s"],["live10","10s"],["live15","15s"],["live30","30s"],["intraday","1m"],["1d","5m"],["5d","15m"],["1mo","1H"],["1y","1D"],["5y","1W"]];
 const PT_IV={"1m":60,"5m":300,"15m":900,"30m":1800,"1h":3600,"60m":3600};
-S.pt={side:"buy",type:"market",mode:"usd",sym:store.get("ptSym",""),confirm:null,range:store.get("ptRange","intraday"),pane:"pos",sr:store.get("ptSR",true)};
-if(!PT_RANGES.some(r=>r[0]===S.pt.range)) S.pt.range="intraday";
+S.pt={side:"buy",type:"market",mode:"usd",sym:store.get("ptSym",""),confirm:null,range:store.get("ptRange2","live10"),pane:"pos",sr:store.get("ptSR",true)};
+if(!PT_RANGES.some(r=>r[0]===S.pt.range)) S.pt.range="live10";
+const ptLiveBars={}; // seconds candles built from live prices while the site is open, per symbol and length
+const ptLiveSec=r=>/^live(\d+)$/.test(r)?+r.slice(4):0;
 const r2=n=>Math.round(n*100)/100+0, r6=n=>Math.round(n*1e6)/1e6;
 const usd=(n,sign)=>n==null||isNaN(n)?"—":(sign?(n>=0?"+":"−"):(n<0?"−":""))+"$"+fmt(Math.abs(n));
 const ptQ=sym=>{ const q=S.quotes[sym]; return q&&!q.error&&q.price!=null?q:null; };
@@ -2424,17 +2428,20 @@ function ptEnsureChart(){
 }
 async function ptLoadChart(){
   const sym=S.pt.sym, range=S.pt.range, key=sym+"|"+range; ptChartKey=key;
-  $("ptRange").innerHTML=PT_RANGES.map(([k,l])=>`<button type="button" data-ptrange="${k}" class="${range===k?"on":""}">${l}</button>`).join("")+`<button type="button" data-ptsr="1" class="${S.pt.sr?"on":""}" title="Show support and resistance">S/R</button>`;
+  $("ptRange").innerHTML=PT_RANGES.map(([k,l],i)=>`${i===4?'<span class="pt-sep"></span>':""}<button type="button" data-ptrange="${k}" class="${range===k?"on":""}" title="${ptLiveSec(k)?"New candle every "+ptLiveSec(k)+" seconds":"Candle length "+l}">${l}</button>`).join("")+`<button type="button" data-ptsr="1" class="${S.pt.sr?"on":""}" title="Show support and resistance">S/R</button>`;
   if(!sym){ if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">Search a ticker to see its chart and trade it.</div>`; return; }
-  let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${range}`); }
+  let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${ptLiveSec(range)?"intraday":range}`); }
   catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
   if(key!==ptChartKey) return;
   $("ptChart").querySelector(".empty")?.remove();
   if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
   if(ptSeries){ ptc.removeSeries(ptSeries); ptSeries=null; } if(ptVol){ ptc.removeSeries(ptVol); ptVol=null; } ptLines=[]; ptLinesSig="";
   ptCandles=h.candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
-  ptIv=PT_IV[h.interval]||0; ptSRLines=[]; ptSRAt=0;
+  ptIv=PT_IV[h.interval]||0; ptSRLines=[]; ptSRAt=0; ptSRSig="";
   if(range==="intraday"&&ptCandles.length>240) ptCandles=ptCandles.slice(-240); // last ~4 hours of 1-minute candles
+  if(ptLiveSec(range)){ // last hour of 1-minute candles for context, then seconds candles built live
+    ptCandles=ptCandles.slice(-60); ptIv=ptLiveSec(range); const seedEnd=ptCandles.length?ptCandles[ptCandles.length-1].time:0;
+    ptCandles.push(...(ptLiveBars[sym+"|"+ptIv]||[]).filter(c=>c.time>seedEnd)); }
   ptSeries=ptc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
   ptSeries.setData(ptCandles.map(({volume,...c})=>c));
   ptVol=ptc.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
@@ -2464,10 +2471,11 @@ function ptChartLive(){ // move the current candle with the live price; start a 
   let c=ptCandles[ptCandles.length-1]; const now=Math.floor(Date.now()/1000);
   const live=isCrypto(S.pt.sym)||/open/i.test(marketState()[0]);
   if(ptIv&&live){ const slot=Math.floor(now/ptIv)*ptIv;
-    if(slot>c.time&&slot-c.time<ptIv*30){ c={time:slot,open:c.close,high:c.close,low:c.close,close:c.close,volume:0}; ptCandles.push(c); if(ptCandles.length>1500) ptCandles.shift(); if(now-ptSRAt>60) ptDrawSR(); } }
+    if(slot>c.time&&(slot-c.time<ptIv*30||ptLiveSec(S.pt.range))){ c={time:slot,open:c.close,high:c.close,low:c.close,close:c.close,volume:0}; ptCandles.push(c); if(ptCandles.length>1500) ptCandles.shift();
+      if(ptLiveSec(S.pt.range)){ const k=S.pt.sym+"|"+ptIv, b=ptLiveBars[k]||(ptLiveBars[k]=[]); b.push(c); if(b.length>1440) b.shift(); } } }
   c.close=q.price; c.high=Math.max(c.high,q.price); c.low=Math.min(c.low,q.price);
   try{ ptSeries.update({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close}); }catch{}
-  ptCountdown();
+  ptDrawSR(); ptCountdown();
 }
 function ptCountdown(){
   const cd=$("ptCd"), c=ptCandles[ptCandles.length-1]; if(!cd||!c) return; const now=Math.floor(Date.now()/1000);
@@ -2490,16 +2498,19 @@ function ptLevels(c){
   if(!sup.length&&lo<last*0.9995) sup.push({px:lo,n:1,recent:true});
   return {res,sup};
 }
-function ptDrawSR(){
+let ptSRSig="";
+function ptDrawSR(){ // recalculated every second; lines only move when a level changes
   if(!ptSeries) return; ptSRAt=Math.floor(Date.now()/1000);
-  ptSRLines.forEach(l=>{ try{ ptSeries.removePriceLine(l); }catch{} }); ptSRLines=[]; S.pt.levels=ptLevels(ptCandles);
+  S.pt.levels=ptLevels(ptCandles);
+  const sig=S.pt.sr?JSON.stringify([S.pt.levels.res.map(l=>l.px.toFixed(4)+l.n),S.pt.levels.sup.map(l=>l.px.toFixed(4)+l.n)]):"off";
+  if(sig===ptSRSig) return; ptSRSig=sig;
+  ptSRLines.forEach(l=>{ try{ ptSeries.removePriceLine(l); }catch{} }); ptSRLines=[];
   if(!S.pt.sr) return;
   S.pt.levels.res.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#ff9f43",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Resistance${l.recent?" (recent high)":l.n>1?" ("+l.n+" touches)":""}`})));
   S.pt.levels.sup.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#22c3e6",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Support${l.recent?" (recent low)":l.n>1?" ("+l.n+" touches)":""}`})));
 }
-// The chart moves every 5 seconds; the next-candle countdown ticks every second
-setInterval(()=>{ if(S.tab==="trade"&&!document.hidden) ptChartLive(); },5000);
-setInterval(()=>{ if(S.tab==="trade"&&!document.hidden) ptCountdown(); },1000);
+// The chart (candle, support/resistance and countdown) updates every second
+setInterval(()=>{ if(S.tab==="trade"&&!document.hidden) ptChartLive(); },1000);
 
 /* ----- screen ----- */
 function ptStatsCalc(){
@@ -2638,7 +2649,7 @@ $("ptCloseBtn").onclick=()=>ptClose(S.pt.sym);
 $("ptHead").addEventListener("click",e=>{ const b=e.target.closest("[data-ptx]"); if(b) ptClose(b.dataset.ptx); });
 $("ptBracket").addEventListener("click",e=>{ const f=e.target.closest("[data-ptfill]"); if(!f) return; $(f.dataset.ptfill).value=f.dataset.v; S.pt.confirm=null; $("ptGo").hidden=false; ptEstimate(); });
 attachSuggest("ptSym",s=>ptPick(s));
-$("ptRange").addEventListener("click",e=>{ if(e.target.closest("[data-ptsr]")){ S.pt.sr=!S.pt.sr; store.set("ptSR",S.pt.sr); e.target.closest("[data-ptsr]").classList.toggle("on",S.pt.sr); ptDrawSR(); renderTrade(); return; } const b=e.target.closest("[data-ptrange]"); if(!b) return; S.pt.range=b.dataset.ptrange; store.set("ptRange",S.pt.range); ptLoadChart(); });
+$("ptRange").addEventListener("click",e=>{ if(e.target.closest("[data-ptsr]")){ S.pt.sr=!S.pt.sr; store.set("ptSR",S.pt.sr); e.target.closest("[data-ptsr]").classList.toggle("on",S.pt.sr); ptDrawSR(); renderTrade(); return; } const b=e.target.closest("[data-ptrange]"); if(!b) return; S.pt.range=b.dataset.ptrange; store.set("ptRange2",S.pt.range); ptLoadChart(); });
 $("ptTabs").addEventListener("click",e=>{ const b=e.target.closest("[data-ptpane]"); if(!b) return; S.pt.pane=b.dataset.ptpane; renderTrade(); });
 $("ptPane").addEventListener("click",e=>{
   const c=e.target.closest("[data-ptcancel]"); if(c){ const o=PA.orders.find(x=>x.id===c.dataset.ptcancel); if(o){ o.status="canceled"; ptSave(); toast("Order canceled."); renderTrade(); ptPriceLines(); } return; }
