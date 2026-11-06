@@ -395,9 +395,8 @@ async function askClaude(apiKey, prompt, raw = false, retry = false) {
   throw new Error("Claude's answer couldn't be read. Please try again.");
 }
 
-// Structured output: Claude fills this schema, so the reply is always valid JSON
-const STR = { type: "string" }, LIST = { type: "array", items: { type: "string" } };
-const HORIZON = { type: "object", properties: { horizon: STR, view: STR, range: STR }, required: ["horizon", "view", "range"] };
+// Structured output: a flat schema of simple text fields (nested lists came back garbled)
+const T = (d) => ({ type: "string", description: d });
 const PREDICTION_TOOL = {
   name: "prediction",
   description: "Record the outlook for the dashboard.",
@@ -405,19 +404,27 @@ const PREDICTION_TOOL = {
     type: "object",
     properties: {
       stance: { type: "string", enum: ["Bullish", "Bearish", "Neutral"] },
-      confidence: { type: "integer", minimum: 0, maximum: 100 },
-      headline: STR, shortTerm: HORIZON, mediumTerm: HORIZON,
-      bullCase: LIST, bearCase: LIST, catalysts: LIST, newsRead: STR,
+      confidence: { type: "integer", description: "0-100" },
+      headline: T("one-sentence call"),
+      shortTermView: T("2-3 sentences on the next 1-2 weeks"), shortTermRange: T("expected price/level range for the next 1-2 weeks"),
+      mediumTermView: T("2-3 sentences on the next 3-6 months"), mediumTermRange: T("expected price/level range for the next 3-6 months"),
+      bullCase: T("2-4 short points, one per line"), bearCase: T("2-4 short points, one per line"),
+      catalysts: T("2-4 upcoming events to watch, one per line"), newsRead: T("what the latest headlines say, 2-3 sentences"),
     },
-    required: ["stance", "confidence", "headline", "shortTerm", "mediumTerm", "bullCase", "bearCase", "catalysts", "newsRead"],
+    required: ["stance", "confidence", "headline", "shortTermView", "shortTermRange", "mediumTermView", "mediumTermRange", "bullCase", "bearCase", "catalysts", "newsRead"],
   },
 };
-const SHAPE = `Fill in the prediction tool. Shape for reference:
-{"stance":"Bullish"|"Bearish"|"Neutral","confidence":0-100,"headline":"one-sentence call",
- "shortTerm":{"horizon":"next 1-2 weeks","view":"2-3 sentences","range":"expected price/level range as text"},
- "mediumTerm":{"horizon":"next 3-6 months","view":"2-3 sentences","range":"expected price/level range as text"},
- "bullCase":["..."],"bearCase":["..."],"catalysts":["upcoming events to watch"],
- "newsRead":"what the latest headlines say, 2-3 sentences"}`;
+const lines = (v) => (Array.isArray(v) ? v : String(v || "").split(/\n+|(?:^|\s)[•\-]\s+/)).map((x) => String(x).replace(/^[\s•\-\d.)]+/, "").trim()).filter(Boolean).slice(0, 6);
+function shapePrediction(p) {
+  if (p.shortTerm && typeof p.shortTerm === "object") return p; // already in the old shape
+  return {
+    stance: p.stance, confidence: Math.max(0, Math.min(100, Math.round(+p.confidence || 0))), headline: p.headline,
+    shortTerm: { horizon: "next 1-2 weeks", view: p.shortTermView, range: p.shortTermRange },
+    mediumTerm: { horizon: "next 3-6 months", view: p.mediumTermView, range: p.mediumTermRange },
+    bullCase: lines(p.bullCase), bearCase: lines(p.bearCase), catalysts: lines(p.catalysts), newsRead: p.newsRead,
+  };
+}
+const SHAPE = `Give your answer by calling the prediction tool. Put each bull point, bear point and catalyst on its own line.`;
 
 async function predict(sym, apiKey) {
   const isMarket = sym === "MARKET";
@@ -443,7 +450,7 @@ async function predict(sym, apiKey) {
         .map((i) => `- [${SOURCES[i.source].name}${i.time ? ", " + new Date(i.time).toISOString().slice(0, 10) : ""}] ${i.title}${i.summary ? " — " + i.summary.slice(0, 160) : ""}`).join("\n");
       prompt = `Today is ${today}. Give your outlook for ${q.name} (${sym}).\n\nQUOTE\nPrice ${q.price} ${q.currency}, ${q.changePct?.toFixed(2)}% today, prev close ${q.prevClose}, day ${q.dayLow}-${q.dayHigh}, 52w ${q.low52}-${q.high52}, volume ${q.volume}\n\nTREND\n${h ? summarizeHistory(h) : "n/a"}\n\nLATEST ${sym} HEADLINES\n${heads || "(none found)"}\n\n${SHAPE}`;
     }
-    const out = await askClaude(apiKey, prompt);
+    const out = shapePrediction(await askClaude(apiKey, prompt));
     return { symbol: sym, model: MODEL, generated: Date.now(), ...out };
   });
 }
