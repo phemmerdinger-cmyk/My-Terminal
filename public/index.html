@@ -310,6 +310,7 @@ nav.tabs .ti{display:none}
   #liveTxt{display:none}
   #notifBtn{font-size:0;padding:5px 8px} #notifBtn::before{content:"🔔";font-size:14px}
   #installBtn{display:none}
+  #syncLbl{display:none}
   header{gap:10px}
 }
 .wl-car{display:none;transition:transform .15s;font-size:10px;margin-left:4px}
@@ -407,6 +408,14 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .h2h{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
 .h2h .pcard h3{margin-top:0}
 @media (max-width:760px){.h2h{grid-template-columns:1fr}.tgt{grid-template-columns:1fr 1fr}}
+
+/* sync */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-box{background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:18px;width:min(460px,100%);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.modal-box p{color:var(--muted);font-size:14px;line-height:1.55;margin:0 0 12px}
+.modal-box .row{display:flex;gap:8px}
+.sync-ok{color:var(--up)} .sync-warn{color:#eab308}
+#syncBtn.on{color:var(--up);border-color:rgba(33,195,122,.5)}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -487,6 +496,36 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
   .horiz,.cases{grid-template-columns:1fr}
   .toolbar{position:static}
 }
+
+/* ===== Webull-style theme ===== */
+:root{
+  --bg:#0d0e12; --panel:#16181e; --panel2:#1d2027; --line:#23262e; --line2:#2e323b;
+  --text:#eef0f3; --muted:#9097a3; --dim:#646b77;
+  --amber:#2f80ed; --up:#0fbf7d; --down:#f6465d;
+  --mono:"IBM Plex Sans",system-ui,sans-serif;
+}
+body{font-variant-numeric:tabular-nums}
+.num,td,.wl .px,.kpi b,.rs-px,.big-px,.tk{font-variant-numeric:tabular-nums}
+.btn{background:var(--amber);color:#fff;border-radius:8px}
+.btn.ghost{background:var(--panel2);color:var(--text)}
+.brand i{background:var(--amber)} .brand span{color:var(--amber)}
+.tk .s,.wl .sym,.sym-cell,.mini .top b,.earn-list .s,.big-sym,.rs-name small{color:var(--text)}
+.wl .sym{font-weight:700}
+.sym-cell{font-weight:700}
+/* Webull-style colored change pills */
+.wl li{grid-template-columns:1fr 60px 86px}
+.wl .px{font-weight:600}
+.wl .ch{display:block;margin-top:3px;margin-left:auto;width:74px;text-align:center;border-radius:4px;padding:3px 0;font-weight:600;font-size:12px;color:#fff;background:var(--line2)}
+.wl .ch.up{background:var(--up);color:#fff} .wl .ch.down{background:var(--down);color:#fff}
+.wl li.sel{box-shadow:inset 3px 0 0 var(--amber)}
+.tg{color:#cfe0ff;background:rgba(47,128,237,.16)}
+.chip.on{border-color:var(--amber);color:#fff;background:rgba(47,128,237,.18)}
+nav.tabs button.on{border-bottom-color:var(--amber)}
+.seg button.on{background:var(--amber);color:#fff}
+.subnav button.on{border-bottom-color:var(--amber)}
+.add input:focus,.field:focus,.search:focus{border-color:var(--amber)}
+.badge-new{color:var(--amber);border-color:var(--amber)}
+@media (max-width:760px){ nav.tabs button.on{border-top-color:var(--amber)} .wl .ch{width:auto;padding:3px 8px} }
 </style>
 </head>
 <body>
@@ -498,6 +537,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
     <div class="hide-sm" id="mkt">—</div>
     <div class="live" id="live"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
     <button class="iconbtn" id="installBtn" hidden title="Install Peter's Finance Terminal as an app">⤓ Install app</button>
+    <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <button class="iconbtn" id="notifBtn" title="Desktop alerts for headlines on your stocks">🔔 Alerts</button>
   </div>
 </header>
@@ -625,7 +665,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
           <div class="disc">Alerts are checked every 15 seconds while this site is open. Turn on 🔔 Alerts in the top bar to get desktop notifications.</div>
         </div>
       </div>
-      <div class="disc">Your holdings and alerts are saved in this browser only.</div>
+      <div class="disc">Saved on this device. Turn on ☁ Sync (top bar) to see the same portfolios on your phone and computer.</div>
     </section>
 
     <!-- PREDICTIONS -->
@@ -707,6 +747,10 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 </div>
 <div class="toast" id="toast"></div>
 <div class="ctx" id="ctx" hidden></div>
+<div class="modal" id="syncModal" hidden><div class="modal-box">
+  <div class="ac-head" style="padding:0 0 10px"><span class="who" style="color:var(--amber)">☁ Sync across devices</span><span style="flex:1"></span><button class="ac-x" id="syncClose" aria-label="Close">✕</button></div>
+  <div id="syncBody"></div>
+</div></div>
 <button class="ac-fab" id="acFab" title="Ask Claude about this page">✦ <span>Ask Claude</span></button>
 <div class="ac-panel" id="acPanel" hidden>
   <div class="ac-head"><span class="who"><i></i>Ask Claude</span><span class="ac-where" id="acWhere"></span><button class="ac-x" id="acClose" aria-label="Close">✕</button></div>
@@ -728,7 +772,7 @@ const INDEXES = [["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow Jones"],["^
 const IDX_NAME = Object.fromEntries(INDEXES);
 const DEFAULT_WL = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM"];
 const SECTORS = [["XLK","Technology"],["XLC","Communication"],["XLY","Consumer Disc."],["XLP","Consumer Staples"],["XLF","Financials"],["XLV","Health Care"],["XLI","Industrials"],["XLE","Energy"],["XLB","Materials"],["XLU","Utilities"],["XLRE","Real Estate"]];
-const PALETTE = ["#ff9e1b","#3b82f6","#21c37a","#8b5cf6","#e11d48","#14b8a6","#eab308","#f97316","#64748b","#ec4899","#22d3ee","#a3e635"];
+const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#eab308","#f97316","#64748b","#ec4899","#22d3ee","#a3e635"];
 // Typing a coin's symbol adds the crypto (Yahoo uses COIN-USD)
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
@@ -745,7 +789,7 @@ const RANGES = [["1d","1D"],["5d","5D"],["1mo","1M"],["6mo","6M"],["ytd","YTD"],
 
 const store = {
   get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{} if(window.__syncHook) window.__syncHook(k);}
 };
 const S = {
   tab: "news",
@@ -1945,6 +1989,73 @@ setInterval(startStream,3000);
   const apply=()=>{ if(small.matches) left.classList.toggle("collapsed",store.get("wlCollapsed",true)); else left.classList.remove("collapsed"); };
   $("wlHead").addEventListener("click",()=>{ if(!small.matches) return; const c=!left.classList.contains("collapsed"); left.classList.toggle("collapsed",c); store.set("wlCollapsed",c); });
   small.addEventListener?.("change",apply); apply(); })();
+
+
+/* ---------- SYNC: same portfolios, watchlist, alerts and predictions on every device ---------- */
+const SYNC_KEYS=new Set(["portfolios","pfActive","wl","alerts","predDB"]);
+S.sync={code:store.get("syncCode",""),updated:store.get("syncUpdated",0),last:0,status:"",durable:null,applying:false,timer:0};
+window.__syncHook=k=>{ if(!SYNC_KEYS.has(k)||S.sync.applying||!S.sync.code) return; S.sync.updated=Date.now(); try{localStorage.setItem("syncUpdated",JSON.stringify(S.sync.updated))}catch{} clearTimeout(S.sync.timer); S.sync.timer=setTimeout(syncPush,1500); };
+const syncDoc=()=>({updated:S.sync.updated||Date.now(),portfolios:S.pfs,pfActive:S.pfActive,wl:S.wl,alerts:S.alerts,predDB:S.db.slice(0,500)});
+function syncApply(d){
+  if(!d) return; S.sync.applying=true;
+  try{
+    if(Array.isArray(d.portfolios)&&d.portfolios.length){ S.pfs=d.portfolios; S.pfActive=S.pfs.some(p=>p.id===d.pfActive)?d.pfActive:S.pfs[0].id; S.port=S.pfs.find(p=>p.id===S.pfActive).holdings; store.set("portfolios",S.pfs); store.set("pfActive",S.pfActive); }
+    if(Array.isArray(d.wl)){ S.wl=d.wl; store.set("wl",S.wl); }
+    if(Array.isArray(d.alerts)){ S.alerts=d.alerts; store.set("alerts",S.alerts); }
+    if(Array.isArray(d.predDB)){ S.db=d.predDB; store.set("predDB",S.db); }
+    S.sync.updated=d.updated; localStorage.setItem("syncUpdated",JSON.stringify(d.updated));
+  }catch{} S.sync.applying=false;
+  renderWL(); renderTape(); loadQuotes(); if(S.tab==="portfolio") renderPortfolio(); if(S.tab==="predict"&&typeof renderPredict==="function") renderPredict();
+}
+async function syncPull(){
+  if(!S.sync.code) return;
+  try{ const j=await api("/api/sync?code="+encodeURIComponent(S.sync.code)); S.sync.durable=j.durable; S.sync.last=Date.now();
+    if(j.doc&&j.doc.updated>(S.sync.updated||0)) syncApply(j.doc);
+    else if(!j.doc){ S.sync.updated=S.sync.updated||Date.now(); await syncPush(); }
+    S.sync.status="ok"; }catch(e){ S.sync.status="err"; }
+  syncUI();
+}
+async function syncPush(){
+  if(!S.sync.code) return;
+  try{ const r=await fetch("/api/sync?code="+encodeURIComponent(S.sync.code),{method:"PUT",headers:{"content-type":"application/json"},body:JSON.stringify(syncDoc())});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===409&&j.doc) syncApply(j.doc); else if(!r.ok) throw new Error(j.error||r.status);
+    S.sync.durable=j.durable??S.sync.durable; S.sync.last=Date.now(); S.sync.status="ok"; }catch{ S.sync.status="err"; }
+  syncUI();
+}
+function syncUI(){
+  const on=!!S.sync.code; $("syncBtn").classList.toggle("on",on&&S.sync.status==="ok"); $("syncLbl").textContent=on?(S.sync.status==="err"?"Sync error":"Synced"):"Sync";
+  if($("syncModal").hidden) return;
+  if(!on){
+    const sug=Math.random().toString(36).slice(2,6).toUpperCase()+"-"+Math.random().toString(36).slice(2,6).toUpperCase()+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+    $("syncBody").innerHTML=`<p>Make up a private <b>sync code</b> and enter the <b>same code</b> on your computer and your phone. Your portfolios, watchlist, price alerts and prediction database will then stay the same everywhere.</p>
+      <p>Treat it like a password: anyone with your code can see and change this data.</p>
+      <form class="row" id="syncForm"><input class="field" id="syncCode" value="${sug}" maxlength="80" style="flex:1;font-family:var(--mono)"><button class="btn">Turn on sync</button></form>
+      <p style="margin-top:10px;font-size:12px">Already set up on another device? Replace the code above with the one you used there.</p>`;
+    $("syncForm").onsubmit=async e=>{ e.preventDefault(); const c=$("syncCode").value.trim(); if(c.length<6) return toast("Use at least 6 characters.");
+      try{ localStorage.setItem("preSyncBackup",JSON.stringify(syncDoc())); }catch{}
+      S.sync.code=c; store.set("syncCode",c); S.sync.updated=0; $("syncBody").innerHTML='<p><span class="spin"></span>Connecting…</p>';
+      try{ const j=await api("/api/sync?code="+encodeURIComponent(c)); S.sync.durable=j.durable;
+        if(j.doc){ syncApply(j.doc); toast("Synced: loaded your data from your other device."); }
+        else { S.sync.updated=Date.now(); await syncPush(); toast("Sync is on. Enter the same code on your other devices."); }
+        S.sync.status="ok"; }catch{ S.sync.status="err"; }
+      syncUI(); };
+  } else {
+    const ago2=S.sync.last?ago(S.sync.last):"never";
+    $("syncBody").innerHTML=`<p class="${S.sync.status==="err"?"bad":"sync-ok"}">${S.sync.status==="err"?"⚠ Couldn't reach the server. It will retry automatically.":"✓ Sync is on"} <span style="color:var(--dim)">· last synced ${ago2==="now"?"just now":ago2+" ago"}</span></p>
+      <p>Sync code: <b style="font-family:var(--mono);color:var(--text)">${esc(S.sync.code)}</b><br>Enter this exact code on your other devices.</p>
+      ${S.sync.durable===false?`<p class="sync-warn">⚠ Temporary storage: synced data lives on your free Render server and is wiped whenever the site updates. Your devices still keep their own copy and re-upload it. For permanent sync, add a free Upstash database (I'll walk you through it).</p>`:S.sync.durable?`<p class="sync-ok" style="font-size:12px">Stored permanently.</p>`:""}
+      <div class="row"><button class="btn ghost" id="syncNow" style="flex:1">Sync now</button><button class="btn ghost" id="syncOff" style="flex:1">Turn off on this device</button></div>`;
+    $("syncNow").onclick=async()=>{ await syncPull(); await syncPush(); toast("Synced."); };
+    $("syncOff").onclick=()=>{ S.sync.code=""; store.set("syncCode",""); S.sync.status=""; syncUI(); toast("Sync is off on this device. Your data stays here."); };
+  }
+}
+$("syncBtn").onclick=()=>{ $("syncModal").hidden=false; syncUI(); };
+$("syncClose").onclick=()=>{ $("syncModal").hidden=true; };
+$("syncModal").addEventListener("click",e=>{ if(e.target.id==="syncModal") $("syncModal").hidden=true; });
+setInterval(()=>{ if(S.sync.code&&!document.hidden) syncPull(); },20000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.sync.code) syncPull(); });
+syncUI(); if(S.sync.code) syncPull();
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
