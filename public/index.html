@@ -249,6 +249,10 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 
 /* ASK */
 .ask{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.ask-box{position:relative;margin-top:10px}
+.ask-box textarea{padding-right:52px!important}
+.ask-send{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--claude);color:#fff;font-size:18px;font-weight:700;cursor:pointer;line-height:1}
+.ask-send:hover{filter:brightness(1.1)} .ask-send:disabled{opacity:.5;cursor:wait}
 .ask textarea{width:100%;min-height:64px;resize:vertical;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:10px 12px;font:inherit;color:inherit;outline:none}
 .ask textarea:focus{border-color:var(--claude)}
 .ask .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
@@ -273,6 +277,14 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .sugg .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
 .sugg .ty{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 /* portfolios bar */
+.pf-hint{font-size:12px;color:var(--dim)}
+.ctx{position:fixed;z-index:50;background:var(--panel);border:1px solid var(--line2);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.5);padding:4px;min-width:190px}
+.ctx-title{font-size:11px;color:var(--dim);padding:6px 10px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.ctx button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:5px;cursor:pointer;color:var(--text);font-size:13px}
+.ctx button:hover{background:var(--panel2)}
+.ctx button[data-ctx="delete"]{color:var(--down)}
+.ctx button.dis{opacity:.4}
+@media (max-width:760px){.pf-hint{display:none}}
 .pf-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
 .pf-btn{font-size:15px;font-weight:600;padding:8px 14px;border-radius:8px}
 .pf-item{display:flex;justify-content:space-between;gap:14px;padding:9px 10px;border-radius:6px;cursor:pointer;font-size:13px}
@@ -491,11 +503,9 @@ nav.tabs .ti{display:none}
     <!-- PORTFOLIO -->
     <section id="tab-portfolio" class="pad" hidden>
       <div class="pf-bar">
-        <div class="dd" id="pfDD"><button class="dd-btn pf-btn" type="button" data-dd="pfDD"><span id="pfName"></span> <span class="car">▾</span></button><div class="dd-menu" id="pfMenu"></div></div>
+        <div class="dd" id="pfDD"><button class="dd-btn pf-btn" type="button" data-dd="pfDD" title="Right-click to rename or delete"><span id="pfName"></span> <span class="car">▾</span></button><div class="dd-menu" id="pfMenu"></div></div>
         <span id="pfRenameWrap"></span>
-        <button class="btn ghost" id="pfRename" type="button">Rename</button>
         <button class="btn ghost" id="pfNew" type="button">+ New portfolio</button>
-        <button class="btn ghost" id="pfDelete" type="button">Delete</button>
       </div>
       <div class="kpis" id="kpis"></div>
       <div id="allocWrap"></div>
@@ -531,9 +541,8 @@ nav.tabs .ti{display:none}
       <div id="keyBox"></div>
       <div class="ask">
         <div class="pcard" style="padding:0;border:0;background:none"><div class="who"><i></i>Ask Claude</div></div>
-        <textarea id="askInput" placeholder="Ask anything, e.g. “Am I too concentrated in tech?” or “What's moving the market today?”" style="margin-top:10px"></textarea>
+        <div class="ask-box"><textarea id="askInput" rows="2" placeholder="Ask anything, e.g. “Am I too concentrated in tech?” or “What's moving the market today?”"></textarea><button class="ask-send" id="askBtn" title="Send (Enter)" aria-label="Send">↑</button></div>
         <div class="row">
-          <button class="btn claude" id="askBtn">Ask</button>
           <span class="chip" data-ask="How is my portfolio positioned for the week ahead, and what are the biggest risks?">Portfolio check-up</span>
           <span class="chip" data-ask="Summarize today's most important market news in 5 bullets.">Today in 5 bullets</span>
           <span class="chip" data-ask="Which stocks on my watchlist have the most notable news right now, and why?">Watchlist news</span>
@@ -551,6 +560,7 @@ nav.tabs .ti{display:none}
   </main>
 </div>
 <div class="toast" id="toast"></div>
+<div class="ctx" id="ctx" hidden></div>
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
 <script>
@@ -953,26 +963,46 @@ function renderPfBar(){
   $("pfName").textContent=cur.name;
   $("pfMenu").innerHTML=S.pfs.map(p=>`<div class="pf-item ${p.id===S.pfActive?"on":""}" data-pf="${p.id}"><span>${p.id===S.pfActive?"✓ ":""}${esc(p.name)}</span><small>${p.holdings.length} · $${fmt(pfValue(p),0)}</small></div>`).join("")+
     `<div class="dd-act"><button type="button" id="pfNew2">+ New portfolio</button></div>`;
-  $("pfDelete").disabled=S.pfs.length<2; $("pfDelete").title=S.pfs.length<2?"You need at least one portfolio":"Delete this portfolio";
 }
 function switchPf(id){ S.pfActive=id; S.port=S.pfs.find(p=>p.id===id).holdings; savePorts(); document.querySelectorAll(".dd.open").forEach(d=>d.classList.remove("open")); renderPortfolio(); loadQuotes(); }
 function newPf(){ const n=S.pfs.length+1; const p={id:"p"+Date.now(),name:"Portfolio "+n,holdings:[]}; S.pfs.push(p); switchPf(p.id); startRename(); }
 function startRename(){
   const cur=S.pfs.find(p=>p.id===S.pfActive);
-  $("pfDD").hidden=true; $("pfRename").hidden=true;
+  $("pfDD").hidden=true;
   $("pfRenameWrap").innerHTML=`<form id="pfRenameForm" style="display:flex;gap:6px"><input class="field" id="pfRenameInput" maxlength="40" value="${esc(cur.name)}" style="width:240px;font-family:var(--sans)"><button class="btn">Save</button></form>`;
   const inp=$("pfRenameInput"); inp.focus(); inp.select();
-  const done=(save)=>{ if(save){ const v=inp.value.trim(); if(v) cur.name=v; savePorts(); } $("pfRenameWrap").innerHTML=""; $("pfDD").hidden=false; $("pfRename").hidden=false; renderPfBar(); };
+  const done=(save)=>{ if(save){ const v=inp.value.trim(); if(v) cur.name=v; savePorts(); } $("pfRenameWrap").innerHTML=""; $("pfDD").hidden=false; renderPfBar(); };
   $("pfRenameForm").onsubmit=e=>{ e.preventDefault(); done(true); };
   inp.onkeydown=e=>{ if(e.key==="Escape") done(false); };
   inp.onblur=()=>setTimeout(()=>{ if($("pfRenameInput")) done(true); },100);
 }
-$("pfRename").onclick=startRename;
 $("pfNew").onclick=newPf;
 $("pfMenu").addEventListener("click",e=>{ const it=e.target.closest("[data-pf]"); if(it){ switchPf(it.dataset.pf); return; } if(e.target.closest("#pfNew2")) newPf(); });
-$("pfDelete").onclick=()=>{ if(S.pfs.length<2) return; const b=$("pfDelete");
-  if(!b.dataset.arm){ b.dataset.arm="1"; b.textContent="Click again to delete"; setTimeout(()=>{ delete b.dataset.arm; b.textContent="Delete"; },3000); return; }
-  const gone=S.pfs.find(p=>p.id===S.pfActive); S.pfs=S.pfs.filter(p=>p.id!==S.pfActive); delete b.dataset.arm; b.textContent="Delete"; toast(`Deleted "${gone.name}".`); switchPf(S.pfs[0].id); };
+// Right-click (or press and hold on a phone) a portfolio name for Rename / Delete
+function deletePf(id){ if(S.pfs.length<2) return toast("You need at least one portfolio.");
+  const gone=S.pfs.find(p=>p.id===id); S.pfs=S.pfs.filter(p=>p.id!==id); toast(`Deleted "${gone.name}".`);
+  switchPf(S.pfActive===id?S.pfs[0].id:S.pfActive); }
+function showCtx(x,y,id){
+  const p=S.pfs.find(q=>q.id===id); const m=$("ctx");
+  m.innerHTML=`<div class="ctx-title">${esc(p.name)}</div><button data-ctx="rename">✎ Rename</button><button data-ctx="delete" class="${S.pfs.length<2?"dis":""}">🗑 Delete</button>`;
+  m.hidden=false; const r=m.getBoundingClientRect();
+  m.style.left=Math.min(x,innerWidth-r.width-8)+"px"; m.style.top=Math.min(y,innerHeight-r.height-8)+"px";
+  m.onclick=e=>{ const b=e.target.closest("[data-ctx]"); if(!b) return; m.hidden=true;
+    if(b.dataset.ctx==="rename"){ if(S.pfActive!==id) switchPf(id); startRename(); }
+    else if(!b.classList.contains("dis")){ if(b.dataset.armed) deletePf(id); }
+  };
+  // delete needs a second click to confirm
+  const del=m.querySelector('[data-ctx="delete"]');
+  del.addEventListener("click",e=>{ if(del.classList.contains("dis")){ e.stopPropagation(); toast("You need at least one portfolio."); m.hidden=true; return; }
+    if(!del.dataset.armed){ e.stopPropagation(); del.dataset.armed="1"; del.textContent="Click again to delete"; } },true);
+}
+document.addEventListener("contextmenu",e=>{
+  const t=e.target.closest("[data-pf], #pfDD .pf-btn"); if(!t) return;
+  e.preventDefault(); showCtx(e.clientX,e.clientY,t.dataset.pf||S.pfActive);
+});
+document.addEventListener("click",e=>{ if(!e.target.closest("#ctx")) $("ctx").hidden=true; });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("ctx").hidden=true; });
+window.addEventListener("scroll",()=>{ $("ctx").hidden=true; },true);
 $("alertForm").onsubmit=e=>{ e.preventDefault();
   const s=normSym($("aSym").value), p=+$("aPx").value;
   if(!/^[A-Z0-9.\-]{1,10}$/.test(s)||!(p>0)) return toast("Enter a ticker and a target price.");
@@ -1122,7 +1152,7 @@ async function runAsk(){
   $("askBtn").disabled=false;
 }
 $("askBtn").onclick=runAsk;
-$("askInput").onkeydown=e=>{ if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)) runAsk(); };
+$("askInput").onkeydown=e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); if(!$("askBtn").disabled) runAsk(); } };
 
 
 /* ---------- MARKETS: bonds, funds, crypto, ETFs, futures ---------- */
