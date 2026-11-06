@@ -817,13 +817,13 @@ http
         const raw = String(u.searchParams.get("symbol") || "MARKET").toUpperCase();
         const [s] = raw === "MARKET" ? ["MARKET"] : parseList(raw, 1);
         if (!s) return send(res, 400, { error: "Enter a valid ticker" });
-        const key = process.env.ANTHROPIC_API_KEY || req.headers["x-anthropic-key"];
+        const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
         try { return send(res, 200, await predict(s, key)); }
         catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/ask" && req.method === "POST") {
-        const key = process.env.ANTHROPIC_API_KEY || req.headers["x-anthropic-key"];
+        const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
         try { return send(res, 200, await ask(key, await readBody(req))); }
         catch (e) { return send(res, 502, { error: String(e.message || e) }); }
