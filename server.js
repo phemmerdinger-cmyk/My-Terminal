@@ -91,6 +91,14 @@ async function cached(key, ttlMs, fn) {
   return promise;
 }
 
+// Keep memory in check on the small free server: drop cache entries unused for 12 hours,
+// and if there are still too many, drop the oldest.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of cache) if (!v.promise && v.at && now - v.at > 12 * 3600e3) cache.delete(k);
+  if (cache.size > 6000) [...cache.entries()].filter(([, v]) => !v.promise).sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).slice(0, cache.size - 5000).forEach(([k]) => cache.delete(k));
+}, 10 * 60e3).unref();
+
 async function get(url, accept = "*/*") {
   const res = await fetch(url, {
     headers: { "User-Agent": UA, Accept: accept, "Accept-Language": "en-US,en;q=0.9" },
@@ -341,8 +349,47 @@ async function history(sym, range = "6mo") {
 }
 
 // ---------------------------------------------------------------- Claude predictions
-// Needs an Anthropic API key: set ANTHROPIC_API_KEY on the server
-// (or paste one in the site's settings, sent only to this server).
+// Needs an Anthropic API key, set as ANTHROPIC_API_KEY in Render's Environment settings.
+//
+// Credit protection: the site is public, so every real call to Claude counts toward a daily cap
+// (CLAUDE_DAILY_LIMIT, default 60 ≈ $1/day worst case) and each visitor gets at most 20 Claude
+// requests per hour. Cached predictions (reused for 30 minutes) are free and don't count.
+const DAILY_LIMIT = Math.max(0, parseInt(process.env.CLAUDE_DAILY_LIMIT || "60", 10) || 0);
+const usage = { day: "", count: 0 };
+const etDay = () => new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
+function claudeUsed() { if (usage.day !== etDay()) { usage.day = etDay(); usage.count = 0; } return usage.count; }
+function spendOne() {
+  if (claudeUsed() >= DAILY_LIMIT) {
+    const e = new Error(`Daily Claude limit reached (${DAILY_LIMIT} requests). It resets at midnight Eastern, or raise CLAUDE_DAILY_LIMIT in Render.`);
+    e.code = "daily_limit"; throw e;
+  }
+  usage.count++;
+}
+const perIp = new Map();
+const IP_HOURLY = Math.max(1, parseInt(process.env.CLAUDE_HOURLY_LIMIT || "40", 10) || 40);
+function ipAllowed(req) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now(), list = (perIp.get(ip) || []).filter((t) => now - t < 3600e3);
+  if (list.length >= IP_HOURLY) return false;
+  list.push(now); perIp.set(ip, list);
+  if (perIp.size > 2000) perIp.clear();
+  return true;
+}
+async function anthropic(apiKey, body) {
+  spendOne();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90_000),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (j.error && j.error.message) || `Anthropic API error ${res.status}`;
+    throw new Error(/credit balance/i.test(msg) ? "Your Anthropic credit balance is too low. Add credits at platform.claude.com/settings/billing." : msg);
+  }
+  return j;
+}
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5-5";
 
 function perf(c, days) {
@@ -363,10 +410,7 @@ function summarizeHistory(h) {
 }
 
 async function askClaude(apiKey, prompt, raw = false, retry = false) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
+  const j = await anthropic(apiKey, {
       model: MODEL,
       max_tokens: 3000,
       ...(raw ? {} : { tools: [PREDICTION_TOOL], tool_choice: { type: "auto" } }),
@@ -378,11 +422,7 @@ async function askClaude(apiKey, prompt, raw = false, retry = false) {
           ? "Answer in plain text: short paragraphs or '- ' bullets, no markdown headings, under 250 words."
           : "Always give your answer by calling the prediction tool exactly once. Do not answer in plain text."),
       messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(90_000),
   });
-  const j = await res.json();
-  if (!res.ok) throw new Error((j.error && j.error.message) || `Anthropic API error ${res.status}`);
   if (!raw) {
     const tu = (j.content || []).find((b) => b.type === "tool_use");
     if (tu && tu.input) return tu.input;
@@ -501,10 +541,7 @@ function parsePairs(str) {
   }).filter((x) => x && x.value > 0).slice(0, 40);
 }
 async function askWithActions(apiKey, prompt) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({
+  const j = await anthropic(apiKey, {
       model: MODEL, max_tokens: 3000, tools: ACTION_TOOLS, tool_choice: { type: "auto" },
       system:
         "You are a sharp, balanced investing assistant inside one person's personal stock dashboard. Use the data provided plus general market knowledge, " +
@@ -513,11 +550,7 @@ async function askWithActions(apiKey, prompt) {
         "When they ask to add stocks to their current portfolio, CALL add_holdings. Otherwise just answer. " +
         "Always also write a short plain-text reply (no markdown headings, '- ' bullets are fine, under 220 words).",
       messages: [{ role: "user", content: prompt }],
-    }),
-    signal: AbortSignal.timeout(90_000),
   });
-  const j = await res.json();
-  if (!res.ok) throw new Error((j.error && j.error.message) || `Anthropic API error ${res.status}`);
   const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   const tu = (j.content || []).find((b) => b.type === "tool_use");
   let action = null;
@@ -984,6 +1017,9 @@ function send(res, code, body, type = "application/json") {
   res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
+process.on("unhandledRejection", (e) => console.error("unhandled:", e && e.message));
+process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message));
+
 http
   .createServer(async (req, res) => {
     const u = new URL(req.url, "http://x");
@@ -992,7 +1028,7 @@ http
         const r = String(u.searchParams.get("range") || "");
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
       }
-      if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 120)));
+      if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
         if (!s) return send(res, 400, { error: "symbol required" });
@@ -1004,14 +1040,16 @@ http
         if (!s) return send(res, 400, { error: "Enter a valid ticker" });
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
+        if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached (safety cap to protect your credits). Try again a bit later." });
         try { return send(res, 200, await predict(s, key, u.searchParams.get("fresh") === "1")); }
-        catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+        catch (e) { return send(res, e.code === "daily_limit" ? 429 : 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/ask" && req.method === "POST") {
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
+        if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached (safety cap to protect your credits). Try again a bit later." });
         try { return send(res, 200, await ask(key, await readBody(req))); }
-        catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+        catch (e) { return send(res, e.code === "daily_limit" ? 429 : 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/search") {
         const q = String(u.searchParams.get("q") || "").trim().slice(0, 40);
@@ -1051,7 +1089,7 @@ http
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
       let file = path.normalize(path.join(PUBLIC, u.pathname === "/" ? "index.html" : u.pathname));
       if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden", "text/plain");
       fs.readFile(file, (err, data) => {
