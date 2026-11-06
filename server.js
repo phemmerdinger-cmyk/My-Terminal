@@ -362,21 +362,21 @@ function summarizeHistory(h) {
     `SMA50 ${f(sma(50))}, SMA200 ${f(sma(200))}, 1y high ${f(Math.max(...c.map((x) => x.high)))}, 1y low ${f(Math.min(...c.map((x) => x.low)))}`;
 }
 
-async function askClaude(apiKey, prompt, raw = false) {
+async function askClaude(apiKey, prompt, raw = false, retry = false) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 3000,
-      ...(raw ? {} : { tools: [PREDICTION_TOOL], tool_choice: { type: "tool", name: "prediction" } }),
+      ...(raw ? {} : { tools: [PREDICTION_TOOL], tool_choice: { type: "auto" } }),
       system:
         "You are a sharp, balanced equity strategist writing for one individual investor's personal dashboard. " +
         "Use ONLY the data provided plus general market knowledge. Be specific, cite the headlines and numbers you rely on, " +
         "state uncertainty honestly, and never present a forecast as certain. This is an opinion, not financial advice. " +
         (raw
           ? "Answer in plain text: short paragraphs or '- ' bullets, no markdown headings, under 250 words."
-          : "Use the prediction tool to give your answer."),
+          : "Always give your answer by calling the prediction tool exactly once. Do not answer in plain text."),
       messages: [{ role: "user", content: prompt }],
     }),
     signal: AbortSignal.timeout(90_000),
@@ -390,8 +390,9 @@ async function askClaude(apiKey, prompt, raw = false) {
   const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   if (raw) return text.trim();
   const m = text.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("Claude did not return a prediction");
-  return JSON.parse(m[0]);
+  if (m) { try { return JSON.parse(m[0]); } catch {} }
+  if (!retry) return askClaude(apiKey, prompt + "\n\nIMPORTANT: answer by calling the prediction tool.", raw, true);
+  throw new Error("Claude's answer couldn't be read. Please try again.");
 }
 
 // Structured output: Claude fills this schema, so the reply is always valid JSON
