@@ -609,6 +609,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pt-more{text-align:center;padding:10px}
 #ptReset.armed{border-color:var(--down);color:var(--down)}
 @media (max-width:1100px){ .pt-main{grid-template-columns:minmax(0,1fr)} .pt-spark{display:none} }
+.pt-mono polyline{stroke:#fff!important} .pt-mono line{stroke:#555!important}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -2388,14 +2389,15 @@ async function ptLoadChart(){
   catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
   if(key!==ptChartKey) return;
   $("ptChart").querySelector(".empty")?.remove();
-  if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
+  if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div class="pt-mono" style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
   if(ptSeries){ ptc.removeSeries(ptSeries); ptSeries=null; } if(ptVol){ ptc.removeSeries(ptVol); ptVol=null; } ptLines=[]; ptLinesSig="";
   ptCandles=h.candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
-  ptSeries=ptc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
+  // black & white candles: rising = white, falling = black with a light outline
+  ptSeries=ptc.addCandlestickSeries({upColor:"#ffffff",downColor:"#000000",borderVisible:true,borderUpColor:"#ffffff",borderDownColor:"#d9d9d9",wickUpColor:"#ffffff",wickDownColor:"#d9d9d9",priceLineColor:"#ffffff"});
   ptSeries.setData(ptCandles.map(({volume,...c})=>c));
   ptVol=ptc.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
   ptVol.priceScale().applyOptions({scaleMargins:{top:.85,bottom:0}});
-  ptVol.setData(ptCandles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(33,195,122,.3)":"rgba(255,77,94,.3)"})));
+  ptVol.setData(ptCandles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(255,255,255,.28)":"rgba(255,255,255,.12)"})));
   ptc.timeScale().fitContent();
   ptMarkers(); ptPriceLines();
 }
