@@ -488,7 +488,7 @@ async function ask(apiKey, body) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let d = "";
-    req.on("data", (c) => { d += c; if (d.length > 100_000) req.destroy(); });
+    req.on("data", (c) => { d += c; if (d.length > 1_000_000) req.destroy(); });
     req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch (e) { reject(e); } });
     req.on("error", reject);
   });
@@ -875,6 +875,33 @@ function openStream(req, res, syms) {
   req.on("close", () => { live.clients.delete(client); syncSubs(); });
 }
 
+// ---------------------------------------------------------------- device sync (portfolios, watchlist, alerts, predictions)
+// Each person picks a private sync code; data is stored under a hash of it.
+// With UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN set, data lives in Upstash Redis
+// (free, survives restarts). Otherwise it is kept in a file on this server, which free
+// Render plans wipe whenever the site updates.
+const crypto = require("crypto");
+const UP_URL = process.env.UPSTASH_REDIS_REST_URL, UP_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const SYNC_DIR = path.join(require("os").tmpdir(), "pft-sync");
+const syncKey = (code) => "pft:sync:" + crypto.createHash("sha256").update("pft|" + code).digest("hex").slice(0, 40);
+async function syncGet(code) {
+  const k = syncKey(code);
+  if (UP_URL && UP_TOKEN) {
+    const r = await fetch(`${UP_URL}/get/${k}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) });
+    const j = await r.json(); return j.result ? JSON.parse(j.result) : null;
+  }
+  try { return JSON.parse(fs.readFileSync(path.join(SYNC_DIR, k + ".json"), "utf8")); } catch { return null; }
+}
+async function syncPut(code, doc) {
+  const k = syncKey(code), body = JSON.stringify(doc);
+  if (body.length > 900_000) throw new Error("Too much data to sync");
+  if (UP_URL && UP_TOKEN) {
+    const r = await fetch(`${UP_URL}/set/${k}`, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}` }, body, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) throw new Error("Sync storage error " + r.status); return;
+  }
+  fs.mkdirSync(SYNC_DIR, { recursive: true }); fs.writeFileSync(path.join(SYNC_DIR, k + ".json"), body);
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -939,7 +966,22 @@ http
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
         return openStream(req, res, parseList(u.searchParams.get("symbols"), 60));
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
+      if (u.pathname === "/api/sync") {
+        const code = String(u.searchParams.get("code") || "");
+        if (code.length < 6 || code.length > 80) return send(res, 400, { error: "Sync code must be 6 to 80 characters" });
+        try {
+          if (req.method === "GET") return send(res, 200, { doc: await syncGet(code), durable: !!(UP_URL && UP_TOKEN) });
+          if (req.method === "PUT" || req.method === "POST") {
+            const doc = await readBody(req);
+            if (!doc || typeof doc !== "object" || !doc.updated) return send(res, 400, { error: "bad data" });
+            const cur = await syncGet(code);
+            if (cur && cur.updated > doc.updated && !u.searchParams.get("force")) return send(res, 409, { error: "newer", doc: cur });
+            await syncPut(code, doc);
+            return send(res, 200, { ok: true, durable: !!(UP_URL && UP_TOKEN) });
+          }
+        } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
       let file = path.normalize(path.join(PUBLIC, u.pathname === "/" ? "index.html" : u.pathname));
       if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden", "text/plain");
       fs.readFile(file, (err, data) => {
