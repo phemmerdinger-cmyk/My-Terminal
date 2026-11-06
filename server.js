@@ -262,8 +262,13 @@ async function getNews(tickers, range) {
     .sort((a, b) => (b.time || 0) - (a.time || 0));
   // Keep a fair share from every outlet (stories about your tickers always stay)
   const long = !days || days > 7;
+  // Long timelines: keep a fair share per outlet per month so older periods aren't crowded out
   const per = {};
-  const items = recent.filter((i) => { per[i.source] = (per[i.source] || 0) + 1; return i.tickers.length || per[i.source] <= (long ? 400 : 90); }).slice(0, long ? 2000 : 500);
+  const items = recent.filter((i) => {
+    const k = i.source + (long ? ":" + new Date(i.time || 0).toISOString().slice(0, 7) : "");
+    per[k] = (per[k] || 0) + 1;
+    return i.tickers.length ? per[k] <= (long ? 120 : 1e9) : per[k] <= (long ? 60 : 90);
+  }).slice(0, long ? 6000 : 500);
   return {
     updated: Date.now(),
     sources: Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, { name: s.name, ok: !!status[k] }])),
@@ -363,20 +368,25 @@ async function askClaude(apiKey, prompt, raw = false) {
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1800,
+      max_tokens: 3000,
+      ...(raw ? {} : { tools: [PREDICTION_TOOL], tool_choice: { type: "tool", name: "prediction" } }),
       system:
         "You are a sharp, balanced equity strategist writing for one individual investor's personal dashboard. " +
         "Use ONLY the data provided plus general market knowledge. Be specific, cite the headlines and numbers you rely on, " +
         "state uncertainty honestly, and never present a forecast as certain. This is an opinion, not financial advice. " +
         (raw
           ? "Answer in plain text: short paragraphs or '- ' bullets, no markdown headings, under 250 words."
-          : "Reply with a single JSON object and nothing else."),
+          : "Use the prediction tool to give your answer."),
       messages: [{ role: "user", content: prompt }],
     }),
     signal: AbortSignal.timeout(90_000),
   });
   const j = await res.json();
   if (!res.ok) throw new Error((j.error && j.error.message) || `Anthropic API error ${res.status}`);
+  if (!raw) {
+    const tu = (j.content || []).find((b) => b.type === "tool_use");
+    if (tu && tu.input) return tu.input;
+  }
   const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   if (raw) return text.trim();
   const m = text.match(/\{[\s\S]*\}/);
@@ -384,7 +394,24 @@ async function askClaude(apiKey, prompt, raw = false) {
   return JSON.parse(m[0]);
 }
 
-const SHAPE = `Return JSON exactly in this shape:
+// Structured output: Claude fills this schema, so the reply is always valid JSON
+const STR = { type: "string" }, LIST = { type: "array", items: { type: "string" } };
+const HORIZON = { type: "object", properties: { horizon: STR, view: STR, range: STR }, required: ["horizon", "view", "range"] };
+const PREDICTION_TOOL = {
+  name: "prediction",
+  description: "Record the outlook for the dashboard.",
+  input_schema: {
+    type: "object",
+    properties: {
+      stance: { type: "string", enum: ["Bullish", "Bearish", "Neutral"] },
+      confidence: { type: "integer", minimum: 0, maximum: 100 },
+      headline: STR, shortTerm: HORIZON, mediumTerm: HORIZON,
+      bullCase: LIST, bearCase: LIST, catalysts: LIST, newsRead: STR,
+    },
+    required: ["stance", "confidence", "headline", "shortTerm", "mediumTerm", "bullCase", "bearCase", "catalysts", "newsRead"],
+  },
+};
+const SHAPE = `Fill in the prediction tool. Shape for reference:
 {"stance":"Bullish"|"Bearish"|"Neutral","confidence":0-100,"headline":"one-sentence call",
  "shortTerm":{"horizon":"next 1-2 weeks","view":"2-3 sentences","range":"expected price/level range as text"},
  "mediumTerm":{"horizon":"next 3-6 months","view":"2-3 sentences","range":"expected price/level range as text"},
