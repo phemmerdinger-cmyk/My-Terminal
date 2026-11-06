@@ -373,6 +373,40 @@ nav.tabs .ti{display:none}
   .ask-send{width:40px;height:40px}
   .mini{padding:14px}
 }
+
+/* AI database */
+.pt{cursor:pointer;border-radius:5px;padding:2px 4px;margin-left:-4px;transition:background .15s}
+.pt:hover{background:var(--panel2);color:var(--text)}
+.pt-ask{display:none;margin-left:8px;font-size:11px;color:var(--claude);font-weight:600}
+.pt:hover .pt-ask{display:inline}
+.followup{position:relative;margin-top:14px}
+.followup input{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:11px 50px 11px 12px;color:var(--text);font:inherit;outline:none}
+.followup input:focus{border-color:var(--claude)}
+.followup .ask-send{right:6px;bottom:50%;transform:translateY(50%);width:32px;height:32px;font-size:16px}
+.proj{margin:4px 0 14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.proj-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);padding:4px 4px 0}
+.proj-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+tr.sel-row{background:var(--panel2)}
+tr[data-scropen],tr[data-dbopen]{cursor:pointer}
+.scr-detail .pcard{border-color:var(--claude)}
+.ai-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:4px}
+.ai-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.ai-sub b{color:var(--text);font-family:var(--mono);font-weight:500}
+.tgt{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 14px}
+.tgt div{background:var(--panel2);border-radius:8px;padding:10px}
+.tgt span{display:block;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.tgt b{font-family:var(--mono);font-weight:500;font-size:15px}
+.risk{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line2)}
+.risk.High,.risk.Very{color:#f97316;border-color:#f9731655} .risk.Low{color:var(--up)} .risk.Medium{color:#eab308}
+.scr-prog{height:6px;background:var(--line2);border-radius:3px;overflow:hidden;margin-top:10px}
+.scr-prog i{display:block;height:100%;width:0;background:var(--claude);transition:width .3s}
+.cbar{display:inline-block;width:70px;height:6px;background:var(--line2);border-radius:3px;vertical-align:middle;margin-right:6px;overflow:hidden}
+.cbar i{display:block;height:100%}
+.verdict{font-family:var(--sans);font-weight:600;font-size:12px;white-space:nowrap}
+.verdict.ok{color:var(--up)} .verdict.no{color:var(--down)} .verdict.on{color:#84cc16} .verdict.off{color:#f97316}
+.h2h{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.h2h .pcard h3{margin-top:0}
+@media (max-width:760px){.h2h{grid-template-columns:1fr}.tgt{grid-template-columns:1fr 1fr}}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -597,6 +631,65 @@ nav.tabs .ti{display:none}
     <!-- PREDICTIONS -->
     <section id="tab-predict" class="pad" hidden>
       <div id="keyBox"></div>
+      <div class="ai-hero">
+        <div><div class="who" style="color:var(--claude);font-weight:700;letter-spacing:.1em;font-size:12px;text-transform:uppercase">✦ Claude Predictor</div>
+          <div class="ai-sub" id="aiStats"></div></div>
+      </div>
+      <nav class="subnav" id="aiNav">
+        <button data-ai="predict" class="on">Predict</button>
+        <button data-ai="screener">AI Screener</button>
+        <button data-ai="h2h">Head-to-head</button>
+        <button data-ai="db">Prediction database</button>
+        <button data-ai="ask">Ask Claude</button>
+      </nav>
+
+      <div data-aipane="predict">
+        <form class="pred-hero" id="predForm">
+          <input class="field" id="predInput" autocomplete="off" placeholder="Search any stock for Claude's prediction — e.g. NVDA" maxlength="12">
+          <button class="btn claude" id="predBtn">✦ Predict</button>
+        </form>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="predChips"></div>
+        <div class="pred-grid" id="predGrid"></div>
+      </div>
+
+      <div data-aipane="screener" hidden>
+        <div class="card" style="margin:0 0 16px">
+          <div class="h" style="margin-bottom:8px">Scan a list with Claude and rank it from most bullish to most bearish</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <div class="seg" id="scrSrc"></div>
+            <input class="field" id="scrCustom" placeholder="Or type tickers: AAPL, NVDA, TSLA" style="flex:1;min-width:220px;text-transform:uppercase">
+            <button class="btn claude" id="scrRun">Run scan</button>
+          </div>
+          <div class="disc" id="scrCost" style="margin-top:8px"></div>
+          <div class="scr-prog" id="scrProg" hidden><i></i></div>
+        </div>
+        <div class="tbl-wrap"><table id="scrTable"></table></div>
+      </div>
+
+      <div data-aipane="h2h" hidden>
+        <form class="pred-hero" id="h2hForm">
+          <input class="field" id="h2hA" placeholder="First ticker, e.g. NVDA" style="text-transform:uppercase">
+          <span style="color:var(--muted);font-weight:700">vs</span>
+          <input class="field" id="h2hB" placeholder="Second ticker, e.g. AMD" style="text-transform:uppercase">
+          <button class="btn claude">Compare</button>
+        </form>
+        <div id="h2hOut"></div>
+      </div>
+
+      <div data-aipane="db" hidden>
+        <div class="kpis" id="dbKpis"></div>
+        <div class="toolbar" style="position:static;padding:0 0 12px;border:0">
+          <input class="search" id="dbSearch" placeholder="Search symbol…" style="margin-left:0;width:180px">
+          <select class="dd-btn" id="dbStance"><option value="">All stances</option><option>Bullish</option><option>Neutral</option><option>Bearish</option></select>
+          <select class="dd-btn" id="dbStatus"><option value="">All results</option><option value="correct">Correct</option><option value="wrong">Wrong</option><option value="tracking">Still tracking</option></select>
+          <button class="btn ghost" id="dbExport" type="button" style="margin-left:auto">⤓ Export CSV</button>
+        </div>
+        <div class="tbl-wrap"><table id="dbTable"></table></div>
+        <div class="disc">Every prediction is saved here and graded 2 weeks later against what the price actually did. Bullish counts as correct if the price rose more than 1%, Bearish if it fell more than 1%, and Neutral if it stayed within ±3%. Until then it shows whether the call is currently on track. Saved in this browser.</div>
+        <div id="dbDetail"></div>
+      </div>
+
+      <div data-aipane="ask" hidden>
       <div class="ask">
         <div class="pcard" style="padding:0;border:0;background:none"><div class="who"><i></i>Ask Claude</div></div>
         <div class="ask-box"><textarea id="askInput" rows="2" placeholder="Ask anything, e.g. “Am I too concentrated in tech?” or “What's moving the market today?”"></textarea><button class="ask-send" id="askBtn" title="Send (Enter)" aria-label="Send">↑</button></div>
@@ -607,12 +700,7 @@ nav.tabs .ti{display:none}
         </div>
         <div class="answer" id="askOut" hidden></div>
       </div>
-      <form class="pred-hero" id="predForm">
-        <input class="field" id="predInput" autocomplete="off" placeholder="Search any stock for Claude's prediction — e.g. NVDA" maxlength="12" autocomplete="off">
-        <button class="btn claude" id="predBtn">✦ Predict</button>
-      </form>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="predChips"></div>
-      <div class="pred-grid" id="predGrid"></div>
+      </div>
       <div class="disc">Claude's predictions are an AI opinion built from live prices, a year of price history and the latest headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the Wall Street Journal. They can be wrong and aren't financial advice. Each prediction is reused for 30 minutes to keep API costs down.</div>
     </section>
   </main>
@@ -1158,13 +1246,13 @@ function renderKeyBox(){
   $("keyBox").innerHTML=S.serverKey?"":`<div class="keybox"><b>Claude Predictor isn't switched on yet.</b> It turns on automatically once an Anthropic API key is saved in your Render settings.</div>`;
 }
 function renderPredict(){
-  renderKeyBox();
+  renderKeyBox(); aiStats(); aiShow(S.aiPane||"predict");
   $("predChips").innerHTML=`<span class="chip" data-pred="MARKET">Whole market</span>`+S.wl.map(s=>`<span class="chip" data-pred="${esc(s)}">${esc(s)}</span>`).join("");
   const order=["MARKET",...S.predOrder.filter(s=>s!=="MARKET")];
   $("predGrid").innerHTML=order.filter(s=>S.preds[s]).map(s=>predCard(s,S.preds[s])).join("")||
     "";
 }
-function list(a){ return (a||[]).map(x=>`<li>${esc(x)}</li>`).join(""); }
+function list(a,sym){ return (a||[]).map(x=>`<li class="pt" data-acopen="${esc(`About ${sym==="MARKET"?"the market":sym}: explain this point in more depth, how likely it is, and what would confirm or undo it — "${x}"`)}" title="Click to ask Claude about this">${esc(x)}<span class="pt-ask">Ask ✦</span></li>`).join(""); }
 function predCard(s,p){
   const title=s==="MARKET"?"US Stock Market":s;
   if(p.loading) return `<div class="pcard"><div class="who"><i></i>Claude's prediction</div><h3>${esc(title)}</h3><div class="call" style="color:var(--muted)"><span class="spin"></span>Reading live prices, a year of price history and the latest headlines…</div></div>`;
@@ -1173,27 +1261,30 @@ function predCard(s,p){
   return `<div class="pcard">
     <div class="who"><i></i>Claude's prediction</div>
     <h3>${esc(title)} ${q&&!q.error?`<span style="font-size:14px;color:var(--muted)">${fmt(q.price)} <span class="${cls(q.changePct)}">${pct(q.changePct)}</span></span>`:""}</h3>
-    <div style="display:flex;align-items:center;gap:12px;margin-top:8px"><span class="stance ${esc(p.stance)}">${p.stance==="Bullish"?"▲":p.stance==="Bearish"?"▼":"■"} ${esc(p.stance)}</span><span style="font-size:12px;color:var(--muted)">Confidence ${esc(p.confidence)}%</span></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:8px"><span class="stance ${esc(p.stance)}">${p.stance==="Bullish"?"▲":p.stance==="Bearish"?"▼":"■"} ${esc(p.stance)}</span><span style="font-size:12px;color:var(--muted)">Confidence ${esc(p.confidence)}%</span>${p.riskLevel?`<span class="risk ${esc(String(p.riskLevel).split(" ")[0])}">${esc(p.riskLevel)} risk</span>`:""}</div>
     <div class="conf"><i style="width:${Math.max(0,Math.min(100,+p.confidence||0))}%"></i></div>
     <div class="call">${esc(p.headline)}</div>
+    ${p.targetShort||p.targetMedium?projChart(s,p):""}
+    ${p.targetShort||p.targetMedium?`<div class="tgt"><div><span>Price when predicted</span><b>${fmt(p.priceAt)}</b></div><div><span>2-week target</span><b>${fmt(p.targetShort)} <small class="${cls(p.targetShort-p.priceAt)}">${p.priceAt&&p.targetShort?pct((p.targetShort/p.priceAt-1)*100):""}</small></b></div><div><span>6-month target</span><b>${fmt(p.targetMedium)} <small class="${cls(p.targetMedium-p.priceAt)}">${p.priceAt&&p.targetMedium?pct((p.targetMedium/p.priceAt-1)*100):""}</small></b></div></div>`:""}
     <div class="horiz">
       <div><span>${esc(p.shortTerm?.horizon||"Short term")}</span><b>${esc(p.shortTerm?.range||"")}</b><p>${esc(p.shortTerm?.view||"")}</p></div>
       <div><span>${esc(p.mediumTerm?.horizon||"Medium term")}</span><b>${esc(p.mediumTerm?.range||"")}</b><p>${esc(p.mediumTerm?.view||"")}</p></div>
     </div>
-    <div class="cases"><div><h4 class="up">Bull case</h4><ul>${list(p.bullCase)}</ul></div><div><h4 class="down">Bear case</h4><ul>${list(p.bearCase)}</ul></div></div>
-    ${p.catalysts?.length?`<div class="sub"><b>Catalysts to watch:</b><ul style="margin:6px 0 0;padding-left:18px">${list(p.catalysts)}</ul></div>`:""}
+    <div class="cases"><div><h4 class="up">Bull case</h4><ul>${list(p.bullCase,s)}</ul></div><div><h4 class="down">Bear case</h4><ul>${list(p.bearCase,s)}</ul></div></div>
+    ${p.catalysts?.length?`<div class="sub"><b>Catalysts to watch:</b><ul style="margin:6px 0 0;padding-left:18px">${list(p.catalysts,s)}</ul></div>`:""}
     ${p.newsRead?`<div class="sub"><b>What the news says:</b> ${esc(p.newsRead)}</div>`:""}
-    <div class="stamp">Generated ${new Date(p.generated).toLocaleString("en-US",{timeZone:"America/New_York",dateStyle:"medium",timeStyle:"short"})} ET · ${esc(p.model)} · <a href="#" data-pred-refresh="${esc(s)}" style="text-decoration:underline">refresh</a></div>
+    <form class="followup" data-follow="${esc(s)}"><input placeholder="Ask a follow-up about ${esc(s==="MARKET"?"the market":s)}… e.g. what would change your mind?"><button class="ask-send" aria-label="Send">↑</button></form>
+    <div class="stamp">Generated ${new Date(p.generated).toLocaleString("en-US",{timeZone:"America/New_York",dateStyle:"medium",timeStyle:"short"})} ET · ${esc(p.model)} · <a href="#" data-pred-refresh="${esc(s)}" style="text-decoration:underline">get a fresh prediction</a> · saved to your prediction database</div>
   </div>`;
 }
-async function runPredict(s){
+async function runPredict(s,fresh){
   if(!hasKey()){ renderPredict(); return toast("Claude Predictor isn't switched on yet."); }
   S.predOrder=[s,...S.predOrder.filter(x=>x!==s)];
   S.preds[s]={loading:true}; renderPredict();
   if(s!=="MARKET"&&!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes};}).catch(()=>{});
   try{
-    const p=await api("/api/predict?symbol="+encodeURIComponent(s),{});
-    S.preds[s]=p;
+    const p=await api("/api/predict?symbol="+encodeURIComponent(s)+(fresh?"&fresh=1":""),{});
+    S.preds[s]=p; dbSave(p);
   }catch(e){
     S.preds[s]={error:e.code==="no_key"?"No API key is set up yet.":"Couldn't get a prediction: "+e.message};
   }
@@ -1202,6 +1293,145 @@ async function runPredict(s){
 $("predForm").onsubmit=e=>{ e.preventDefault(); const s=normSym($("predInput").value);
   if(!(s==="MARKET"||/^[A-Z0-9.\-]{1,10}$/.test(s))) return toast("Enter a valid ticker, like NVDA.");
   $("predInput").value=""; runPredict(s); };
+
+
+/* ---------- AI DATABASE: saved predictions, grading, screener, head-to-head ---------- */
+S.db=store.get("predDB",[]);
+const dbPersist=()=>store.set("predDB",S.db.slice(0,500));
+function dbSave(p){ if(!p||!p.stance||!p.generated) return; if(S.db.some(x=>x.symbol===p.symbol&&x.generated===p.generated)) return;
+  S.db.unshift({...p,id:p.symbol+"-"+p.generated}); dbPersist(); aiStats(); }
+const DAY=86400e3;
+function grade(e){ // returns {move, status:'correct'|'wrong'|'on'|'off', final}
+  const q=S.quotes[e.priceSymbol||e.symbol]; const now=e.final?.close ?? (q&&!q.error?q.price:null);
+  if(!e.priceAt||now==null) return {move:null,status:"pending"};
+  const move=(now/e.priceAt-1)*100; const ok=e.stance==="Bullish"?move>1:e.stance==="Bearish"?move<-1:Math.abs(move)<=3;
+  const matured=!!e.final; return {move, status:matured?(ok?"correct":"wrong"):(ok?"on":"off"), final:matured};
+}
+async function dbMature(){ // grade predictions that are 2+ weeks old against the actual close 14 days later
+  const due=S.db.filter(e=>!e.final&&e.priceAt&&Date.now()-e.generated>=14*DAY).slice(0,20);
+  for(const e of due){ try{ const h=await api(`/api/history?symbol=${encodeURIComponent(e.priceSymbol||e.symbol)}&range=1y`);
+    const tgt=(e.generated+14*DAY)/1000; const c=h.candles.find(x=>x.time>=tgt)||null;
+    if(c) e.final={close:c.close,date:new Date(c.time*1000).toISOString().slice(0,10)}; }catch{} }
+  if(due.length){ dbPersist(); if(S.tab==="predict") { aiStats(); if(S.aiPane==="db") renderDB(); } }
+}
+function aiStats(){
+  const g=S.db.map(grade), done=g.filter(x=>x.final), right=done.filter(x=>x.status==="correct").length, track=g.filter(x=>x.status==="on").length, live=g.filter(x=>!x.final&&x.move!=null).length;
+  $("aiStats").innerHTML=`<b>${S.db.length}</b> predictions saved · <b>${done.length?Math.round(right/done.length*100)+"%":"—"}</b> accuracy after 2 weeks (${done.length} graded) · <b>${live?Math.round(track/live*100)+"%":"—"}</b> of open calls on track`;
+}
+function aiShow(k){
+  S.aiPane=k; document.querySelectorAll("#aiNav [data-ai]").forEach(b=>b.classList.toggle("on",b.dataset.ai===k));
+  document.querySelectorAll("[data-aipane]").forEach(d=>d.hidden=d.dataset.aipane!==k);
+  if(k==="db"){ renderDB(); dbMature(); } if(k==="screener") renderScreener();
+}
+$("aiNav").onclick=e=>{ const b=e.target.closest("[data-ai]"); if(b) aiShow(b.dataset.ai); };
+
+/* database table */
+function renderDB(){
+  const q=$("dbSearch").value.trim().toUpperCase(), st=$("dbStance").value, rs=$("dbStatus").value;
+  const rows=S.db.map(e=>({e,g:grade(e)})).filter(({e,g})=>(!q||e.symbol.includes(q))&&(!st||e.stance===st)&&(!rs||(rs==="tracking"?!g.final:g.status===rs)));
+  const all=S.db.map(grade), done=all.filter(x=>x.final), right=done.filter(x=>x.status==="correct").length;
+  const by=k=>{ const d=S.db.map((e,i)=>({e,g:all[i]})).filter(x=>x.e.stance===k&&x.g.final); return d.length?Math.round(d.filter(x=>x.g.status==="correct").length/d.length*100)+"% of "+d.length:"—"; };
+  $("dbKpis").innerHTML=[["Predictions saved",S.db.length,`<small style="color:var(--dim)">${new Set(S.db.map(e=>e.symbol)).size} different symbols</small>`],
+    ["Accuracy (2 weeks)",done.length?Math.round(right/done.length*100)+"%":"—",`<small style="color:var(--dim)">${done.length} graded so far</small>`],
+    ["Bullish calls right",by("Bullish"),""],["Bearish calls right",by("Bearish"),""]].map(([k,v,x])=>`<div class="kpi"><span>${k}</span><b>${v}</b>${x}</div>`).join("");
+  const V={correct:['ok','✓ Correct'],wrong:['no','✗ Wrong'],on:['on','● On track'],off:['off','○ Off track'],pending:['','…']};
+  $("dbTable").innerHTML=rows.length?`<thead><tr><th>Date</th><th>Symbol</th><th>Call</th><th>Price then</th><th>2-wk target</th><th>${'Now / at 2 wks'}</th><th>Move</th><th>Result</th><th></th></tr></thead><tbody>${rows.slice(0,300).map(({e,g})=>{const now=e.final?.close??S.quotes[e.priceSymbol||e.symbol]?.price; const v=V[g.status];
+    return `<tr data-dbopen="${esc(e.id)}"><td style="text-align:left">${new Date(e.generated).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"2-digit"})}</td><td class="sym-cell">${esc(e.symbol==="MARKET"?"S&P 500":e.symbol)}</td>
+      <td style="text-align:left"><span class="stance ${esc(e.stance)}" style="font-size:11px;padding:2px 8px">${esc(e.stance)}</span> <span style="color:var(--muted)">${esc(e.confidence)}%</span></td>
+      <td>${fmt(e.priceAt)}</td><td>${fmt(e.targetShort)}</td><td>${fmt(now)}</td><td class="${cls(g.move)}">${pct(g.move)}</td><td><span class="verdict ${v[0]}">${v[1]}</span></td><td><button class="del" data-dbdel="${esc(e.id)}" title="Delete">✕</button></td></tr>`;}).join("")}</tbody>`
+    :`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:20px">${S.db.length?"Nothing matches these filters.":"Your predictions will be saved here automatically. Run one on the Predict tab, or scan a whole list with the AI Screener."}</td></tr></tbody>`;
+  // make sure prices are live for everything shown
+  const need=[...new Set(S.db.map(e=>e.priceSymbol||e.symbol))].filter(x=>!S.quotes[x]); if(need.length) api("/api/quotes?symbols="+encodeURIComponent(need.slice(0,80).join(","))).then(j=>{S.quotes={...S.quotes,...j.quotes}; if(S.aiPane==="db") renderDB(); aiStats();}).catch(()=>{});
+}
+["dbSearch","dbStance","dbStatus"].forEach(id=>$(id).addEventListener("input",renderDB));
+$("dbExport").onclick=()=>{ const head=["date","symbol","stance","confidence","risk","price_then","target_2wk","target_6mo","price_now_or_at_2wk","move_pct","result","headline"];
+  const rows=S.db.map(e=>{const g=grade(e);return [new Date(e.generated).toISOString(),e.symbol,e.stance,e.confidence,e.riskLevel||"",e.priceAt,e.targetShort,e.targetMedium,e.final?.close??S.quotes[e.priceSymbol||e.symbol]?.price??"",g.move!=null?g.move.toFixed(2):"",g.status,(e.headline||"").replace(/"/g,"'")];});
+  const csv=[head,...rows].map(r=>r.map(x=>`"${String(x??"")}"`).join(",")).join("\n");
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="claude-predictions.csv"; a.click(); };
+document.addEventListener("click",e=>{
+  const d=e.target.closest("[data-dbdel]"); if(d){ e.stopPropagation(); S.db=S.db.filter(x=>x.id!==d.dataset.dbdel); dbPersist(); renderDB(); aiStats(); return; }
+  const o=e.target.closest("[data-dbopen]"); if(o){ const ent=S.db.find(x=>x.id===o.dataset.dbopen); if(ent){ $("dbDetail").innerHTML=`<h2 class="h" style="margin-top:20px">Saved prediction</h2>`+predCard(ent.symbol,ent); $("dbDetail").scrollIntoView({behavior:"smooth"}); } }
+});
+
+/* screener */
+S.scr={src:"wl",rows:[],running:false};
+function scrList(){ if(S.scr.src==="custom") return [...new Set($("scrCustom").value.split(/[,\s]+/).map(normSym).filter(x=>/^[A-Z0-9.\-^=]{1,12}$/.test(x)))].slice(0,25);
+  if(S.scr.src==="pf") return [...new Set(S.port.map(h=>h.symbol))].slice(0,25); return S.wl.slice(0,25); }
+function renderScreener(){
+  $("scrSrc").innerHTML=[["wl",`Watchlist (${S.wl.length})`],["pf",`Portfolio (${new Set(S.port.map(h=>h.symbol)).size})`],["custom","Custom"]].map(([k,l])=>`<button type="button" data-scr="${k}" class="${S.scr.src===k?"on":""}">${l}</button>`).join("");
+  const L=scrList(), cachedN=L.filter(x=>S.preds[x]&&S.preds[x].stance&&Date.now()-S.preds[x].generated<30*60e3).length, n=L.length-cachedN;
+  $("scrCost").textContent=L.length?`${L.length} symbol${L.length===1?"":"s"} · about $${(n*0.016).toFixed(2)} in API usage${cachedN?` (${cachedN} already predicted in the last 30 min are free)`:""} · takes about ${Math.max(1,Math.ceil(n*12/3/60))} min`:"Add symbols to scan.";
+  const rows=L.map(x=>S.preds[x]).filter(p=>p&&p.stance).map(p=>({p,score:(p.stance==="Bullish"?1:p.stance==="Bearish"?-1:0)*(+p.confidence||0)})).sort((a,b)=>b.score-a.score);
+  $("scrTable").innerHTML=rows.length?`<thead><tr><th>#</th><th>Symbol</th><th>Call</th><th>Confidence</th><th>Risk</th><th>Price</th><th>2-wk target</th><th>6-mo target</th><th>Why</th></tr></thead><tbody>${rows.map(({p},i)=>`<tr data-scropen="${esc(p.symbol)}" class="${S.scr.open===p.symbol?"sel-row":""}" title="Click to see the full prediction"><td>${i+1}</td><td class="sym-cell">${esc(p.symbol)}</td><td style="text-align:left"><span class="stance ${esc(p.stance)}" style="font-size:11px;padding:2px 8px">${esc(p.stance)}</span></td>
+    <td><span class="cbar"><i style="width:${p.confidence}%;background:${p.stance==="Bullish"?"var(--up)":p.stance==="Bearish"?"var(--down)":"var(--muted)"}"></i></span>${esc(p.confidence)}%</td><td><span class="risk ${esc(String(p.riskLevel||"").split(" ")[0])}">${esc(p.riskLevel||"—")}</span></td>
+    <td>${fmt(p.priceAt)}</td><td class="${cls(p.targetShort-p.priceAt)}">${fmt(p.targetShort)} ${p.priceAt&&p.targetShort?"("+pct((p.targetShort/p.priceAt-1)*100)+")":""}</td><td class="${cls(p.targetMedium-p.priceAt)}">${fmt(p.targetMedium)} ${p.priceAt&&p.targetMedium?"("+pct((p.targetMedium/p.priceAt-1)*100)+")":""}</td>
+    <td style="text-align:left;font-family:var(--sans);white-space:normal;min-width:220px;color:var(--muted)">${esc(p.oneLiner||p.headline||"")}</td></tr>`).join("")}</tbody>`
+    +(S.scr.open&&S.preds[S.scr.open]?.stance?`<tr class="scr-detail"><td colspan="9" style="white-space:normal;text-align:left;font-family:var(--sans);padding:12px">${predCard(S.scr.open,S.preds[S.scr.open])}</td></tr>`:"")
+    :`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:20px">Pick a list and press Run scan. Claude predicts each symbol and ranks them here.</td></tr></tbody>`;
+}
+document.addEventListener("click",e=>{ const r=e.target.closest("[data-scropen]"); if(!r) return; S.scr.open=S.scr.open===r.dataset.scropen?null:r.dataset.scropen; renderScreener(); });
+$("scrSrc").onclick=e=>{ const b=e.target.closest("[data-scr]"); if(!b) return; S.scr.src=b.dataset.scr; renderScreener(); if(S.scr.src==="custom") $("scrCustom").focus(); };
+$("scrCustom").addEventListener("input",()=>{ S.scr.src="custom"; renderScreener(); });
+$("scrRun").onclick=async()=>{
+  if(!hasKey()) return toast("Claude Predictor isn't switched on yet."); if(S.scr.running) return;
+  const L=scrList(); if(!L.length) return toast("Add symbols to scan.");
+  const b=$("scrRun"); if(!b.dataset.arm){ b.dataset.arm="1"; b.textContent="Click again to start"; setTimeout(()=>{ delete b.dataset.arm; if(!S.scr.running) b.textContent="Run scan"; },4000); return; }
+  delete b.dataset.arm; S.scr.running=true; b.disabled=true; $("scrProg").hidden=false; let done=0;
+  const step=()=>{ $("scrProg").firstElementChild.style.width=(done/L.length*100)+"%"; b.textContent=`Scanning ${done}/${L.length}…`; renderScreener(); };
+  step(); let i=0;
+  await Promise.all([0,1,2].map(async()=>{ while(i<L.length){ const sym=L[i++]; await runPredict(sym).catch(()=>{}); done++; step(); } }));
+  S.scr.running=false; b.disabled=false; b.textContent="Run scan"; $("scrProg").hidden=true; renderScreener(); toast("Scan complete. Results are ranked and saved to your prediction database.");
+};
+
+/* head-to-head */
+$("h2hForm").onsubmit=async e=>{ e.preventDefault();
+  if(!hasKey()) return toast("Claude Predictor isn't switched on yet.");
+  const A=normSym($("h2hA").value), B=normSym($("h2hB").value); if(!A||!B||A===B) return toast("Enter two different tickers.");
+  $("h2hOut").innerHTML='<div class="pcard"><span class="spin"></span>Claude is comparing '+esc(A)+' and '+esc(B)+'…</div>';
+  const info=async sym=>{ const [q,d]=await Promise.all([api("/api/quotes?symbols="+encodeURIComponent(sym)).then(j=>j.quotes[sym]).catch(()=>({})),api("/api/summary?symbol="+encodeURIComponent(sym)).catch(()=>({}))]);
+    S.quotes[sym]=q; const sd=d.summaryDetail||{}, fd=d.financialData||{}, ks=d.defaultKeyStatistics||{};
+    return {q,d,txt:`${d.price?.longName||q?.name||sym} (${sym}): price ${fmt(q?.price)} (${pct(q?.changePct)} today), 52w ${fmt(sd.fiftyTwoWeekLow??q?.low52)}-${fmt(sd.fiftyTwoWeekHigh??q?.high52)}, mkt cap ${money(sd.marketCap)}, P/E ${num(sd.trailingPE)}, fwd P/E ${num(sd.forwardPE)}, revenue growth ${fp(fd.revenueGrowth)}, profit margin ${fp(fd.profitMargins)}, analysts ${fd.recommendationKey||"n/a"} target ${fmt(fd.targetMeanPrice)}, beta ${num(sd.beta)}, sector ${(d.assetProfile||{}).sector||"n/a"}`}; };
+  const [a,b]=await Promise.all([info(A),info(B)]);
+  const card=(sym,x)=>`<div class="pcard"><h3>${esc(sym)} <span style="font-size:14px;color:var(--muted)">${fmt(x.q?.price)} <span class="${cls(x.q?.changePct)}">${pct(x.q?.changePct)}</span></span></h3>${kv([["Market cap",money(x.d.summaryDetail?.marketCap)],["P/E",num(x.d.summaryDetail?.trailingPE)],["Revenue growth",fp(x.d.financialData?.revenueGrowth)],["Profit margin",fp(x.d.financialData?.profitMargins)],["Analysts",esc(x.d.financialData?.recommendationKey||"—")],["52-wk range",`${fmt(x.d.summaryDetail?.fiftyTwoWeekLow??x.q?.low52)} – ${fmt(x.d.summaryDetail?.fiftyTwoWeekHigh??x.q?.high52)}`]])}</div>`;
+  try{
+    const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:`Compare ${A} vs ${B} for an investor. Cover growth, valuation, risk, momentum and the latest news. Say which looks better positioned over the next 2 weeks and the next 6 months. Finish with a final line exactly like "Verdict: <TICKER> — <short reason>".`,watchlist:[A,B],holdings:[],context:"HEAD-TO-HEAD\n"+a.txt+"\n"+b.txt})});
+    $("h2hOut").innerHTML=`<div class="h2h">${card(A,a)}${card(B,b)}</div><div class="pcard"><div class="who"><i></i>Claude's head-to-head</div><div class="answer" style="border:0;padding-top:6px">${esc(j.answer)}</div><div class="stamp">${esc(j.model)} · AI opinion, not financial advice</div></div>`;
+  }catch(err){ $("h2hOut").innerHTML=`<div class="pcard bad">Couldn't compare: ${esc(err.message)}</div>`; }
+};
+attachSuggest("h2hA",()=>$("h2hB").focus());
+
+
+/* ---------- interactive bits for prediction cards ---------- */
+S.projH={};
+function rangeNums(t){ const n=(String(t||"").replace(/,/g,"").match(/\d+(\.\d+)?/g)||[]).map(Number).filter(x=>x>0); return n.length>=2?[Math.min(...n),Math.max(...n)]:null; }
+function projChart(sym,p){
+  const ps=p.priceSymbol||(sym==="MARKET"?"^GSPC":sym), h=S.projH[ps];
+  if(!h){ if(h!==null){ S.projH[ps]=null; api(`/api/history?symbol=${encodeURIComponent(ps)}&range=6mo`).then(j=>{ S.projH[ps]=j.candles.map(c=>[c.time*1000,c.close]); if(S.tab==="predict") renderPredict(); }).catch(()=>{ S.projH[ps]=[]; }); }
+    return '<div class="proj"><div class="skeleton" style="height:180px;margin:0"></div></div>'; }
+  if(!h.length) return "";
+  const t0=p.generated, past=h.filter(x=>x[0]>=t0-120*DAY), now=[t0,p.priceAt||past[past.length-1][1]];
+  const pts=[[t0+14*DAY,p.targetShort],[t0+182*DAY,p.targetMedium]].filter(x=>x[1]);
+  const r1=rangeNums(p.shortTerm?.range), r2=rangeNums(p.mediumTerm?.range);
+  const actual=h.filter(x=>x[0]>t0);
+  const xs=[past[0]?.[0]??t0-120*DAY,t0+182*DAY], ys=[...past.map(x=>x[1]),...pts.map(x=>x[1]),...(r1||[]),...(r2||[]),...actual.map(x=>x[1]),now[1]];
+  const lo=Math.min(...ys)*0.98, hi=Math.max(...ys)*1.02, W=innerWidth<760?520:1000, H=200;
+  const X=t=>(t-xs[0])/(xs[1]-xs[0])*W, Y=v=>H-(v-lo)/(hi-lo)*H;
+  const line=a=>a.map(x=>X(x[0]).toFixed(1)+","+Y(x[1]).toFixed(1)).join(" ");
+  const band=r1&&r2?`<polygon points="${X(now[0])},${Y(now[1])} ${X(t0+14*DAY)},${Y(r1[1])} ${X(t0+182*DAY)},${Y(r2[1])} ${X(t0+182*DAY)},${Y(r2[0])} ${X(t0+14*DAY)},${Y(r1[0])}" fill="rgba(217,119,87,.13)"/>`:"";
+  const col=p.stance==="Bullish"?"#21c37a":p.stance==="Bearish"?"#ff4d5e":"#8b95a3";
+  const dots=pts.map(([t,v],i)=>`<circle cx="${X(t)}" cy="${Y(v)}" r="5" fill="${col}"/><text x="${X(t)-(i?8:0)}" y="${Y(v)-10}" text-anchor="${i?"end":"middle"}" fill="#e7e9ec" font-size="13" font-family="IBM Plex Mono">${i?"6 mo":"2 wk"} ${fmt(v)}</text>`).join("");
+  return `<div class="proj"><svg viewBox="0 0 ${W} ${H+18}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;display:block">
+    <line x1="${X(t0)}" x2="${X(t0)}" y1="0" y2="${H}" stroke="#2d3540" stroke-dasharray="3 3"/><text x="${X(t0)+4}" y="${H+14}" fill="#5c6673" font-size="12" font-family="IBM Plex Mono">prediction</text>
+    ${band}<polyline points="${line(past)}" fill="none" stroke="#8b95a3" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    ${actual.length?`<polyline points="${line([now,...actual])}" fill="none" stroke="#e7e9ec" stroke-width="2.2" vector-effect="non-scaling-stroke"/>`:""}
+    <polyline points="${line([now,...pts])}" fill="none" stroke="${col}" stroke-width="2" stroke-dasharray="6 5" vector-effect="non-scaling-stroke"/>${dots}</svg>
+    <div class="proj-leg"><span><i style="background:#8b95a3"></i>Before</span>${actual.length?'<span><i style="background:#e7e9ec"></i>What actually happened</span>':""}<span><i style="background:${col}"></i>Claude's path</span>${band?'<span><i style="background:rgba(217,119,87,.5)"></i>Likely range</span>':""}</div></div>`;
+}
+function openAsk(q){ $("acPanel").hidden=false; $("acFab").hidden=true; acRender(); acSend(q); }
+document.addEventListener("click",e=>{ const a=e.target.closest("[data-acopen]"); if(a){ openAsk(a.dataset.acopen); } });
+document.addEventListener("submit",e=>{ const f=e.target.closest("[data-follow]"); if(!f) return; e.preventDefault(); const v=f.querySelector("input").value.trim(); if(!v) return; const s=f.dataset.follow;
+  const p=S.preds[s]||S.db.find(x=>x.symbol===s)||{};
+  openAsk(`About my Claude prediction for ${s==="MARKET"?"the market":s} (${p.stance||""} ${p.confidence||""}%, 2-week target ${p.targetShort??"n/a"}, 6-month target ${p.targetMedium??"n/a"}): ${v}`); f.querySelector("input").value=""; });
 
 /* ---------- ASK CLAUDE ---------- */
 async function runAsk(){
@@ -1664,7 +1894,7 @@ document.addEventListener("click",e=>{
   const dh=e.target.closest("[data-delhold]"); if(dh){ S.port.splice(+dh.dataset.delhold,1); savePorts(); renderPortfolio(); return; }
   const da=e.target.closest("[data-delalert]"); if(da){ S.alerts=S.alerts.filter(a=>String(a.id)!==da.dataset.delalert); store.set("alerts",S.alerts); renderPortfolio(); return; }
   const ak=e.target.closest("[data-ask]"); if(ak){ $("askInput").value=ak.dataset.ask; runAsk(); return; }
-  const pr=e.target.closest("[data-pred-refresh]"); if(pr){ e.preventDefault(); runPredict(pr.dataset.predRefresh); return; }
+  const pr=e.target.closest("[data-pred-refresh]"); if(pr){ e.preventDefault(); runPredict(pr.dataset.predRefresh,true); return; }
   const pd=e.target.closest("[data-pred]"); if(pd){ runPredict(pd.dataset.pred); return; }
   const qo=e.target.closest("[data-quote]"); if(qo){ openQuote(qo.dataset.quote); return; }
   const ch=e.target.closest("[data-chart]"); if(ch){ openChart(ch.dataset.chart); return; }
