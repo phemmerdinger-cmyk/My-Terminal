@@ -523,7 +523,8 @@ body{font-variant-numeric:tabular-nums}
 .wl .sym{font-weight:700}
 .sym-cell{font-weight:700}
 /* Webull-style colored change pills */
-.wl li{grid-template-columns:1fr 60px 86px}
+.wl li{grid-template-columns:minmax(0,1fr) 60px max-content}
+.wl li > div:first-child{min-width:0} .wl li .nm,.wl li .sym{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wl .px{font-weight:600}
 .wl .ch{display:block;margin-top:3px;margin-left:auto;width:74px;text-align:center;border-radius:4px;padding:3px 0;font-weight:600;font-size:12px;color:#fff;background:var(--line2)}
 .wl .ch.up{background:var(--up);color:#fff} .wl .ch.down{background:var(--down);color:#fff}
@@ -549,13 +550,14 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 /* paper trading (computer only) */
 @media (max-width:760px){ nav.tabs button[data-tab=trade]{display:none!important} }
 .pt-lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
-.pt-bar{display:flex;align-items:center;gap:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex-wrap:wrap}
+.pt-bar{display:flex;align-items:center;gap:10px 22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex-wrap:wrap}
 .pt-bar > div{display:flex;flex-direction:column;gap:3px}
 .pt-bar b{font-family:var(--mono);font-size:15px;font-weight:500}
 .pt-bar .pt-bv b{font-size:22px}
 .pt-spark{flex:1 1 80px;min-width:0;max-width:300px;margin-left:auto}
 .pt-spark:empty{visibility:hidden}
-.pt-plus{width:40px;height:40px;border-radius:50%;border:0;background:var(--amber);color:#fff;font-size:26px;line-height:1;cursor:pointer;font-weight:300;flex:none}
+.pt-bvrow{display:flex;align-items:center;gap:10px}
+.pt-plus{width:32px;height:32px;font-size:22px!important;border-radius:50%;border:0;background:var(--amber);color:#fff;font-size:26px;line-height:1;cursor:pointer;font-weight:300;flex:none}
 .pt-add{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:12px 16px;margin-top:-8px}
 .pt-add[hidden]{display:none}
 .pt-row{display:flex;gap:8px} .pt-row .field{flex:1}
@@ -764,14 +766,13 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
     <!-- PAPER TRADING (computer only) -->
     <section id="tab-trade" class="pad" hidden>
       <div class="pt-bar">
-        <div class="pt-bv"><span class="pt-lbl">Paper account</span><b id="ptVal">$0.00</b></div>
+        <div class="pt-bv"><span class="pt-lbl">Paper account</span><div class="pt-bvrow"><b id="ptVal">$0.00</b><button class="pt-plus" id="ptPlus" type="button" title="Add practice money">+</button></div></div>
         <div><span class="pt-lbl">Today</span><b id="ptToday">—</b></div>
         <div><span class="pt-lbl">All time</span><b id="ptAll">—</b></div>
         <div><span class="pt-lbl">Buying power</span><b id="ptBP">—</b></div>
         <div><span class="pt-lbl">Cash</span><b id="ptCash">—</b></div>
         <div><span class="pt-lbl">Money added</span><b id="ptDep">—</b></div>
         <div class="pt-spark" id="ptCurve" title="Account value by day"></div>
-        <button class="pt-plus" id="ptPlus" type="button" title="Add practice money">+</button>
       </div>
       <form class="pt-add" id="ptAdd" hidden>
         <span class="pt-lbl">Add practice money (up to $1,000,000 at a time)</span>
