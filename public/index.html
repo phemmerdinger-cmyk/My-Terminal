@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="My Terminal">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="/tickers.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
@@ -246,6 +247,13 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .cmd-list div.on{background:var(--panel2)}
 .cmd-list div span{color:var(--dim);font-size:12px}
 
+/* suggestions dropdown */
+.sugg{position:fixed;z-index:40;background:var(--panel);border:1px solid var(--line2);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:4px;max-height:360px;overflow-y:auto}
+.sugg div{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+.sugg div.on,.sugg div:hover{background:var(--panel2)}
+.sugg b{font-family:var(--mono);color:var(--amber)}
+.sugg .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.sugg .ty{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -256,11 +264,11 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .mood-parts div{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--line);color:var(--muted)}
 .mood-parts b{font-family:var(--mono);font-weight:500;color:var(--text)}
 .earn-list{max-height:260px;overflow-y:auto}
-.earn-list div{display:grid;grid-template-columns:96px 70px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px;cursor:pointer}
+.earn-list div{display:grid;grid-template-columns:92px 62px auto minmax(0,1fr);gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px;cursor:pointer}
 .earn-list div:hover{background:var(--panel2)}
 .earn-list .d{font-family:var(--mono);color:var(--muted);font-size:12px}
 .earn-list .s{font-family:var(--mono);color:var(--amber);font-weight:600}
-.earn-list .e{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
+.earn-list .e{font-family:var(--mono);font-size:11px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .earn-list .mine{color:var(--claude);font-size:10px;font-weight:700;letter-spacing:.06em}
 @media (max-width:900px){.mk-top{grid-template-columns:1fr}}
 /* MARKETS extra tables */
@@ -355,7 +363,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 <div class="wrap">
   <aside class="left">
     <div class="sec-h"><span>Watchlist</span><span id="wlCount"></span></div>
-    <form class="add" id="addForm"><input id="addInput" placeholder="Add ticker, e.g. NVDA" maxlength="12" autocomplete="off"><button class="btn">Add</button></form>
+    <form class="add" id="addForm"><input id="addInput" autocomplete="off" placeholder="Add ticker, e.g. NVDA" maxlength="12" autocomplete="off"><button class="btn">Add</button></form>
     <ul class="wl" id="wl"></ul>
   </aside>
 
@@ -418,7 +426,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
       <div class="chart-head">
         <div class="chart-title" id="chartTitle"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <form id="chartForm" style="display:flex;gap:6px"><input class="field" id="chartInput" placeholder="Any ticker" style="width:120px;text-transform:uppercase"><button class="btn ghost">Go</button></form>
+          <form id="chartForm" style="display:flex;gap:6px"><input class="field" id="chartInput" autocomplete="off" placeholder="Any ticker" style="width:120px;text-transform:uppercase"><button class="btn ghost">Go</button></form>
           <div class="seg" id="rangeSeg"></div>
           <div class="seg" id="typeSeg"><button data-type="candle">Candles</button><button data-type="line">Line</button></div>
         </div>
@@ -442,7 +450,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
         <div>
           <h2 class="h">Holdings</h2>
           <form class="inline-form" id="holdForm">
-            <input class="field" id="hSym" placeholder="Ticker" maxlength="10" style="text-transform:uppercase">
+            <input class="field" id="hSym" autocomplete="off" placeholder="Ticker" maxlength="10" style="text-transform:uppercase">
             <input class="field" id="hSh" placeholder="Shares" type="number" step="any" min="0">
             <input class="field" id="hCost" placeholder="Avg cost / share" type="number" step="any" min="0">
             <button class="btn">Add holding</button>
@@ -452,7 +460,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
         <div>
           <h2 class="h">Price alerts</h2>
           <form class="inline-form" id="alertForm">
-            <input class="field" id="aSym" placeholder="Ticker" maxlength="10" style="text-transform:uppercase;flex-basis:90px">
+            <input class="field" id="aSym" autocomplete="off" placeholder="Ticker" maxlength="10" style="text-transform:uppercase;flex-basis:90px">
             <select id="aDir"><option value="above">rises above</option><option value="below">falls below</option></select>
             <input class="field" id="aPx" placeholder="Price" type="number" step="any" min="0" style="flex-basis:90px">
             <button class="btn">Set</button>
@@ -479,7 +487,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
         <div class="answer" id="askOut" hidden></div>
       </div>
       <form class="pred-hero" id="predForm">
-        <input class="field" id="predInput" placeholder="Search any stock for Claude's prediction — e.g. NVDA" maxlength="12" autocomplete="off">
+        <input class="field" id="predInput" autocomplete="off" placeholder="Search any stock for Claude's prediction — e.g. NVDA" maxlength="12" autocomplete="off">
         <button class="btn claude" id="predBtn">✦ Predict</button>
       </form>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="predChips"></div>
@@ -1256,6 +1264,34 @@ window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEv
 $("installBtn").onclick=async()=>{ if(!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; $("installBtn").hidden=true; };
 if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
 
+
+/* ---------- TICKER SUGGESTIONS for every symbol box ---------- */
+function attachSuggest(inputId, onPick){
+  const inp=$(inputId); if(!inp) return;
+  const box=document.createElement("div"); box.className="sugg"; box.hidden=true; document.body.appendChild(box);
+  let items=[], sel=0, t=0, q0="";
+  const place=()=>{ const r=inp.getBoundingClientRect(); box.style.left=r.left+"px"; box.style.top=(r.bottom+4)+"px"; box.style.width=Math.max(r.width,300)+"px"; };
+  const draw=()=>{ if(!items.length){ box.hidden=true; return; } place(); box.hidden=false;
+    box.innerHTML=items.map((r,i)=>`<div class="${i===sel?"on":""}" data-i="${i}"><b>${esc(r.symbol)}</b><span class="nm">${esc(r.name)}</span><span class="ty">${esc(r.typeDisp||"")}</span></div>`).join(""); };
+  const pick=(r)=>{ box.hidden=true; inp.value=r.symbol; onPick&&onPick(r.symbol); };
+  inp.addEventListener("input",()=>{ const q=inp.value.trim(); q0=q; items=window.localSearch?localSearch(q,8):[]; sel=0; draw(); clearTimeout(t);
+    if(!q) return; t=setTimeout(async()=>{ try{ const j=await api("/api/search?q="+encodeURIComponent(q)); if(q0===q&&inp.value.trim()===q){ items=mergeResults(items,j.results,8); draw(); } }catch{} },150); });
+  inp.addEventListener("keydown",e=>{ if(box.hidden) return;
+    if(e.key==="ArrowDown"){ e.preventDefault(); sel=Math.min(items.length-1,sel+1); draw(); }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); sel=Math.max(0,sel-1); draw(); }
+    else if(e.key==="Enter"&&items[sel]&&inp.value.trim().toUpperCase()!==items[sel].symbol){ e.preventDefault(); pick(items[sel]); }
+    else if(e.key==="Escape"||e.key==="Tab") box.hidden=true; });
+  inp.addEventListener("blur",()=>setTimeout(()=>box.hidden=true,150));
+  box.addEventListener("mousedown",e=>{ const d=e.target.closest("[data-i]"); if(d){ e.preventDefault(); pick(items[+d.dataset.i]); } });
+  window.addEventListener("scroll",()=>{ if(!box.hidden) place(); },true);
+}
+const submit=(formId)=>()=>{ const f=$(formId); f.requestSubmit?f.requestSubmit():f.dispatchEvent(new Event("submit",{cancelable:true})); };
+attachSuggest("addInput",submit("addForm"));
+attachSuggest("predInput",submit("predForm"));
+attachSuggest("chartInput",submit("chartForm"));
+attachSuggest("hSym",()=>$("hSh").focus());
+attachSuggest("aSym",()=>$("aPx").focus());
+
 /* ---------- COMMAND BAR ---------- */
 let cmdSel=0, cmdItems=[];
 function openCmd(){ $("cmd").hidden=false; $("cmdInput").value=""; cmdResults=[]; buildCmd(); $("cmdInput").focus(); }
@@ -1263,10 +1299,10 @@ function closeCmd(){ $("cmd").hidden=true; }
 function buildCmd(){
   const raw=$("cmdInput").value.trim(), v=normSym(raw); const items=[];
   const valid=/^[A-Z0-9.\-^=]{1,12}$/.test(v);
-  (cmdResults||[]).forEach(r=>items.push([`${r.symbol} · ${r.name}`,r.typeDisp||"",()=>openQuote(r.symbol),r]));
-  const exact=cmdResults.some(r=>r.symbol===v);
+  (cmdResults||[]).forEach(r=>{ const q=S.quotes[r.symbol]; items.push([`${r.symbol} · ${r.name}${q&&!q.error?"   "+fmt(q.price)+" "+pct(q.changePct):""}`,r.typeDisp||"",()=>openQuote(r.symbol),r]); });
+  const exact=cmdResults.length&&cmdResults[0].symbol===v;
   if(valid&&!cmdResults.length) items.push([`Open ${v} research page`,"Research",()=>openQuote(v)]);
-  if(valid&&(exact||!cmdResults.length)){
+  if(valid&&exact){
     items.push([`Chart ${v}`,"Charts",()=>openChart(v)]);
     items.push([`Claude's prediction for ${v}`,"Predictions",()=>{setTab("predict");runPredict(v);}]);
     if(!S.wl.includes(v)) items.push([`Add ${v} to watchlist`,"Watchlist",()=>{S.wl.push(v);store.set("wl",S.wl);renderWL();loadQuotes();loadNews();toast(v+" added to your watchlist");}]);
@@ -1278,9 +1314,10 @@ function buildCmd(){
 function drawCmd(){ $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||'<div style="color:var(--muted)">Type a company name or ticker, like Apple or VFIAX</div>'; }
 $("cmdBtn").onclick=openCmd;
 let cmdResults=[], cmdTimer=0, cmdQ="";
-$("cmdInput").oninput=()=>{ cmdResults=[]; buildCmd(); clearTimeout(cmdTimer);
-  const q=$("cmdInput").value.trim(); if(q.length<1) return;
-  cmdTimer=setTimeout(async()=>{ cmdQ=q; try{ const j=await api("/api/search?q="+encodeURIComponent(q)); if(cmdQ===q&&$("cmdInput").value.trim()===q){ cmdResults=j.results.slice(0,8); buildCmd(); } }catch{} },180); };
+function mergeResults(local,remote,n=12){ const seen=new Set(), out=[]; for(const r of [...local.slice(0,6),...remote,...local.slice(6)]){ if(!seen.has(r.symbol)){ seen.add(r.symbol); out.push(r); } } return out.slice(0,n); }
+$("cmdInput").oninput=()=>{ const q=$("cmdInput").value.trim(); const local=window.localSearch?localSearch(q,10):[]; cmdResults=local; buildCmd(); clearTimeout(cmdTimer);
+  if(q.length<1) return;
+  cmdTimer=setTimeout(async()=>{ cmdQ=q; try{ const j=await api("/api/search?q="+encodeURIComponent(q)); if(cmdQ===q&&$("cmdInput").value.trim()===q){ cmdResults=mergeResults(local,j.results); buildCmd(); } }catch{} },120); };
 $("cmdInput").onkeydown=e=>{
   if(e.key==="ArrowDown"){e.preventDefault();cmdSel=Math.min(cmdItems.length-1,cmdSel+1);drawCmd();}
   else if(e.key==="ArrowUp"){e.preventDefault();cmdSel=Math.max(0,cmdSel-1);drawCmd();}
