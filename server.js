@@ -464,6 +464,76 @@ async function predict(sym, apiKey, fresh) {
   });
 }
 
+// Ask Claude can also DO things on the dashboard: build a portfolio or add holdings.
+// Simple text fields only (nested lists came back garbled from this model).
+const ACTION_TOOLS = [
+  {
+    name: "create_portfolio",
+    description: "Create a new portfolio on the user's dashboard. Use this whenever the user asks you to make, build or set up a portfolio for them. Pick real, liquid tickers that fit their request and today's data.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "short portfolio name, e.g. 'Aggressive Growth'" },
+        total: { type: "number", description: "total dollars to invest; use the amount the user gave, otherwise 10000" },
+        holdings: { type: "string", description: "comma-separated TICKER:PERCENT pairs that add up to 100, e.g. 'NVDA:15, MSFT:10, VOO:25'. Use Yahoo symbols (crypto like BTC-USD)." },
+        rationale: { type: "string", description: "2-4 sentences on why these picks and weights" },
+      },
+      required: ["name", "total", "holdings", "rationale"],
+    },
+  },
+  {
+    name: "add_holdings",
+    description: "Add holdings to the portfolio the user is currently viewing. Use when they ask to add stocks to their current/existing portfolio.",
+    input_schema: {
+      type: "object",
+      properties: {
+        holdings: { type: "string", description: "comma-separated TICKER:DOLLARS pairs, e.g. 'AAPL:1000, AMD:500'" },
+        rationale: { type: "string", description: "1-3 sentences on why" },
+      },
+      required: ["holdings", "rationale"],
+    },
+  },
+];
+function parsePairs(str) {
+  return String(str || "").split(/,(?!\d{3}(?!\d))|[;\n]+/).map((x) => x.trim()).filter(Boolean).map((x) => {
+    const m = x.match(/^\$?([A-Za-z0-9.\-^=]{1,12})\s*[:=\s]\s*\$?([\d.,]+)\s*%?$/);
+    return m ? { symbol: m[1].toUpperCase(), value: parseFloat(m[2].replace(/,/g, "")) } : null;
+  }).filter((x) => x && x.value > 0).slice(0, 40);
+}
+async function askWithActions(apiKey, prompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: MODEL, max_tokens: 3000, tools: ACTION_TOOLS, tool_choice: { type: "auto" },
+      system:
+        "You are a sharp, balanced investing assistant inside one person's personal stock dashboard. Use the data provided plus general market knowledge, " +
+        "cite specific numbers and headlines, and be honest about uncertainty. This is an opinion, not financial advice. " +
+        "You can take actions: when the user asks you to make/build/create a portfolio, CALL create_portfolio (don't just describe one). " +
+        "When they ask to add stocks to their current portfolio, CALL add_holdings. Otherwise just answer. " +
+        "Always also write a short plain-text reply (no markdown headings, '- ' bullets are fine, under 220 words).",
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  const j = await res.json();
+  if (!res.ok) throw new Error((j.error && j.error.message) || `Anthropic API error ${res.status}`);
+  const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  const tu = (j.content || []).find((b) => b.type === "tool_use");
+  let action = null;
+  if (tu && tu.name === "create_portfolio") {
+    const pairs = parsePairs(tu.input.holdings);
+    const sum = pairs.reduce((a, b) => a + b.value, 0) || 1;
+    if (pairs.length) action = { type: "create_portfolio", name: String(tu.input.name || "Claude's portfolio").slice(0, 40), total: Math.max(1, +tu.input.total || 10000),
+      holdings: pairs.map((p) => ({ symbol: p.symbol, pct: (p.value / sum) * 100 })), rationale: tu.input.rationale || "" };
+  } else if (tu && tu.name === "add_holdings") {
+    const pairs = parsePairs(tu.input.holdings);
+    if (pairs.length) action = { type: "add_holdings", holdings: pairs.map((p) => ({ symbol: p.symbol, amount: p.value })), rationale: tu.input.rationale || "" };
+  }
+  const answer = text || (action ? action.rationale : "") || "Done.";
+  return { answer, action };
+}
+
 // Free-form question, with the viewer's watchlist / portfolio as context
 async function ask(apiKey, body) {
   const question = String(body.question || "").slice(0, 1000);
@@ -482,7 +552,7 @@ async function ask(apiKey, body) {
   const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", dateStyle: "full" });
   const ctx = String(body.context || "").slice(0, 6000);
   const prompt = `Today is ${today}.\n\n${ctx ? "WHAT I'M LOOKING AT ON MY DASHBOARD RIGHT NOW\n" + ctx + "\n\n" : ""}MARKET\n${idx.map(qline).join("\n")}\n\nWATCHED / HELD STOCKS\n${syms.map(qline).join("\n")}\n\nMY PORTFOLIO\n${port}\n\nLATEST HEADLINES\n${news.items.slice(0, 40).map((i) => `- [${SOURCES[i.source].name}] ${i.title}`).join("\n")}\n\nMY QUESTION\n${question}`;
-  return { answer: await askClaude(apiKey, prompt, true), model: MODEL, generated: Date.now() };
+  return { ...(await askWithActions(apiKey, prompt)), model: MODEL, generated: Date.now() };
 }
 
 function readBody(req) {

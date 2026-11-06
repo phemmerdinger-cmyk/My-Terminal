@@ -744,6 +744,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
         <div class="pcard" style="padding:0;border:0;background:none"><div class="who"><i></i>Ask Claude</div></div>
         <div class="ask-box"><textarea id="askInput" rows="2" placeholder="Ask anything, e.g. “Am I too concentrated in tech?” or “What's moving the market today?”"></textarea><button class="ask-send" id="askBtn" title="Send (Enter)" aria-label="Send">↑</button></div>
         <div class="row">
+          <span class="chip" data-ask="Build me a new portfolio based on today's news and upcoming earnings. Use $10,000 and about 12 holdings.">✦ Build me a portfolio</span>
           <span class="chip" data-ask="How is my portfolio positioned for the week ahead, and what are the biggest risks?">Portfolio check-up</span>
           <span class="chip" data-ask="Summarize today's most important market news in 5 bullets.">Today in 5 bullets</span>
           <span class="chip" data-ask="Which stocks on my watchlist have the most notable news right now, and why?">Watchlist news</span>
@@ -766,7 +767,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
   <div class="ac-head"><span class="who"><i></i>Ask Claude</span><span class="ac-where" id="acWhere"></span><button class="ac-x" id="acClose" aria-label="Close">✕</button></div>
   <div class="ac-thread" id="acThread"></div>
   <div class="ac-chips" id="acChips"></div>
-  <div class="ask-box ac-input"><textarea id="acInput" rows="2" placeholder="Ask about what you're looking at…"></textarea><button class="ask-send" id="acSend" aria-label="Send">↑</button></div>
+  <div class="ask-box ac-input"><textarea id="acInput" rows="2" placeholder="Ask anything, or say “build me a portfolio”…"></textarea><button class="ask-send" id="acSend" aria-label="Send">↑</button></div>
 </div>
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
@@ -1094,8 +1095,10 @@ function renderPortfolio(){
     const etDay=t=>new Date(t).toLocaleDateString("en-US",{timeZone:"America/New_York"});
     const v=px!=null?px*h.shares:null, c=h.cost*h.shares;
     const d=q&&!q.error&&q.change!=null?(h.added&&etDay(h.added)===etDay(Date.now())?(px-h.cost)*h.shares:q.change*h.shares):null;
-    if(v!=null) val+=v; cost+=c; if(d!=null) day+=d; return {...h,q,px,v,c,d};});
-  const tot=val-cost, totPct=cost?tot/cost*100:0, dayPct=val-day?day/(val-day)*100:0;
+    const d2=d!=null?Math.round(d*100)/100+0:null;
+    if(v!=null) val+=v; cost+=c; if(d2!=null) day+=d2; return {...h,q,px,v,c,d:d2};});
+  day=Math.round(day*100)/100+0;
+  const tot=Math.round((val-cost)*100)/100+0, totPct=cost?tot/cost*100:0, dayPct=val-day?day/(val-day)*100:0;
   $("kpis").innerHTML=[
     ["Portfolio value",`$${fmt(val)}`,""],
     ["Today",`<span class="${cls(day)}">${day>=0?"+":"−"}$${fmt(Math.abs(day))}</span>`,`<small class="${cls(day)}">${pct(dayPct)}</small>`],
@@ -1111,7 +1114,7 @@ function renderPortfolio(){
     <div class="sec-list">${alloc.map(([k,g],i)=>`<div><span><i class="sw" style="background:${PALETTE[i%PALETTE.length]}"></i>${esc(k)}</span><b>${(g.v/val*100).toFixed(1)}%</b><small>${g.syms.map(esc).join(", ")}</small></div>`).join("")}</div>`:"";
   loadSectors(rows.map(r=>r.symbol));
   $("holdTable").innerHTML=S.port.length?`<thead><tr><th>Symbol</th><th>Invested</th><th>Value now</th><th>Today</th><th>Total gain</th><th>Weight</th><th></th></tr></thead><tbody>${
-    rows.map((r,i)=>{const g=r.v!=null?r.v-r.c:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}</td>
+    rows.map((r,i)=>{const g=r.v!=null?Math.round((r.v-r.c)*100)/100+0:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}</td>
       <td class="${cls(r.d)}">${r.d!=null?(r.d>=0?"+":"−")+"$"+fmt(Math.abs(r.d)):"—"}</td><td class="${cls(g)}">${g!=null?(g>=0?"+":"−")+"$"+fmt(Math.abs(g))+` (${pct(r.c?g/r.c*100:0)})`:"—"}</td>
       <td>${r.v&&val?(r.v/val*100).toFixed(1)+"%":"—"}</td><td><button class="del" data-delhold="${i}" title="Remove">✕</button></td></tr>`;}).join("")}</tbody>`
     :`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:20px">Add a ticker and how much you invested to start tracking this portfolio.</td></tr></tbody>`;
@@ -1496,7 +1499,9 @@ async function runAsk(){
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port})});
-    out.textContent=j.answer;
+    const did=j.action?await applyAction(j.action):"";
+    out.textContent=j.answer+(did?"\n\n"+did:"");
+    if(did.startsWith("✓")){ const b=document.createElement("button"); b.className="btn"; b.style.marginTop="10px"; b.dataset.gotab="portfolio"; b.textContent="Open portfolio →"; out.appendChild(b); }
     const st=document.createElement("div"); st.className="stamp"; st.style.cssText="font-size:11px;color:var(--dim);margin-top:12px";
     st.textContent=`${j.model} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`; out.appendChild(st);
   }catch(e){ out.innerHTML=`<span class="bad">${esc(e.code==="no_key"?"No API key is set up yet.":"Couldn't get an answer: "+e.message)}</span>`; }
@@ -1834,6 +1839,32 @@ attachSuggest("aSym",()=>$("aPx").focus());
 
 
 
+
+/* ---------- Claude can build portfolios ---------- */
+async function applyAction(a){
+  if(!a) return "";
+  const syms=[...new Set(a.holdings.map(h=>normSym(h.symbol)))];
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(","))); S.quotes={...S.quotes,...j.quotes}; }catch{}
+  const price=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price>0?q.price:null; };
+  const missing=[], rows=[];
+  for(const h of a.holdings){ const s=normSym(h.symbol), px=price(s); if(!px){ missing.push(s); continue; }
+    const dollars=a.type==="create_portfolio"?a.total*h.pct/100:h.amount; rows.push({symbol:s,shares:+(dollars/px).toFixed(6),cost:+px.toFixed(4),added:Date.now(),dollars}); }
+  if(!rows.length) return "⚠ I couldn't find live prices for those tickers, so nothing was added.";
+  let msg;
+  if(a.type==="create_portfolio"){
+    let name=a.name, n=2; while(S.pfs.some(p=>p.name===name)) name=`${a.name} ${n++}`;
+    const p={id:"p"+Date.now(),name,holdings:rows.map(({dollars,...r})=>r)}; S.pfs.push(p); switchPf(p.id);
+    msg=`✓ Created portfolio "${name}": ${rows.length} holdings, $${fmt(rows.reduce((x,r)=>x+r.dollars,0),0)} invested at today's prices.`;
+  } else {
+    for(const r of rows){ const ex=S.port.find(h=>h.symbol===r.symbol); if(ex){ const n=ex.shares+r.shares; ex.cost=(ex.cost*ex.shares+r.cost*r.shares)/n; ex.shares=n; } else { const {dollars,...x}=r; S.port.push(x); } }
+    savePorts(); if(S.tab==="portfolio") renderPortfolio(); loadQuotes();
+    msg=`✓ Added ${rows.length} holding${rows.length===1?"":"s"} to "${S.pfs.find(p=>p.id===S.pfActive).name}": ${rows.map(r=>`${r.symbol} $${fmt(r.dollars,0)}`).join(", ")}.`;
+  }
+  if(missing.length) msg+=` Skipped (no price found): ${missing.join(", ")}.`;
+  return msg;
+}
+document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]"); if(g){ setTab(g.dataset.gotab); if(window.innerWidth<760){ $("acPanel").hidden=true; $("acFab").hidden=false; } } });
+
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
 const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",predict:"Claude Predictor"};
@@ -1871,14 +1902,14 @@ function acChips(){
     news:["Summarize the most important headlines here","What news could move my stocks?","Any red flags in today's news?"],
     data:["What's driving the market today?","Explain the market mood score","Which sectors look strongest right now?"],
     research:s?[`Is ${s} a good buy right now?`,`Explain ${s}'s financials simply`,`What are the biggest risks for ${s}?`]:["How do I read a stock's key stats?"],
-    portfolio:["Portfolio check-up","Am I too concentrated anywhere?","Which holding is the riskiest?"],
-    predict:["How is my portfolio positioned for the week ahead?","Summarize today's market in 5 bullets","Which stocks on my watchlist have notable news?"],
+    portfolio:["Build me a balanced $10,000 portfolio","Build me an aggressive growth portfolio","Portfolio check-up","Am I too concentrated anywhere?"],
+    predict:["Build me a portfolio based on today's news and earnings","How is my portfolio positioned for the week ahead?","Summarize today's market in 5 bullets","Which stocks on my watchlist have notable news?"],
   };
   return map[t]||map.news;
 }
 function acRender(){
   $("acWhere").textContent="on "+(TAB_NAMES[S.tab]||"")+(S.tab==="research"&&S.rq?.sym?" · "+S.rq.sym:"");
-  $("acThread").innerHTML=S.ac.thread.length?S.ac.thread.map(m=>`<div class="ac-msg ${m.me?"me":"ai"}">${esc(m.text)}${m.meta?`<small>${esc(m.meta)}</small>`:""}</div>`).join("")+(S.ac.busy?'<div class="ac-msg ai"><span class="spin"></span>Thinking…</div>':"")
+  $("acThread").innerHTML=S.ac.thread.length?S.ac.thread.map(m=>`<div class="ac-msg ${m.me?"me":"ai"}">${esc(m.text)}${m.go?`<button class="btn" style="margin-top:10px;width:100%" data-gotab="${m.go}">Open portfolio →</button>`:""}${m.meta?`<small>${esc(m.meta)}</small>`:""}</div>`).join("")+(S.ac.busy?'<div class="ac-msg ai"><span class="spin"></span>Thinking…</div>':"")
     :`<div class="ac-empty">${hasKey()?"Ask anything about what you're looking at. Claude sees this page, your watchlist and your portfolio.":"Claude isn't switched on yet. It turns on once an Anthropic API key is saved in your Render settings."}</div>`;
   $("acChips").innerHTML=acChips().map(q=>`<span class="chip" data-acq="${esc(q)}">${esc(q)}</span>`).join("");
   $("acThread").scrollTop=$("acThread").scrollHeight;
@@ -1889,7 +1920,8 @@ async function acSend(q){
   $("acInput").value=""; S.ac.thread.push({me:true,text:q}); S.ac.busy=true; acRender();
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port,context:acContext()})});
-    S.ac.thread.push({me:false,text:j.answer,meta:`${TAB_NAMES[S.tab]} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`});
+    const did=j.action?await applyAction(j.action):"";
+    S.ac.thread.push({me:false,text:j.answer+(did?"\n\n"+did:""),meta:`${TAB_NAMES[S.tab]} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`,go:j.action&&did.startsWith("✓")?"portfolio":null});
   }catch(e){ S.ac.thread.push({me:false,text:"Sorry, I couldn't answer that: "+e.message}); }
   S.ac.busy=false; acRender();
 }
