@@ -666,6 +666,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 #installBtn,#notifBtn{display:none!important}
 #liveTxt{display:none!important}
 .live .dot{width:11px;height:11px}
+.live.stale .dot{background:#f5c518!important} .live.err .dot{background:#ff4d5e!important} .live:not(.stale):not(.err) .dot{background:#21c37a!important}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -2623,7 +2624,7 @@ function renderTrade(){
   const tfl=(PT_RANGES.find(r=>r[0]===S.pt.range)||[])[1]||"";
   const g=held&&q?r2(held*(q.price-PA.pos[sym].avg)):0;
   setHTML("ptHead",sym?`<div class="l1"><b>${esc(sym)}</b><span>${esc(q&&q.name&&q.name!==sym?q.name:"")}</span><span>· ${tfl}</span></div>
-    ${c?`<div class="ohlc">O<i>${fpx(c.open)}</i>H<i>${fpx(c.high)}</i>L<i>${fpx(c.low)}</i>C<i>${fpx(c.close)}</i>${q?`<span class="${cls(q.change)}">${q.change>=0?"+":""}${fpx(q.change)} (${pct(q.changePct)})</span>`:""}</div>`:""}
+    ${c?`<div class="ohlc">O<i>${fpx(c.open)}</i>H<i>${fpx(c.high)}</i>L<i>${fpx(c.low)}</i>C<i>${fpx(c.close)}</i>${q?`<span class="${cls(q.change)}">${q.change>=0?"+":""}${fmt(q.change,q.price<1?5:2)} (${pct(q.changePct)})</span>`:""}</div>`:""}
     ${ba?`<div class="tv-qt"><button type="button" class="s" data-quick="sell" title="Sell at the bid using the amount in the order panel"><b>${fpx(ba.bid)}</b><span>SELL</span></button><span class="sp">${fmt(ba.spr,ba.px<1?5:2)}</span><button type="button" class="b" data-quick="buy" title="Buy at the ask using the amount in the order panel"><b>${fpx(ba.ask)}</b><span>BUY</span></button>${held?`<button type="button" class="pos ${g>=0?"up":"down"}" data-ptx="${esc(sym)}" title="Close the whole position now">${held>0?"Long":"Short"} ${num(Math.abs(held),4)} · ${usd(g,1)} ✕</button>`:""}</div>`:""}
     ${q&&!isCrypto(sym)&&!/open/i.test(marketState()[0])?'<span class="closed">Market closed — orders fill at the last price</span>':""}`:"");
   ptPriceLines();
