@@ -664,6 +664,8 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pfc-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
 /* top bar: install-app and notification buttons removed at Peter's request (notification setting itself is kept) */
 #installBtn,#notifBtn{display:none!important}
+#liveTxt{display:none!important}
+.live .dot{width:11px;height:11px}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -682,7 +684,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
   <div class="hstat">
     <div class="hide-sm">NEW YORK <b id="clock" class="num">--:--:--</b></div>
     <div class="hide-sm" id="mkt">—</div>
-    <div class="live" id="live"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
+    <div class="live stale" id="live" title="Connecting…"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
     <button class="iconbtn" id="installBtn" hidden title="Install Peter's Finance Terminal as an app">⤓ Install app</button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <button class="iconbtn" id="notifBtn" title="Desktop alerts for headlines on your stocks">🔔 Alerts</button>
@@ -1073,9 +1075,10 @@ function tick(){
   const [t,c]=marketState(); $("mkt").textContent=t; $("mkt").style.color=c;
   if(!S.lastOk) return;
   const live=$("live"), age=(Date.now()-S.lastOk)/1000, a=ago(S.lastOk);
-  if(S.streaming&&S.lastTick&&Date.now()-S.lastTick<120e3){live.className="live";$("liveTxt").textContent="STREAMING · real-time";}
-  else if(age<120){live.className="live";$("liveTxt").textContent="LIVE · "+(a==="now"?"just now":a+" ago");}
-  else {live.className="live stale";$("liveTxt").textContent="Updated "+a+" ago";}
+  // Status dot only: green = live, yellow = catching up, red = can't connect (hover for details)
+  if(S.streaming&&S.lastTick&&Date.now()-S.lastTick<120e3){live.className="live";live.title="Live — prices streaming in real time";}
+  else if(age<120){live.className="live";live.title="Live — updated "+(a==="now"?"just now":a+" ago");}
+  else {live.className="live stale";live.title="Catching up — last update "+a+" ago";}
 }
 setInterval(tick,1000); tick();
 
@@ -1124,7 +1127,7 @@ async function loadNews(){
     renderFeed(); renderStatus(); renderWL(); tick();
     if(S.tab==="data") renderData();
   }catch(e){
-    console.warn("news",e); $("live").className="live err"; $("liveTxt").textContent="Offline — retrying";
+    console.warn("news",e); $("live").className="live err"; $("live").title="Not connecting — retrying";
     if(!S.news) $("feed").innerHTML=`<div class="empty">Couldn't reach the news server.<br>Make sure <code>node server.js</code> is running.</div>`;
   }
 }
