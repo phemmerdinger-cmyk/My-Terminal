@@ -625,6 +625,14 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pt-bracket .field{height:38px!important;font-size:14px!important;padding:8px 10px!important}
 .pt-sep{width:1px;align-self:stretch;background:var(--line2);margin:0 2px}
 #ptRange{flex-wrap:wrap}
+/* portfolio performance chart */
+.pfc{margin-top:22px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.pfc-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.pfc-head select{background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:7px;padding:6px 8px;font-size:13px;max-width:60%}
+.pfc-stat{font-family:var(--mono);font-size:13px;color:var(--muted)} .pfc-stat b{font-size:18px;color:var(--text);font-weight:500;margin-right:6px}
+#pfChart{height:280px;position:relative}
+#pfChart .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px;line-height:1.5}
+.pfc-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--dim);margin-top:8px}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -773,6 +781,12 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
           </form>
           <div class="tbl-wrap"><table id="alertTable"></table></div>
           <div class="disc">Alerts are checked every 15 seconds while this site is open. Turn on 🔔 Alerts in the top bar to get desktop notifications.</div>
+          <div class="pfc">
+            <div class="pfc-head"><h2 class="h" style="margin:0">Performance</h2><select id="pfcSel" title="Show the whole portfolio or one holding"></select></div>
+            <div class="pfc-head"><div class="pfc-stat" id="pfcStat"></div><div class="seg" id="pfcRange"></div></div>
+            <div id="pfChart"></div>
+            <div class="pfc-legend" id="pfcLegend"></div>
+          </div>
         </div>
       </div>
       <div class="disc">Saved on this device. Turn on ☁ Sync (top bar) to see the same portfolios on your phone and computer.</div>
@@ -1284,6 +1298,7 @@ function renderPortfolio(){
   $("allocWrap").innerHTML=alloc.length?`<h2 class="h">Allocation by sector${pending?' <span class="spin" style="width:10px;height:10px"></span>':""}</h2><div class="alloc">${alloc.map(([k,g],i)=>`<i title="${esc(k)} ${(g.v/val*100).toFixed(1)}%" style="width:${g.v/val*100}%;background:${PALETTE[i%PALETTE.length]}"></i>`).join("")}</div>
     <div class="sec-list">${alloc.map(([k,g],i)=>`<div><span><i class="sw" style="background:${PALETTE[i%PALETTE.length]}"></i>${esc(k)}</span><b>${(g.v/val*100).toFixed(1)}%</b><small>${g.syms.map(esc).join(", ")}</small></div>`).join("")}</div>`:"";
   loadSectors(rows.map(r=>r.symbol));
+  if(S.pfc&&S.tab==="portfolio") pfcLoad();
   $("holdTable").innerHTML=S.port.length?`<thead><tr><th>Symbol</th><th>Invested</th><th>Value now</th><th>Today</th><th>Total gain</th><th>Weight</th><th></th></tr></thead><tbody>${
     rows.map((r,i)=>{const g=r.v!=null?Math.round((r.v-r.c)*100)/100+0:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}</td>
       <td class="${cls(r.d)}">${r.d!=null?(r.d>=0?"+":"−")+"$"+fmt(Math.abs(r.d)):"—"}</td><td class="${cls(g)}">${g!=null?(g>=0?"+":"−")+"$"+fmt(Math.abs(g))+` (${pct(r.c?g/r.c*100:0)})`:"—"}</td>
@@ -2678,6 +2693,91 @@ function ptOpen(){ if(!S.pt.sym){ const first=Object.keys(PA.pos)[0]; S.pt.sym=f
   h.addEventListener("dblclick",()=>{ saved=null; document.documentElement.style.removeProperty("--wlw"); document.body.classList.remove("wl-narrow"); store.set("wlWidth",null); window.dispatchEvent(new Event("resize")); });
 })();
 
+
+/* ---------- portfolio performance chart (bottom right of Portfolio) ---------- */
+S.pfc={range:store.get("pfcRange","1mo"),sel:"__all",key:"",data:null};
+const PFC_RANGES=[["1d","1D"],["5d","5D"],["1mo","1M"],["6mo","6M"],["ytd","YTD"],["1y","1Y"],["5y","5Y"]];
+let pfc=null, pfcMain=null, pfcSpx=null, pfcLine=null;
+function pfcEnsure(){
+  if(pfc||!window.LightweightCharts) return !!pfc;
+  pfc=LightweightCharts.createChart($("pfChart"),{autoSize:true,
+    layout:{background:{type:"solid",color:"transparent"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},
+    grid:{vertLines:{color:"#1c2129"},horzLines:{color:"#1c2129"}},rightPriceScale:{borderColor:"#2d3540"},
+    timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false},crosshair:{mode:0},
+    localization:{priceFormatter:v=>"$"+fmt(v),timeFormatter:t=>new Date(t*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}});
+  return true;
+}
+function pfcReset(msg){ if(pfc){ pfc.remove(); pfc=null; pfcMain=pfcSpx=pfcLine=null; } $("pfChart").innerHTML=`<div class="empty">${msg}</div>`; $("pfcStat").innerHTML=""; $("pfcLegend").innerHTML=""; }
+// Value of today's holdings at each point in time (each symbol's price × shares, gaps filled with its last price)
+function pfcCombine(series,hold){
+  const times=[...new Set(series.flatMap(x=>x.c.map(k=>k.time)))].sort((a,b)=>a-b);
+  const idx=series.map(()=>0), last=series.map(x=>x.c.length?x.c[0].close:0);
+  return times.map(t=>{ let v=0; series.forEach((x,i)=>{ while(idx[i]<x.c.length&&x.c[idx[i]].time<=t){ last[i]=x.c[idx[i]].close; idx[i]++; } v+=last[i]*hold[x.sym]; }); return {time:t,value:v}; });
+}
+function pfcControls(){
+  const opts=[["__all","Whole portfolio"],...S.port.map(h=>[h.symbol,h.symbol])];
+  if(!opts.some(o=>o[0]===S.pfc.sel)) S.pfc.sel="__all";
+  const html=opts.map(([v,l])=>`<option value="${esc(v)}"${v===S.pfc.sel?" selected":""}>${esc(l)}</option>`).join("");
+  if($("pfcSel").innerHTML!==html) $("pfcSel").innerHTML=html;
+  const rh=PFC_RANGES.map(([k,l])=>`<button type="button" data-pfcr="${k}" class="${S.pfc.range===k?"on":""}">${l}</button>`).join("");
+  if($("pfcRange").innerHTML!==rh) $("pfcRange").innerHTML=rh;
+}
+async function pfcLoad(force){
+  pfcControls();
+  const hold={}; S.port.forEach(h=>hold[h.symbol]=(hold[h.symbol]||0)+h.shares);
+  const key=JSON.stringify([S.pfActive,hold,S.pfc.range,S.pfc.sel]);
+  if(!force&&key===S.pfc.key){ pfcLive(); return; } S.pfc.key=key;
+  if(!S.port.length) return pfcReset("Add holdings to see how your portfolio has done over time.");
+  const r=S.pfc.range, one=S.pfc.sel!=="__all";
+  const syms=one?[S.pfc.sel]:Object.keys(hold);
+  $("pfcStat").innerHTML='<span class="spin"></span>';
+  let series, spx=null;
+  try{
+    series=(await Promise.all(syms.map(sym=>api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${r}`).then(h=>({sym,c:h.candles})).catch(()=>({sym,c:[]}))))).filter(x=>x.c.length);
+    if(!one) spx=await api(`/api/history?symbol=%5EGSPC&range=${r}`).then(h=>h.candles).catch(()=>null);
+  }catch{ series=[]; }
+  if(key!==S.pfc.key) return;
+  if(!series.length) return pfcReset("No price history for these holdings yet.");
+  const missing=syms.filter(x=>!series.some(y=>y.sym===x));
+  if(!pfcEnsure()){ const pts=one?series[0].c.map(k=>k.close):pfcCombine(series,hold).map(p=>p.value); $("pfChart").innerHTML=`<div style="position:absolute;inset:0">${spark(pts,"100%",280)}</div>`;
+    S.pfc.first=pts[0]; S.pfc.ref=null; S.pfc.data=null; pfcStat(pts[pts.length-1]); return; }
+  [pfcMain,pfcSpx].forEach(x=>{ if(x) pfc.removeSeries(x); }); pfcMain=pfcSpx=pfcLine=null;
+  let first,lastV,ref,refLabel;
+  if(one){
+    const c=series[0].c, h=S.port.filter(x=>x.symbol===S.pfc.sel), sh=h.reduce((a,x)=>a+x.shares,0), avg=sh?h.reduce((a,x)=>a+x.cost*x.shares,0)/sh:0;
+    pfcMain=pfc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
+    pfcMain.applyOptions({priceFormat:{type:"price",precision:2,minMove:.01}});
+    pfcMain.setData(c.map(({time,open,high,low,close})=>({time,open,high,low,close})));
+    if(avg) pfcLine=pfcMain.createPriceLine({price:avg,color:"#2f80ed",lineWidth:1,lineStyle:2,axisLabelVisible:true,title:"You paid"});
+    first=c[0].open; lastV=c[c.length-1].close; S.pfc.data={one:true,c};
+    $("pfcLegend").innerHTML=`<span>Price of ${esc(S.pfc.sel)}</span>${avg?'<span style="color:#2f80ed">- - What you paid per share</span>':""}`;
+  }else{
+    const pts=pfcCombine(series,hold); first=pts[0].value; lastV=pts[pts.length-1].value; const up=lastV>=first;
+    pfcMain=pfc.addAreaSeries({lineColor:up?"#21c37a":"#ff4d5e",topColor:up?"rgba(33,195,122,.25)":"rgba(255,77,94,.25)",bottomColor:"rgba(0,0,0,0)",lineWidth:2});
+    pfcMain.setData(pts);
+    const invested=S.port.reduce((a,x)=>a+x.cost*x.shares,0);
+    pfcLine=pfcMain.createPriceLine({price:invested,color:"#2f80ed",lineWidth:1,lineStyle:2,axisLabelVisible:true,title:"Invested"});
+    if(spx&&spx.length){ const s0=spx[0].close; pfcSpx=pfc.addLineSeries({color:"rgba(160,170,185,.7)",lineWidth:1,priceLineVisible:false,lastValueVisible:false});
+      pfcSpx.setData(spx.map(k=>({time:k.time,value:k.close/s0*first}))); ref=(spx[spx.length-1].close/s0-1)*100; refLabel="S&P 500"; }
+    S.pfc.data={one:false,pts,hold};
+    $("pfcLegend").innerHTML=`<span>Value of your current holdings</span><span style="color:#2f80ed">- - Amount invested</span>${pfcSpx?'<span style="color:#a0aab9">— S&P 500 (same starting value)</span>':""}${missing.length?`<span>No data: ${missing.map(esc).join(", ")}</span>`:""}`;
+  }
+  pfc.timeScale().fitContent();
+  S.pfc.first=first; S.pfc.ref=ref; S.pfc.refLabel=refLabel; pfcLive();
+}
+function pfcLive(){ // keep the newest point in step with live prices
+  const d=S.pfc.data; if(!d||!pfcMain) return;
+  let now;
+  if(d.one){ const q=ptQ?ptQ(S.pfc.sel):null; const c=d.c[d.c.length-1]; if(q){ c.close=q.price; c.high=Math.max(c.high,q.price); c.low=Math.min(c.low,q.price); try{ pfcMain.update({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close}); }catch{} } now=c.close; }
+  else { const p=d.pts[d.pts.length-1]; let v=0, ok=true; for(const [s,sh] of Object.entries(d.hold)){ const q=S.quotes[s]; if(!q||q.error||q.price==null){ ok=false; break; } v+=q.price*sh; } if(ok){ p.value=v; try{ pfcMain.update(p); }catch{} } now=p.value; }
+  pfcStat(now);
+}
+function pfcStat(now){
+  const ch=now-S.pfc.first, chp=S.pfc.first?ch/S.pfc.first*100:0, lbl=PFC_RANGES.find(x=>x[0]===S.pfc.range)[1];
+  $("pfcStat").innerHTML=`<b>${"$"+fmt(now)}</b><span class="${cls(ch)}">${usd(r2(ch),1)} (${pct(chp)})</span> <span style="color:var(--dim)">${lbl}</span>${S.pfc.ref!=null?` · <span style="color:var(--dim)">${S.pfc.refLabel}</span> <span class="${cls(S.pfc.ref)}">${pct(S.pfc.ref)}</span>`:""}`;
+}
+$("pfcSel").addEventListener("change",e=>{ S.pfc.sel=e.target.value; pfcLoad(); });
+$("pfcRange").addEventListener("click",e=>{ const b=e.target.closest("[data-pfcr]"); if(!b) return; S.pfc.range=b.dataset.pfcr; store.set("pfcRange",S.pfc.range); pfcLoad(); });
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
