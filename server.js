@@ -266,13 +266,14 @@ async function getQuotes(symbols) {
 
 // ---------------------------------------------------------------- history (candles)
 const RANGES = {
+  intraday: ["1d", "1m"], intraday5: ["5d", "5m"],
   "1d": ["1d", "5m"], "5d": ["5d", "15m"], "1mo": ["1mo", "1h"], "6mo": ["6mo", "1d"],
   ytd: ["ytd", "1d"], "1y": ["1y", "1d"], "5y": ["5y", "1wk"], max: ["max", "1mo"],
 };
 async function history(sym, range = "6mo") {
   const [r, iv] = RANGES[range] || RANGES["6mo"];
-  return cached(`h:${sym}:${r}`, r === "1d" || r === "5d" ? 30_000 : 10 * 60_000, async () => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${r}&interval=${iv}`;
+  return cached(`h:${sym}:${r}:${iv}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${r}&interval=${iv}${range && range.startsWith("intraday") ? "&includePrePost=true" : ""}`;
     const j = JSON.parse(await get(url, "application/json"));
     const res = j.chart && j.chart.result && j.chart.result[0];
     if (!res || !res.timestamp) throw new Error("no history");
