@@ -279,6 +279,30 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .pf-item:hover,.pf-item.on{background:var(--panel2)}
 .pf-item small{color:var(--dim);font-family:var(--mono)}
 #pfMenu{min-width:300px}
+/* app-like phone layout */
+nav.tabs .ti{display:none}
+@media (max-width:760px){
+  nav.tabs{position:fixed;top:auto;bottom:0;left:0;right:0;z-index:15;justify-content:space-around;padding:0 0 env(safe-area-inset-bottom);border-top:1px solid var(--line2);border-bottom:0;background:rgba(13,16,20,.97);backdrop-filter:blur(8px)}
+  nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px 9px;font-size:10px;border-bottom:0;border-top:2px solid transparent;flex:1;min-width:0}
+  nav.tabs button.on{border-top-color:var(--amber);color:var(--text)}
+  nav.tabs button .k{display:none}
+  nav.tabs .ti{display:block;font-size:18px;line-height:1}
+  body{padding-bottom:70px}
+  .wl-head{cursor:pointer}
+  .left.collapsed .wl,.left.collapsed .add{display:none}
+  .left.collapsed .wl-car{display:inline-block;transform:rotate(-90deg)}
+  .toolbar{top:0}
+  .rs-actions .btn{padding:7px 10px;font-size:13px}
+  nav.tabs .tlong{display:none}
+  .chip,.dd-btn{white-space:nowrap}
+  #liveTxt{display:none}
+  #notifBtn{font-size:0;padding:5px 8px} #notifBtn::before{content:"🔔";font-size:14px}
+  #installBtn{display:none}
+  header{gap:10px}
+}
+.wl-car{display:none;transition:transform .15s;font-size:10px;margin-left:4px}
+@media (max-width:760px){ .wl-car{display:inline-block} }
+.more-tags{font-family:var(--mono);font-size:11px;color:var(--dim)}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -377,16 +401,16 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 <div class="tape"><div class="tape-inner" id="tape"></div></div>
 
 <nav class="tabs" id="tabs">
-  <button data-tab="news">News<span class="k" id="newsCount"></span></button>
-  <button data-tab="data">Markets</button>
-  <button data-tab="research">Research</button>
-  <button data-tab="portfolio">Portfolio</button>
-  <button data-tab="predict" class="claude">✦ Claude Predictor</button>
+  <button data-tab="news"><span class="ti">📰</span>News<span class="k" id="newsCount"></span></button>
+  <button data-tab="data"><span class="ti">📊</span>Markets</button>
+  <button data-tab="research"><span class="ti">🔎</span>Research</button>
+  <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
+  <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
 
 <div class="wrap">
   <aside class="left">
-    <div class="sec-h"><span>Watchlist</span><span id="wlCount"></span></div>
+    <div class="sec-h wl-head" id="wlHead"><span>Watchlist <span class="wl-car">▾</span></span><span id="wlCount"></span></div>
     <form class="add" id="addForm"><input id="addInput" autocomplete="off" placeholder="Add ticker, e.g. NVDA" maxlength="12" autocomplete="off"><button class="btn">Add</button></form>
     <ul class="wl" id="wl"></ul>
   </aside>
@@ -781,7 +805,8 @@ function renderFeed(){
   const more=list.length>S.newsShow;
   $("feed").innerHTML=`<div class="feed-count">${list.length.toLocaleString()} headline${list.length===1?"":"s"} · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</div>`+list.slice(0,S.newsShow).map(i=>{
     const s=SRC[i.source]; const isNew=i._new&&now-i._new<10*60e3;
-    const tags=i.tickers.map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("");
+    const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
+    const tags=shown.slice(0,3).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")+(shown.length>3?`<span class="more-tags">+${shown.length-3}</span>`:"");
     return `<li class="item ${isNew&&now-i._new<5000?"new":""}">
       <div class="t">${when(i.time)}<small>${ago(i.time)}</small></div>
       <div><div class="meta"><span class="src" style="background:${s.c}">${s.short}</span>${isNew?'<span class="badge-new">NEW</span>':""}${i.mood>0?'<span class="mood p">▲ Positive</span>':i.mood<0?'<span class="mood n">▼ Negative</span>':""}${tags}</div>
@@ -1522,6 +1547,12 @@ function startStream(){
 }
 // Re-subscribe when the watchlist, holdings or alerts change
 setInterval(startStream,3000);
+
+/* ---------- phone: collapsible watchlist ---------- */
+(()=>{ const left=document.querySelector(".left"); const small=matchMedia("(max-width:760px)");
+  const apply=()=>{ if(small.matches) left.classList.toggle("collapsed",store.get("wlCollapsed",true)); else left.classList.remove("collapsed"); };
+  $("wlHead").addEventListener("click",()=>{ if(!small.matches) return; const c=!left.classList.contains("collapsed"); left.classList.toggle("collapsed",c); store.set("wlCollapsed",c); });
+  small.addEventListener?.("change",apply); apply(); })();
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
