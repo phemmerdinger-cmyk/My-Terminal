@@ -609,7 +609,6 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pt-more{text-align:center;padding:10px}
 #ptReset.armed{border-color:var(--down);color:var(--down)}
 @media (max-width:1100px){ .pt-main{grid-template-columns:minmax(0,1fr)} .pt-spark{display:none} }
-.pt-mono polyline{stroke:#fff!important} .pt-mono line{stroke:#555!important}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -642,7 +641,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
   <button data-tab="data"><span class="ti">📊</span>Markets</button>
   <button data-tab="research"><span class="ti">🔎</span>Research</button>
   <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
-  <button data-tab="trade"><span class="ti">💵</span>Trade</button>
+  <button data-tab="trade"><span class="ti">💵</span>Trading Sim</button>
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
 
@@ -767,7 +766,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
     <!-- PAPER TRADING (computer only) -->
     <section id="tab-trade" class="pad" hidden>
       <div class="pt-bar">
-        <div class="pt-bv"><span class="pt-lbl">Paper account</span><div class="pt-bvrow"><b id="ptVal">$0.00</b><button class="pt-plus" id="ptPlus" type="button" title="Add practice money">+</button></div></div>
+        <div class="pt-bv"><span class="pt-lbl">Trading Sim account</span><div class="pt-bvrow"><b id="ptVal">$0.00</b><button class="pt-plus" id="ptPlus" type="button" title="Add practice money">+</button></div></div>
         <div><span class="pt-lbl">Today</span><b id="ptToday">—</b></div>
         <div><span class="pt-lbl">All time</span><b id="ptAll">—</b></div>
         <div><span class="pt-lbl">Buying power</span><b id="ptBP">—</b></div>
@@ -2022,7 +2021,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",trade:"Paper Trading",predict:"Claude Predictor"};
+const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",trade:"Trading Sim",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -2389,15 +2388,14 @@ async function ptLoadChart(){
   catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
   if(key!==ptChartKey) return;
   $("ptChart").querySelector(".empty")?.remove();
-  if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div class="pt-mono" style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
+  if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
   if(ptSeries){ ptc.removeSeries(ptSeries); ptSeries=null; } if(ptVol){ ptc.removeSeries(ptVol); ptVol=null; } ptLines=[]; ptLinesSig="";
   ptCandles=h.candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
-  // black & white candles: rising = white, falling = black with a light outline
-  ptSeries=ptc.addCandlestickSeries({upColor:"#ffffff",downColor:"#000000",borderVisible:true,borderUpColor:"#ffffff",borderDownColor:"#d9d9d9",wickUpColor:"#ffffff",wickDownColor:"#d9d9d9",priceLineColor:"#ffffff"});
+  ptSeries=ptc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
   ptSeries.setData(ptCandles.map(({volume,...c})=>c));
   ptVol=ptc.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
   ptVol.priceScale().applyOptions({scaleMargins:{top:.85,bottom:0}});
-  ptVol.setData(ptCandles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(255,255,255,.28)":"rgba(255,255,255,.12)"})));
+  ptVol.setData(ptCandles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(33,195,122,.3)":"rgba(255,77,94,.3)"})));
   ptc.timeScale().fitContent();
   ptMarkers(); ptPriceLines();
 }
@@ -2455,7 +2453,7 @@ function renderTrade(){
   // chart header
   const sym=S.pt.sym, q=sym?ptQ(sym):null;
   setHTML("ptHead",sym?`<div><span class="sym">${esc(sym)}</span><span class="nm">${esc(q&&q.name&&q.name!==sym?q.name:"")}</span></div>
-    <div class="px">${q?"$"+fmt(q.price):"…"}${q?`<span class="${cls(q.change)}">${q.change>=0?"+":""}${fmt(q.change)} (${pct(q.changePct)})</span>`:""}${q&&!isCrypto(sym)&&!/open/i.test(marketState()[0])?"<small>market closed · fills at last price</small>":""}</div>`:`<div><span class="sym">Trade</span></div>`);
+    <div class="px">${q?"$"+fmt(q.price):"…"}${q?`<span class="${cls(q.change)}">${q.change>=0?"+":""}${fmt(q.change)} (${pct(q.changePct)})</span>`:""}${q&&!isCrypto(sym)&&!/open/i.test(marketState()[0])?"<small>market closed · fills at last price</small>":""}</div>`:`<div><span class="sym">Trading Sim</span></div>`);
   ptPriceLines();
   // ticket
   ["ptSide","ptType","ptMode"].forEach(id=>$(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.pt[{ptSide:"side",ptType:"type",ptMode:"mode"}[id]])));
