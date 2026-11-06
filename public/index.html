@@ -548,55 +548,73 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 
 /* paper trading (computer only) */
 @media (max-width:760px){ nav.tabs button[data-tab=trade]{display:none!important} }
-.pt-grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start;margin-top:18px}
-.pt-left{position:sticky;top:96px}
-.pt-left .h{margin-top:0}
-.pt-right h2.h{margin-top:24px} .pt-right h2.h:first-child{margin-top:0}
-.pt-stats{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))!important}
-.pt-acct{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:6px 28px;align-items:center}
-.pt-acct > .pt-top,.pt-acct > .pt-val,.pt-acct > .pt-sub,.pt-acct > .pt-mini{grid-column:1}
-.pt-acct > #ptCurve{grid-column:2;grid-row:1 / span 4;margin:0}
-.pt-acct > .pt-add{grid-column:1 / -1}
-@media (max-width:1000px){ .pt-grid,.pt-acct{grid-template-columns:minmax(0,1fr)} .pt-acct > #ptCurve{grid-column:1;grid-row:auto} .pt-left{position:static} }
-.pt-acct{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:6px}
-.pt-top{display:flex;justify-content:space-between;align-items:center}
-.pt-lbl{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
-.pt-plus{width:44px;height:44px;border-radius:50%;border:0;background:var(--amber);color:#fff;font-size:28px;line-height:1;cursor:pointer;font-weight:300}
-.pt-val{font-family:var(--mono);font-size:34px;font-weight:500;margin:4px 0 2px}
-.pt-sub{font-family:var(--mono);font-size:14px;display:flex;gap:14px;flex-wrap:wrap}
-.pt-sub span small{color:var(--dim);font-family:var(--sans);margin-left:4px}
-#ptCurve{margin:12px 0 6px}
-.pt-mini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px}
-.pt-mini div{font-size:11px;color:var(--dim)} .pt-mini b{display:block;font-family:var(--mono);font-size:14px;color:var(--text);font-weight:500;margin-top:2px}
-.pt-add{margin-top:14px;border-top:1px solid var(--line);padding-top:14px}
+.pt-lbl{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.pt-bar{display:flex;align-items:center;gap:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 16px;flex-wrap:wrap}
+.pt-bar > div{display:flex;flex-direction:column;gap:3px}
+.pt-bar b{font-family:var(--mono);font-size:15px;font-weight:500}
+.pt-bar .pt-bv b{font-size:22px}
+.pt-spark{flex:1;min-width:140px;max-width:320px;margin-left:auto}
+.pt-plus{width:40px;height:40px;border-radius:50%;border:0;background:var(--amber);color:#fff;font-size:26px;line-height:1;cursor:pointer;font-weight:300;flex:none}
+.pt-add{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-top:0;border-radius:0 0 12px 12px;padding:12px 16px;margin-top:-8px}
+.pt-add[hidden]{display:none}
 .pt-row{display:flex;gap:8px} .pt-row .field{flex:1}
-.pt-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
-.pt-chips button{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:10px 6px;font-family:var(--mono);font-size:14px;cursor:pointer}
-.pt-ticket{display:flex;flex-direction:column;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
-.pt-ticket .field{width:100%;font-size:16px;padding:12px}
+.pt-chips{display:flex;gap:6px;flex-wrap:wrap}
+.pt-chips button{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:7px;padding:8px 8px;font-family:var(--mono);font-size:13px;cursor:pointer}
+.pt-chips button:hover{border-color:var(--amber)}
+.pt-main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;margin-top:14px;align-items:stretch}
+.pt-chartbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;min-width:0}
+.pt-chead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.pt-chead .sym{font-size:20px;font-weight:700} .pt-chead .nm{color:var(--muted);font-size:13px;margin-left:8px}
+.pt-chead .px{font-family:var(--mono);font-size:24px;margin-top:2px} .pt-chead .px span{font-size:14px;margin-left:8px}
+.pt-chead .px small{font-size:12px;color:var(--dim);margin-left:8px;font-family:var(--sans)}
+#ptChart{flex:1;min-height:400px;position:relative}
+#ptChart .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted)}
+.pt-legend{display:flex;gap:16px;font-size:11px;color:var(--dim);margin-top:8px;flex-wrap:wrap}
+.pt-ticket{display:flex;flex-direction:column;gap:9px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.pt-ticket .field{width:100%;font-size:15px;padding:10px 12px;height:44px;min-height:0;flex:none}
 .pt-seg{display:flex;width:100%} .pt-seg button{flex:1}
-#ptSide button.on[data-v=buy]{background:var(--up);color:#fff} #ptSide button.on[data-v=sell]{background:var(--down);color:#fff}
-.pt-quote{font-family:var(--mono);font-size:14px;color:var(--muted);min-height:18px}
-.pt-quote b{color:var(--text);font-size:18px;margin-right:8px}
-.pt-est{font-size:13px;color:var(--muted);line-height:1.5}
+#ptSide button.on[data-v=buy]{background:var(--up);color:#fff} #ptSide button.on[data-v=sell],#ptSide button.on[data-v=short]{background:var(--down);color:#fff}
+.pt-est{font-size:13px;color:var(--muted);line-height:1.5;min-height:20px}
 .pt-est .err{color:var(--down)}
-.pt-go{width:100%;font-size:17px;padding:14px}
-.pt-go.buy{background:var(--up);color:#fff} .pt-go.sell{background:var(--down);color:#fff}
+.pt-go{width:100%;font-size:16px;padding:12px}
+.pt-go.buy{background:var(--up);color:#fff} .pt-go.sell,.pt-go.short{background:var(--down);color:#fff}
 .pt-confirm{background:var(--panel2);border:1px solid var(--line2);border-radius:10px;padding:12px;font-size:14px;line-height:1.6}
 .pt-confirm .pt-row{margin-top:10px} .pt-confirm .btn{flex:1}
-.pt-card{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--panel);cursor:pointer}
-.pt-card b{font-size:17px} .pt-card .r{text-align:right;font-family:var(--mono)}
-.pt-card small{color:var(--dim);font-size:12px;font-family:var(--mono)}
-.pt-empty{color:var(--muted);padding:16px;border:1px dashed var(--line2);border-radius:12px;text-align:center;line-height:1.5}
-.pt-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.pt-stats div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.pt-held{font-size:12px;color:var(--dim);border-top:1px solid var(--line);padding-top:9px;line-height:1.6}
+.pt-held b{color:var(--text);font-family:var(--mono);font-weight:500}
+.pt-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-top:14px;overflow:hidden}
+.pt-tabs{display:flex;border-bottom:1px solid var(--line);overflow-x:auto}
+.pt-tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:12px 18px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.pt-tabs button.on{color:var(--text);border-bottom-color:var(--amber)}
+.pt-tabs button span{font-family:var(--mono);color:var(--dim);margin-left:4px;font-weight:400}
+#ptPane{min-height:120px}
+.pt-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.pt-tbl th{text-align:right;font-weight:600;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.pt-tbl td{text-align:right;padding:10px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);white-space:nowrap}
+.pt-tbl th:first-child,.pt-tbl td:first-child{text-align:left}
+.pt-tbl td:first-child{font-family:var(--sans)}
+.pt-tbl tr:last-child td{border-bottom:0}
+.pt-tbl tbody tr[data-ptsym]{cursor:pointer} .pt-tbl tbody tr[data-ptsym]:hover{background:var(--panel2)}
+.pt-tbl .tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:6px;font-family:var(--sans)}
+.pt-tbl .tag.long{background:rgba(33,195,122,.15);color:var(--up)} .pt-tbl .tag.short{background:rgba(255,77,94,.15);color:var(--down)}
+.pt-tbl .x{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--sans)}
+.pt-tbl .x:hover{color:var(--text);border-color:var(--amber)}
+.pt-empty{color:var(--muted);padding:28px;text-align:center}
+.pt-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1px;background:var(--line)}
+.pt-stats div{background:var(--panel);padding:12px 14px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 .pt-stats b{display:block;font-family:var(--mono);font-size:16px;font-weight:500;color:var(--text);margin-top:4px;text-transform:none;letter-spacing:0}
-.pt-list{border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.pt-list > div{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:14px}
-.pt-list > div:last-child{border-bottom:0}
-.pt-list .r{text-align:right;font-family:var(--mono)} .pt-list small{color:var(--dim);font-size:12px}
-.pt-list .x{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:6px;padding:6px 10px;cursor:pointer}
+.pt-more{text-align:center;padding:10px}
 #ptReset.armed{border-color:var(--down);color:var(--down)}
+@media (max-width:1100px){ .pt-main{grid-template-columns:minmax(0,1fr)} .pt-spark{display:none} }
+/* resizable watchlist */
+.wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
+.left{position:relative}
+.wl-resize{position:absolute;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;z-index:20;touch-action:none}
+.wl-resize::after{content:"";position:absolute;left:4px;top:0;width:2px;height:100%;background:transparent;transition:background .15s}
+.wl-resize:hover::after,body.wl-dragging .wl-resize::after{background:var(--amber)}
+body.wl-dragging{cursor:col-resize;user-select:none}
+body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{display:none}
+@media (max-width:760px){ .wrap{grid-template-columns:minmax(0,1fr)} .wl-resize{display:none} }
 </style>
 </head>
 <body>
@@ -626,6 +644,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 
 <div class="wrap">
   <aside class="left">
+    <div class="wl-resize" id="wlResize" title="Drag to make the watchlist wider or narrower · double-click to reset"></div>
     <div class="sec-h wl-head" id="wlHead"><span>Watchlist <span class="wl-car">▾</span></span><span id="wlCount"></span></div>
     <form class="add" id="addForm"><input id="addInput" autocomplete="off" placeholder="Add ticker, e.g. NVDA" maxlength="12" autocomplete="off"><button class="btn">Add</button></form>
     <ul class="wl" id="wl"></ul>
@@ -743,51 +762,49 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
     <!-- PREDICTIONS -->
     <!-- PAPER TRADING (computer only) -->
     <section id="tab-trade" class="pad" hidden>
-      <div class="pt-acct">
-        <div class="pt-top"><span class="pt-lbl">Paper account value</span><button class="pt-plus" id="ptPlus" type="button" title="Add money">+</button></div>
-        <div class="pt-val" id="ptVal">$0.00</div>
-        <div class="pt-sub" id="ptSub"></div>
-        <div id="ptCurve"></div>
-        <div class="pt-mini" id="ptMini"></div>
-        <form class="pt-add" id="ptAdd" hidden>
-          <div class="pt-lbl" style="margin-bottom:8px">Add practice money (up to $1,000,000 at a time)</div>
-          <div class="pt-chips"><button type="button" data-ptadd="10000">$10K</button><button type="button" data-ptadd="100000">$100K</button><button type="button" data-ptadd="500000">$500K</button><button type="button" data-ptadd="1000000">$1M</button></div>
-          <div class="pt-row"><input class="field" id="ptAddAmt" type="number" inputmode="decimal" min="1" max="1000000" step="any" placeholder="Amount ($)"><button class="btn">Add money</button></div>
+      <div class="pt-bar">
+        <div class="pt-bv"><span class="pt-lbl">Paper account</span><b id="ptVal">$0.00</b></div>
+        <div><span class="pt-lbl">Today</span><b id="ptToday">—</b></div>
+        <div><span class="pt-lbl">All time</span><b id="ptAll">—</b></div>
+        <div><span class="pt-lbl">Buying power</span><b id="ptBP">—</b></div>
+        <div><span class="pt-lbl">Cash</span><b id="ptCash">—</b></div>
+        <div><span class="pt-lbl">Money added</span><b id="ptDep">—</b></div>
+        <div class="pt-spark" id="ptCurve" title="Account value by day"></div>
+        <button class="pt-plus" id="ptPlus" type="button" title="Add practice money">+</button>
+      </div>
+      <form class="pt-add" id="ptAdd" hidden>
+        <span class="pt-lbl">Add practice money (up to $1,000,000 at a time)</span>
+        <div class="pt-chips"><button type="button" data-ptadd="10000">$10K</button><button type="button" data-ptadd="100000">$100K</button><button type="button" data-ptadd="500000">$500K</button><button type="button" data-ptadd="1000000">$1M</button></div>
+        <div class="pt-row"><input class="field" id="ptAddAmt" type="number" inputmode="decimal" min="1" max="1000000" step="any" placeholder="Amount ($)"><button class="btn">Add money</button></div>
+      </form>
+
+      <div class="pt-main">
+        <div class="pt-chartbox">
+          <div class="pt-chead"><div id="ptHead"></div><div class="seg" id="ptRange"></div></div>
+          <div id="ptChart"></div>
+          <div class="pt-legend"><span class="up">▲ Buy / Cover</span><span class="down">▼ Sell / Short</span><span>- - Your average cost</span><span>··· Open orders</span></div>
+        </div>
+        <form class="pt-ticket" id="ptForm" autocomplete="off">
+          <input class="field" id="ptSym" placeholder="Search a stock, ETF or crypto" maxlength="15" style="text-transform:uppercase">
+          <div class="seg pt-seg" id="ptSide"><button type="button" data-v="buy">Buy</button><button type="button" data-v="sell">Sell</button><button type="button" data-v="short">Short</button></div>
+          <div class="seg pt-seg" id="ptType"><button type="button" data-v="market">Market</button><button type="button" data-v="limit">Limit</button><button type="button" data-v="stop">Stop</button></div>
+          <div class="seg pt-seg" id="ptMode"><button type="button" data-v="usd">Dollars</button><button type="button" data-v="shares">Shares</button></div>
+          <input class="field" id="ptAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount in dollars">
+          <div class="pt-chips" id="ptQuick"></div>
+          <input class="field" id="ptPx" type="number" inputmode="decimal" min="0" step="any" placeholder="Limit price" hidden>
+          <div class="pt-est" id="ptEst"></div>
+          <button class="btn pt-go" id="ptGo">Review</button>
+          <div class="pt-held" id="ptHeld"></div>
         </form>
       </div>
 
-      <div class="pt-grid"><div class="pt-left">
-      <h2 class="h">Trade</h2>
-      <form class="pt-ticket" id="ptForm" autocomplete="off">
-        <input class="field" id="ptSym" placeholder="Search a stock, ETF or crypto" maxlength="15" style="text-transform:uppercase">
-        <div class="pt-quote" id="ptQuote"></div>
-        <div class="seg pt-seg" id="ptSide"><button type="button" data-v="buy">Buy</button><button type="button" data-v="sell">Sell</button></div>
-        <div class="seg pt-seg" id="ptType"><button type="button" data-v="market">Market</button><button type="button" data-v="limit">Limit</button><button type="button" data-v="stop">Stop</button></div>
-        <div class="seg pt-seg" id="ptMode"><button type="button" data-v="usd">Dollars</button><button type="button" data-v="shares">Shares</button></div>
-        <input class="field" id="ptAmt" type="number" inputmode="decimal" min="0" step="any" placeholder="Amount in dollars">
-        <div class="pt-chips" id="ptQuick"></div>
-        <input class="field" id="ptPx" type="number" inputmode="decimal" min="0" step="any" placeholder="Limit price" hidden>
-        <div class="pt-est" id="ptEst"></div>
-        <button class="btn pt-go" id="ptGo">Review</button>
-      </form>
-      </div><div class="pt-right">
+      <div class="pt-panel">
+        <div class="pt-tabs" id="ptTabs"></div>
+        <div id="ptPane"></div>
+      </div>
 
-      <h2 class="h">Positions</h2>
-      <div id="ptPos"></div>
-      <div id="ptOpenWrap"></div>
-
-      <h2 class="h">Account stats</h2>
-      <div class="pt-stats" id="ptStats"></div>
-
-      <h2 class="h">Daily returns</h2>
-      <div id="ptDays"></div>
-
-      <h2 class="h">Activity</h2>
-      <div id="ptHist"></div>
-
-      </div></div>
-      <div style="margin:28px 0 10px;text-align:center"><button class="btn ghost" id="ptReset" type="button">Reset paper account</button></div>
-      <div class="disc">Practice only. No real money is used. Orders fill at the latest live price; outside market hours stocks fill at the last traded price. Limit and stop orders are checked every 15 seconds while the app is open. This account is saved in this browser on this computer.</div>
+      <div style="margin:22px 0 8px;text-align:center"><button class="btn ghost" id="ptReset" type="button">Reset paper account</button></div>
+      <div class="disc">Practice only. No real money is used. Orders fill at the latest live price; outside market hours stocks fill at the last traded price. Shorts need buying power equal to their value. Limit and stop orders are checked every 15 seconds while the site is open. This account is saved in this browser on this computer.</div>
     </section>
 
     <section id="tab-predict" class="pad" hidden>
@@ -989,7 +1006,7 @@ function setTab(t){
   if(typeof acRender==="function"&&!$("acPanel").hidden) acRender();
   if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
-  if(t==="trade"){ renderTrade(); }
+  if(t==="trade"){ ptOpen(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -2250,25 +2267,28 @@ const isApp=()=>!matchMedia("(max-width:760px)").matches; // paper trading: comp
 function ptFresh(){ const t=Date.now(); return {v:1,created:t,cash:PT_START,deposited:PT_START,pos:{},orders:[],log:[{k:"dep",t,amt:PT_START}],realized:0,closed:[],days:{[etDate(t)]:{start:PT_START,end:PT_START,dep:0}},spx0:null}; }
 let PA=store.get("paper",null); if(!PA||PA.v!==1) PA=ptFresh();
 const ptSave=()=>store.set("paper",PA);
-S.pt={side:"buy",type:"market",mode:"usd",sym:"",confirm:null};
+S.pt={side:"buy",type:"market",mode:"usd",sym:store.get("ptSym",""),confirm:null,range:store.get("ptRange","1d"),pane:"pos"};
 const r2=n=>Math.round(n*100)/100+0, r6=n=>Math.round(n*1e6)/1e6;
 const usd=(n,sign)=>n==null||isNaN(n)?"—":(sign?(n>=0?"+":"−"):(n<0?"−":""))+"$"+fmt(Math.abs(n));
 const ptQ=sym=>{ const q=S.quotes[sym]; return q&&!q.error&&q.price!=null?q:null; };
 const isCrypto=sym=>/-USD$/.test(sym);
+const ptHeld=sym=>PA.pos[sym]?PA.pos[sym].shares:0;
 function ptEquity(prev){ let v=PA.cash, ok=true; for(const [s,p] of Object.entries(PA.pos)){ const q=ptQ(s); if(!q){ ok=false; v+=p.shares*p.avg; continue; } v+=p.shares*(prev&&q.prevClose!=null?q.prevClose:q.price); } return {v,ok}; }
-function ptSyms(){ return [...new Set([...Object.keys(PA.pos),...PA.orders.filter(o=>o.status==="open").map(o=>o.sym),...(S.pt.sym?[S.pt.sym]:[])])]; }
+function ptShortValue(){ let v=0; for(const [s,p] of Object.entries(PA.pos)) if(p.shares<0){ const q=ptQ(s); v+=-p.shares*(q?q.price:p.avg); } return v; }
+const ptBP=()=>Math.max(0,PA.cash-1.5*ptShortValue()); // cash minus what's held against shorts
+function ptSyms(){ return [...new Set([...(S.pt.sym?[S.pt.sym]:[]),...Object.keys(PA.pos),...PA.orders.filter(o=>o.status==="open").map(o=>o.sym)])]; }
 const dayKeys=()=>Object.keys(PA.days).sort();
 const dayRet=d=>d.end-d.start-d.dep, dayPct=d=>(d.start+d.dep)?dayRet(d)/(d.start+d.dep)*100:0;
+const KIND={buy:"Bought",sell:"Sold",short:"Shorted",cover:"Covered"};
 
-// Keep a record for every day: start value, latest value, money added that day
 function ptDayTick(){
   const now=ptEquity(false); if(!now.ok) return;
   const today=etDate(), wd=new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short"});
   if(!PA.days[today]){
     const keys=dayKeys(), last=keys[keys.length-1];
     const weekend=wd==="Sat"||wd==="Sun";
-    const start=weekend?now.v:ptEquity(true).v;     // weekdays start from yesterday's closing prices
-    if(last&&!weekend&&!PA.days[last].weekend) PA.days[last].end=start; // finish yesterday at its closing value
+    const start=weekend?now.v:ptEquity(true).v;
+    if(last&&!weekend&&!PA.days[last].weekend) PA.days[last].end=start;
     PA.days[today]={start,end:now.v,dep:0,weekend:weekend||undefined};
     if(last) ptBackfill(last,today);
   }
@@ -2276,7 +2296,6 @@ function ptDayTick(){
   const spx=ptQ("^GSPC"); if(spx&&!PA.spx0) PA.spx0=spx.price;
   ptSave();
 }
-// Fill in weekdays the app wasn't opened, using each day's closing prices
 async function ptBackfill(from,to){
   const syms=Object.keys(PA.pos); const gap=[];
   for(let d=new Date(from+"T12:00:00Z");;){ d.setUTCDate(d.getUTCDate()+1); const k=d.toISOString().slice(0,10); if(k>=to) break; const w=d.getUTCDay(); if(w!==0&&w!==6) gap.push(k); }
@@ -2285,8 +2304,8 @@ async function ptBackfill(from,to){
     const closes={};
     await Promise.all(syms.map(async s=>{ const j=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=6mo`); closes[s]=Object.fromEntries(j.candles.map(c=>[etDate(c.time*1000),c.close])); }));
     let prev=PA.days[from].end;
-    for(const k of gap){ if(PA.days[k]) { prev=PA.days[k].end; continue; }
-      if(syms.length&&!syms.every(s=>closes[s][k]!=null)) continue;          // market holiday
+    for(const k of gap){ if(PA.days[k]){ prev=PA.days[k].end; continue; }
+      if(syms.length&&!syms.every(s=>closes[s][k]!=null)) continue;
       const v=PA.cash+syms.reduce((a,s)=>a+PA.pos[s].shares*closes[s][k],0);
       PA.days[k]={start:prev,end:v,dep:0,filled:true}; prev=v; }
     ptSave(); if(S.tab==="trade") renderTrade();
@@ -2300,47 +2319,106 @@ function ptDeposit(amt){
   const d=PA.days[etDate()]; if(d){ d.dep=r2(d.dep+amt); d.end=ptEquity(false).v; }
   ptLog({k:"dep",amt}); ptSave(); $("ptAdd").hidden=true; $("ptAddAmt").value=""; toast(`Added $${fmt(amt)} in practice money.`); renderTrade();
 }
-// Execute an order at price px. Returns an error message or "".
-function ptFill(o,px){
-  const p=PA.pos[o.sym];
-  let sh=o.qty!=null?o.qty:o.usd/px; sh=r6(sh);
-  if(o.side==="sell"&&p&&Math.abs(sh-p.shares)<1e-4) sh=p.shares;
-  if(!(sh>0)) return "Amount is too small.";
-  const cost=r2(sh*px);
-  if(o.side==="buy"){
-    if(cost>PA.cash+0.005) return `Not enough cash: this costs $${fmt(cost)} and you have $${fmt(PA.cash)}. Tap + to add money.`;
-    PA.cash=r2(PA.cash-cost);
-    const n=p?p.shares+sh:sh; PA.pos[o.sym]={shares:r6(n),avg:p?(p.avg*p.shares+px*sh)/n:px,opened:p?p.opened:Date.now()};
-  }else{
-    if(!p||sh>p.shares+1e-9) return `You only own ${p?num(p.shares,4):0} shares of ${o.sym}. Short selling isn't supported.`;
-    const pnl=r2((px-p.avg)*sh); PA.cash=r2(PA.cash+cost); PA.realized=r2(PA.realized+pnl);
-    PA.closed.push({sym:o.sym,pnl,pct:(px/p.avg-1)*100,t:Date.now()});
-    p.shares=r6(p.shares-sh); if(p.shares<1e-6) delete PA.pos[o.sym];
+// Rules check: returns an error message, or "" if the trade is allowed
+function ptCheck(side,sym,sh,px){
+  const held=ptHeld(sym), cost=sh*px, bp=ptBP();
+  if(!(sh>0)) return "Enter an amount.";
+  if(side==="buy"){
+    if(held<0){ if(sh>-held+1e-4) return `You're short ${num(-held,4)} ${sym}. Buy up to ${num(-held,4)} shares to cover first.`; if(cost>PA.cash+0.005) return "Not enough cash to cover. Tap + to add money."; return ""; }
+    if(cost>bp+0.005) return `Not enough buying power ($${fmt(bp)}). Tap + at the top to add money.`;
+  }else if(side==="sell"){
+    if(held<0) return `You're short ${sym}. Use Buy to cover it.`;
+    if(held<=0) return `You don't own any ${sym}. Use Short to bet against it.`;
+    if(sh>held+1e-4) return `You only own ${num(held,4)} shares (about $${fmt(held*px)}).`;
+  }else if(side==="short"){
+    if(held>0) return `You own ${num(held,4)} ${sym}. Sell those shares before shorting.`;
+    if(cost>bp+0.005) return `Not enough buying power to short ($${fmt(bp)} available). Tap + to add money.`;
   }
-  o.status="filled"; o.fillPx=px; o.fillQty=sh; o.fillT=Date.now();
-  ptLog({k:"fill",side:o.side,sym:o.sym,qty:sh,px,amt:cost,type:o.type});
+  return "";
+}
+function ptFill(o,px){
+  const p=PA.pos[o.sym], held=p?p.shares:0;
+  let sh=r6(o.qty!=null?o.qty:o.usd/px);
+  if(o.side==="sell"&&held>0&&Math.abs(sh-held)<1e-4) sh=held;
+  if(o.side==="buy"&&held<0&&Math.abs(sh+held)<1e-4) sh=-held;
+  const err=ptCheck(o.side,o.sym,sh,px); if(err) return err;
+  const cost=r2(sh*px); let kind=o.side;
+  const close=pnl=>{ PA.realized=r2(PA.realized+pnl); PA.closed.push({sym:o.sym,pnl,t:Date.now(),short:held<0}); };
+  if(o.side==="buy"&&held<0){ kind="cover"; close(r2((p.avg-px)*sh)); PA.cash=r2(PA.cash-cost); p.shares=r6(held+sh); }
+  else if(o.side==="buy"){ PA.cash=r2(PA.cash-cost); const n=held+sh; PA.pos[o.sym]={shares:r6(n),avg:p?(p.avg*held+px*sh)/n:px,opened:p?p.opened:Date.now()}; }
+  else if(o.side==="sell"){ close(r2((px-p.avg)*sh)); PA.cash=r2(PA.cash+cost); p.shares=r6(held-sh); }
+  else { PA.cash=r2(PA.cash+cost); const n=-held+sh; PA.pos[o.sym]={shares:r6(held-sh),avg:p?(p.avg*-held+px*sh)/n:px,opened:p?p.opened:Date.now()}; }
+  if(PA.pos[o.sym]&&Math.abs(PA.pos[o.sym].shares)<1e-6) delete PA.pos[o.sym];
+  o.status="filled"; o.fillPx=px; o.fillQty=sh; o.fillT=Date.now(); o.kind=kind;
+  ptLog({k:"fill",side:kind,sym:o.sym,qty:sh,px,amt:cost,type:o.type});
   return "";
 }
 function ptCheckOrders(){
   let ch=false;
-  PA.orders.filter(o=>o.status==="open").forEach(o=>{ const q=ptQ(o.sym); if(!q) return; const px=q.price;
-    const hit=o.type==="limit"?(o.side==="buy"?px<=o.px:px>=o.px):(o.side==="buy"?px>=o.px:px<=o.px);
+  PA.orders.filter(o=>o.status==="open").forEach(o=>{ const q=ptQ(o.sym); if(!q) return; const px=q.price, up=o.side==="buy";
+    const hit=o.type==="limit"?(up?px<=o.px:px>=o.px):(up?px>=o.px:px<=o.px);
     if(!hit) return; const err=ptFill(o,px); ch=true;
     if(err){ o.status="rejected"; o.note=err; toast(`${o.sym} ${o.type} order couldn't fill: ${err}`); }
-    else toast(`${o.type==="limit"?"Limit":"Stop"} order filled: ${o.side==="buy"?"bought":"sold"} ${num(o.fillQty,4)} ${o.sym} at $${fmt(px)}`);
+    else toast(`${o.type==="limit"?"Limit":"Stop"} order filled: ${KIND[o.kind].toLowerCase()} ${num(o.fillQty,4)} ${o.sym} at $${fmt(px)}`);
   });
   if(ch){ ptDayTick(); ptSave(); }
   return ch;
 }
-function ptOnQuotes(){ ptCheckOrders(); ptDayTick(); if(S.tab==="trade") renderTrade(); }
+function ptOnQuotes(){ ptCheckOrders(); ptDayTick(); if(S.tab==="trade"){ renderTrade(); ptChartLive(); } }
+
+/* ----- chart with trade markers ----- */
+let ptc=null, ptSeries=null, ptVol=null, ptCandles=[], ptLines=[], ptLinesSig="", ptChartKey="";
+function ptEnsureChart(){
+  if(ptc||!window.LightweightCharts) return !!ptc;
+  ptc=LightweightCharts.createChart($("ptChart"),{autoSize:true,
+    layout:{background:{type:"solid",color:"transparent"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},
+    grid:{vertLines:{color:"#1c2129"},horzLines:{color:"#1c2129"}},
+    rightPriceScale:{borderColor:"#2d3540"},timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false},
+    crosshair:{mode:0},localization:{timeFormatter:t=>new Date(t*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}});
+  return true;
+}
+async function ptLoadChart(){
+  const sym=S.pt.sym, range=S.pt.range, key=sym+"|"+range; ptChartKey=key;
+  $("ptRange").innerHTML=RANGES.map(([k,l])=>`<button type="button" data-ptrange="${k}" class="${range===k?"on":""}">${l}</button>`).join("");
+  if(!sym){ if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">Search a ticker to see its chart and trade it.</div>`; return; }
+  let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${range}`); }
+  catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
+  if(key!==ptChartKey) return;
+  $("ptChart").querySelector(".empty")?.remove();
+  if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
+  if(ptSeries){ ptc.removeSeries(ptSeries); ptSeries=null; } if(ptVol){ ptc.removeSeries(ptVol); ptVol=null; } ptLines=[]; ptLinesSig="";
+  ptCandles=h.candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
+  ptSeries=ptc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
+  ptSeries.setData(ptCandles.map(({volume,...c})=>c));
+  ptVol=ptc.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
+  ptVol.priceScale().applyOptions({scaleMargins:{top:.85,bottom:0}});
+  ptVol.setData(ptCandles.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(33,195,122,.3)":"rgba(255,77,94,.3)"})));
+  ptc.timeScale().fitContent();
+  ptMarkers(); ptPriceLines();
+}
+function ptMarkers(){ // ▲ below the bar for buys/covers, ▼ above the bar for sells/shorts
+  if(!ptSeries||!ptCandles.length) return;
+  const sym=S.pt.sym, first=ptCandles[0].time, times=ptCandles.map(c=>c.time);
+  const snap=t=>{ if(t<first) return null; let lo=0,hi=times.length-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(times[m]<=t) lo=m; else hi=m-1; } return times[lo]; };
+  const ms=PA.log.filter(l=>l.k==="fill"&&l.sym===sym).map(l=>{ const time=snap(Math.floor(l.t/1000)); if(time==null) return null; const up=l.side==="buy"||l.side==="cover";
+    return {time,position:up?"belowBar":"aboveBar",color:up?"#21c37a":"#ff4d5e",shape:up?"arrowUp":"arrowDown",text:`${{buy:"Buy",sell:"Sell",short:"Short",cover:"Cover"}[l.side]} ${num(l.qty,l.qty%1?2:0)} @ ${fmt(l.px)}`}; })
+    .filter(Boolean).sort((a,b)=>a.time-b.time);
+  ptSeries.setMarkers(ms);
+}
+function ptPriceLines(){
+  if(!ptSeries) return; const sym=S.pt.sym, p=PA.pos[sym]; const open=PA.orders.filter(o=>o.status==="open"&&o.sym===sym);
+  const sig=JSON.stringify([p&&[p.shares,p.avg],open.map(o=>o.id)]); if(sig===ptLinesSig) return; ptLinesSig=sig;
+  ptLines.forEach(l=>{ try{ ptSeries.removePriceLine(l); }catch{} }); ptLines=[];
+  if(p) ptLines.push(ptSeries.createPriceLine({price:p.avg,color:"#2f80ed",lineWidth:1,lineStyle:2,axisLabelVisible:true,title:`${p.shares<0?"Short":"Avg cost"} ${num(Math.abs(p.shares),2)} sh`}));
+  open.forEach(o=>ptLines.push(ptSeries.createPriceLine({price:o.px,color:o.side==="buy"?"#21c37a":"#ff4d5e",lineWidth:1,lineStyle:1,axisLabelVisible:true,title:`${o.type} ${o.side}`})));
+}
+function ptChartLive(){ // move the last candle with the live price
+  const q=ptQ(S.pt.sym); if(!ptSeries||!q||!ptCandles.length) return;
+  const c=ptCandles[ptCandles.length-1]; c.close=q.price; c.high=Math.max(c.high,q.price); c.low=Math.min(c.low,q.price);
+  try{ ptSeries.update({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close}); }catch{}
+}
 
 /* ----- screen ----- */
-function ptCurve(){
-  const keys=dayKeys(); const pts=keys.map(k=>PA.days[k].end); const cur=ptEquity(false).v;
-  if(pts.length) pts[pts.length-1]=cur;
-  if(pts.length<2) return `<div style="font-size:12px;color:var(--dim)">Your growth chart fills in day by day as you trade.</div>`;
-  return spark(pts,"100%",70,PA.days[keys[0]].start);
-}
 function ptStatsCalc(){
   const keys=dayKeys(); let idx=1, peak=1, dd=0; const rets=[];
   keys.forEach(k=>{ const d=PA.days[k]; const r=dayPct(d)/100; rets.push({k,r,amt:dayRet(d)}); idx*=1+r; peak=Math.max(peak,idx); dd=Math.min(dd,idx/peak-1); });
@@ -2349,114 +2427,148 @@ function ptStatsCalc(){
   const wins=PA.closed.filter(c=>c.pnl>0).length;
   return {twr:(idx-1)*100,dd:dd*100,best,worst,avg:real.length?real.reduce((a,b)=>a+b.r,0)/real.length*100:0,upDays:real.filter(x=>x.amt>0).length,days:real.length,wins,win:PA.closed.length?wins/PA.closed.length*100:null};
 }
+const setHTML=(id,h)=>{ const e=$(id); if(e&&e.innerHTML!==h) e.innerHTML=h; }; // skip redraws that would eat a click
+const tstamp=t=>new Date(t).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+function ptRows(){
+  return Object.entries(PA.pos).map(([s,p])=>{ const q=ptQ(s); const px=q?q.price:p.avg; const v=p.shares*px; const g=p.shares*(px-p.avg);
+    const todayStart=new Date(etDate()+"T00:00:00-05:00").getTime();
+    const dchg=q&&q.prevClose!=null?(p.opened>=todayStart?(px-p.avg)*p.shares:(px-q.prevClose)*p.shares):null;
+    return {s,p,q,px,v,g,gp:p.avg?(p.shares<0?(p.avg/px-1):(px/p.avg-1))*100:0,dchg}; }).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
+}
 function renderTrade(){
   if(!$("tab-trade")) return;
   const eq=ptEquity(false), today=PA.days[etDate()]||{start:eq.v,end:eq.v,dep:0};
   const tr=eq.v-today.start-today.dep, trp=(today.start+today.dep)?tr/(today.start+today.dep)*100:0;
   const tot=eq.v-PA.deposited, totp=PA.deposited?tot/PA.deposited*100:0;
-  let mv=0, unr=0, dayPos=0; const rows=Object.entries(PA.pos).map(([s,p])=>{ const q=ptQ(s); const px=q?q.price:p.avg; const v=p.shares*px; mv+=v; const g=v-p.shares*p.avg; unr+=g;
-    const dchg=q&&q.prevClose!=null?(p.opened>=new Date(etDate()+"T00:00:00-05:00").getTime()?(px-p.avg)*p.shares:(px-q.prevClose)*p.shares):null; if(dchg!=null) dayPos+=dchg;
-    return {s,p,q,px,v,g,dchg}; }).sort((a,b)=>b.v-a.v);
-  $("ptVal").textContent="$"+fmt(eq.v);
-  $("ptSub").innerHTML=`<span class="${cls(tr)}">${usd(r2(tr),1)} (${pct(trp)})<small>today</small></span><span class="${cls(tot)}">${usd(r2(tot),1)} (${pct(totp)})<small>all time</small></span>`;
-  $("ptCurve").innerHTML=ptCurve();
-  $("ptMini").innerHTML=`<div>Cash / buying power<b>$${fmt(PA.cash)}</b></div><div>Invested<b>$${fmt(mv)}</b></div><div>Money added<b>$${big(PA.deposited)}</b></div>`;
-  // ticket
+  const rows=ptRows(); const unr=rows.reduce((a,r)=>a+r.g,0), dayPos=rows.reduce((a,r)=>a+(r.dchg||0),0);
+  setHTML("ptVal","$"+fmt(eq.v));
+  setHTML("ptToday",`<span class="${cls(tr)}">${usd(r2(tr),1)} (${pct(trp)})</span>`);
+  setHTML("ptAll",`<span class="${cls(tot)}">${usd(r2(tot),1)} (${pct(totp)})</span>`);
+  setHTML("ptBP","$"+fmt(ptBP())); setHTML("ptCash","$"+fmt(PA.cash)); setHTML("ptDep","$"+big(PA.deposited));
+  const keys=dayKeys(), pts=keys.map(k=>PA.days[k].end); if(pts.length) pts[pts.length-1]=eq.v;
+  setHTML("ptCurve",pts.length>1?spark(pts,"100%",36,PA.days[keys[0]].start):"");
+  // chart header
   const sym=S.pt.sym, q=sym?ptQ(sym):null;
-  const qh=sym?(q?`<b>${esc(sym)}</b>$${fmt(q.price)} <span class="${cls(q.change)}">${pct(q.changePct)}</span>${!isCrypto(sym)&&!/open/i.test(marketState()[0])?' <small style="color:var(--dim)">· market closed, fills at last price</small>':""}`:`<span class="spin"></span> Getting ${esc(sym)} price…`):"";
-  if($("ptQuote").innerHTML!==qh) $("ptQuote").innerHTML=qh;
+  setHTML("ptHead",sym?`<div><span class="sym">${esc(sym)}</span><span class="nm">${esc(q&&q.name&&q.name!==sym?q.name:"")}</span></div>
+    <div class="px">${q?"$"+fmt(q.price):"…"}${q?`<span class="${cls(q.change)}">${q.change>=0?"+":""}${fmt(q.change)} (${pct(q.changePct)})</span>`:""}${q&&!isCrypto(sym)&&!/open/i.test(marketState()[0])?"<small>market closed · fills at last price</small>":""}</div>`:`<div><span class="sym">Trade</span></div>`);
+  ptPriceLines();
+  // ticket
   ["ptSide","ptType","ptMode"].forEach(id=>$(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.pt[{ptSide:"side",ptType:"type",ptMode:"mode"}[id]])));
-  $("ptPx").hidden=S.pt.type==="market"; $("ptPx").placeholder=S.pt.type==="limit"?(S.pt.side==="buy"?"Buy if price falls to ($)":"Sell if price rises to ($)"):(S.pt.side==="buy"?"Buy if price rises to ($)":"Sell if price falls to ($) — stop loss");
+  const up=S.pt.side==="buy";
+  $("ptPx").hidden=S.pt.type==="market"; $("ptPx").placeholder=S.pt.type==="limit"?(up?"Buy if price falls to ($)":"Sell if price rises to ($)"):(up?"Buy if price rises to ($)":"Sell if price falls to ($) — stop loss");
   $("ptAmt").placeholder=S.pt.mode==="usd"?"Amount in dollars":"Number of shares";
-  const held=sym&&PA.pos[sym];
-  const quick=S.pt.side==="buy"?(S.pt.mode==="usd"?[1000,5000,10000,"max"].map(v=>`<button type="button" data-ptq="${v}">${v==="max"?"Max":"$"+(v/1000)+"K"}</button>`).join(""):"")
-    :held?[25,50,100].map(v=>`<button type="button" data-ptq="p${v}">${v===100?"Sell all":v+"%"}</button>`).join(""):"";
-  if($("ptQuick").innerHTML!==quick) $("ptQuick").innerHTML=quick; // don't rebuild buttons mid-tap
+  const held=sym?ptHeld(sym):0;
+  const money=[1000,5000,10000].map(v=>`<button type="button" data-ptq="${v}">$${v/1000}K</button>`).join("")+`<button type="button" data-ptq="max">Max</button>`;
+  setHTML("ptQuick",S.pt.side==="sell"?(held>0?[25,50,100].map(v=>`<button type="button" data-ptq="p${v}">${v===100?"Sell all":v+"%"}</button>`).join(""):"")
+    :S.pt.side==="buy"&&held<0?`<button type="button" data-ptq="cover">Cover all ${num(-held,4)} sh</button>`:money);
+  setHTML("ptHeld",sym?(held?`Your position: <b class="${held<0?"down":"up"}">${held<0?"Short":"Long"} ${num(Math.abs(held),4)} sh</b> @ <b>$${fmt(PA.pos[sym].avg)}</b>${q?` · P/L <b class="${cls(held*(q.price-PA.pos[sym].avg))}">${usd(r2(held*(q.price-PA.pos[sym].avg)),1)}</b>`:""}`:`You have no ${esc(sym)} position.`)+`<br>Buying power <b>$${fmt(ptBP())}</b>`:`Buying power <b>$${fmt(ptBP())}</b>`);
   ptEstimate();
-  // positions
-  $("ptPos").innerHTML=rows.length?rows.map(r=>`<div class="pt-card" data-ptsym="${esc(r.s)}"><div><b>${esc(r.s)}</b><br><small>${num(r.p.shares,4)} sh · avg $${fmt(r.p.avg)}</small></div>
-    <div class="r">$${fmt(r.v)}<br><small class="${cls(r.g)}">${usd(r2(r.g),1)} (${pct(r.p.avg?(r.px/r.p.avg-1)*100:0)})</small></div>
-    <div><small>Price $${fmt(r.px)} · ${eq.v?(r.v/eq.v*100).toFixed(1):0}% of account</small></div><div class="r"><small class="${cls(r.dchg)}">${r.dchg!=null?usd(r2(r.dchg),1)+" today":""}</small></div></div>`).join("")
-    :`<div class="pt-empty">No positions yet. Search a ticker above and buy to start practicing.</div>`;
+  // bottom panel
   const open=PA.orders.filter(o=>o.status==="open");
-  $("ptOpenWrap").innerHTML=open.length?`<h2 class="h">Open orders</h2><div class="pt-list">${open.map(o=>`<div><span><b>${o.side==="buy"?"Buy":"Sell"} ${esc(o.sym)}</b> · ${o.type} ${o.side==="buy"?(o.type==="limit"?"≤":"≥"):(o.type==="limit"?"≥":"≤")} $${fmt(o.px)}<br><small>${o.qty!=null?num(o.qty,4)+" shares":"$"+fmt(o.usd)} · placed ${ago(o.t)} ago · now $${fmt(ptQ(o.sym)?.price)}</small></span><span class="r"><button class="x" data-ptcancel="${o.id}">Cancel</button></span></div>`).join("")}</div>`:"";
-  // stats
-  const st=ptStatsCalc(); const spx=ptQ("^GSPC"); const spxR=spx&&PA.spx0?(spx.price/PA.spx0-1)*100:null;
-  $("ptStats").innerHTML=[
-    ["Total return",`<span class="${cls(tot)}">${usd(r2(tot),1)}</span>`],["Return % (time-weighted)",`<span class="${cls(st.twr)}">${pct(st.twr)}</span>`],
-    ["S&P 500 since start",spxR!=null?`<span class="${cls(spxR)}">${pct(spxR)}</span>`:"—"],["You vs S&P 500",spxR!=null?`<span class="${cls(st.twr-spxR)}">${pct(st.twr-spxR)}</span>`:"—"],
-    ["Unrealized gain",`<span class="${cls(unr)}">${usd(r2(unr),1)}</span>`],["Realized gain",`<span class="${cls(PA.realized)}">${usd(PA.realized,1)}</span>`],
-    ["Today (positions)",`<span class="${cls(dayPos)}">${usd(r2(dayPos),1)}</span>`],["Avg daily return",`<span class="${cls(st.avg)}">${pct(st.avg)}</span>`],
-    ["Best day",st.best?`<span class="up">${usd(r2(st.best.amt),1)}</span>`:"—"],["Worst day",st.worst?`<span class="${cls(st.worst.amt)}">${usd(r2(st.worst.amt),1)}</span>`:"—"],
-    ["Biggest drop (drawdown)",`<span class="${cls(st.dd)}">${pct(st.dd)}</span>`],["Up days",st.days?`${st.upDays} of ${st.days}`:"—"],
-    ["Win rate (closed trades)",st.win!=null?`${st.win.toFixed(0)}% <small style="color:var(--dim)">${st.wins}/${PA.closed.length}</small>`:"—"],["Trades made",String(PA.log.filter(l=>l.k==="fill").length)],
-    ["Positions",String(rows.length)],["Account opened",new Date(PA.created).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})],
-  ].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join("");
-  // daily returns
-  const keys=dayKeys().reverse();
-  $("ptDays").innerHTML=`<div class="pt-list">${keys.slice(0,S.pt.daysAll?400:10).map(k=>{ const d=k===etDate()?{...PA.days[k],end:eq.v}:PA.days[k]; const a=dayRet(d);
-    return `<div><span><b>${new Date(k+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",timeZone:"UTC"})}</b>${k===etDate()?' <small>today, live</small>':d.filled?' <small>from closing prices</small>':""}<br><small>Value $${fmt(d.end)}${d.dep?` · added $${big(d.dep)}`:""}</small></span><span class="r ${cls(a)}">${usd(r2(a),1)}<br><small class="${cls(a)}">${pct(dayPct(d))}</small></span></div>`; }).join("")}</div>`+(keys.length>10&&!S.pt.daysAll?`<div style="text-align:center;margin-top:8px"><button class="btn ghost" type="button" id="ptDaysAll">Show all ${keys.length} days</button></div>`:"");
-  // activity
-  const L=PA.log.slice(0,S.pt.histAll?1000:15);
-  $("ptHist").innerHTML=`<div class="pt-list">${L.map(l=>l.k==="dep"?`<div><span><b>Added money</b><br><small>${new Date(l.t).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</small></span><span class="r up">+$${fmt(l.amt)}</span></div>`
-    :`<div><span><b class="${l.side==="buy"?"up":"down"}">${l.side==="buy"?"Bought":"Sold"}</b> <b>${esc(l.sym)}</b>${l.type!=="market"?` <small>(${l.type})</small>`:""}<br><small>${num(l.qty,4)} sh @ $${fmt(l.px)} · ${new Date(l.t).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}</small></span><span class="r">${l.side==="buy"?"−":"+"}$${fmt(l.amt)}</span></div>`).join("")}</div>`
-    +(PA.log.length>15&&!S.pt.histAll?`<div style="text-align:center;margin-top:8px"><button class="btn ghost" type="button" id="ptHistAll">Show all activity</button></div>`:"");
-  if($("ptDaysAll")) $("ptDaysAll").onclick=()=>{ S.pt.daysAll=true; renderTrade(); };
-  if($("ptHistAll")) $("ptHistAll").onclick=()=>{ S.pt.histAll=true; renderTrade(); };
+  const tabs=[["pos","Positions",rows.length],["orders","Open orders",open.length],["days","Daily returns",null],["stats","Stats",null],["hist","Activity",null]];
+  setHTML("ptTabs",tabs.map(([k,l,n])=>`<button type="button" data-ptpane="${k}" class="${S.pt.pane===k?"on":""}">${l}${n!=null?`<span>${n}</span>`:""}</button>`).join(""));
+  let h="";
+  if(S.pt.pane==="pos") h=rows.length?`<table class="pt-tbl"><thead><tr><th>Symbol</th><th>Shares</th><th>Avg cost</th><th>Price</th><th>Market value</th><th>Today</th><th>Total P/L</th><th>% of acct</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr data-ptsym="${esc(r.s)}">
+      <td><b>${esc(r.s)}</b><span class="tag ${r.p.shares<0?"short":"long"}">${r.p.shares<0?"SHORT":"LONG"}</span></td><td>${num(Math.abs(r.p.shares),4)}</td><td>$${fmt(r.p.avg)}</td><td>$${fmt(r.px)}${r.q?` <span class="${cls(r.q.change)}">${pct(r.q.changePct)}</span>`:""}</td>
+      <td>${usd(r2(r.v))}</td><td class="${cls(r.dchg)}">${r.dchg!=null?usd(r2(r.dchg),1):"—"}</td><td class="${cls(r.g)}">${usd(r2(r.g),1)} (${pct(r.gp)})</td><td>${eq.v?(Math.abs(r.v)/eq.v*100).toFixed(1):0}%</td>
+      <td><button type="button" class="x" data-ptclose="${esc(r.s)}">${r.p.shares<0?"Cover":"Close"}</button></td></tr>`).join("")}</tbody></table>`
+    :`<div class="pt-empty">No positions yet. Search a ticker, then Buy (or Short if you think it'll fall).</div>`;
+  else if(S.pt.pane==="orders") h=open.length?`<table class="pt-tbl"><thead><tr><th>Order</th><th>Type</th><th>Trigger</th><th>Amount</th><th>Now</th><th>Placed</th><th></th></tr></thead><tbody>${open.map(o=>`<tr data-ptsym="${esc(o.sym)}"><td><b class="${o.side==="buy"?"up":"down"}">${o.side[0].toUpperCase()+o.side.slice(1)}</b> <b>${esc(o.sym)}</b></td><td>${o.type}</td><td>${o.side==="buy"?(o.type==="limit"?"≤":"≥"):(o.type==="limit"?"≥":"≤")} $${fmt(o.px)}</td><td>${o.qty!=null?num(o.qty,4)+" sh":"$"+fmt(o.usd)}</td><td>$${fmt(ptQ(o.sym)?.price)}</td><td>${tstamp(o.t)}</td><td><button type="button" class="x" data-ptcancel="${o.id}">Cancel</button></td></tr>`).join("")}</tbody></table>`
+    :`<div class="pt-empty">No open orders. Limit and stop orders wait here until their price is hit.</div>`;
+  else if(S.pt.pane==="days"){ const ks=dayKeys().reverse(); const all=S.pt.daysAll?ks:ks.slice(0,15);
+    h=`<table class="pt-tbl"><thead><tr><th>Day</th><th>Start value</th><th>End value</th><th>Money added</th><th>Return $</th><th>Return %</th></tr></thead><tbody>${all.map(k=>{ const d=k===etDate()?{...PA.days[k],end:eq.v}:PA.days[k]; const a=dayRet(d);
+      return `<tr><td><b>${new Date(k+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"})}</b>${k===etDate()?' <small style="color:var(--dim)">live</small>':d.filled?' <small style="color:var(--dim)">from closes</small>':""}</td><td>$${fmt(d.start)}</td><td>$${fmt(d.end)}</td><td>${d.dep?"$"+fmt(d.dep):"—"}</td><td class="${cls(a)}">${usd(r2(a),1)}</td><td class="${cls(a)}">${pct(dayPct(d))}</td></tr>`; }).join("")}</tbody></table>`+(ks.length>15&&!S.pt.daysAll?`<div class="pt-more"><button class="btn ghost" type="button" data-ptall="daysAll">Show all ${ks.length} days</button></div>`:""); }
+  else if(S.pt.pane==="stats"){ const st=ptStatsCalc(); const spx=ptQ("^GSPC"); const spxR=spx&&PA.spx0?(spx.price/PA.spx0-1)*100:null;
+    h=`<div class="pt-stats">${[
+      ["Total return",`<span class="${cls(tot)}">${usd(r2(tot),1)}</span>`],["Return % (time-weighted)",`<span class="${cls(st.twr)}">${pct(st.twr)}</span>`],
+      ["S&P 500 since start",spxR!=null?`<span class="${cls(spxR)}">${pct(spxR)}</span>`:"—"],["You vs S&P 500",spxR!=null?`<span class="${cls(st.twr-spxR)}">${pct(st.twr-spxR)}</span>`:"—"],
+      ["Unrealized gain",`<span class="${cls(unr)}">${usd(r2(unr),1)}</span>`],["Realized gain",`<span class="${cls(PA.realized)}">${usd(PA.realized,1)}</span>`],
+      ["Today (positions)",`<span class="${cls(dayPos)}">${usd(r2(dayPos),1)}</span>`],["Avg daily return",`<span class="${cls(st.avg)}">${pct(st.avg)}</span>`],
+      ["Best day",st.best?`<span class="${cls(st.best.amt)}">${usd(r2(st.best.amt),1)}</span>`:"—"],["Worst day",st.worst?`<span class="${cls(st.worst.amt)}">${usd(r2(st.worst.amt),1)}</span>`:"—"],
+      ["Biggest drop (drawdown)",`<span class="${cls(st.dd)}">${pct(st.dd)}</span>`],["Up days",st.days?`${st.upDays} of ${st.days}`:"—"],
+      ["Win rate (closed trades)",st.win!=null?`${st.win.toFixed(0)}% <small style="color:var(--dim)">${st.wins}/${PA.closed.length}</small>`:"—"],["Trades made",String(PA.log.filter(l=>l.k==="fill").length)],
+      ["Long value","$"+fmt(rows.filter(r=>r.v>0).reduce((a,r)=>a+r.v,0))],["Short value","$"+fmt(ptShortValue())],
+      ["Account opened",new Date(PA.created).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})],["Money added","$"+fmt(PA.deposited)],
+    ].map(([k,v])=>`<div>${k}<b>${v}</b></div>`).join("")}</div>`; }
+  else { const L=PA.log.slice(0,S.pt.histAll?1000:25);
+    h=`<table class="pt-tbl"><thead><tr><th>Activity</th><th>Shares</th><th>Price</th><th>Amount</th><th>Type</th><th>Time</th></tr></thead><tbody>${L.map(l=>l.k==="dep"?`<tr><td><b>Added money</b></td><td></td><td></td><td class="up">+$${fmt(l.amt)}</td><td></td><td>${tstamp(l.t)}</td></tr>`
+      :`<tr data-ptsym="${esc(l.sym)}"><td><b class="${l.side==="buy"||l.side==="cover"?"up":"down"}">${l.side==="buy"||l.side==="cover"?"▲":"▼"} ${KIND[l.side]||l.side}</b> <b>${esc(l.sym)}</b></td><td>${num(l.qty,4)}</td><td>$${fmt(l.px)}</td><td>${l.side==="buy"||l.side==="cover"?"−":"+"}$${fmt(l.amt)}</td><td>${l.type}</td><td>${tstamp(l.t)}</td></tr>`).join("")}</tbody></table>`
+      +(PA.log.length>25&&!S.pt.histAll?`<div class="pt-more"><button class="btn ghost" type="button" data-ptall="histAll">Show all activity</button></div>`:""); }
+  setHTML("ptPane",h);
 }
-function ptBuild(){ // read the ticket into an order (or an error)
+function ptBuild(){
   const sym=S.pt.sym, q=sym?ptQ(sym):null, amt=+$("ptAmt").value, lim=+$("ptPx").value;
   if(!sym) return {err:"Search a ticker first."}; if(!q) return {err:"Waiting for a live price…"};
-  if(!(amt>0)) return {err:S.pt.mode==="usd"?"Enter a dollar amount.":"Enter how many shares."};
+  if(!(amt>0)) return {err:S.pt.mode==="usd"?"Enter a dollar amount.":"Enter how many shares.",quiet:true};
   if(S.pt.type!=="market"&&!(lim>0)) return {err:`Enter the ${S.pt.type} price.`};
   const o={id:"o"+Date.now(),sym,side:S.pt.side,type:S.pt.type,t:Date.now(),status:"open"};
   if(S.pt.mode==="usd") o.usd=r2(amt); else o.qty=r6(amt); if(S.pt.type!=="market") o.px=lim;
   const px=S.pt.type==="market"?q.price:lim, sh=o.qty??o.usd/px, cost=sh*px;
-  if(o.side==="buy"&&cost>PA.cash+0.005) return {o,sh,cost,err:`Not enough cash ($${fmt(PA.cash)} available). Tap + at the top to add money.`};
-  if(o.side==="sell"){ const p=PA.pos[sym]; if(!p) return {o,err:`You don't own any ${sym}.`}; if(sh>p.shares+1e-4) return {o,err:`You only own ${num(p.shares,4)} shares (worth about $${fmt(p.shares*q.price)}).`}; }
-  return {o,sh,cost,px};
+  const err=ptCheck(o.side,sym,sh,px);
+  return {o,sh,cost,px,err};
 }
 function ptEstimate(){
-  const b=ptBuild(), el=$("ptEst"), go=$("ptGo");
-  go.className="btn pt-go "+S.pt.side; go.textContent=S.pt.confirm?"":(S.pt.type==="market"?(S.pt.side==="buy"?"Review buy":"Review sell"):`Review ${S.pt.type} order`);
-  if(S.pt.confirm){ return; }
-  if(!$("ptAmt").value&&!b.o){ el.innerHTML=S.pt.sym?`Buying power: $${fmt(PA.cash)}${PA.pos[S.pt.sym]?` · You own ${num(PA.pos[S.pt.sym].shares,4)} shares`:""}`:""; return; }
-  el.innerHTML=b.err?`<span class="err">${esc(b.err)}</span>`:`About <b>${num(b.sh,4)} shares</b> for <b>$${fmt(b.cost)}</b>${S.pt.type!=="market"?` when the price ${S.pt.type==="limit"?(S.pt.side==="buy"?"falls to":"rises to"):(S.pt.side==="buy"?"rises to":"falls to")} $${fmt(b.px)}`:` at $${fmt(b.px)}`} · Cash after: $${fmt(S.pt.side==="buy"?PA.cash-b.cost:PA.cash+b.cost)}`;
+  if(S.pt.confirm) return;
+  const b=ptBuild(), el=$("ptEst"), go=$("ptGo"), side=S.pt.side;
+  go.className="btn pt-go "+side; go.textContent=`Review ${S.pt.type!=="market"?S.pt.type+" ":""}${side==="buy"&&S.pt.sym&&ptHeld(S.pt.sym)<0?"cover":side}`;
+  const h=b.err?(b.quiet?"":`<span class="err">${esc(b.err)}</span>`):`About <b>${num(b.sh,4)} shares</b> for <b>$${fmt(b.cost)}</b>${S.pt.type!=="market"?` when the price ${S.pt.type==="limit"?(side==="buy"?"falls to":"rises to"):(side==="buy"?"rises to":"falls to")} $${fmt(b.px)}`:` at $${fmt(b.px)}`}`;
+  if(el.innerHTML!==h) el.innerHTML=h;
 }
 function ptPick(sym){ sym=String(sym||"").trim().toUpperCase(); if(!sym) return; if(window.cryptoFix) sym=cryptoFix(sym);
-  if(sym===S.pt.sym&&ptQ(sym)){ $("ptSym").value=sym; return; }
-  S.pt.sym=sym; $("ptSym").value=sym; renderTrade();
-  if(!ptQ(sym)) api("/api/quotes?symbols="+encodeURIComponent(sym)).then(j=>{ const k=Object.keys(j.quotes)[0]; if(k&&k!==sym){ S.pt.sym=k; $("ptSym").value=k; } S.quotes={...S.quotes,...j.quotes}; renderTrade(); }).catch(()=>{});
+  $("ptSym").value=sym; if(sym===S.pt.sym&&ptQ(sym)) return;
+  S.pt.sym=sym; S.pt.confirm=null; $("ptGo").hidden=false; store.set("ptSym",sym); renderTrade(); ptLoadChart();
+  if(!ptQ(sym)) api("/api/quotes?symbols="+encodeURIComponent(sym)).then(j=>{ const k=Object.keys(j.quotes)[0]; if(k&&k!==sym&&S.pt.sym===sym){ S.pt.sym=k; $("ptSym").value=k; store.set("ptSym",k); ptLoadChart(); } S.quotes={...S.quotes,...j.quotes}; renderTrade(); }).catch(()=>{});
 }
 function ptSubmit(e){
-  e&&e.preventDefault(); const b=ptBuild(); if(b.err){ toast(b.err); ptEstimate(); return; }
-  S.pt.confirm=b; const o=b.o;
-  $("ptEst").innerHTML=`<div class="pt-confirm"><b>${o.side==="buy"?"Buy":"Sell"} ${num(b.sh,4)} ${esc(o.sym)}</b> ${o.type==="market"?`at about $${fmt(b.px)}`:`with a ${o.type} at $${fmt(o.px)}`}<br>Estimated ${o.side==="buy"?"cost":"proceeds"}: <b>$${fmt(b.cost)}</b><div class="pt-row"><button type="button" class="btn ghost" id="ptNo">Edit</button><button type="button" class="btn ${o.side==="buy"?"pt-go buy":"pt-go sell"}" id="ptYes">${o.type==="market"?(o.side==="buy"?"Buy now":"Sell now"):"Place order"}</button></div></div>`;
+  e&&e.preventDefault(); const b=ptBuild(); if(b.err){ toast(b.err); return; }
+  S.pt.confirm=b; const o=b.o; const verb=o.side==="buy"&&ptHeld(o.sym)<0?"Cover":o.side[0].toUpperCase()+o.side.slice(1);
+  $("ptEst").innerHTML=`<div class="pt-confirm"><b>${verb} ${num(b.sh,4)} ${esc(o.sym)}</b> ${o.type==="market"?`at about $${fmt(b.px)}`:`with a ${o.type} at $${fmt(o.px)}`}<br>Estimated ${o.side==="buy"?"cost":"proceeds"}: <b>$${fmt(b.cost)}</b><div class="pt-row"><button type="button" class="btn ghost" id="ptNo">Edit</button><button type="button" class="btn pt-go ${o.side}" id="ptYes">${o.type==="market"?verb+" now":"Place order"}</button></div></div>`;
   $("ptGo").hidden=true;
   $("ptNo").onclick=()=>{ S.pt.confirm=null; $("ptGo").hidden=false; ptEstimate(); };
-  $("ptYes").onclick=()=>{ const o=b.o; S.pt.confirm=null; $("ptGo").hidden=false; ptDayTick();
-    if(o.type==="market"){ const err=ptFill(o,ptQ(o.sym).price); if(err){ toast(err); return renderTrade(); } PA.orders.unshift(o); toast(`${o.side==="buy"?"Bought":"Sold"} ${num(o.fillQty,4)} ${o.sym} at $${fmt(o.fillPx)}`); }
-    else { PA.orders.unshift(o); toast(`${o.type==="limit"?"Limit":"Stop"} order placed for ${o.sym}.`); ptCheckOrders(); }
-    PA.orders=PA.orders.slice(0,500); $("ptAmt").value=""; $("ptPx").value=""; ptDayTick(); ptSave(); renderTrade(); };
+  $("ptYes").onclick=()=>{ S.pt.confirm=null; $("ptGo").hidden=false; $("ptEst").innerHTML=""; ptDayTick();
+    if(o.type==="market"){ const err=ptFill(o,ptQ(o.sym).price); if(err){ toast(err); return renderTrade(); } PA.orders.unshift(o); toast(`${KIND[o.kind]} ${num(o.fillQty,4)} ${o.sym} at $${fmt(o.fillPx)}`); }
+    else { PA.orders.unshift(o); S.pt.pane="orders"; toast(`${o.type==="limit"?"Limit":"Stop"} order placed for ${o.sym}.`); ptCheckOrders(); }
+    PA.orders=PA.orders.slice(0,500); $("ptAmt").value=""; $("ptPx").value=""; ptDayTick(); ptSave(); renderTrade(); ptMarkers(); ptPriceLines(); };
 }
 $("ptForm").addEventListener("submit",ptSubmit);
-["ptSide","ptType","ptMode"].forEach(id=>$(id).addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; S.pt[{ptSide:"side",ptType:"type",ptMode:"mode"}[id]]=b.dataset.v; S.pt.confirm=null; $("ptGo").hidden=false; renderTrade(); }));
+["ptSide","ptType","ptMode"].forEach(id=>$(id).addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; S.pt[{ptSide:"side",ptType:"type",ptMode:"mode"}[id]]=b.dataset.v; S.pt.confirm=null; $("ptGo").hidden=false; $("ptEst").innerHTML=""; renderTrade(); }));
 ["ptAmt","ptPx"].forEach(id=>$(id).addEventListener("input",()=>{ S.pt.confirm=null; $("ptGo").hidden=false; ptEstimate(); }));
-$("ptQuick").addEventListener("click",e=>{ const b=e.target.closest("[data-ptq]"); if(!b) return; const v=b.dataset.ptq, q=ptQ(S.pt.sym);
-  if(v==="max"){ S.pt.mode="usd"; $("ptAmt").value=Math.floor(PA.cash*100)/100; }
-  else if(v[0]==="p"){ const p=PA.pos[S.pt.sym]; S.pt.mode="shares"; $("ptAmt").value=v==="p100"?p.shares:r6(p.shares*+v.slice(1)/100); }
+$("ptQuick").addEventListener("click",e=>{ const b=e.target.closest("[data-ptq]"); if(!b) return; const v=b.dataset.ptq, held=ptHeld(S.pt.sym);
+  if(v==="max"){ const q=ptQ(S.pt.sym); S.pt.mode="usd"; $("ptAmt").value=Math.floor(ptBP()*100)/100; }
+  else if(v==="cover"){ S.pt.mode="shares"; $("ptAmt").value=-held; }
+  else if(v[0]==="p"){ S.pt.mode="shares"; $("ptAmt").value=v==="p100"?held:r6(held*+v.slice(1)/100); }
   else { S.pt.mode="usd"; $("ptAmt").value=v; }
-  S.pt.confirm=null; renderTrade(); });
+  S.pt.confirm=null; $("ptGo").hidden=false; renderTrade(); });
 $("ptSym").addEventListener("change",()=>ptPick($("ptSym").value));
 attachSuggest("ptSym",s=>ptPick(s));
-$("ptPos").addEventListener("click",e=>{ const c=e.target.closest("[data-ptsym]"); if(!c) return; S.pt.side="sell"; ptPick(c.dataset.ptsym); $("ptForm").scrollIntoView({behavior:"smooth",block:"start"}); });
-$("ptOpenWrap").addEventListener("click",e=>{ const b=e.target.closest("[data-ptcancel]"); if(!b) return; const o=PA.orders.find(x=>x.id===b.dataset.ptcancel); if(o){ o.status="canceled"; ptSave(); toast("Order canceled."); renderTrade(); } });
+$("ptRange").addEventListener("click",e=>{ const b=e.target.closest("[data-ptrange]"); if(!b) return; S.pt.range=b.dataset.ptrange; store.set("ptRange",S.pt.range); ptLoadChart(); });
+$("ptTabs").addEventListener("click",e=>{ const b=e.target.closest("[data-ptpane]"); if(!b) return; S.pt.pane=b.dataset.ptpane; renderTrade(); });
+$("ptPane").addEventListener("click",e=>{
+  const c=e.target.closest("[data-ptcancel]"); if(c){ const o=PA.orders.find(x=>x.id===c.dataset.ptcancel); if(o){ o.status="canceled"; ptSave(); toast("Order canceled."); renderTrade(); ptPriceLines(); } return; }
+  const x=e.target.closest("[data-ptclose]"); if(x){ const s=x.dataset.ptclose, held=ptHeld(s); S.pt.side=held<0?"buy":"sell"; S.pt.type="market"; S.pt.mode="shares"; ptPick(s); $("ptAmt").value=Math.abs(held); renderTrade(); $("ptAmt").focus(); return; }
+  const a=e.target.closest("[data-ptall]"); if(a){ S.pt[a.dataset.ptall]=true; renderTrade(); return; }
+  const r=e.target.closest("[data-ptsym]"); if(r){ ptPick(r.dataset.ptsym); scrollTo({top:0,behavior:"smooth"}); }
+});
 $("ptPlus").onclick=()=>{ const f=$("ptAdd"); f.hidden=!f.hidden; if(!f.hidden) $("ptAddAmt").focus(); };
 $("ptAdd").addEventListener("click",e=>{ const b=e.target.closest("[data-ptadd]"); if(b) ptDeposit(b.dataset.ptadd); });
 $("ptAdd").addEventListener("submit",e=>{ e.preventDefault(); ptDeposit($("ptAddAmt").value); });
-$("ptReset").onclick=()=>{ const b=$("ptReset"); if(!b.classList.contains("armed")){ b.classList.add("armed"); b.textContent="Tap again to erase everything and restart with $100,000"; setTimeout(()=>{ b.classList.remove("armed"); b.textContent="Reset paper account"; },5000); return; }
-  PA=ptFresh(); S.pt={side:"buy",type:"market",mode:"usd",sym:"",confirm:null}; $("ptSym").value=""; ptSave(); b.classList.remove("armed"); b.textContent="Reset paper account"; toast("Paper account reset to $100,000."); renderTrade(); };
+$("ptReset").onclick=()=>{ const b=$("ptReset"); if(!b.classList.contains("armed")){ b.classList.add("armed"); b.textContent="Click again to erase everything and restart with $100,000"; setTimeout(()=>{ b.classList.remove("armed"); b.textContent="Reset paper account"; },5000); return; }
+  PA=ptFresh(); S.pt.confirm=null; ptSave(); b.classList.remove("armed"); b.textContent="Reset paper account"; toast("Paper account reset to $100,000."); renderTrade(); ptMarkers(); ptLinesSig=""; ptPriceLines(); };
 matchMedia("(max-width:760px)").addEventListener("change",()=>{ if(S.tab==="trade"&&!isApp()) setTab("portfolio"); });
+function ptOpen(){ if(!S.pt.sym){ const first=Object.keys(PA.pos)[0]; S.pt.sym=first||"SPY"; } $("ptSym").value=S.pt.sym; renderTrade(); if(ptChartKey!==S.pt.sym+"|"+S.pt.range||!ptSeries) ptLoadChart(); else { ptMarkers(); ptChartLive(); } if(!ptQ(S.pt.sym)) ptPick(S.pt.sym); }
+
+/* ---------- resizable watchlist ---------- */
+(function(){
+  const h=$("wlResize"); if(!h) return; const MIN=170, MAX=560;
+  const apply=w=>{ w=Math.max(MIN,Math.min(MAX,Math.round(w))); document.documentElement.style.setProperty("--wlw",w+"px"); document.body.classList.toggle("wl-narrow",w<230); return w; };
+  let saved=store.get("wlWidth",null); if(saved) apply(saved);
+  h.addEventListener("pointerdown",e=>{ e.preventDefault(); h.setPointerCapture(e.pointerId); document.body.classList.add("wl-dragging");
+    const left=h.parentElement.getBoundingClientRect().left;
+    const move=ev=>{ saved=apply(ev.clientX-left); };
+    const up=()=>{ h.removeEventListener("pointermove",move); h.removeEventListener("pointerup",up); document.body.classList.remove("wl-dragging"); store.set("wlWidth",saved); window.dispatchEvent(new Event("resize")); };
+    h.addEventListener("pointermove",move); h.addEventListener("pointerup",up); });
+  h.addEventListener("dblclick",()=>{ saved=null; document.documentElement.style.removeProperty("--wlw"); document.body.classList.remove("wl-narrow"); store.set("wlWidth",null); window.dispatchEvent(new Event("resize")); });
+})();
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
