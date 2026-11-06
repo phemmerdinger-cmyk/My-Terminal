@@ -407,11 +407,15 @@ const PREDICTION_TOOL = {
       confidence: { type: "integer", description: "0-100" },
       headline: T("one-sentence call"),
       shortTermView: T("2-3 sentences on the next 1-2 weeks"), shortTermRange: T("expected price/level range for the next 1-2 weeks"),
+      shortTermTarget: { type: "number", description: "single most likely price/level in 2 weeks" },
+      mediumTermTarget: { type: "number", description: "single most likely price/level in 6 months" },
+      riskLevel: { type: "string", enum: ["Low", "Medium", "High", "Very high"] },
+      oneLiner: T("under 12 words, the gist for a ranked list"),
       mediumTermView: T("2-3 sentences on the next 3-6 months"), mediumTermRange: T("expected price/level range for the next 3-6 months"),
       bullCase: T("2-4 short points, one per line"), bearCase: T("2-4 short points, one per line"),
       catalysts: T("2-4 upcoming events to watch, one per line"), newsRead: T("what the latest headlines say, 2-3 sentences"),
     },
-    required: ["stance", "confidence", "headline", "shortTermView", "shortTermRange", "mediumTermView", "mediumTermRange", "bullCase", "bearCase", "catalysts", "newsRead"],
+    required: ["stance", "confidence", "headline", "oneLiner", "riskLevel", "shortTermTarget", "mediumTermTarget", "shortTermView", "shortTermRange", "mediumTermView", "mediumTermRange", "bullCase", "bearCase", "catalysts", "newsRead"],
   },
 };
 const lines = (v) => (Array.isArray(v) ? v : String(v || "").split(/\n+|(?:^|\s)[•\-]\s+/)).map((x) => String(x).replace(/^[\s•\-\d.)]+/, "").trim()).filter(Boolean).slice(0, 6);
@@ -422,12 +426,15 @@ function shapePrediction(p) {
     shortTerm: { horizon: "next 1-2 weeks", view: p.shortTermView, range: p.shortTermRange },
     mediumTerm: { horizon: "next 3-6 months", view: p.mediumTermView, range: p.mediumTermRange },
     bullCase: lines(p.bullCase), bearCase: lines(p.bearCase), catalysts: lines(p.catalysts), newsRead: p.newsRead,
+    oneLiner: p.oneLiner, riskLevel: p.riskLevel,
+    targetShort: +p.shortTermTarget || null, targetMedium: +p.mediumTermTarget || null,
   };
 }
 const SHAPE = `Give your answer by calling the prediction tool. Put each bull point, bear point and catalyst on its own line.`;
 
-async function predict(sym, apiKey) {
+async function predict(sym, apiKey, fresh) {
   const isMarket = sym === "MARKET";
+  if (fresh) cache.delete(`p:${sym}:${MODEL}`);
   return cached(`p:${sym}:${MODEL}`, 30 * 60_000, async () => {
     const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", dateStyle: "full" });
     let prompt;
@@ -451,7 +458,9 @@ async function predict(sym, apiKey) {
       prompt = `Today is ${today}. Give your outlook for ${q.name} (${sym}).\n\nQUOTE\nPrice ${q.price} ${q.currency}, ${q.changePct?.toFixed(2)}% today, prev close ${q.prevClose}, day ${q.dayLow}-${q.dayHigh}, 52w ${q.low52}-${q.high52}, volume ${q.volume}\n\nTREND\n${h ? summarizeHistory(h) : "n/a"}\n\nLATEST ${sym} HEADLINES\n${heads || "(none found)"}\n\n${SHAPE}`;
     }
     const out = shapePrediction(await askClaude(apiKey, prompt));
-    return { symbol: sym, model: MODEL, generated: Date.now(), ...out };
+    const pq = (await getQuotes([isMarket ? "^GSPC" : sym])).quotes;
+    const priceAt = (pq[isMarket ? "^GSPC" : sym] || {}).price ?? null;
+    return { symbol: sym, model: MODEL, generated: Date.now(), priceAt, priceSymbol: isMarket ? "^GSPC" : sym, ...out };
   });
 }
 
@@ -898,7 +907,7 @@ http
         if (!s) return send(res, 400, { error: "Enter a valid ticker" });
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
-        try { return send(res, 200, await predict(s, key)); }
+        try { return send(res, 200, await predict(s, key, u.searchParams.get("fresh") === "1")); }
         catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/ask" && req.method === "POST") {
