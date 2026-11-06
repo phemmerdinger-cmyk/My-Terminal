@@ -110,6 +110,11 @@ select.dd-btn{appearance:auto;padding:5px 10px}
 .dd-menu label{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:5px;cursor:pointer;font-size:13px}
 .dd-menu label:hover{background:var(--panel2)}
 .dd-menu input{accent-color:var(--amber)}
+.dd-title{display:none;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 8px 8px;font-weight:600}
+.src-row{display:flex;align-items:center;gap:4px}
+.src-row label{flex:1}
+.only{background:none;border:1px solid var(--line2);border-radius:5px;color:var(--muted);font-size:11px;padding:3px 8px;cursor:pointer;opacity:.0;transition:opacity .15s}
+.src-row:hover .only{opacity:1} .only:hover{color:#fff;border-color:var(--amber)}
 .dd-act{display:flex;gap:6px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
 .dd-act button{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:5px;font-size:12px;cursor:pointer;color:var(--muted)}
 .feed-count{padding:10px 16px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line)}
@@ -311,6 +316,11 @@ nav.tabs .ti{display:none}
   #notifBtn{font-size:0;padding:5px 8px} #notifBtn::before{content:"🔔";font-size:14px}
   #installBtn{display:none}
   #syncLbl{display:none}
+  /* dropdowns open as a panel above the bottom tab bar so nothing clips them */
+  .dd-menu{position:fixed;left:12px;right:12px;top:auto;bottom:86px;min-width:0;max-height:62vh;overflow-y:auto;z-index:45;padding:10px;border-radius:14px;box-shadow:0 -10px 50px rgba(0,0,0,.6)}
+  .dd-title{display:block}
+  .only{opacity:1;padding:8px 12px;font-size:13px}
+  .dd-act button{padding:12px;font-size:14px}
   header{gap:10px}
 }
 .wl-car{display:none;transition:transform .15s;font-size:10px;margin-left:4px}
@@ -968,7 +978,7 @@ function renderToolbar(){
   $("toolbar").innerHTML=
     views.map(([k,l])=>`<span class="chip ${S.view===k?"on":""}" data-view="${esc(k)}">${esc(l)}</span>`).join("")+
     `<div class="dd" id="srcDD"><button class="dd-btn" type="button" data-dd="srcDD">${esc(srcLabel)} <span class="car">▾</span></button>
-      <div class="dd-menu">${Object.entries(SRC).map(([k,s])=>`<label><input type="checkbox" data-srcbox="${k}" ${S.srcOff.has(k)?"":"checked"}><span class="sw" style="background:${s.c}"></span>${s.name}</label>`).join("")}
+      <div class="dd-menu"><div class="dd-title">News sources</div>${Object.entries(SRC).map(([k,s])=>`<div class="src-row"><label><input type="checkbox" data-srcbox="${k}" ${S.srcOff.has(k)?"":"checked"}><span class="sw" style="background:${s.c}"></span>${s.name}</label><button type="button" class="only" data-srconly="${k}">Only</button></div>`).join("")}
       <div class="dd-act"><button type="button" data-srcall="1">Select all</button><button type="button" data-srcall="0">Clear</button></div></div></div>`+
     `<div class="dd"><select class="dd-btn" id="newsRange" title="Timeline">${NEWS_RANGES.map(([k,l])=>`<option value="${k}" ${S.newsRange===k?"selected":""}>🕒 ${l}</option>`).join("")}</select></div>`+
     `<input class="search" id="search" placeholder="Search headlines…" value="${esc(S.q)}">`;
@@ -977,6 +987,7 @@ function renderToolbar(){
 }
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-dd]"); if(b){ const dd=$(b.dataset.dd); dd.classList.toggle("open"); return; }
+  const so=e.target.closest("[data-srconly]"); if(so){ S.srcOff=new Set(Object.keys(SRC).filter(k=>k!==so.dataset.srconly)); store.set("srcOff",[...S.srcOff]); renderToolbar(); S.newsShow=150; renderFeed(); renderWL(); toast("Showing only "+SRC[so.dataset.srconly].name); return; }
   const sa=e.target.closest("[data-srcall]"); if(sa){ S.srcOff=new Set(sa.dataset.srcall==="1"?[]:Object.keys(SRC)); store.set("srcOff",[...S.srcOff]); renderToolbar(); $("srcDD").classList.add("open"); renderFeed(); renderWL(); return; }
   if(!e.target.closest(".dd")) document.querySelectorAll(".dd.open").forEach(d=>d.classList.remove("open"));
 });
