@@ -193,17 +193,54 @@ async function loadSource(srcKey, urls, ticker) {
 
 const TICKER_RE = /^[A-Z0-9.\-^=]{1,12}$/;
 
-async function getNews(tickers) {
+// ---------------------------------------------------------------- news archive (older headlines)
+// RSS feeds only hold the latest stories, so older news comes from Google News
+// searches limited to each outlet's site and split into date windows.
+const RANGE_DAYS = { today: 1, "24h": 1, week: 7, month: 31, "6m": 183, year: 366, all: null };
+const DOMAINS = { yahoo: "finance.yahoo.com", cnbc: "cnbc.com", morningstar: "morningstar.com", seekingalpha: "seekingalpha.com", wsj: "wsj.com" };
+function newsWindows(range) {
+  const day = 86400e3, now = Date.now();
+  const make = (n, len) => Array.from({ length: n }, (_, i) => [now - (i + 1) * len, now - i * len]);
+  if (range === "week") return make(2, 4 * day);
+  if (range === "month") return make(4, 8 * day);
+  if (range === "6m") return make(6, 31 * day);
+  if (range === "year") return make(12, 31 * day);
+  if (range === "all") return [...make(12, 31 * day), ...Array.from({ length: 9 }, (_, i) => [now - (i + 2) * 365 * day, now - (i + 1) * 365 * day])];
+  return [];
+}
+async function pool(tasks, n) {
+  const out = []; let i = 0;
+  await Promise.all(Array.from({ length: n }, async () => { while (i < tasks.length) { const k = i++; out[k] = await tasks[k]().catch(() => []); } }));
+  return out;
+}
+async function newsArchive(range, tickers) {
+  const wins = newsWindows(range);
+  if (!wins.length) return [];
+  const tk = tickers.filter((t) => !/[\^=]/.test(t)).slice(0, 8).map(base);
+  return cached(`arch:${range}:${tk.join(",")}`, range === "week" ? 30 * 60e3 : 6 * 3600e3, async () => {
+    const d = (t) => new Date(t).toISOString().slice(0, 10);
+    const tasks = [];
+    for (const [a, b] of wins) for (const key of Object.keys(SOURCES)) {
+      const when = `after:${d(a)} before:${d(b + 86400e3)}`;
+      tasks.push(() => fetchFeed(gnews(`site:${DOMAINS[key]} (stocks OR markets OR economy OR earnings) ${when}`)).then((l) => l.map((i) => cleanItem(i, key, null))));
+      if (tk.length && range !== "all") tasks.push(() => fetchFeed(gnews(`(${tk.join(" OR ")}) site:${DOMAINS[key]} ${when}`)).then((l) => l.map((i) => cleanItem(i, key, null))));
+    }
+    return (await pool(tasks, 8)).flat().filter(Boolean);
+  });
+}
+
+async function getNews(tickers, range) {
   const jobs = [];
   for (const key of Object.keys(SOURCES)) {
     jobs.push(loadSource(key, SOURCES[key].market, null).then((r) => ({ key, ...r })));
     for (const t of tickers) jobs.push(loadSource(key, SOURCES[key].ticker(t), t).then((r) => ({ key, ...r })));
   }
-  const done = await Promise.all(jobs);
+  const [done, older] = await Promise.all([Promise.all(jobs), newsArchive(range, tickers).catch(() => [])]);
+  done.push({ key: "archive", ok: false, items: older });
   const status = {};
   const byId = new Map();
   for (const { key, ok, items } of done) {
-    status[key] = status[key] || ok;
+    if (key !== "archive") status[key] = status[key] || ok;
     for (const it of items) {
       const prev = byId.get(it.id);
       if (prev) prev.tickers = [...new Set([...prev.tickers, ...it.tickers])];
@@ -218,12 +255,15 @@ async function getNews(tickers) {
       if (new RegExp(`(^|[\\s($])${b.replace(/[.^=]/g, "\\$&")}([\\s),:'’]|$)`).test(it.title)) it.tickers.push(t);
     }
   }
+  const days = range in RANGE_DAYS ? RANGE_DAYS[range] : 21;
+  const since = days ? Date.now() - days * 86400e3 : 0;
   const recent = [...byId.values()]
-    .filter((i) => !i.time || i.time > Date.now() - 1000 * 60 * 60 * 24 * 21)
+    .filter((i) => !i.time || i.time >= since)
     .sort((a, b) => (b.time || 0) - (a.time || 0));
   // Keep a fair share from every outlet (stories about your tickers always stay)
+  const long = !days || days > 7;
   const per = {};
-  const items = recent.filter((i) => { per[i.source] = (per[i.source] || 0) + 1; return i.tickers.length || per[i.source] <= 90; }).slice(0, 500);
+  const items = recent.filter((i) => { per[i.source] = (per[i.source] || 0) + 1; return i.tickers.length || per[i.source] <= (long ? 400 : 90); }).slice(0, long ? 2000 : 500);
   return {
     updated: Date.now(),
     sources: Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, { name: s.name, ok: !!status[k] }])),
@@ -806,7 +846,10 @@ http
   .createServer(async (req, res) => {
     const u = new URL(req.url, "http://x");
     try {
-      if (u.pathname === "/api/news") return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25)));
+      if (u.pathname === "/api/news") {
+        const r = String(u.searchParams.get("range") || "");
+        return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
+      }
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 120)));
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
