@@ -15,6 +15,9 @@ const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 // ---------------------------------------------------------------- sources
+const isCrypto = (t) => /-USD$/.test(t);
+const base = (t) => t.replace(/-USD$/, "");
+const kind = (t) => (isCrypto(t) ? "crypto" : "stock");
 const gnews = (q) =>
   `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`;
 
@@ -34,13 +37,13 @@ const SOURCES = {
       "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839135", // earnings
       "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664", // finance
     ],
-    ticker: (t) => [gnews(`${t} stock site:cnbc.com when:7d`)],
+    ticker: (t) => [gnews(`${base(t)} ${kind(t)} site:cnbc.com when:7d`)],
   },
   morningstar: {
     name: "Morningstar",
     domain: "morningstar.com",
     market: [gnews("site:morningstar.com stocks when:3d"), gnews("site:morningstar.com markets when:3d")],
-    ticker: (t) => [gnews(`${t} site:morningstar.com when:14d`)],
+    ticker: (t) => [gnews(`${base(t)} ${isCrypto(t) ? "crypto " : ""}site:morningstar.com when:14d`)],
   },
   seekingalpha: {
     name: "Seeking Alpha",
@@ -56,7 +59,7 @@ const SOURCES = {
       "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml",
       "https://feeds.a.dj.com/rss/RSSWSJD.xml",
     ],
-    ticker: (t) => [gnews(`${t} stock site:wsj.com when:7d`)],
+    ticker: (t) => [gnews(`${base(t)} ${kind(t)} site:wsj.com when:7d`)],
   },
 };
 
@@ -172,7 +175,7 @@ async function loadSource(srcKey, urls, ticker) {
   let ok = results.some((r) => r.status === "fulfilled" && r.value.length);
   // Fallback: if the outlet's own feed failed, use Google News for that site
   if (!ok) {
-    const q = ticker ? `${ticker} site:${src.domain} when:7d` : `site:${src.domain} stocks when:2d`;
+    const q = ticker ? `${base(ticker)} ${kind(ticker)} site:${src.domain} when:7d` : `site:${src.domain} stocks when:2d`;
     try {
       items = await fetchFeed(gnews(q));
       ok = items.length > 0;
@@ -204,7 +207,8 @@ async function getNews(tickers) {
   for (const it of byId.values()) {
     for (const t of tickers) {
       if (it.tickers.includes(t)) continue;
-      if (new RegExp(`(^|[\\s($])${t.replace(/[.^=]/g, "\\$&")}([\\s),:]|$)`).test(it.title)) it.tickers.push(t);
+      const b = base(t);
+      if (new RegExp(`(^|[\\s($])${b.replace(/[.^=]/g, "\\$&")}([\\s),:'’]|$)`).test(it.title)) it.tickers.push(t);
     }
   }
   const items = [...byId.values()]
@@ -395,13 +399,139 @@ function readBody(req) {
   });
 }
 
+// ---------------------------------------------------------------- Yahoo research data
+// quoteSummary needs a Yahoo session cookie + "crumb"; we fetch one and reuse it.
+const yahoo = { cookie: "", crumb: "", at: 0, pending: null };
+function cookiesFrom(res) {
+  const list = res.headers.getSetCookie ? res.headers.getSetCookie() : [res.headers.get("set-cookie")].filter(Boolean);
+  return list.map((c) => c.split(";")[0]).join("; ");
+}
+async function yahooAuth(force = false) {
+  if (!force && yahoo.crumb && Date.now() - yahoo.at < 6 * 3600e3) return yahoo;
+  if (yahoo.pending) return yahoo.pending;
+  yahoo.pending = (async () => {
+    let cookie = "";
+    for (const u of ["https://fc.yahoo.com/", "https://finance.yahoo.com/"]) {
+      try {
+        const r = await fetch(u, { headers: { "User-Agent": UA }, redirect: "manual", signal: AbortSignal.timeout(10000) });
+        cookie = cookiesFrom(r);
+        if (cookie) break;
+      } catch {}
+    }
+    const r2 = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+      headers: { "User-Agent": UA, Cookie: cookie, Accept: "text/plain" }, signal: AbortSignal.timeout(10000),
+    });
+    const crumb = (await r2.text()).trim();
+    if (!r2.ok || !crumb || crumb.length > 40 || crumb.includes("<")) throw new Error("Couldn't start a Yahoo Finance session");
+    Object.assign(yahoo, { cookie, crumb, at: Date.now() });
+    return yahoo;
+  })().finally(() => { yahoo.pending = null; });
+  return yahoo.pending;
+}
+async function yget(url) {
+  let last;
+  for (let i = 0; i < 2; i++) {
+    const a = await yahooAuth(i > 0);
+    const u = url + (url.includes("?") ? "&" : "?") + "crumb=" + encodeURIComponent(a.crumb);
+    const res = await fetch(u, { headers: { "User-Agent": UA, Cookie: a.cookie, Accept: "application/json" }, signal: AbortSignal.timeout(12000) });
+    const body = await res.json().catch(() => ({}));
+    if (res.status === 401 || res.status === 403) { last = new Error("Yahoo refused the request"); continue; }
+    if (!res.ok) { const e = new Error((body.quoteSummary && body.quoteSummary.error && body.quoteSummary.error.description) || `Yahoo error ${res.status}`); e.status = res.status; throw e; }
+    return body;
+  }
+  throw last;
+}
+// {raw, fmt} -> raw, recursively
+function unwrap(v) {
+  if (Array.isArray(v)) return v.map(unwrap);
+  if (v && typeof v === "object") {
+    if ("raw" in v && (typeof v.raw !== "object" || v.raw === null)) return v.raw;
+    if ("fmt" in v && Object.keys(v).length <= 2) return v.fmt ?? null;
+    if (Object.keys(v).length === 0) return null;
+    const o = {};
+    for (const [k, x] of Object.entries(v)) o[k] = unwrap(x);
+    return o;
+  }
+  return v;
+}
+
+async function search(q) {
+  return cached("s:" + q.toLowerCase(), 10 * 60_000, async () => {
+    const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0&listsCount=0&enableFuzzyQuery=true`;
+    const j = JSON.parse(await get(url, "application/json"));
+    return (j.quotes || []).filter((x) => x.symbol).map((x) => ({
+      symbol: x.symbol, name: x.shortname || x.longname || x.symbol, type: x.quoteType || "", typeDisp: x.typeDisp || x.quoteType || "", exchange: x.exchDisp || x.exchange || "",
+    }));
+  });
+}
+
+const MODULE_SETS = [
+  "price,quoteType,summaryDetail,defaultKeyStatistics,financialData,assetProfile,calendarEvents,earnings,earningsTrend,earningsHistory,recommendationTrend,upgradeDowngradeHistory,majorHoldersBreakdown,institutionOwnership,fundOwnership,insiderHolders,netSharePurchaseActivity",
+  "price,quoteType,summaryDetail,defaultKeyStatistics,assetProfile,summaryProfile,fundProfile,topHoldings,fundPerformance",
+  "price,quoteType,summaryDetail",
+];
+async function summary(sym) {
+  return cached("sum:" + sym, 10 * 60_000, async () => {
+    let lastErr;
+    // ETFs / funds / crypto get the fund set first; everything else the stock set
+    let order = [0, 1, 2];
+    try {
+      const qt = unwrap((await yget(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=quoteType`)).quoteSummary.result[0]).quoteType;
+      if (qt && qt.quoteType && qt.quoteType !== "EQUITY") order = [1, 2];
+    } catch (e) { lastErr = e; }
+    for (const i of order) {
+      try {
+        const j = await yget(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=${MODULE_SETS[i]}`);
+        const r = j.quoteSummary && j.quoteSummary.result && j.quoteSummary.result[0];
+        if (r) return { symbol: sym, ...unwrap(r) };
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error("No data for " + sym);
+  });
+}
+
+const STATEMENTS = {
+  income: ["TotalRevenue", "CostOfRevenue", "GrossProfit", "ResearchAndDevelopment", "SellingGeneralAndAdministration", "OperatingExpense", "OperatingIncome", "InterestExpense", "OtherIncomeExpense", "PretaxIncome", "TaxProvision", "NetIncome", "NetIncomeCommonStockholders", "BasicEPS", "DilutedEPS", "BasicAverageShares", "DilutedAverageShares", "EBIT", "EBITDA", "NormalizedEBITDA"],
+  balance: ["TotalAssets", "CurrentAssets", "CashAndCashEquivalents", "CashCashEquivalentsAndShortTermInvestments", "Receivables", "Inventory", "NetPPE", "Goodwill", "TotalNonCurrentAssets", "TotalLiabilitiesNetMinorityInterest", "CurrentLiabilities", "AccountsPayable", "CurrentDebt", "LongTermDebt", "TotalDebt", "NetDebt", "StockholdersEquity", "RetainedEarnings", "WorkingCapital", "TangibleBookValue", "OrdinarySharesNumber"],
+  cash: ["OperatingCashFlow", "CapitalExpenditure", "FreeCashFlow", "InvestingCashFlow", "FinancingCashFlow", "StockBasedCompensation", "DepreciationAndAmortization", "CashDividendsPaid", "RepurchaseOfCapitalStock", "IssuanceOfDebt", "RepaymentOfDebt", "ChangesInCash", "EndCashPosition"],
+};
+async function financials(sym, freq) {
+  const f = freq === "quarterly" ? "quarterly" : "annual";
+  return cached(`fin:${sym}:${f}`, 6 * 3600e3, async () => {
+    const keys = Object.values(STATEMENTS).flat();
+    const types = keys.map((k) => f + k).join(",");
+    const now = Math.floor(Date.now() / 1000);
+    const url = `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=493590046&period2=${now}&merge=false&padTimeSeries=true`;
+    let j;
+    try { j = await yget(url); } catch { j = JSON.parse(await get(url, "application/json")); }
+    const rows = {};
+    const dates = new Set();
+    for (const r of (j.timeseries && j.timeseries.result) || []) {
+      const type = r.meta && r.meta.type && r.meta.type[0];
+      if (!type) continue;
+      const key = type.replace(/^(annual|quarterly)/, "");
+      for (const pt of r[type] || []) {
+        if (!pt || !pt.asOfDate || !pt.reportedValue) continue;
+        (rows[key] = rows[key] || {})[pt.asOfDate] = pt.reportedValue.raw;
+        dates.add(pt.asOfDate);
+      }
+    }
+    const periods = [...dates].sort().reverse().slice(0, f === "annual" ? 5 : 8);
+    const out = {};
+    for (const [stmt, list] of Object.entries(STATEMENTS)) out[stmt] = list.filter((k) => rows[k]).map((k) => ({ key: k, values: periods.map((d) => rows[k][d] ?? null) }));
+    return { symbol: sym, freq: f, periods, ...out };
+  });
+}
+
 // ---------------------------------------------------------------- live streaming prices (Finnhub)
 // With FINNHUB_API_KEY set (free at finnhub.io), the server keeps one WebSocket to
 // Finnhub and streams every trade to open browsers via Server-Sent Events.
 // Free tier: real-time US stock trades, up to 30 symbols at once. Needs Node 22+.
 const FINNHUB = process.env.FINNHUB_API_KEY;
 const live = { ws: null, open: false, subs: new Set(), last: new Map(), dirty: new Set(), clients: new Set(), retry: 1000 };
-const streamable = (s) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s); // stocks/ETFs only (no ^indexes or futures)
+const streamable = (s) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s); // stocks, ETFs and COIN-USD (no ^indexes or futures)
+const toFeed = (s) => (isCrypto(s) ? `BINANCE:${base(s)}USDT` : s);
+const fromFeed = (f) => { const m = f.match(/^BINANCE:(\w+)USDT$/); return m ? m[1] + "-USD" : f; };
 
 function wanted() {
   const want = new Set();
@@ -411,8 +541,8 @@ function wanted() {
 function syncSubs() {
   if (!live.open) return;
   const want = wanted();
-  for (const s of live.subs) if (!want.has(s)) { live.ws.send(JSON.stringify({ type: "unsubscribe", symbol: s })); live.subs.delete(s); }
-  for (const s of want) if (!live.subs.has(s)) { live.ws.send(JSON.stringify({ type: "subscribe", symbol: s })); live.subs.add(s); }
+  for (const s of live.subs) if (!want.has(s)) { live.ws.send(JSON.stringify({ type: "unsubscribe", symbol: toFeed(s) })); live.subs.delete(s); }
+  for (const s of want) if (!live.subs.has(s)) { live.ws.send(JSON.stringify({ type: "subscribe", symbol: toFeed(s) })); live.subs.add(s); }
 }
 function connectFinnhub() {
   if (!FINNHUB || typeof WebSocket === "undefined") return;
@@ -423,8 +553,9 @@ function connectFinnhub() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.type !== "trade" || !Array.isArray(m.data)) return;
     for (const t of m.data) {
-      const prev = live.last.get(t.s);
-      if (!prev || t.t >= prev.t) { live.last.set(t.s, { p: t.p, t: t.t }); live.dirty.add(t.s); }
+      const sym = fromFeed(t.s);
+      const prev = live.last.get(sym);
+      if (!prev || t.t >= prev.t) { live.last.set(sym, { p: t.p, t: t.t }); live.dirty.add(sym); }
     }
   };
   ws.onclose = () => {
@@ -477,7 +608,7 @@ http
     const u = new URL(req.url, "http://x");
     try {
       if (u.pathname === "/api/news") return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25)));
-      if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 90)));
+      if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 120)));
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
         if (!s) return send(res, 400, { error: "symbol required" });
@@ -497,6 +628,19 @@ http
         if (!key) return send(res, 401, { error: "no_key" });
         try { return send(res, 200, await ask(key, await readBody(req))); }
         catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/search") {
+        const q = String(u.searchParams.get("q") || "").trim().slice(0, 40);
+        if (!q) return send(res, 200, { results: [] });
+        try { return send(res, 200, { results: await search(q) }); }
+        catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/summary" || u.pathname === "/api/financials") {
+        const [s] = parseList(u.searchParams.get("symbol"), 1);
+        if (!s) return send(res, 400, { error: "symbol required" });
+        try {
+          return send(res, 200, u.pathname === "/api/summary" ? await summary(s) : await financials(s, u.searchParams.get("freq")));
+        } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/stream") {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
