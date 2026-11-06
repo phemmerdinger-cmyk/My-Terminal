@@ -621,7 +621,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .pt-bracket{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .pt-bracket[hidden]{display:none}
 .pt-bracket label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
-.pt-bracket em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--amber);cursor:pointer;font-weight:500}
+.pt-bracket em{display:block;margin-top:2px;font-style:normal;text-transform:none;letter-spacing:0;color:var(--amber);cursor:pointer;font-weight:500}
 .pt-bracket .field{height:38px!important;font-size:14px!important;padding:8px 10px!important}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
@@ -2485,14 +2485,17 @@ function ptLevels(c){
   const lv=cl.map(g=>({px:g.sum/g.n,n:g.n})); const strong=x=>lv.some(l=>l.n>=2)?x.n>=2:true;
   const res=lv.filter(l=>l.px>last*1.0005&&strong(l)).sort((a,b)=>a.px-b.px).slice(0,2);
   const sup=lv.filter(l=>l.px<last*0.9995&&strong(l)).sort((a,b)=>b.px-a.px).slice(0,2);
+  const hi=Math.max(...c.map(x=>x.high)), lo=Math.min(...c.map(x=>x.low));
+  if(!res.length&&hi>last*1.0005) res.push({px:hi,n:1,recent:true}); // at the top of the range: use the recent high
+  if(!sup.length&&lo<last*0.9995) sup.push({px:lo,n:1,recent:true});
   return {res,sup};
 }
 function ptDrawSR(){
   if(!ptSeries) return; ptSRAt=Math.floor(Date.now()/1000);
   ptSRLines.forEach(l=>{ try{ ptSeries.removePriceLine(l); }catch{} }); ptSRLines=[]; S.pt.levels=ptLevels(ptCandles);
   if(!S.pt.sr) return;
-  S.pt.levels.res.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#ff9f43",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Resistance${l.n>1?" ("+l.n+" touches)":""}`})));
-  S.pt.levels.sup.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#22c3e6",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Support${l.n>1?" ("+l.n+" touches)":""}`})));
+  S.pt.levels.res.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#ff9f43",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Resistance${l.recent?" (recent high)":l.n>1?" ("+l.n+" touches)":""}`})));
+  S.pt.levels.sup.forEach((l,i)=>ptSRLines.push(ptSeries.createPriceLine({price:l.px,color:"#22c3e6",lineWidth:i?1:2,lineStyle:0,axisLabelVisible:true,title:`Support${l.recent?" (recent low)":l.n>1?" ("+l.n+" touches)":""}`})));
 }
 // The chart moves every 5 seconds; the next-candle countdown ticks every second
 setInterval(()=>{ if(S.tab==="trade"&&!document.hidden) ptChartLive(); },5000);
@@ -2518,8 +2521,8 @@ function ptRows(){
 function renderTrade(){
   if(!$("tab-trade")) return;
   const eq=ptEquity(false), today=PA.days[etDate()]||{start:eq.v,end:eq.v,dep:0};
-  const tr=eq.v-today.start-today.dep, trp=(today.start+today.dep)?tr/(today.start+today.dep)*100:0;
-  const tot=eq.v-PA.deposited, totp=PA.deposited?tot/PA.deposited*100:0;
+  const tr=r2(eq.v-today.start-today.dep), trp=tr&&(today.start+today.dep)?tr/(today.start+today.dep)*100:0;
+  const tot=r2(eq.v-PA.deposited), totp=tot&&PA.deposited?tot/PA.deposited*100:0;
   const rows=ptRows(); const unr=rows.reduce((a,r)=>a+r.g,0), dayPos=rows.reduce((a,r)=>a+(r.dchg||0),0);
   setHTML("ptVal","$"+fmt(eq.v));
   setHTML("ptToday",`<span class="${cls(tr)}">${usd(r2(tr),1)} (${pct(trp)})</span>`);
