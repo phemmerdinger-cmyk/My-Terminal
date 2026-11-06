@@ -536,6 +536,15 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .add input:focus,.field:focus,.search:focus{border-color:var(--amber)}
 .badge-new{color:var(--amber);border-color:var(--amber)}
 @media (max-width:760px){ nav.tabs button.on{border-top-color:var(--amber)} .wl .ch{width:auto;padding:3px 8px} }
+.item.feedv{}
+#feed .item{display:block;padding:14px 16px}
+#feed .meta{flex-wrap:nowrap;overflow:hidden;gap:8px;margin-bottom:6px;font-size:12px;color:var(--dim);white-space:nowrap}
+#feed .when{color:var(--muted);font-family:var(--mono);font-size:12px}
+#feed .dot{font-size:10px} #feed .dot.p{color:var(--up)} #feed .dot.n{color:var(--down)}
+#feed .also{overflow:hidden;text-overflow:ellipsis;min-width:0} #feed .also a{font-weight:600}
+#feed .tags{display:flex;gap:6px;margin-top:8px;flex-wrap:nowrap;overflow:hidden;align-items:center}
+#feed .tags .tg{white-space:nowrap}
+#feed .item p{margin-top:5px}
 </style>
 </head>
 <body>
@@ -1016,23 +1025,39 @@ function filtered(){
     return true;
   });
 }
+const STOP=new Set("a an the and or of to in on for with at by from as is are be its it this that after over into amid says said new stock stocks shares".split(" "));
+function words(t){ return new Set(String(t||"").toLowerCase().replace(/\s[-–|]\s[^-–|]{2,40}$/,"").replace(/[^a-z0-9$%. ]/g," ").split(/\s+/).filter(w=>w.length>1&&!STOP.has(w))); }
+function overlap(a,b){ if(!a.size||!b.size) return 0; let n=0; for(const w of a) if(b.has(w)) n++; return n/Math.min(a.size,b.size); }
+function cluster(list){ // merge the same story from different outlets into one entry
+  const out=[];
+  for(const i of list){
+    const w=words(i.title);
+    const hit=out.find(g=>Math.abs((g.time||0)-(i.time||0))<36*3600e3&&overlap(g._w,w)>=0.75&&Math.min(g._w.size,w.size)>=3);
+    if(hit){ if(!hit.also.some(a=>a.source===i.source)&&hit.source!==i.source) hit.also.push({source:i.source,link:i.link}); if(!hit.summary&&i.summary) hit.summary=i.summary; hit.tickers=[...new Set([...hit.tickers,...i.tickers])]; continue; }
+    out.push({...i,_w:w,also:[]});
+  }
+  return out;
+}
+function usefulSummary(i){ if(!i.summary) return ""; const sw=words(i.summary); return overlap(sw,i._w)>=0.7&&sw.size<=i._w.size+4?"":i.summary; }
 function renderFeed(){
-  const list=filtered(); const now=Date.now();
+  const list=cluster(filtered()); const now=Date.now();
   const nNew=S.news?S.news.items.filter(i=>i._new&&now-i._new<10*60e3).length:0;
   $("newsCount").textContent=nNew?nNew+" new":"";
   if(!list.length){ $("feed").innerHTML=`<div class="empty">${S.news?(S.srcOff.size===5?"Pick at least one news source from the Sources menu.":"No headlines match these filters yet."):"Loading…"}</div>`; return; }
-  const when=t=>{ if(!t) return ""; const d=new Date(t); const old=now-t>20*3600e3;
-    return old?d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}):etTime(t); };
+  const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3) return ago(t);
+    return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
   const more=list.length>S.newsShow;
-  $("feed").innerHTML=`<div class="feed-count">${list.length.toLocaleString()} headline${list.length===1?"":"s"} · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</div>`+list.slice(0,S.newsShow).map(i=>{
+  $("feed").innerHTML=`<div class="feed-count">${list.length.toLocaleString()} stor${list.length===1?"y":"ies"} · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</div>`+list.slice(0,S.newsShow).map(i=>{
     const s=SRC[i.source]; const isNew=i._new&&now-i._new<10*60e3;
     const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
     const tags=shown.slice(0,3).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")+(shown.length>3?`<span class="more-tags">+${shown.length-3}</span>`:"");
+    const also=i.also.length?`<span class="also">also on ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener" style="color:${SRC[a.source].c}">${SRC[a.source].short}</a>`).join(", ")}</span>`:"";
+    const sum=usefulSummary(i);
     return `<li class="item ${isNew&&now-i._new<5000?"new":""}">
-      <div class="t">${when(i.time)}<small>${ago(i.time)}</small></div>
-      <div><div class="meta"><span class="src" style="background:${s.c}">${s.short}</span>${isNew?'<span class="badge-new">NEW</span>':""}${i.mood>0?'<span class="mood p">▲ Positive</span>':i.mood<0?'<span class="mood n">▼ Negative</span>':""}${tags}</div>
+      <div class="meta"><span class="src" style="background:${s.c}">${s.short}</span><span class="when" title="${i.time?esc(new Date(i.time).toLocaleString("en-US",{timeZone:"America/New_York"})):""}">${when(i.time)}</span>${i.mood>0?'<span class="dot p" title="Positive tone">▲</span>':i.mood<0?'<span class="dot n" title="Negative tone">▼</span>':""}${isNew?'<span class="badge-new">NEW</span>':""}${also}</div>
       <h3><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
-      ${i.summary?`<p>${esc(i.summary)}</p>`:""}</div></li>`;
+      ${sum?`<p>${esc(sum)}</p>`:""}
+      ${tags?`<div class="tags">${tags}</div>`:""}</li>`;
   }).join("")+(more?`<div style="text-align:center;padding:16px"><button class="btn ghost" id="moreNews">Show more (${(list.length-S.newsShow).toLocaleString()} older)</button></div>`:"");
   if(more) $("moreNews").onclick=()=>{ S.newsShow+=200; renderFeed(); };
 }
