@@ -1,6 +1,6 @@
 {
- "name": "My Terminal",
- "short_name": "Terminal",
+ "name": "Peter's Finance Terminal",
+ "short_name": "Peter's Terminal",
  "description": "Live stock news, markets, research and predictions",
  "start_url": "/",
  "display": "standalone",
