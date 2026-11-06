@@ -1002,7 +1002,7 @@ function renderResearchHead(){
 }
 function rqSubs(){
   const t=rqType();
-  if(S.rq.sum&&S.rq.sum.limited) return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],["news","News"]];
+  if(S.rq.sum&&S.rq.sum.limited){ const d=S.rq.sum; return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],...(d.recommendationTrend||d.earningsHistory?[["analysis","Analysis"]]:[]),...(d.assetProfile?[["profile","Profile"]]:[]),["news","News"]]; }
   if(t==="ETF"||t==="MUTUALFUND") return [["summary","Summary"],["holdings","Holdings"],["performance","Performance"],["profile","Profile"],["news","News"]];
   if(t==="CRYPTOCURRENCY"||t==="INDEX"||t==="FUTURE"||t==="CURRENCY") return [["summary","Summary"],["news","News"]];
   return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],["analysis","Analysis"],["holders","Holders"],["profile","Profile"],["news","News"]];
@@ -1039,7 +1039,7 @@ function renderResearchBody(){
         ["Market cap",money(sd.marketCap??p.marketCap)],["Beta (5Y monthly)",num(sd.beta)],["PE ratio (TTM)",num(sd.trailingPE)],["EPS (TTM)",num(ks.trailingEps)],["Earnings date",Array.isArray(ed)&&ed.length?ed.map(dt).join(" – "):"—"],["Forward dividend & yield",div],["Ex-dividend date",dt(sd.exDividendDate??ce.exDividendDate)],["1y target est.",fmt(fd.targetMeanPrice)]];
     }
     const prof=d.assetProfile||d.summaryProfile||{};
-    el.innerHTML=(d.limited?`<div class="disc" style="margin:0 0 12px;color:var(--amber)">Yahoo Finance isn't sharing full company details with this server right now, so some sections are hidden. Prices, charts, financial statements and news still work. This usually fixes itself within a few minutes.</div>`:"")+rsChart()+`<div class="rs-cols"><div class="rs-sec">${kv(rows)}</div><div>
+    el.innerHTML=(d.limited?`<div class="disc" style="margin:0 0 12px;color:var(--amber)">${d.assetProfile?"Some details (like holders, analyst price targets and the company description) aren't available from Yahoo right now, so the rest comes from Finnhub.":"Yahoo Finance isn't sharing full company details with this server right now, so some sections are hidden. Prices, charts, financial statements and news still work."} This usually fixes itself later.</div>`:"")+rsChart()+`<div class="rs-cols"><div class="rs-sec">${kv(rows)}</div><div>
       ${prof.longBusinessSummary?`<h2 class="h">About</h2><div class="prose" style="font-size:13px;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden">${esc(prof.longBusinessSummary)}</div><a href="#" data-rs-sub="profile" style="font-size:12px;color:var(--amber)">More about ${esc(s)} →</a>`:""}
       ${fd.recommendationKey&&fd.recommendationKey!=="none"?`<h2 class="h" style="margin-top:18px">Analyst view</h2><div style="font-size:14px">Consensus: <b style="text-transform:capitalize;color:var(--amber)">${esc(fd.recommendationKey.replace("_"," "))}</b> · ${num(fd.numberOfAnalystOpinions,0)} analysts · target ${fmt(fd.targetMeanPrice)}</div>`:""}
     </div></div>`;
