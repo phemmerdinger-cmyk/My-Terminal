@@ -406,25 +406,48 @@ function cookiesFrom(res) {
   const list = res.headers.getSetCookie ? res.headers.getSetCookie() : [res.headers.get("set-cookie")].filter(Boolean);
   return list.map((c) => c.split(";")[0]).join("; ");
 }
+// Follow redirects by hand so every Set-Cookie along the way is kept
+async function collectCookies(startUrl, jar) {
+  let url = startUrl;
+  for (let i = 0; i < 6 && url; i++) {
+    const r = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml", "Accept-Language": "en-US,en;q=0.9", Cookie: [...jar].map(([k, v]) => `${k}=${v}`).join("; ") },
+      redirect: "manual", signal: AbortSignal.timeout(10000),
+    });
+    const list = r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get("set-cookie")].filter(Boolean);
+    for (const c of list) { const [kv] = c.split(";"); const i2 = kv.indexOf("="); if (i2 > 0) jar.set(kv.slice(0, i2).trim(), kv.slice(i2 + 1).trim()); }
+    const loc = r.headers.get("location");
+    url = loc && r.status >= 300 && r.status < 400 ? new URL(loc, url).toString() : null;
+  }
+}
 async function yahooAuth(force = false) {
   if (!force && yahoo.crumb && Date.now() - yahoo.at < 6 * 3600e3) return yahoo;
+  if (yahoo.failedAt && Date.now() - yahoo.failedAt < 5 * 60e3 && !force) throw new Error(yahoo.failMsg);
   if (yahoo.pending) return yahoo.pending;
   yahoo.pending = (async () => {
-    let cookie = "";
-    for (const u of ["https://fc.yahoo.com/", "https://finance.yahoo.com/"]) {
-      try {
-        const r = await fetch(u, { headers: { "User-Agent": UA }, redirect: "manual", signal: AbortSignal.timeout(10000) });
-        cookie = cookiesFrom(r);
-        if (cookie) break;
-      } catch {}
+    const jar = new Map();
+    const notes = [];
+    for (const u of ["https://fc.yahoo.com/", "https://finance.yahoo.com/", "https://finance.yahoo.com/quote/AAPL/"]) {
+      try { await collectCookies(u, jar); } catch (e) { notes.push(`${new URL(u).host}: ${e.message}`); }
+      if (jar.has("A3") || jar.has("A1")) break;
     }
-    const r2 = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
-      headers: { "User-Agent": UA, Cookie: cookie, Accept: "text/plain" }, signal: AbortSignal.timeout(10000),
-    });
-    const crumb = (await r2.text()).trim();
-    if (!r2.ok || !crumb || crumb.length > 40 || crumb.includes("<")) throw new Error("Couldn't start a Yahoo Finance session");
-    Object.assign(yahoo, { cookie, crumb, at: Date.now() });
-    return yahoo;
+    const cookie = [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
+    for (const host of ["query2", "query1"]) {
+      try {
+        const r2 = await fetch(`https://${host}.finance.yahoo.com/v1/test/getcrumb`, {
+          headers: { "User-Agent": UA, Cookie: cookie, Accept: "text/plain", Referer: "https://finance.yahoo.com/" }, signal: AbortSignal.timeout(10000),
+        });
+        const crumb = (await r2.text()).trim();
+        if (r2.ok && crumb && crumb.length < 40 && !crumb.includes("<") && !crumb.includes("{")) {
+          Object.assign(yahoo, { cookie, crumb, at: Date.now(), failedAt: 0 });
+          return yahoo;
+        }
+        notes.push(`${host} crumb HTTP ${r2.status}`);
+      } catch (e) { notes.push(`${host}: ${e.message}`); }
+    }
+    yahoo.failedAt = Date.now();
+    yahoo.failMsg = `Couldn't start a Yahoo Finance session (cookies: ${[...jar.keys()].join(",") || "none"}; ${notes.join("; ")})`;
+    throw new Error(yahoo.failMsg);
   })().finally(() => { yahoo.pending = null; });
   return yahoo.pending;
 }
@@ -470,6 +493,31 @@ const MODULE_SETS = [
   "price,quoteType,summaryDetail,defaultKeyStatistics,assetProfile,summaryProfile,fundProfile,topHoldings,fundPerformance",
   "price,quoteType,summaryDetail",
 ];
+const VALUATION = ["MarketCap", "EnterpriseValue", "PeRatio", "ForwardPeRatio", "PegRatio", "PsRatio", "PbRatio", "EnterprisesValueRevenueRatio", "EnterprisesValueEBITDARatio"];
+async function basicSummary(sym) {
+  const [q, val] = await Promise.all([
+    quote(sym),
+    (async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const types = VALUATION.map((k) => "trailing" + k).join(",");
+      const url = `https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(sym)}?symbol=${encodeURIComponent(sym)}&type=${types}&period1=${now - 86400 * 400}&period2=${now}&merge=false`;
+      const j = JSON.parse(await get(url, "application/json"));
+      const out = {};
+      for (const r of (j.timeseries && j.timeseries.result) || []) {
+        const t = r.meta && r.meta.type && r.meta.type[0]; const pts = (t && r[t]) || [];
+        const last = pts.filter((p) => p && p.reportedValue).pop();
+        if (last) out[t.replace(/^trailing/, "")] = last.reportedValue.raw;
+      }
+      return out;
+    })().catch(() => ({})),
+  ]);
+  return {
+    symbol: sym, limited: true,
+    price: { longName: q.name, regularMarketPrice: q.price, regularMarketChange: q.change, regularMarketChangePercent: q.changePct / 100, exchangeName: q.exchange, currency: q.currency },
+    summaryDetail: { previousClose: q.prevClose, dayLow: q.dayLow, dayHigh: q.dayHigh, fiftyTwoWeekLow: q.low52, fiftyTwoWeekHigh: q.high52, volume: q.volume, marketCap: val.MarketCap, trailingPE: val.PeRatio, forwardPE: val.ForwardPeRatio, priceToSalesTrailing12Months: val.PsRatio },
+    defaultKeyStatistics: { enterpriseValue: val.EnterpriseValue, pegRatio: val.PegRatio, priceToBook: val.PbRatio, enterpriseToRevenue: val.EnterprisesValueRevenueRatio, enterpriseToEbitda: val.EnterprisesValueEBITDARatio },
+  };
+}
 async function summary(sym) {
   return cached("sum:" + sym, 10 * 60_000, async () => {
     let lastErr;
@@ -486,7 +534,9 @@ async function summary(sym) {
         if (r) return { symbol: sym, ...unwrap(r) };
       } catch (e) { lastErr = e; }
     }
-    throw lastErr || new Error("No data for " + sym);
+    // Yahoo wouldn't give us a session: fall back to what we can get without one
+    try { const b = await basicSummary(sym); b.note = String((lastErr && lastErr.message) || ""); return b; }
+    catch { throw lastErr || new Error("No data for " + sym); }
   });
 }
 
