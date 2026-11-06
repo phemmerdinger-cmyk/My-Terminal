@@ -11,6 +11,7 @@ const path = require("path");
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, "public");
+const FINNHUB = process.env.FINNHUB_API_KEY;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
@@ -511,12 +512,65 @@ async function basicSummary(sym) {
       return out;
     })().catch(() => ({})),
   ]);
-  return {
+  const out = {
     symbol: sym, limited: true,
     price: { longName: q.name, regularMarketPrice: q.price, regularMarketChange: q.change, regularMarketChangePercent: q.changePct / 100, exchangeName: q.exchange, currency: q.currency },
     summaryDetail: { previousClose: q.prevClose, dayLow: q.dayLow, dayHigh: q.dayHigh, fiftyTwoWeekLow: q.low52, fiftyTwoWeekHigh: q.high52, volume: q.volume, marketCap: val.MarketCap, trailingPE: val.PeRatio, forwardPE: val.ForwardPeRatio, priceToSalesTrailing12Months: val.PsRatio },
     defaultKeyStatistics: { enterpriseValue: val.EnterpriseValue, pegRatio: val.PegRatio, priceToBook: val.PbRatio, enterpriseToRevenue: val.EnterprisesValueRevenueRatio, enterpriseToEbitda: val.EnterprisesValueEBITDARatio },
   };
+  if (FINNHUB && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym) && !isCrypto(sym)) await addFinnhub(sym, out).catch(() => {});
+  return out;
+}
+
+// Finnhub free endpoints fill in what Yahoo won't share: profile, key metrics, analyst trends, earnings
+async function fh(path) {
+  const r = await fetch(`https://finnhub.io/api/v1${path}${path.includes("?") ? "&" : "?"}token=${FINNHUB}`, { signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw new Error("Finnhub " + r.status);
+  return r.json();
+}
+async function addFinnhub(sym, out) {
+  const fsym = sym.replace("-", ".");
+  const [prof, met, rec, earn] = await Promise.allSettled([
+    fh(`/stock/profile2?symbol=${fsym}`), fh(`/stock/metric?symbol=${fsym}&metric=all`), fh(`/stock/recommendation?symbol=${fsym}`), fh(`/stock/earnings?symbol=${fsym}`),
+  ]).then((r) => r.map((x) => (x.status === "fulfilled" ? x.value : null)));
+  const m = (met && met.metric) || {};
+  const pc = (x) => (x == null ? undefined : x / 100);
+  const mil = (x) => (x == null ? undefined : x * 1e6);
+  const sd = out.summaryDetail, ks = out.defaultKeyStatistics;
+  if (prof && prof.name) {
+    out.price.longName = prof.name;
+    out.assetProfile = { sector: prof.finnhubIndustry, industry: prof.finnhubIndustry, country: prof.country, website: prof.weburl, phone: prof.phone };
+    sd.marketCap = sd.marketCap ?? mil(prof.marketCapitalization);
+    ks.sharesOutstanding = mil(prof.shareOutstanding);
+  }
+  Object.assign(sd, {
+    beta: m.beta, trailingPE: sd.trailingPE ?? m.peTTM ?? m.peBasicExclExtraTTM, dividendYield: pc(m.dividendYieldIndicatedAnnual ?? m.currentDividendYieldTTM),
+    dividendRate: m.dividendPerShareAnnual, payoutRatio: pc(m.payoutRatioTTM ?? m.payoutRatioAnnual),
+    averageVolume: mil(m["3MonthAverageTradingVolume"]), averageVolume10days: mil(m["10DayAverageTradingVolume"]),
+    fiftyTwoWeekHigh: sd.fiftyTwoWeekHigh ?? m["52WeekHigh"], fiftyTwoWeekLow: sd.fiftyTwoWeekLow ?? m["52WeekLow"],
+  });
+  Object.assign(ks, {
+    trailingEps: m.epsTTM ?? m.epsBasicExclExtraItemsTTM, priceToBook: ks.priceToBook ?? m.pbQuarterly ?? m.pbAnnual,
+    bookValue: m.bookValuePerShareQuarterly ?? m.bookValuePerShareAnnual, "52WeekChange": pc(m["52WeekPriceReturnDaily"]),
+  });
+  out.financialData = {
+    profitMargins: pc(m.netProfitMarginTTM), operatingMargins: pc(m.operatingMarginTTM), grossMargins: pc(m.grossMarginTTM),
+    returnOnAssets: pc(m.roaTTM), returnOnEquity: pc(m.roeTTM), revenueGrowth: pc(m.revenueGrowthQuarterlyYoy), earningsGrowth: pc(m.epsGrowthQuarterlyYoy),
+    currentRatio: m.currentRatioQuarterly, quickRatio: m.quickRatioQuarterly, revenuePerShare: m.revenuePerShareTTM,
+    debtToEquity: m["totalDebt/totalEquityQuarterly"] != null ? m["totalDebt/totalEquityQuarterly"] * 100 : undefined,
+    totalCashPerShare: m.cashPerSharePerShareQuarterly,
+  };
+  if (Array.isArray(rec) && rec.length) {
+    const r0 = rec[0];
+    out.recommendationTrend = { trend: [{ period: "0m", strongBuy: r0.strongBuy || 0, buy: r0.buy || 0, hold: r0.hold || 0, sell: r0.sell || 0, strongSell: r0.strongSell || 0 }] };
+    const sc = (r0.strongBuy * 1 + r0.buy * 2 + r0.hold * 3 + r0.sell * 4 + r0.strongSell * 5) / Math.max(1, r0.strongBuy + r0.buy + r0.hold + r0.sell + r0.strongSell);
+    out.financialData.recommendationKey = sc <= 1.5 ? "strong_buy" : sc <= 2.5 ? "buy" : sc <= 3.5 ? "hold" : sc <= 4.5 ? "sell" : "strong_sell";
+    out.financialData.numberOfAnalystOpinions = r0.strongBuy + r0.buy + r0.hold + r0.sell + r0.strongSell;
+  }
+  if (Array.isArray(earn) && earn.length) {
+    out.earningsHistory = { history: earn.slice(0, 8).reverse().map((e) => ({ quarter: Date.parse(e.period) / 1000, epsEstimate: e.estimate, epsActual: e.actual, epsDifference: e.surprise, surprisePercent: pc(e.surprisePercent) })) };
+  }
+  out.source = "Yahoo Finance + Finnhub";
 }
 async function summary(sym) {
   return cached("sum:" + sym, 10 * 60_000, async () => {
@@ -577,7 +631,6 @@ async function financials(sym, freq) {
 // With FINNHUB_API_KEY set (free at finnhub.io), the server keeps one WebSocket to
 // Finnhub and streams every trade to open browsers via Server-Sent Events.
 // Free tier: real-time US stock trades, up to 30 symbols at once. Needs Node 22+.
-const FINNHUB = process.env.FINNHUB_API_KEY;
 const live = { ws: null, open: false, subs: new Set(), last: new Map(), dirty: new Set(), clients: new Set(), retry: 1000 };
 const streamable = (s) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s); // stocks, ETFs and COIN-USD (no ^indexes or futures)
 const toFeed = (s) => (isCrypto(s) ? `BINANCE:${base(s)}USDT` : s);
