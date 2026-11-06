@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>My Terminal — Live Stock News</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff9e1b'/><path d='M7 22l6-7 5 4 7-9' stroke='%23111' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#0b0d10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Terminal">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -241,6 +246,23 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .cmd-list div.on{background:var(--panel2)}
 .cmd-list div span{color:var(--dim);font-size:12px}
 
+/* MARKETS top: mood + earnings */
+.mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
+.mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.mood-g{position:relative;height:12px;border-radius:6px;background:linear-gradient(90deg,#ff4d5e,#f97316,#eab308,#84cc16,#21c37a);margin:18px 0 6px}
+.mood-g i{position:absolute;top:-6px;width:4px;height:24px;background:var(--text);border-radius:2px;transform:translateX(-50%)}
+.mood-n{font-family:var(--mono);font-size:40px;font-weight:500;line-height:1}
+.mood-l{font-size:16px;font-weight:600;margin-left:10px}
+.mood-parts div{display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-top:1px solid var(--line);color:var(--muted)}
+.mood-parts b{font-family:var(--mono);font-weight:500;color:var(--text)}
+.earn-list{max-height:260px;overflow-y:auto}
+.earn-list div{display:grid;grid-template-columns:96px 70px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:13px;cursor:pointer}
+.earn-list div:hover{background:var(--panel2)}
+.earn-list .d{font-family:var(--mono);color:var(--muted);font-size:12px}
+.earn-list .s{font-family:var(--mono);color:var(--amber);font-weight:600}
+.earn-list .e{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right}
+.earn-list .mine{color:var(--claude);font-size:10px;font-weight:700;letter-spacing:.06em}
+@media (max-width:900px){.mk-top{grid-template-columns:1fr}}
 /* MARKETS extra tables */
 .mk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:18px}
 .mk-grid table th:nth-child(2),.mk-grid table td:nth-child(2){text-align:left}
@@ -314,6 +336,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
     <div class="hide-sm">NEW YORK <b id="clock" class="num">--:--:--</b></div>
     <div class="hide-sm" id="mkt">—</div>
     <div class="live" id="live"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
+    <button class="iconbtn" id="installBtn" hidden title="Install My Terminal as an app">⤓ Install app</button>
     <button class="iconbtn" id="notifBtn" title="Desktop alerts for headlines on your stocks">🔔 Alerts</button>
   </div>
 </header>
@@ -354,6 +377,15 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 
     <!-- DATA -->
     <section id="tab-data" class="pad" hidden>
+      <div class="mk-top">
+        <div class="mood-card" id="mood"></div>
+        <div class="earn-card"><h2 class="h">Upcoming earnings · next 30 days</h2><div id="earnings"><div class="skeleton" style="margin:0"></div></div></div>
+      </div>
+      <div class="mk-grid" style="margin-bottom:24px">
+        <div><h2 class="h">Top gainers today</h2><div class="tbl-wrap"><table id="mvGain"></table></div></div>
+        <div><h2 class="h">Top losers today</h2><div class="tbl-wrap"><table id="mvLose"></table></div></div>
+        <div><h2 class="h">Most active today</h2><div class="tbl-wrap"><table id="mvActive"></table></div></div>
+      </div>
       <h2 class="h">Watchlist heatmap · today</h2>
       <div class="heat" id="heat"></div>
       <h2 class="h">Watchlist</h2>
@@ -393,6 +425,11 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
       </div>
       <div id="chart"></div>
       <div class="stats" id="chartStats"></div>
+      <h2 class="h">Compare performance</h2>
+      <div class="rs-chart" style="margin-bottom:26px">
+        <form id="cmpForm" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><input class="field" id="cmpInput" placeholder="Tickers to compare, e.g. AAPL, MSFT, SPY, BTC" style="flex:1;min-width:220px"><button class="btn">Compare</button></form>
+        <div id="cmpOut"><div style="color:var(--muted);font-size:13px">See how several stocks, funds or coins performed over the selected range, all starting from 0%.</div></div>
+      </div>
       <h2 class="h">Your watchlist · 1 month</h2>
       <div class="minis" id="minis"></div>
     </section>
@@ -550,7 +587,7 @@ function setTab(t){
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
   TABS.forEach(k=>$("tab-"+k).hidden=k!==t);
-  if(t==="data"){ renderData(); loadPerf(); loadMarkets(); }
+  if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
   if(t==="research"){ renderResearch(); }
   if(t==="charts"){ loadChart(); renderMinis(); }
@@ -720,6 +757,7 @@ function renderData(){
   table("wlTable",S.wl,true,["news","News mood",q=>moodCell(q.symbol)]);
   table("idxTable",INDEXES.map(i=>i[0]),false);
   renderMarkets();
+  renderMood();
   $("sectors").innerHTML=SECTORS.map(([s,n])=>{const q=S.quotes[s]; if(!q||q.error) return "";
     const p=q.changePct||0,a=Math.min(1,Math.abs(p)/3)*.75+.12; const bg=p>=0?`rgba(33,195,122,${a})`:`rgba(255,77,94,${a})`;
     return `<div data-quote="${s}" style="background:${bg}"><b style="font-family:var(--sans);font-size:13px">${n}</b><span>${s} · ${pct(p)}</span></div>`;}).join("")||'<div style="color:var(--muted)">Loading sectors…</div>';
@@ -1145,6 +1183,79 @@ document.addEventListener("click",e=>{
 });
 $("rsSearch").onclick=openCmd;
 
+
+/* ---------- MARKET MOOD, MOVERS, EARNINGS ---------- */
+function renderMood(){
+  const vix=S.quotes["^VIX"]?.price; const sec=SECTORS.map(x=>S.quotes[x[0]]).filter(q=>q&&!q.error&&q.changePct!=null);
+  const spx=S.quotes["^GSPC"]; const it=S.news?.items||[]; const pos=it.filter(i=>i.mood>0).length, neg=it.filter(i=>i.mood<0).length;
+  const parts=[];
+  if(vix!=null) parts.push(["Volatility (VIX "+vix.toFixed(1)+")",Math.max(0,Math.min(100,(35-vix)/(35-12)*100))]);
+  if(sec.length) parts.push(["Sectors up today ("+sec.filter(q=>q.changePct>0).length+"/"+sec.length+")",sec.filter(q=>q.changePct>0).length/sec.length*100]);
+  if(spx&&!spx.error&&spx.high52&&spx.low52) parts.push(["S&P 500 in its 52-week range",(spx.price-spx.low52)/(spx.high52-spx.low52)*100]);
+  if(spx&&!spx.error&&spx.changePct!=null) parts.push(["S&P 500 today ("+pct(spx.changePct)+")",Math.max(0,Math.min(100,50+spx.changePct*25))]);
+  if(pos+neg>=10) parts.push(["Headline tone ("+pos+" positive / "+neg+" negative)",pos/(pos+neg)*100]);
+  if(!parts.length){ $("mood").innerHTML='<h2 class="h">Market mood</h2><div class="skeleton" style="margin:0"></div>'; return; }
+  const score=Math.round(parts.reduce((a,p)=>a+p[1],0)/parts.length);
+  const [lab,col]=score<25?["Extreme fear","var(--down)"]:score<45?["Fear","#f97316"]:score<56?["Neutral","#eab308"]:score<76?["Greed","#84cc16"]:["Extreme greed","var(--up)"];
+  $("mood").innerHTML=`<h2 class="h">Market mood</h2><div style="display:flex;align-items:baseline"><span class="mood-n">${score}</span><span class="mood-l" style="color:${col}">${lab}</span></div>
+    <div class="mood-g"><i style="left:${score}%"></i></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:10px"><span>Fear</span><span>Greed</span></div>
+    <div class="mood-parts">${parts.map(([k,v])=>`<div><span>${esc(k)}</span><b>${Math.round(v)}</b></div>`).join("")}</div>
+    <div class="disc" style="margin-top:8px">My Terminal's own blend of live signals, scored 0–100. Not CNN's Fear &amp; Greed Index.</div>`;
+}
+async function loadMovers(){
+  try{ const j=await api("/api/movers"); S.movers=j; }catch{ S.movers={error:true}; }
+  renderMovers2();
+}
+function renderMovers2(){
+  const m=S.movers; const row=q=>`<tr data-quote="${esc(q.symbol)}"><td class="sym-cell">${esc(q.symbol)}</td><td class="name">${esc(q.name||"")}</td><td>${fmt(q.price)}</td><td class="${cls(q.changePct)}">${pct(q.changePct)}</td><td>${big(q.volume)}</td></tr>`;
+  const head='<thead><tr><th>Symbol</th><th>Name</th><th>Price</th><th>% Chg</th><th>Volume</th></tr></thead>';
+  for(const [id,k] of [["mvGain","gainers"],["mvLose","losers"],["mvActive","active"]]) $(id).innerHTML=!m?`<tbody><tr><td style="text-align:left">Loading…</td></tr></tbody>`:m.error?`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans)">Unavailable right now.</td></tr></tbody>`:head+`<tbody>${(m[k]||[]).map(row).join("")}</tbody>`;
+}
+async function loadEarnings(){
+  const syms=[...new Set([...S.wl,...S.port.map(h=>h.symbol)])].filter(s=>!/[\^=]|-USD$/.test(s));
+  try{ S.earn=await api("/api/earnings?symbols="+encodeURIComponent(syms.join(","))); }catch{ S.earn={error:true}; }
+  renderEarnings();
+}
+function renderEarnings(){
+  const e=S.earn; if(!e){ return; }
+  if(e.error){ $("earnings").innerHTML='<div style="color:var(--muted);font-size:13px">Earnings calendar is unavailable right now.</div>'; return; }
+  const when=h=>h==="bmo"?"Before open":h==="amc"?"After close":"";
+  const fd=d=>new Date(d+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+  const row=(x,mine)=>`<div data-quote="${esc(x.symbol)}"><span class="d">${fd(x.date)}</span><span class="s">${esc(x.symbol)}</span><span>${mine?'<span class="mine">YOURS</span> ':""}<span style="color:var(--muted);font-size:12px">${when(x.hour)}</span></span><span class="e">${x.epsEstimate!=null?"EPS est. "+num(x.epsEstimate):""}${x.revenueEstimate?" · Rev "+money(x.revenueEstimate,1):""}</span></div>`;
+  const all=[...e.yours.map(x=>row(x,true)),...e.notable.map(x=>row(x,false))];
+  $("earnings").innerHTML=all.length?`<div class="earn-list">${all.join("")}</div><div class="disc" style="margin-top:6px">Your watchlist and holdings first, then the biggest US companies. Source: ${esc(e.source)}.</div>`:'<div style="color:var(--muted);font-size:13px">No earnings reports scheduled in the next 30 days for your stocks.</div>';
+}
+
+/* ---------- COMPARE ---------- */
+const CMP_COLORS=["#ff9e1b","#3b82f6","#21c37a","#e11d48","#8b5cf6","#22d3ee"];
+async function runCompare(){
+  const syms=[...new Set($("cmpInput").value.split(/[,\s]+/).map(normSym).filter(s=>/^[A-Z0-9.\-^=]{1,12}$/.test(s)))].slice(0,6);
+  if(syms.length<2) return toast("Enter at least 2 tickers, separated by commas.");
+  store.set("cmp",syms);
+  $("cmpOut").innerHTML='<div class="skeleton" style="height:260px;margin:0"></div>';
+  const range=["1d","5d"].includes(S.chartRange)?"1mo":S.chartRange;
+  const res=await Promise.all(syms.map(s=>api(`/api/history?symbol=${encodeURIComponent(s)}&range=${range}`).then(h=>({s,c:h.candles})).catch(()=>({s,c:[]}))));
+  const ok=res.filter(r=>r.c.length>1);
+  if(!ok.length){ $("cmpOut").innerHTML='<div class="empty">No data for those tickers.</div>'; return; }
+  const t0=Math.max(...ok.map(r=>r.c[0].time)), t1=Math.max(...ok.map(r=>r.c[r.c.length-1].time));
+  const lines=ok.map(r=>{ const c=r.c.filter(x=>x.time>=t0); const b=c[0].close; return {s:r.s,pts:c.map(x=>[x.time,(x.close/b-1)*100])}; });
+  const lo=Math.min(0,...lines.flatMap(l=>l.pts.map(p=>p[1]))), hi=Math.max(0,...lines.flatMap(l=>l.pts.map(p=>p[1]))), W=1000,H=280,pad=6;
+  const X=t=>(t-t0)/(t1-t0||1)*W, Y=v=>pad+(hi-v)/(hi-lo||1)*(H-2*pad);
+  const ticks=[lo,0,hi].map(v=>`<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===0?"#5c6673":"#232932"}" stroke-dasharray="${v===0?"4 4":"0"}"/><text x="4" y="${Math.max(14,Y(v)-4)}" fill="#8b95a3" font-size="12" font-family="IBM Plex Mono">${v>=0?"+":""}${v.toFixed(1)}%</text>`).join("");
+  const paths=lines.map((l,i)=>`<polyline fill="none" stroke="${CMP_COLORS[i]}" stroke-width="2" vector-effect="non-scaling-stroke" points="${l.pts.map(p=>X(p[0]).toFixed(1)+","+Y(p[1]).toFixed(1)).join(" ")}"/>`).join("");
+  $("cmpOut").innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:280px;display:block">${ticks}${paths}</svg>
+    <div class="legend" style="margin:10px 0 0">${lines.map((l,i)=>{const v=l.pts[l.pts.length-1][1];return `<span><i class="sw" style="background:${CMP_COLORS[i]}"></i>${esc(l.s)} <b class="${cls(v)}" style="font-weight:500">${pct(v)}</b></span>`}).join("")}</div>
+    <div class="disc" style="margin-top:6px">Range: ${esc(RANGES.find(r=>r[0]===range)?.[1]||range)} (uses the range picked above; 1D/5D compare over 1M).${res.length>ok.length?" No data for: "+esc(res.filter(r=>r.c.length<2).map(r=>r.s).join(", "))+".":""}</div>`;
+}
+$("cmpForm").onsubmit=e=>{ e.preventDefault(); runCompare(); };
+$("cmpInput").value=(store.get("cmp",["SPY","QQQ","BTC-USD"])).join(", ");
+
+/* ---------- INSTALL AS APP ---------- */
+let installEvt=null;
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEvt=e; $("installBtn").hidden=false; });
+$("installBtn").onclick=async()=>{ if(!installEvt) return; installEvt.prompt(); await installEvt.userChoice.catch(()=>{}); installEvt=null; $("installBtn").hidden=true; };
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+
 /* ---------- COMMAND BAR ---------- */
 let cmdSel=0, cmdItems=[];
 function openCmd(){ $("cmd").hidden=false; $("cmdInput").value=""; cmdResults=[]; buildCmd(); $("cmdInput").focus(); }
@@ -1248,7 +1359,8 @@ setTab(TABS.includes(location.hash.slice(1))?location.hash.slice(1):"news");
 loadQuotes(); loadNews();
 setInterval(loadQuotes,15000);
 setInterval(loadNews,60000);
-setInterval(()=>{ if(S.tab==="data") loadMarkets(); },30000);
+setInterval(()=>{ if(S.tab==="data"){ loadMarkets(); renderMood(); } },30000);
+setInterval(()=>{ if(S.tab==="data"){ S.moversAt=Date.now(); loadMovers(); } },120000);
 setInterval(()=>{ if(S.news) renderFeed(); },30000);
 setInterval(()=>{ if(S.tab==="charts"&&["1d","5d"].includes(S.chartRange)) loadChart(); },60000);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuotes(); loadNews(); } });
