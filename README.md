@@ -2,20 +2,19 @@
 
 A real, self-hosted website that pulls **live headlines** from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and The Wall Street Journal, along with **live prices**. It also gives you charts, a portfolio tracker, price alerts and **Claude predictions**.
 
-No database, no build step and **no dependencies**. All you need is Node.js 18 or newer.
+No build step and **no dependencies**. All you need is Node.js 22 or newer.
 
 ## What's inside
 
 | Tab | What it does |
 |---|---|
-| **News** | One live feed from all 5 outlets. Refreshes every 60s and flags new stories. Each headline is tagged positive or negative and labeled with your tickers. Filter by source, ticker or keyword. Optional desktop alerts. |
-| **Markets** | Watchlist heatmap and table, S&P sectors, indexes, Treasury yields, bond funds, crypto, popular ETFs, mutual funds, futures and currencies. |
-| **Research** | A Yahoo Finance-style page for any stock, ETF, mutual fund, crypto, index or future: Summary, Statistics, Financials (income statement, balance sheet, cash flow, annual and quarterly), Analysis, Holders, Holdings, Performance, Profile and News. |
-| **Charts** | Interactive candlestick or line charts with volume for any ticker (1D → 5Y), plus period stats and 1-month mini charts for your whole watchlist. |
-| **Portfolio** | Enter your holdings to see live value, today's P/L, total P/L and allocation. Set price alerts ("TSLA rises above 300"). |
-| **✦ Claude Predictions** | Search any stock for Claude's outlook: stance, confidence, 1–2 week and 3–6 month ranges, bull and bear case, and catalysts. Includes a whole-market outlook and an **Ask Claude** box that knows your watchlist and portfolio. |
+| **News** | One live feed from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. Sources dropdown (with "Only" buttons), timeline from Today to All time, positive/negative tags, ticker labels, search. |
+| **Markets** | Market mood gauge, upcoming earnings, top gainers/losers/most active, watchlist heatmap and table, sectors, indexes, Treasury yields, bond funds, crypto, ETFs, mutual funds, futures and currencies. |
+| **Research** | A Yahoo Finance-style page for any stock, ETF, fund, crypto, index or future: interactive chart first, then Summary, Statistics, Financials, Analysis, Holders, Holdings, Performance, Profile, News and Compare. |
+| **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts. |
+| **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
-Press **⌘K** (or **/**) anywhere to jump to any stock.
+**Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".
 
 ## Run it on your computer
 
@@ -61,6 +60,7 @@ Railway, Fly.io or any VPS also work (there's a `Dockerfile`). Free tiers may sl
 - `PORT`: default 3000
 - `ANTHROPIC_API_KEY`: turns on predictions and Ask Claude
 - `FINNHUB_API_KEY`: turns on real-time streaming prices
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: free Upstash Redis database so device sync is permanent (otherwise synced data lives on the server and is wiped when it redeploys)
 - `CLAUDE_MODEL`: default `claude-sonnet-5-5` (set to `claude-opus-5-5` for deeper analysis)
 
 ## How the data works
