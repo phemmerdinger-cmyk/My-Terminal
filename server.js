@@ -359,6 +359,30 @@ async function history(sym, range = "6mo", interval) {
 // Tries Yahoo's bulk quote (needs a crumb), then falls back to the spark endpoint in batches of 20.
 const SP500 = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, "public", "sp500.json"), "utf8")).rows; } catch { return []; } })();
 const spCaps = {}; // remembered market caps, so the map keeps its shape if the bulk endpoint is blocked
+// Company sizes when Yahoo's bulk quote is blocked: shares outstanding from Finnhub (free tier ~60/min),
+// gathered slowly in the background and saved to a file; market value = shares × live price.
+const SHARES_FILE = path.join(require("os").tmpdir(), "sp500-shares.json");
+const spShares = (() => { try { return JSON.parse(fs.readFileSync(SHARES_FILE, "utf8")); } catch { return {}; } })();
+let shareJob = null;
+function startShareJob() {
+  if (shareJob || !FINNHUB || !SP500.length) return;
+  const todo = SP500.map(r => r[0]).filter(s => !spShares[s] && !spCaps[s]);
+  if (!todo.length) return;
+  shareJob = (async () => {
+    let n = 0;
+    for (const s of todo) {
+      try {
+        const j = JSON.parse(await get(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(s.replace("-", "."))}&token=${FINNHUB}`, "application/json"));
+        if (j && j.shareOutstanding) spShares[s] = j.shareOutstanding * 1e6;
+      } catch (e) { if (/429/.test(String(e.message))) await new Promise(r => setTimeout(r, 30_000)); }
+      if (++n % 20 === 0) { try { fs.writeFileSync(SHARES_FILE, JSON.stringify(spShares)); } catch {} cache.delete && cache.delete("sp500"); }
+      await new Promise(r => setTimeout(r, 1500)); // stay well under Finnhub's free limit (other features use it too)
+    }
+    try { fs.writeFileSync(SHARES_FILE, JSON.stringify(spShares)); } catch {}
+    shareJob = null;
+  })();
+}
+setTimeout(startShareJob, 20_000);
 async function sp500Snapshot() {
   return cached("sp500", 60_000, async () => {
     const syms = SP500.map(r => r[0]), out = {}; let source = "quote";
@@ -385,12 +409,13 @@ async function sp500Snapshot() {
           for (const r of list) {
             const sym = r.symbol, price = r.regularMarketPrice ?? (r.close && r.close[r.close.length - 1]), prev = r.chartPreviousClose ?? r.previousClose;
             if (!sym || price == null || !prev) continue;
-            out[sym] = [price, price - prev, (price / prev - 1) * 100, spCaps[sym] || null];
+            out[sym] = [price, price - prev, (price / prev - 1) * 100, spCaps[sym] || (spShares[sym] ? Math.round(spShares[sym] * price) : null)];
           }
         } catch (e) { /* skip this batch */ } } };
       await Promise.all([worker(), worker(), worker()]);
     }
-    return { updated: Date.now(), source, count: Object.keys(out).length, quotes: out };
+    startShareJob();
+    return { updated: Date.now(), source, count: Object.keys(out).length, sized: Object.values(out).filter(v => v[3]).length, quotes: out };
   });
 }
 

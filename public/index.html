@@ -2904,7 +2904,7 @@ clRender();
 
 /* ---------- WALL STREET: live market floor (S&P 500) ---------- */
 const NY_IDX=[["^NYA","NYSE COMPOSITE"],["^DJI","DOW JONES"],["^GSPC","S&P 500"],["^VIX","VIX · FEAR"]];
-const NY={at:0,loading:false,list:[],snap:null,snapAt:0,prev:{},skyMode:"big",hover:null,anim:null,bars:[],heatKey:"",hmW:0};
+const NY={shares:store.get("spShares",{}),at:0,loading:false,list:[],snap:null,snapAt:0,prev:{},skyMode:"big",hover:null,anim:null,bars:[],heatKey:"",hmW:0};
 const SEC_SHORT={"Information Technology":"Technology","Communication Services":"Communication","Consumer Discretionary":"Consumer Disc.","Consumer Staples":"Consumer Staples","Health Care":"Health Care","Financials":"Financials","Industrials":"Industrials","Energy":"Energy","Materials":"Materials","Real Estate":"Real Estate","Utilities":"Utilities"};
 const nyQ=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price!=null?q:null; };
 async function nyList(){ if(NY.list.length) return; try{ const j=await (await fetch("/sp500.json")).json(); NY.list=j.rows; }catch(e){ console.warn("sp500 list",e); } }
@@ -2915,7 +2915,10 @@ async function nyLoad(){ // index cards (every 15s)
 }
 async function nySnap(){ // all S&P 500 prices (every 60s, shared cache on the server)
   await nyList();
-  try{ const j=await api("/api/sp500"); if(NY.snap) for(const [k,v] of Object.entries(j.quotes)){ const o=NY.snap.quotes[k]; if(o&&o[0]!==v[0]) NY.prev[k]={dir:v[0]>o[0]?1:-1,t:Date.now()}; } NY.snap=j; NY.snapAt=Date.now(); }
+  try{ const j=await api("/api/sp500");
+    let learned=0; for(const [k,v] of Object.entries(j.quotes)) if(v[3]&&v[0]){ const sh=v[3]/v[0]; if(!NY.shares[k]||Math.abs(NY.shares[k]/sh-1)>0.01){ NY.shares[k]=sh; learned++; } }
+    if(learned) store.set("spShares",NY.shares); // remember company sizes so the map has its shape right away next time
+    if(NY.snap) for(const [k,v] of Object.entries(j.quotes)){ const o=NY.snap.quotes[k]; if(o&&o[0]!==v[0]) NY.prev[k]={dir:v[0]>o[0]?1:-1,t:Date.now()}; } NY.snap=j; NY.snapAt=Date.now(); }
   catch(e){ console.warn("sp500",e); }
   if(S.tab==="nyse") nyRender(true);
 }
@@ -2924,7 +2927,7 @@ function nyRows(){
   if(!NY.snap||!NY.list.length) return [];
   return NY.list.map(([s,n,sec,sub])=>{ const v=NY.snap.quotes[s]; if(!v) return null; let [p,ch,cp,mc]=v; const lq=nyQ(s);
     if(lq&&lq.marketTime&&lq.marketTime>NY.snap.updated&&lq.changePct!=null){ p=lq.price; ch=lq.change; cp=lq.changePct; }
-    return {s,n,sec,ss:SEC_SHORT[sec]||sec,sub,p,ch,cp:cp??0,mc:mc||0}; }).filter(Boolean);
+    return {s,n,sec,ss:SEC_SHORT[sec]||sec,sub,p,ch,cp:cp??0,mc:mc||(NY.shares[s]?NY.shares[s]*p:0)}; }).filter(Boolean);
 }
 // NYSE session (Eastern time): pre-market 4:00, open 9:30, close 16:00, after-hours until 20:00
 function nySession(){
@@ -3008,9 +3011,10 @@ const hmColor=c=>{ const v=Math.max(-3,Math.min(3,c||0))/3; const lerp=(a,b,t)=>
   return v>=0?`rgb(${lerp(44,19,v)},${lerp(50,180,v)},${lerp(64,95,v)})`:`rgb(${lerp(44,192,-v)},${lerp(50,33,-v)},${lerp(64,58,-v)})`; };
 function nyHeat(rows){
   const box=$("nyHeat"); if(!box||!rows.length) return; const W=box.clientWidth, H=box.clientHeight; if(!W) return;
-  NY.hmW=W; const caps=rows.some(r=>r.mc>0);
-  setHTML("nyHeatNote",`all ${rows.length} companies · ${caps?"size = market value":"equal-size tiles (company sizes unavailable right now)"} · color = today's move · click to open`);
-  const secs=[...new Set(rows.map(r=>r.sec))].map(sec=>{ const rs=rows.filter(r=>r.sec===sec).map(r=>({...r,v:caps?Math.max(r.mc,1):1})).sort((a,b)=>b.v-a.v); return {sec,rs,v:rs.reduce((a,r)=>a+r.v,0)}; }).sort((a,b)=>b.v-a.v);
+  NY.hmW=W; const sized=rows.filter(r=>r.mc>0), caps=sized.length>=rows.length*0.8;
+  const med=caps?sized.map(r=>r.mc).sort((a,b)=>a-b)[Math.floor(sized.length/2)]:1;
+  setHTML("nyHeatNote",`all ${rows.length} companies · ${caps?"size = market value":`equal-size tiles for now (sizing companies: ${sized.length} of ${rows.length})`} · color = today's move · click to open`);
+  const secs=[...new Set(rows.map(r=>r.sec))].map(sec=>{ const rs=rows.filter(r=>r.sec===sec).map(r=>({...r,v:caps?(r.mc>0?r.mc:med):1})).sort((a,b)=>b.v-a.v); return {sec,rs,v:rs.reduce((a,r)=>a+r.v,0)}; }).sort((a,b)=>b.v-a.v);
   const secRects=squarify(secs,0,0,W,H); let html=""; NY.hm=[];
   secRects.forEach(sr=>{ const head=sr.h>40&&sr.w>60?15:0;
     html+=`<div class="ny-hs2" style="left:${sr.x}px;top:${sr.y}px;width:${sr.w}px;height:${sr.h}px">${head?`<b>${esc(SEC_SHORT[sr.sec]||sr.sec)}</b>`:""}</div>`;
