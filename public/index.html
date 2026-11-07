@@ -1028,9 +1028,11 @@ function spark(arr,width=64,h=22,prev){
   const lo=Math.min(...arr,prev??Infinity), hi=Math.max(...arr,prev??-Infinity), r=hi-lo||1;
   const y=v=>(h-2-(v-lo)/r*(h-4)).toFixed(1);
   const pts=arr.map((v,i)=>`${(i/(arr.length-1)*w).toFixed(1)},${y(v)}`).join(" ");
-  const col=arr[arr.length-1]>=(prev??arr[0])?"var(--up)":"var(--down)";
+  // Two-tone line: green where it's above its starting point (or previous close), red where it's below
+  const b=prev??arr[0], by=+y(b), off=Math.max(0,Math.min(1,by/h)).toFixed(4), id="sk"+(spark.n=(spark.n||0)+1);
+  const grad=`<defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${h}"><stop offset="${off}" stop-color="var(--up)"/><stop offset="${off}" stop-color="var(--down)"/></linearGradient></defs>`;
   const base=prev!=null?`<line x1="0" x2="${w}" y1="${y(prev)}" y2="${y(prev)}" stroke="var(--line2)" stroke-dasharray="2 2"/>`:"";
-  return `<svg class="spark" width="${width}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:${typeof width==="number"?width+"px":width}">${base}<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+  return `<svg class="spark" width="${width}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:${typeof width==="number"?width+"px":width}">${grad}${base}<polyline points="${pts}" fill="none" stroke="url(#${id})" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 }
 // Claude lock: requests that spend Claude credits carry the owner's password (checked on the server)
 const CL={pass:"",pending:null}; // starts Off on every visit; the password is only kept in memory until the page closes
@@ -1452,6 +1454,10 @@ function ensureChart(){
   });
   return true;
 }
+// Line charts: green above the baseline (previous close or start of the period), red below it
+const baselineOpts=base=>({baseValue:{type:"price",price:base},lineWidth:2,
+  topLineColor:"#21c37a",topFillColor1:"rgba(33,195,122,.28)",topFillColor2:"rgba(33,195,122,.03)",
+  bottomLineColor:"#ff4d5e",bottomFillColor1:"rgba(255,77,94,.03)",bottomFillColor2:"rgba(255,77,94,.28)"});
 function renderChartTitle(){
   const s=S.chartSym, q=S.quotes[s]||{};
   $("chartTitle").innerHTML=`<div class="big-sym">${esc(label(s))} <span style="font-size:13px;color:var(--muted);font-family:var(--sans)">${esc(q.name&&q.name!==s?q.name:"")}</span></div>
@@ -1474,7 +1480,8 @@ async function loadChart(){
       mainSeries=chart.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
       mainSeries.setData(c.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
     }else{
-      mainSeries=chart.addAreaSeries({lineColor:up?"#21c37a":"#ff4d5e",topColor:up?"rgba(33,195,122,.25)":"rgba(255,77,94,.25)",bottomColor:"rgba(0,0,0,0)",lineWidth:2});
+      const q=S.quotes[s], base=(S.chartRange==="1d"&&q&&q.prevClose)?q.prevClose:(c.length?c[0].open:0);
+      mainSeries=chart.addBaselineSeries(baselineOpts(base));
       mainSeries.setData(c.map(x=>({time:x.time,value:x.close})));
     }
     volSeries=chart.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
@@ -2408,7 +2415,7 @@ async function pfcLoad(force){
     $("pfcLegend").innerHTML=`<span>Price of ${esc(S.pfc.sel)}</span>${avg?'<span style="color:#2f80ed">- - What you paid per share</span>':""}`;
   }else{
     const pts=pfcCombine(series,hold); first=pts[0].value; lastV=pts[pts.length-1].value; const up=lastV>=first;
-    pfcMain=pfc.addAreaSeries({lineColor:up?"#21c37a":"#ff4d5e",topColor:up?"rgba(33,195,122,.25)":"rgba(255,77,94,.25)",bottomColor:"rgba(0,0,0,0)",lineWidth:2});
+    pfcMain=pfc.addBaselineSeries(baselineOpts(first));
     pfcMain.setData(pts);
     const invested=S.port.reduce((a,x)=>a+x.cost*x.shares,0);
     pfcLine=pfcMain.createPriceLine({price:invested,color:"#2f80ed",lineWidth:1,lineStyle:2,axisLabelVisible:true,title:"Invested"});
@@ -2517,13 +2524,15 @@ function sgChart(r){
   const w=600,h=220,p=6, all=[...r.closes,...r.s50.filter(x=>x!=null),...r.s200.filter(x=>x!=null)], mn=Math.min(...all), mx=Math.max(...all), n=r.closes.length;
   const X=i=>p+i/(n-1)*(w-2*p), Y=v=>h-p-(v-mn)/(mx-mn||1)*(h-2*p);
   const line=(arr)=>arr.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
-  const up=r.closes[n-1]>=r.closes[0], col=up?"#38ff9c":"#ff4d6d";
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="sgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+  const up=r.closes[n-1]>=r.closes[0], col=up?"#38ff9c":"#ff4d6d", by=Y(r.closes[0]), off=Math.max(0,Math.min(1,by/h)).toFixed(4);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="sgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient>
+      <linearGradient id="sgL" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${h}"><stop offset="${off}" stop-color="#38ff9c"/><stop offset="${off}" stop-color="#ff4d6d"/></linearGradient></defs>
+    <line x1="0" x2="${w}" y1="${by.toFixed(1)}" y2="${by.toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 4"/>
     ${[0.25,0.5,0.75].map(f=>`<line x1="0" x2="${w}" y1="${h*f}" y2="${h*f}" stroke="rgba(62,242,255,.08)"/>`).join("")}
     <polygon points="${X(0)},${h} ${line(r.closes)} ${X(n-1)},${h}" fill="url(#sgA)"/>
     <polyline points="${line(r.s200)}" fill="none" stroke="#ff3ec8" stroke-width="1.4" opacity=".85"/>
     <polyline points="${line(r.s50)}" fill="none" stroke="#3ef2ff" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>
-    <polyline points="${line(r.closes)}" fill="none" stroke="${col}" stroke-width="2" style="filter:drop-shadow(0 0 6px ${col})"/></svg>`;
+    <polyline points="${line(r.closes)}" fill="none" stroke="url(#sgL)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(62,242,255,.35))"/></svg>`;
 }
 function sgRender(){
   if(!$("tab-signals")) return;
