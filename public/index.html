@@ -2529,7 +2529,7 @@ function ptCheckOrders(){
   if(ch){ ptDayTick(); ptSave(); }
   return ch;
 }
-let ptRetryAt=0;
+let ptRetryAt=0, ptTries=0;
 function ptOnQuotes(){ ptCheckOrders(); ptDayTick(); if(S.tab==="trade"){ renderTrade(); if(S.pt.sym&&!ptSeries&&Date.now()-ptRetryAt>20000){ ptRetryAt=Date.now(); ptLoadChart(); } } } // retry the chart if it failed while the server was waking up
 
 /* ----- chart with trade markers ----- */
@@ -2557,7 +2557,12 @@ async function ptLoadChart(){
   if(!sym){ if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">Search a ticker to see its chart and trade it.</div>`; return; }
   const crypto24=S.pt.period==="1d"&&isCrypto(sym); // crypto never closes: show the last 24 hours, not "since midnight UTC"
   let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${crypto24?"5d":pd[2]}&interval=${sec?"1m":S.pt.iv}`); }
-  catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
+  catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; }
+    ptTries=(ptTries||0)+1; // the free server can be slow to wake up: retry a few times before giving up
+    if(ptTries<=4){ $("ptChart").innerHTML=`<div class="empty"><span><span class="spin"></span> Loading chart… retrying</span></div>`; setTimeout(()=>{ if(key===ptChartKey) ptLoadChart(); },4000); }
+    else $("ptChart").innerHTML=`<div class="empty">Couldn't load a chart for ${esc(sym)} right now. Try another period, or check the symbol.</div>`;
+    return; }
+  ptTries=0;
   if(key!==ptChartKey) return;
   $("ptChart").querySelector(".empty")?.remove();
   if(!ptEnsureChart()){ $("ptChart").innerHTML=`<div style="position:absolute;inset:0">${spark(h.candles.map(x=>x.close),"100%",400)}</div>`; return; }
