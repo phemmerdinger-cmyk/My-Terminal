@@ -352,6 +352,41 @@ async function history(sym, range = "6mo", interval) {
   });
 }
 
+
+// ---------------------------------------------------------------- Claude password lock
+// Every request that spends Claude credits must carry the owner's password (header x-claude-pass).
+// Only a one-way scrypt hash of the password lives in this code. To change the password, set
+// CLAUDE_PASSWORD in Render's Environment settings (it takes priority over the hash below).
+const nodeCrypto = require("crypto");
+const PASS_HASH = process.env.CLAUDE_PASSWORD_HASH || "1cec6559abba0f21217c3da332525de6:3b6fa7c7c1f84925bd3996c9e92a95e84b870569b46891d817182942fd43b65e";
+const goodPass = new Set(); // sha256 of passwords already verified (skips the slow check next time)
+const badTries = new Map(); // ip -> [times] of wrong passwords
+function passOk(pw) {
+  if (!pw || typeof pw !== "string" || pw.length > 200) return false;
+  const tag = nodeCrypto.createHash("sha256").update(pw).digest("hex");
+  if (goodPass.has(tag)) return true;
+  let ok = false;
+  if (process.env.CLAUDE_PASSWORD) {
+    const a = Buffer.from(pw), b = Buffer.from(process.env.CLAUDE_PASSWORD);
+    ok = a.length === b.length && nodeCrypto.timingSafeEqual(a, b);
+  } else {
+    const [salt, hash] = PASS_HASH.split(":");
+    const got = nodeCrypto.scryptSync(pw, salt, 32, { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 });
+    ok = nodeCrypto.timingSafeEqual(got, Buffer.from(hash, "hex"));
+  }
+  if (ok) goodPass.add(tag);
+  return ok;
+}
+// Returns null if allowed, or [status, body] to send back
+function claudeGate(req, pw) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const now = Date.now(), tries = (badTries.get(ip) || []).filter(t => now - t < 15 * 60e3);
+  if (tries.length >= 8) return [429, { error: "Too many wrong passwords. Try again in 15 minutes.", code: "locked" }];
+  if (passOk(pw)) return null;
+  if (pw) { tries.push(now); badTries.set(ip, tries); }
+  return [401, { error: pw ? "Wrong password." : "Claude is locked. Flip the Claude switch at the top and enter the password.", code: "locked" }];
+}
+
 // ---------------------------------------------------------------- Claude predictions
 // Needs an Anthropic API key, set as ANTHROPIC_API_KEY in Render's Environment settings.
 //
@@ -1038,12 +1073,18 @@ http
         if (!s) return send(res, 400, { error: "symbol required" });
         return send(res, 200, await history(s, u.searchParams.get("range"), u.searchParams.get("interval")));
       }
+      if (u.pathname === "/api/unlock" && req.method === "POST") {
+        let pw = ""; try { pw = (await readBody(req)).password; } catch {}
+        const g = claudeGate(req, String(pw || ""));
+        return g ? send(res, ...g) : send(res, 200, { ok: true });
+      }
       if (u.pathname === "/api/predict") {
         const raw = String(u.searchParams.get("symbol") || "MARKET").toUpperCase();
         const [s] = raw === "MARKET" ? ["MARKET"] : parseList(raw, 1);
         if (!s) return send(res, 400, { error: "Enter a valid ticker" });
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
+        { const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g); }
         if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached (safety cap to protect your credits). Try again a bit later." });
         try { return send(res, 200, await predict(s, key, u.searchParams.get("fresh") === "1")); }
         catch (e) { return send(res, e.code === "daily_limit" ? 429 : 502, { error: String(e.message || e) }); }
@@ -1051,6 +1092,7 @@ http
       if (u.pathname === "/api/ask" && req.method === "POST") {
         const key = process.env.ANTHROPIC_API_KEY;
         if (!key) return send(res, 401, { error: "no_key" });
+        { const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g); }
         if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached (safety cap to protect your credits). Try again a bit later." });
         try { return send(res, 200, await ask(key, await readBody(req))); }
         catch (e) { return send(res, e.code === "daily_limit" ? 429 : 502, { error: String(e.message || e) }); }
