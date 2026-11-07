@@ -1033,7 +1033,8 @@ function spark(arr,width=64,h=22,prev){
   return `<svg class="spark" width="${width}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:${typeof width==="number"?width+"px":width}">${base}<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 }
 // Claude lock: requests that spend Claude credits carry the owner's password (checked on the server)
-const CL={pass:""}; // starts Off on every visit; the password is only kept in memory until the page closes
+const CL={pass:"",pending:null}; // starts Off on every visit; the password is only kept in memory until the page closes
+function clNeed(run){ if(CL.pass) return false; CL.pending=run; clOpen(); toast("🔒 Enter your Claude password — your request will run right after."); return true; }
 try{ localStorage.removeItem("claudePass"); }catch{}
 const api = (p,opt={})=>{
   if(/^\/api\/(predict|ask)/.test(p)&&CL.pass) opt={...opt,headers:{...(opt.headers||{}),"x-claude-pass":CL.pass}};
@@ -1563,6 +1564,7 @@ async function runPredict(s,fresh){
 }
 $("predForm").onsubmit=e=>{ e.preventDefault(); const s=normSym($("predInput").value);
   if(!(s==="MARKET"||/^[A-Z0-9.\-]{1,10}$/.test(s))) return toast("Enter a valid ticker, like NVDA.");
+  if(clNeed(()=>$("predForm").requestSubmit())) return;
   $("predInput").value=""; runPredict(s); };
 
 
@@ -1645,7 +1647,7 @@ function renderScreener(){
 document.addEventListener("click",e=>{ const r=e.target.closest("[data-scropen]"); if(!r) return; S.scr.open=S.scr.open===r.dataset.scropen?null:r.dataset.scropen; renderScreener(); });
 $("scrSrc").onclick=e=>{ const b=e.target.closest("[data-scr]"); if(!b) return; S.scr.src=b.dataset.scr; renderScreener(); if(S.scr.src==="custom") $("scrCustom").focus(); };
 $("scrCustom").addEventListener("input",()=>{ S.scr.src="custom"; renderScreener(); });
-$("scrRun").onclick=async()=>{
+$("scrRun").onclick=async()=>{ if(clNeed(()=>$("scrRun").click())) return;
   if(!hasKey()) return toast("Claude Predictor isn't switched on yet."); if(S.scr.running) return;
   const L=scrList(); if(!L.length) return toast("Add symbols to scan.");
   const b=$("scrRun"); if(!b.dataset.arm){ b.dataset.arm="1"; b.textContent="Click again to start"; setTimeout(()=>{ delete b.dataset.arm; if(!S.scr.running) b.textContent="Run scan"; },4000); return; }
@@ -1659,7 +1661,7 @@ $("scrRun").onclick=async()=>{
 };
 
 /* head-to-head */
-$("h2hForm").onsubmit=async e=>{ e.preventDefault();
+$("h2hForm").onsubmit=async e=>{ e.preventDefault(); if(clNeed(()=>$("h2hForm").requestSubmit())) return;
   if(!hasKey()) return toast("Claude Predictor isn't switched on yet.");
   const A=normSym($("h2hA").value), B=normSym($("h2hB").value); if(!A||!B||A===B) return toast("Enter two different tickers.");
   $("h2hOut").innerHTML='<div class="pcard"><span class="spin"></span>Claude is comparing '+esc(A)+' and '+esc(B)+'…</div>';
@@ -2140,6 +2142,7 @@ function acRender(){
 async function acSend(q){
   q=(q||$("acInput").value).trim(); if(!q||S.ac.busy) return;
   if(!hasKey()) return toast("Claude isn't switched on yet.");
+  if(clNeed(()=>acSend(q))) return;
   $("acInput").value=""; S.ac.thread.push({me:true,text:q}); S.ac.busy=true; acRender();
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port,context:acContext()})});
@@ -2588,16 +2591,16 @@ setInterval(()=>{ if(S.tab==="signals"&&!document.hidden&&!SG.scanning) sgScan(f
 /* ---------- Claude on/off switch ---------- */
 function clRender(){ const on=!!CL.pass; $("clSwitch").classList.toggle("on",on); $("clState").textContent=on?"On":"Off"; }
 function clSave(pw){ CL.pass=pw; clRender(); }
-function clOpen(msg){ $("clPop").hidden=false; $("clErr").textContent=msg||""; $("clPass").value=""; setTimeout(()=>$("clPass").focus(),30); }
+function clOpen(msg){ CL.openedAt=Date.now(); $("clPop").hidden=false; $("clErr").textContent=msg||""; $("clPass").value=""; setTimeout(()=>$("clPass").focus(),30); }
 function clLocked(msg){ if(CL.pass){ clSave(""); } clOpen(/wrong|too many/i.test(msg||"")?msg:""); toast("🔒 Claude is off. Switch it on at the top and enter your password."); }
 $("clSwitch").onclick=()=>{ if(CL.pass){ clSave(""); $("clPop").hidden=true; toast("Claude switched off on this device."); } else if($("clPop").hidden) clOpen(); else $("clPop").hidden=true; };
-$("clCancel").onclick=()=>{ $("clPop").hidden=true; };
+$("clCancel").onclick=()=>{ $("clPop").hidden=true; CL.pending=null; };
 $("clPop").addEventListener("submit",async e=>{ e.preventDefault(); const pw=$("clPass").value; if(!pw) return; $("clGo").disabled=true; $("clErr").textContent="";
   try{ const r=await fetch("/api/unlock",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:pw})}); const j=await r.json().catch(()=>({}));
-    if(r.ok&&j.ok){ clSave(pw); $("clPop").hidden=true; toast("✦ Claude is on for this device."); } else { $("clErr").textContent=j.error||"Wrong password."; $("clPass").select(); } }
+    if(r.ok&&j.ok){ clSave(pw); $("clPop").hidden=true; toast("✦ Claude is on."); const run=CL.pending; CL.pending=null; if(run) setTimeout(run,50); } else { $("clErr").textContent=j.error||"Wrong password."; $("clPass").select(); } }
   catch{ $("clErr").textContent="Couldn't reach the server. Try again."; }
   $("clGo").disabled=false; });
-document.addEventListener("click",e=>{ if(!$("clPop").hidden&&!e.target.closest(".cl-wrap")) $("clPop").hidden=true; });
+document.addEventListener("click",e=>{ if(!$("clPop").hidden&&!e.target.closest(".cl-wrap")&&Date.now()-(CL.openedAt||0)>400) $("clPop").hidden=true; });
 clRender();
 
 /* ---------- boot ---------- */
