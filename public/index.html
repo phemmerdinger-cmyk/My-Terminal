@@ -2364,11 +2364,12 @@ function ptFresh(){ const t=Date.now(); return {v:1,created:t,cash:PT_START,depo
 let PA=store.get("paper",null); if(!PA||PA.v!==1) PA=ptFresh();
 const ptSave=()=>store.set("paper",PA);
 // Period (how much time the chart shows) and candle length are chosen separately, like a trading platform
-const PT_PERIODS=[["1h","1 hour","1d",3600],["4h","4 hours","1d",14400],["1d","1 day","1d"],["5d","5 days","5d"],["1mo","1 month","1mo"],["6mo","6 months","6mo"],["ytd","Year to date","ytd"],["1y","1 year","1y"],["5y","5 years","5y"],["max","All time","max"]];
+const PT_PERIODS=[["1h","1 hour","5d",3600],["4h","4 hours","5d",14400],["1d","1 day","1d"],["5d","5 days","5d"],["1mo","1 month","1mo"],["6mo","6 months","6mo"],["ytd","Year to date","ytd"],["1y","1 year","1y"],["5y","5 years","5y"],["max","All time","max"]];
 const PT_IVS=[["5s","5 seconds",5],["10s","10 seconds",10],["15s","15 seconds",15],["30s","30 seconds",30],["1m","1 minute",60],["2m","2 minutes",120],["5m","5 minutes",300],["15m","15 minutes",900],["30m","30 minutes",1800],["1h","1 hour",3600],["1d","1 day",86400],["1wk","1 week",604800]];
 const PT_ALLOW={short:["5s","10s","15s","30s","1m","2m","5m","15m","30m","1h"],"1mo":["2m","5m","15m","30m","1h","1d"],mid:["1h","1d","1wk"],long:["1d","1wk"]};
 const ptAllowed=pd=>["1h","4h","1d","5d"].includes(pd)?PT_ALLOW.short:pd==="1mo"?PT_ALLOW["1mo"]:["6mo","ytd","1y"].includes(pd)?PT_ALLOW.mid:PT_ALLOW.long;
 const ptIvSec=iv=>(PT_IVS.find(x=>x[0]===iv)||[])[2]||0;
+const PT_REC={"1h":"1m","4h":"1m","1d":"5m","5d":"15m","1mo":"1h","6mo":"1d",ytd:"1d","1y":"1d","5y":"1wk",max:"1wk"}; // sensible candles when the current choice doesn't fit
 const PT_RANGES=PT_IVS.map(x=>[x[0],x[0]]); // labels for the legend
 const PT_IV={"1m":60,"5m":300,"15m":900,"30m":1800,"1h":3600,"60m":3600};
 S.pt={side:"buy",type:"market",mode:"usd",tpOn:false,slOn:false,sym:store.get("ptSym",""),confirm:null,period:store.get("ptPeriod","1d"),iv:store.get("ptIv","10s"),pane:"pos",sr:store.get("ptSR",true)};
@@ -2519,7 +2520,8 @@ async function ptLoadChart(){
   const sym=S.pt.sym, pd=PT_PERIODS.find(p=>p[0]===S.pt.period), sec=ptLiveSec(), key=sym+"|"+S.pt.period+"|"+S.pt.iv; ptChartKey=key;
   ptControls(); setHTML("ptNote",sec?"Earlier bars are 1-minute; "+S.pt.iv+" candles build live from here":"");
   if(!sym){ if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">Search a ticker to see its chart and trade it.</div>`; return; }
-  let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${pd[2]}&interval=${sec?"1m":S.pt.iv}`); }
+  const crypto24=S.pt.period==="1d"&&isCrypto(sym); // crypto never closes: show the last 24 hours, not "since midnight UTC"
+  let h; try{ h=await api(`/api/history?symbol=${encodeURIComponent(sym)}&range=${crypto24?"5d":pd[2]}&interval=${sec?"1m":S.pt.iv}`); }
   catch{ if(key!==ptChartKey) return; if(ptc){ ptc.remove(); ptc=null; ptSeries=null; } $("ptChart").innerHTML=`<div class="empty">No chart data for ${esc(sym)}.</div>`; return; }
   if(key!==ptChartKey) return;
   $("ptChart").querySelector(".empty")?.remove();
@@ -2528,7 +2530,8 @@ async function ptLoadChart(){
   try{ ptc.applyOptions({timeScale:{secondsVisible:!!sec,timeVisible:!["6mo","ytd","1y","5y","max"].includes(S.pt.period)}}); }catch{}
   ptCandles=h.candles.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,volume:x.volume}));
   ptIv=sec||(ptIvSec(S.pt.iv)<=3600?ptIvSec(S.pt.iv):0); ptSRLines=[]; ptSRAt=0; ptSRSig="";
-  if(pd[3]&&ptCandles.length){ const cut=ptCandles[ptCandles.length-1].time-pd[3]; ptCandles=ptCandles.filter(c=>c.time>=cut); } // 1 hour / 4 hours
+  const span=pd[3]||(crypto24?86400:0);
+  if(span&&ptCandles.length){ const cut=ptCandles[ptCandles.length-1].time-span; ptCandles=ptCandles.filter(c=>c.time>=cut); } // 1 hour / 4 hours / crypto 24h
   if(sec){ const seedEnd=ptCandles.length?ptCandles[ptCandles.length-1].time:0; // the period's 1-minute bars, then seconds candles built live
     ptCandles.push(...(ptLiveBars[sym+"|"+sec]||[]).filter(c=>c.time>seedEnd)); }
   ptSeries=ptc.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
@@ -2772,7 +2775,7 @@ $("ptHead").addEventListener("click",e=>{
 attachSuggest("ptSym",s=>ptPick(s));
 $("ptSR").onclick=()=>{ S.pt.sr=!S.pt.sr; store.set("ptSR",S.pt.sr); ptControls(); ptDrawSR(); renderTrade(); };
 $("ptPeriod").addEventListener("change",e=>{ S.pt.period=e.target.value; store.set("ptPeriod",S.pt.period);
-  const ok=ptAllowed(S.pt.period); if(!ok.includes(S.pt.iv)){ const want=ptIvSec(S.pt.iv); S.pt.iv=ok.reduce((a,b)=>Math.abs(ptIvSec(b)-want)<Math.abs(ptIvSec(a)-want)?b:a); store.set("ptIv",S.pt.iv); toast("Candles switched to "+PT_IVS.find(x=>x[0]===S.pt.iv)[1]+" for this period."); }
+  const ok=ptAllowed(S.pt.period); if(!ok.includes(S.pt.iv)){ S.pt.iv=PT_REC[S.pt.period]; store.set("ptIv",S.pt.iv); toast("Candles switched to "+PT_IVS.find(x=>x[0]===S.pt.iv)[1]+" for this period."); }
   ptLoadChart(); });
 $("ptIvSel").addEventListener("change",e=>{ S.pt.iv=e.target.value; store.set("ptIv",S.pt.iv); ptLoadChart(); });
 $("ptTabs").addEventListener("click",e=>{ const b=e.target.closest("[data-ptpane]"); if(!b) return; S.pt.pane=b.dataset.ptpane; if(S.pt.min){ S.pt.min=false; store.set("ptMin",false); } renderTrade(); });
