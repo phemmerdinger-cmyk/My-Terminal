@@ -694,6 +694,12 @@ body.sg-lock{overflow:hidden}
 .sg-pbar i{display:block;height:100%;border-radius:4px} .sg-pbar i.g{background:#38ff9c;box-shadow:0 0 8px #38ff9c} .sg-pbar i.r{background:#ff4d6d;box-shadow:0 0 8px #ff4d6d}
 .sg-btbl tfoot td{border-top:1px solid rgba(62,242,255,.3);border-bottom:0;padding-top:12px;color:#fff}
 @media (max-width:760px){ .sg-modal{padding:8px} .sg-modal .sg-detail{max-height:calc(100vh - 16px);padding:14px} .sg-btbl td:first-child{min-width:160px} }
+.sg-sec td{padding:14px 10px 6px!important;border-bottom:1px solid rgba(62,242,255,.25)!important;text-align:left!important;font-family:var(--mono);font-size:11px;color:#7f9bb0;background:linear-gradient(90deg,rgba(62,242,255,.08),transparent 60%);cursor:default}
+.sg-sec td span{margin-right:16px;letter-spacing:.06em} .sg-secn{color:#3ef2ff;letter-spacing:.2em!important;font-size:12px;text-shadow:0 0 10px rgba(62,242,255,.4)}
+.sg-tbl tbody tr.sg-sec:hover{background:transparent}
+.sg-secc{text-align:left!important;font-family:var(--sans)!important;font-size:12px;color:#9fc6dc!important;max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.sg-fsep{width:1px;align-self:stretch;background:var(--sg-line);margin:0 4px}
+.sg-dsec{margin-top:6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#5f7c92} .sg-dsec b{color:#3ef2ff;letter-spacing:.04em;font-weight:500}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -2171,7 +2177,7 @@ function acContext(){
   } else if(t==="signals"){
     const rows=Object.values(SG.res).filter(r=>r.ok).sort((a,b)=>b.score-a.score);
     L.push(`Signal scanner results (score −100 bearish … +100 bullish, from daily price history):`);
-    rows.slice(0,40).forEach(r=>L.push(`- ${r.sym}: score ${r.score} (${sigLabel(r.score)}), price ${fmt(r.last)}, RSI ${r.rsi.toFixed(0)}, ${r.last>r.sma50?"above":"below"} 50-day, ${r.sma200?(r.last>r.sma200?"above":"below")+" 200-day":"no 200-day yet"}, MACD ${r.hist>0?"positive":"negative"}, volume ${r.volx.toFixed(1)}× normal, 1M ${pct(r.m1)}, 52w position ${r.pos52.toFixed(0)}%. Events: ${r.events.map(e=>e.t).join("; ")||"none"}`));
+    rows.slice(0,40).forEach(r=>L.push(`- ${r.sym} [${sgSector(r.sym)||"sector unknown"}]: score ${r.score} (${sigLabel(r.score)}), price ${fmt(r.last)}, RSI ${r.rsi.toFixed(0)}, ${r.last>r.sma50?"above":"below"} 50-day, ${r.sma200?(r.last>r.sma200?"above":"below")+" 200-day":"no 200-day yet"}, MACD ${r.hist>0?"positive":"negative"}, volume ${r.volx.toFixed(1)}× normal, 1M ${pct(r.m1)}, 52w position ${r.pos52.toFixed(0)}%. Events: ${r.events.map(e=>e.t).join("; ")||"none"}`));
     if(SG.sel) L.push(`The user is looking at ${SG.sel}.`);
   } else if(t==="predict"){
     Object.entries(S.preds).filter(([,p])=>p&&p.stance).forEach(([k,p])=>L.push(`Prediction shown for ${k}: ${p.stance} (${p.confidence}%) — ${p.headline}`));
@@ -2494,7 +2500,7 @@ function pfcStat(now){
 $("pfcSel").addEventListener("change",e=>{ S.pfc.sel=e.target.value; pfcLoad(); });
 $("pfcRange").addEventListener("click",e=>{ const b=e.target.closest("[data-pfcr]"); if(!b) return; S.pfc.range=b.dataset.pfcr; store.set("pfcRange",S.pfc.range); pfcLoad(); });
 /* ---------- SIGNALS: technical scanner with radar ---------- */
-const SG={res:{},total:0,done:0,scanning:false,filter:"all",sort:{k:"score",d:-1},sel:null,extra:store.get("sgExtra",[]),at:0,raf:0};
+const SG={res:{},total:0,done:0,scanning:false,filter:"all",sort:{k:"score",d:-1},group:store.get("sgGroup",true),sel:null,extra:store.get("sgExtra",[]),at:0,raf:0};
 const SG_CORE=["SPY","QQQ","IWM","DIA","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","AMD","AVGO","NFLX","JPM","XOM","LLY","COST","BTC-USD","ETH-USD"];
 function sgUniverse(){ const own=new Set(S.pfs.flatMap(p=>p.holdings.map(h=>h.symbol))); return {list:[...new Set([...own,...S.wl,...SG.extra,...SG_CORE])].slice(0,45),own,wl:new Set(S.wl)}; }
 const sgSma=(a,n,i=a.length-1)=>{ if(i+1<n||i<0) return null; let s=0; for(let k=i-n+1;k<=i;k++) s+=a[k]; return s/n; };
@@ -2540,16 +2546,19 @@ function sgAnalyze(sym,c){
 }
 const sigLabel=s=>s>=50?"Strong bullish":s>=20?"Bullish":s<=-50?"Strong bearish":s<=-20?"Bearish":"Neutral";
 const sigTone=s=>s>=20?"g":s<=-20?"r":"n";
+const sgSector=s=>isCrypto(s)?"Crypto":S.sectors[s]===undefined?null:sectorOf(s); // null while still looking it up
+const sgSecGroup=s=>{ const v=sgSector(s); return v==null?"Looking up sector…":v.split(" · ")[0]; };
 const sgName=s=>{ const q=S.quotes[s]; return q&&q.name&&q.name!==s?q.name:(IDX_NAME&&IDX_NAME[s])||""; };
 async function sgScan(force){
   const {list}=sgUniverse(); const todo=list.filter(s=>force||!SG.res[s]||Date.now()-SG.res[s].t>(SG.res[s].ok?15*60e3:20e3)); // failed symbols retry soon
   if(!todo.length||SG.scanning){ sgRender(); return; }
   SG.total=todo.length; SG.done=0; SG.scanning=true; sgRender();
   let i=0; const worker=async()=>{ while(i<todo.length){ const s=todo[i++];
-    try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`); SG.res[s]=sgAnalyze(s,h.candles); }catch{ SG.res[s]={sym:s,ok:false,t:Date.now()}; }
+    try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`); SG.res[s]=sgAnalyze(s,h.candles); if(SG.res[s].ok) loadSectors([s]).then(()=>sgSoon()).catch(()=>{}); }catch{ SG.res[s]={sym:s,ok:false,t:Date.now()}; }
     SG.done++; sgSoon(); } };
   await Promise.all([worker(),worker(),worker(),worker()]);
   SG.scanning=false; SG.at=Date.now(); sgRender();
+  loadSectors(list.filter(s=>SG.res[s]&&SG.res[s].ok)).then(()=>sgSoon()).catch(()=>{}); // so the table can group by sector
   const failed=list.filter(s=>SG.res[s]&&!SG.res[s].ok); // the data source sometimes rate-limits: try misses again shortly
   if(failed.length&&(SG.retries=(SG.retries||0)+1)<=3) setTimeout(()=>{ if(S.tab==="signals") sgScan(false); },25e3); else if(!failed.length) SG.retries=0;
 }
@@ -2558,12 +2567,15 @@ function sigLive(){ sgSoon(); }
 function sgRows(){
   const {list,own,wl}=sgUniverse(); let rows=list.map(s=>SG.res[s]).filter(r=>r&&r.ok);
   const f=SG.filter; rows=rows.filter(r=>f==="all"||(f==="bull"&&r.score>=20)||(f==="bear"&&r.score<=-20)||(f==="ev"&&r.events.length)||(f==="own"&&own.has(r.sym))||(f==="wl"&&wl.has(r.sym)));
-  const k=SG.sort.k, d=SG.sort.d; rows.sort((a,b)=>{ const x=k==="sym"?a.sym.localeCompare(b.sym):(a[k]??0)-(b[k]??0); return k==="sym"?x*-d:x*d; });
+  const k=SG.sort.k, d=SG.sort.d, last=g=>g==="Other"||g==="Looking up sector…";
+  const secCmp=(a,b)=>{ const x=sgSecGroup(a.sym), y=sgSecGroup(b.sym); return last(x)-last(y)||x.localeCompare(y); };
+  rows.sort((a,b)=>{ if(SG.group||k==="sector"){ const c=secCmp(a,b); if(c) return k==="sector"?c*-d:c; if(k==="sector") return b.score-a.score; }
+    const x=k==="sym"?a.sym.localeCompare(b.sym):(a[k]??0)-(b[k]??0); return k==="sym"?x*-d:x*d; });
   return {rows,own,wl};
 }
 function sgRadar(own){
   const all=Object.values(SG.res).filter(r=>r.ok&&sgUniverse().list.includes(r.sym));
-  const groups={}; all.forEach(r=>{ const g=isCrypto(r.sym)?"Crypto":sectorOf(r.sym)||"Other"; (groups[g]=groups[g]||[]).push(r); });
+  const groups={}; all.forEach(r=>{ const g=sgSecGroup(r.sym).replace("Looking up sector…","…"); (groups[g]=groups[g]||[]).push(r); });
   const order=Object.keys(groups).sort(); const items=order.flatMap(g=>groups[g].sort((a,b)=>a.sym.localeCompare(b.sym)).map(r=>({r,g})));
   const N=items.length||1, R=190;
   const rings=[0.25,0.5,0.75,1].map(f=>`<circle cx="0" cy="0" r="${R*f}" fill="none" stroke="rgba(62,242,255,${f===0.5?.35:.14})" stroke-width="${f===0.5?1.2:1}" ${f===0.5?'stroke-dasharray="4 4"':""}/>`).join("");
@@ -2608,14 +2620,18 @@ function sgRender(){
   // feed
   const feed=all.flatMap(r=>r.events.map(e=>({...e,r}))).sort((a,b)=>b.w-a.w||a.age-b.age||Math.abs(b.r.score)-Math.abs(a.r.score)).slice(0,60);
   setHTML("sgFeedCount",feed.length?feed.length+" active signal"+(feed.length===1?"":"s"):"");
-  setHTML("sgFeed",feed.length?feed.map(e=>`<div class="sg-ev ${e.tone}" data-sgsym="${esc(e.r.sym)}"><span class="ic">${e.ic}</span><span class="t"><b>${esc(e.r.sym)}</b> ${esc(e.t)}</span><span class="sc ${sigTone(e.r.score)==="g"?"up":sigTone(e.r.score)==="r"?"down":""}">${e.r.score>0?"+":""}${e.r.score}</span><small>${esc(sgName(e.r.sym))}${e.age?` · ${e.age} day${e.age>1?"s":""} ago`:" · today"}${own.has(e.r.sym)?" · you own it":""}</small></div>`).join(""):`<div class="sg-empty">${SG.scanning?"LISTENING FOR SIGNALS…":"NO ACTIVE SIGNALS"}</div>`);
+  setHTML("sgFeed",feed.length?feed.map(e=>`<div class="sg-ev ${e.tone}" data-sgsym="${esc(e.r.sym)}"><span class="ic">${e.ic}</span><span class="t"><b>${esc(e.r.sym)}</b> ${esc(e.t)}</span><span class="sc ${sigTone(e.r.score)==="g"?"up":sigTone(e.r.score)==="r"?"down":""}">${e.r.score>0?"+":""}${e.r.score}</span><small>${esc(sgName(e.r.sym))}${sgSector(e.r.sym)?" · "+esc(sgSector(e.r.sym)):""}${e.age?` · ${e.age} day${e.age>1?"s":""} ago`:" · today"}${own.has(e.r.sym)?" · you own it":""}</small></div>`).join(""):`<div class="sg-empty">${SG.scanning?"LISTENING FOR SIGNALS…":"NO ACTIVE SIGNALS"}</div>`);
   // filters + matrix
   const fl=[["all","All"],["bull","Bullish"],["bear","Bearish"],["ev","With signals"],["own","My holdings"],["wl","Watchlist"]];
-  setHTML("sgFilters",fl.map(([k,l])=>`<button type="button" data-sgf="${k}" class="${SG.filter===k?"on":""}">${l}</button>`).join(""));
-  const TIPS={sym:"Click a row for details",score:"−100 strongly bearish … +100 strongly bullish",last:"Latest price",d1:"Change today",m1:"Change over the last month",rsi:"Over 70 = overbought (ran up fast), under 30 = oversold (sold off hard)",hist:"MACD momentum: is the short-term push up (pos) or down (neg)?",volx:"Today's volume vs a normal day (2× or more is unusual)",pos52:"Where the price sits between its 52-week low (left) and high (right)"};
+  setHTML("sgFilters",fl.map(([k,l])=>`<button type="button" data-sgf="${k}" class="${SG.filter===k?"on":""}">${l}</button>`).join("")+`<span class="sg-fsep"></span><button type="button" data-sggroup="1" class="${SG.group?"on":""}" title="Group the table by sector">▦ By sector</button>`);
+  const TIPS={sector:"The industry the company is in (from its company profile)",sym:"Click a row for details",score:"−100 strongly bearish … +100 strongly bullish",last:"Latest price",d1:"Change today",m1:"Change over the last month",rsi:"Over 70 = overbought (ran up fast), under 30 = oversold (sold off hard)",hist:"MACD momentum: is the short-term push up (pos) or down (neg)?",volx:"Today's volume vs a normal day (2× or more is unusual)",pos52:"Where the price sits between its 52-week low (left) and high (right)"};
   const th=(k,l)=>`<th data-sgsort="${k}" title="${esc(TIPS[k]||"")}">${l}${SG.sort.k===k?(SG.sort.d<0?" ▾":" ▴"):""}</th>`;
-  setHTML("sgTable",rows.length?`<thead><tr>${th("sym","SYMBOL")}${th("score","SIGNAL SCORE")}${th("last","PRICE")}${th("d1","1D")}${th("m1","1M")}${th("rsi","RSI")}${th("hist","MACD")}<th title="Green = price is above its 50-day / 200-day average (healthy trend); red = below">TREND</th>${th("volx","VOLUME")}${th("pos52","52W RANGE")}<th title="Recent events — hover each icon for what happened">SIGNALS</th></tr></thead><tbody>${rows.map(r=>{ const w=Math.abs(r.score)/2;
-    return `<tr data-sgsym="${esc(r.sym)}" class="${SG.sel===r.sym?"sel":""}"><td class="sg-sym"><b>${esc(r.sym)}</b>${own.has(r.sym)?'<span class="sg-own">◆ OWNED</span>':""}<small>${esc(sgName(r.sym))}</small></td>
+  let curSec=null; const NCOL=12;
+  const secHead=g=>{ const rs=rows.filter(x=>sgSecGroup(x.sym)===g), avg=Math.round(rs.reduce((a,x)=>a+x.score,0)/rs.length), bu=rs.filter(x=>x.score>=20).length, be=rs.filter(x=>x.score<=-20).length;
+    return `<tr class="sg-sec"><td colspan="${NCOL}"><span class="sg-secn">${esc(g.toUpperCase())}</span><span>${rs.length} stock${rs.length===1?"":"s"}</span><span>avg score <b class="${sigTone(avg)==="g"?"up":sigTone(avg)==="r"?"down":""}">${avg>0?"+":""}${avg}</b></span><span class="up">${bu} bullish</span><span class="down">${be} bearish</span></td></tr>`; };
+  setHTML("sgTable",rows.length?`<thead><tr>${th("sym","SYMBOL")}${th("sector","SECTOR")}${th("score","SIGNAL SCORE")}${th("last","PRICE")}${th("d1","1D")}${th("m1","1M")}${th("rsi","RSI")}${th("hist","MACD")}<th title="Green = price is above its 50-day / 200-day average (healthy trend); red = below">TREND</th>${th("volx","VOLUME")}${th("pos52","52W RANGE")}<th title="Recent events — hover each icon for what happened">SIGNALS</th></tr></thead><tbody>${rows.map(r=>{ const w=Math.abs(r.score)/2, g=sgSecGroup(r.sym), hd=SG.group&&g!==curSec?(curSec=g,secHead(g)):"", sec=sgSector(r.sym);
+    return hd+`<tr data-sgsym="${esc(r.sym)}" class="${SG.sel===r.sym?"sel":""}"><td class="sg-sym"><b>${esc(r.sym)}</b>${own.has(r.sym)?'<span class="sg-own">◆ OWNED</span>':""}<small>${esc(sgName(r.sym))}</small></td>
+    <td class="sg-secc" title="${esc(sec||"")}">${sec==null?'<span class="spin" style="width:10px;height:10px"></span>':esc(sec)}</td>
     <td><div class="sg-score"><div class="sg-meter"><i class="${r.score>=0?"p":"n"}" style="width:${w}%"></i></div><span class="sg-cell ${sigTone(r.score)}">${r.score>0?"+":""}${r.score}</span></div></td>
     <td>${fmt(r.last,r.last<1?4:2)}</td><td class="${cls(r.d1)}">${pct(r.d1)}</td><td class="${cls(r.m1)}">${pct(r.m1)}</td>
     <td><span class="sg-cell ${r.rsi>=70?"y":r.rsi<=30?"g":"n"}">${r.rsi.toFixed(0)}</span></td><td><span class="sg-cell ${r.hist>0?"g":"r"}">${r.hist>0?"▲ pos":"▼ neg"}</span></td>
@@ -2634,6 +2650,7 @@ function sgRender(){
         <td class="pt"><div class="sg-pbar"><i class="${t}" style="width:${w}%"></i></div><b class="${t==="g"?"up":t==="r"?"down":""}">${pts(p.pts)}</b><small>of ±${p.max}</small></td></tr>`; }).join("");
     setHTML("sgDetail",`<button type="button" class="sg-x" data-sgclose="1" title="Close (Esc)">✕</button>
     <div class="sg-dhead"><div><div class="sg-kicker"><i></i>TARGET LOCK · SCORE BREAKDOWN</div><h2>${esc(r.sym)}<small>${esc(sgName(r.sym))}</small></h2>
+      <div class="sg-dsec">SECTOR · <b>${esc(sgSector(r.sym)||"looking up…")}</b></div>
       <div style="color:#8aa4b8;font-size:13px;margin-top:4px">${fmt(r.last,r.last<1?4:2)} · <span class="${cls(r.d1)}">${pct(r.d1)} today</span> · <span class="${cls(r.m1)}">${pct(r.m1)} this month</span>${own.has(r.sym)?' · <span style="color:#ffd23e">◆ you own it</span>':""}</div></div>
       <div style="text-align:right"><div class="sg-big ${sigTone(r.score)}">${r.score>0?"+":""}${r.score}</div><div style="font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:#8aa4b8;margin-top:4px">${sigLabel(r.score).toUpperCase()}</div></div></div>
     <div class="sg-tally"><div class="g"><b>${bull.length}</b> bullish factor${bull.length===1?"":"s"} <span>${pts(Math.round(bull.reduce((a,p)=>a+p.pts,0)*10)/10)} pts</span></div><div class="r"><b>${bear.length}</b> bearish factor${bear.length===1?"":"s"} <span>${pts(Math.round(bear.reduce((a,p)=>a+p.pts,0)*10)/10)} pts</span></div><div class="n"><b>${r.parts.length-bull.length-bear.length}</b> neutral</div></div>
@@ -2650,6 +2667,7 @@ function sgSelect(sym){ SG.sel=sym; sgRender(); $("sgDetail").scrollTop=0; }
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&SG.sel){ SG.sel=null; sgRender(); } });
 $("tab-signals").addEventListener("click",e=>{
   const f=e.target.closest("[data-sgf]"); if(f){ SG.filter=f.dataset.sgf; sgRender(); return; }
+  if(e.target.closest("[data-sggroup]")){ SG.group=!SG.group; store.set("sgGroup",SG.group); sgRender(); return; }
   const so=e.target.closest("[data-sgsort]"); if(so){ const k=so.dataset.sgsort; SG.sort=SG.sort.k===k?{k,d:-SG.sort.d}:{k,d:k==="sym"?1:-1}; sgRender(); return; }
   const o=e.target.closest("[data-sgopen]"); if(o){ SG.sel=null; sgRender(); openQuote(o.dataset.sgopen); return; }
   const a=e.target.closest("[data-sgask]"); if(a){ const s=a.dataset.sgask, r=SG.res[s]; SG.sel=null; sgRender(); $("acFab").click(); setTimeout(()=>{ $("acInput").value=`Explain the ${s} signal (score ${r.score}, ${sigLabel(r.score)}). Breakdown: ${r.parts.map(p=>p.name+" "+(p.pts>0?"+":"")+p.pts).join(", ")}. What's driving it and what should I watch next?`; $("acInput").focus(); },150); return; }
