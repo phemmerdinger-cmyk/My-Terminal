@@ -331,8 +331,12 @@ const RANGES = {
   "1d": ["1d", "5m"], "5d": ["5d", "15m"], "1mo": ["1mo", "1h"], "6mo": ["6mo", "1d"],
   ytd: ["ytd", "1d"], "1y": ["1y", "1d"], "5y": ["5y", "1wk"], max: ["max", "1mo"],
 };
-async function history(sym, range = "6mo") {
-  const [r, iv] = RANGES[range] || RANGES["6mo"];
+// Explicit period + candle length (used by the Trading Sim). Only combinations Yahoo serves are allowed.
+const HIST_RANGES = new Set(["1d", "5d", "1mo", "3mo", "6mo", "ytd", "1y", "2y", "5y", "max"]);
+const HIST_IVS = new Set(["1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d", "1wk", "1mo"]);
+async function history(sym, range = "6mo", interval) {
+  let [r, iv] = RANGES[range] || RANGES["6mo"];
+  if (interval && HIST_IVS.has(interval) && HIST_RANGES.has(range)) { r = range; iv = interval === "1h" ? "60m" : interval; }
   return cached(`h:${sym}:${r}:${iv}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${r}&interval=${iv}${range && range.startsWith("intraday") ? "&includePrePost=true" : ""}`;
     const j = JSON.parse(await get(url, "application/json"));
@@ -1032,7 +1036,7 @@ http
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
         if (!s) return send(res, 400, { error: "symbol required" });
-        return send(res, 200, await history(s, u.searchParams.get("range")));
+        return send(res, 200, await history(s, u.searchParams.get("range"), u.searchParams.get("interval")));
       }
       if (u.pathname === "/api/predict") {
         const raw = String(u.searchParams.get("symbol") || "MARKET").toUpperCase();
