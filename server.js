@@ -353,6 +353,47 @@ async function history(sym, range = "6mo", interval) {
 }
 
 
+
+// ---------------------------------------------------------------- S&P 500 snapshot (Wall Street tab)
+// One shared, cached snapshot of all ~503 companies: price, change and market cap.
+// Tries Yahoo's bulk quote (needs a crumb), then falls back to the spark endpoint in batches of 20.
+const SP500 = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, "public", "sp500.json"), "utf8")).rows; } catch { return []; } })();
+const spCaps = {}; // remembered market caps, so the map keeps its shape if the bulk endpoint is blocked
+async function sp500Snapshot() {
+  return cached("sp500", 60_000, async () => {
+    const syms = SP500.map(r => r[0]), out = {}; let source = "quote";
+    try {
+      for (let i = 0; i < syms.length; i += 150) {
+        const chunk = syms.slice(i, i + 150);
+        const j = await yget(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(chunk.join(","))}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,marketCap,regularMarketPreviousClose`);
+        for (const q of (j.quoteResponse && j.quoteResponse.result) || []) {
+          if (q.regularMarketPrice == null) continue;
+          if (q.marketCap) spCaps[q.symbol] = q.marketCap;
+          out[q.symbol] = [q.regularMarketPrice, q.regularMarketChange ?? null, q.regularMarketChangePercent ?? null, q.marketCap || spCaps[q.symbol] || null];
+        }
+      }
+    } catch (e) { source = "spark"; }
+    const missing = syms.filter(s => !out[s]);
+    if (missing.length) {
+      source = Object.keys(out).length ? "mixed" : "spark";
+      const batches = []; for (let i = 0; i < missing.length; i += 20) batches.push(missing.slice(i, i + 20));
+      let bi = 0;
+      const worker = async () => { while (bi < batches.length) { const b = batches[bi++];
+        try {
+          const j = JSON.parse(await get(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(b.join(","))}&range=1d&interval=1d`, "application/json"));
+          const list = j.spark && j.spark.result ? j.spark.result.map(r => ({ symbol: r.symbol, ...(r.response && r.response[0] && r.response[0].meta || {}) })) : Object.values(j);
+          for (const r of list) {
+            const sym = r.symbol, price = r.regularMarketPrice ?? (r.close && r.close[r.close.length - 1]), prev = r.chartPreviousClose ?? r.previousClose;
+            if (!sym || price == null || !prev) continue;
+            out[sym] = [price, price - prev, (price / prev - 1) * 100, spCaps[sym] || null];
+          }
+        } catch (e) { /* skip this batch */ } } };
+      await Promise.all([worker(), worker(), worker()]);
+    }
+    return { updated: Date.now(), source, count: Object.keys(out).length, quotes: out };
+  });
+}
+
 // ---------------------------------------------------------------- Claude password lock
 // Every request that spends Claude credits must carry the owner's password (header x-claude-pass).
 // Only a one-way scrypt hash of the password lives in this code. To change the password, set
@@ -1068,6 +1109,7 @@ http
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
       }
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
+      if (u.pathname === "/api/sp500") return send(res, 200, await sp500Snapshot());
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
         if (!s) return send(res, 400, { error: "symbol required" });

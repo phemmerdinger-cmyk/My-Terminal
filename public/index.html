@@ -814,6 +814,21 @@ body.sg-lock{overflow:hidden}
 @keyframes nyFlash{0%{background:rgba(255,176,0,.35)}100%{background:transparent}}
 @media (max-width:1100px){ .ny-hero{grid-template-columns:1fr auto} .ny-idx{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))} .ny-main{grid-template-columns:minmax(0,1fr)} }
 @media (max-width:760px){ .ny-hero{grid-template-columns:1fr} .ny-ring{margin:0 auto;width:170px;height:170px} .ny-idx{grid-template-columns:repeat(2,minmax(0,1fr))} .ny-id h1 span{font-size:48px} .ny-sky{height:380px} .ny-two{grid-template-columns:1fr} .ny-hs{min-width:100%} }
+/* Wall Street v2 additions */
+.ny-seg{display:flex;gap:4px} .ny-seg button{background:rgba(6,9,18,.7);border:1px solid var(--ny-line);color:#9aa3b5;border-radius:7px;padding:4px 10px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;cursor:pointer}
+.ny-seg button.on{color:var(--gold);border-color:rgba(245,199,107,.6);background:rgba(245,199,107,.08)}
+.ny-skyhelp{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:#8b94a7;margin:-2px 0 8px} .ny-skyhelp b{color:#e9eef7;font-weight:600}
+.ny-sky{cursor:default!important;height:460px;background:#03050c}
+.ny-hm{position:relative;width:100%;height:640px;border-radius:10px;overflow:hidden;background:#05070d}
+.ny-hs2{position:absolute;border:1px solid rgba(5,7,13,1);box-sizing:border-box}
+.ny-hs2 > b{position:absolute;left:4px;top:1px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.75);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;right:4px;pointer-events:none;text-transform:uppercase}
+.ny-t2{position:absolute;box-sizing:border-box;border:1px solid rgba(5,7,13,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;font-family:var(--mono);color:#fff;text-align:center;line-height:1.1}
+.ny-t2:hover{outline:2px solid #fff;outline-offset:-2px;z-index:2}
+.ny-t2 b{font-weight:600;white-space:nowrap} .ny-t2 span{opacity:.9;white-space:nowrap}
+.ny-hmscale{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:#8b94a7;margin:-4px 0 8px;justify-content:flex-end}
+.ny-hmscale i{display:block;width:90px;height:8px;border-radius:4px;background:linear-gradient(90deg,#c0213a,#6e1a26,#2c3240)} .ny-hmscale i.p{background:linear-gradient(90deg,#2c3240,#13643c,#13b45f)}
+#nyHmTip{position:fixed;transform:translate(12px,12px);z-index:40}
+@media (max-width:760px){ .ny-hm{height:900px} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -856,7 +871,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
   <button data-tab="data"><span class="ti">📊</span>Markets</button>
   <button data-tab="research"><span class="ti">🔎</span>Research</button>
   <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
-  <button data-tab="nyse"><span class="ti">🏛</span>Big Board</button>
+  <button data-tab="nyse"><span class="ti">🏛</span>Wall Street</button>
   <!-- Signals tab is hidden but its code is kept; set SHOW_SIGNALS=true to bring it back -->
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
@@ -985,12 +1000,12 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
     </section>
 
     <!-- PREDICTIONS -->
-    <!-- NYSE: live exchange floor -->
+    <!-- WALL STREET: live market floor (S&P 500) -->
     <section id="tab-nyse" class="pad ny" hidden>
       <div class="ny-hero">
         <div class="ny-id">
-          <div class="ny-kick"><i></i>NEW YORK STOCK EXCHANGE <span>· 11 WALL STREET · LIVE FLOOR</span></div>
-          <h1><span>THE BIG BOARD</span><em id="nyStatus">—</em></h1>
+          <div class="ny-kick"><i></i>LIVE MARKET FLOOR <span>· NYSE · NASDAQ · S&amp;P 500</span></div>
+          <h1><span>WALL STREET</span><em id="nyStatus">—</em></h1>
           <div class="ny-clock"><b id="nyClock">--:--:--</b><span>ET</span><small id="nyDate"></small></div>
         </div>
         <div class="ny-ring" id="nyRing"></div>
@@ -999,21 +1014,26 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
       <div class="ny-board"><div class="ny-board-in" id="nyBoard"></div><div class="ny-dots"></div></div>
       <div class="ny-main">
         <div class="ny-pane ny-skyp">
-          <div class="ny-ph"><span>MARKET SKYLINE</span><em>each tower is a company · height = today's move · drag to rotate · click a tower</em></div>
-          <div class="ny-sky" id="nySky"><canvas id="nyCanvas"></canvas><div class="ny-tip" id="nyTip" hidden></div>
-            <div class="ny-skyctl"><button type="button" id="nySpin" class="on" title="Auto-rotate">⟳ Rotate</button><button type="button" id="nyView" title="Change camera angle">◩ Angle</button></div></div>
+          <div class="ny-ph"><span>MARKET SKYLINE</span><div class="ny-seg" id="nySkyMode"><button type="button" data-skym="big" class="on">Biggest companies</button><button type="button" data-skym="move">Biggest movers</button></div></div>
+          <div class="ny-skyhelp"><span><b>Each district</b> on the street is a sector</span><span><b>Each building</b> is a company</span><span><span class="up"><b>Rises</b></span> = up today · <span class="down"><b>sinks into the river</b></span> = down today</span><span>taller / deeper = bigger move · wider = bigger company</span></div>
+          <div class="ny-sky" id="nySky"><canvas id="nyCanvas"></canvas><div class="ny-tip" id="nyTip" hidden></div></div>
         </div>
         <div class="ny-col">
-          <div class="ny-pane"><div class="ny-ph"><span>MARKET BREADTH</span><em>how many are up vs down</em></div><div id="nyBreadth"></div></div>
-          <div class="ny-pane"><div class="ny-ph"><span>SECTOR PULSE</span><em>average move today</em></div><div id="nySectors"></div></div>
+          <div class="ny-pane"><div class="ny-ph"><span>S&amp;P 500 BREADTH</span><em>how many are up vs down</em></div><div id="nyBreadth"></div></div>
+          <div class="ny-pane"><div class="ny-ph"><span>SECTOR PULSE</span><em>size-weighted move today</em></div><div id="nySectors"></div></div>
         </div>
       </div>
-      <div class="ny-pane"><div class="ny-ph"><span>HEATMAP</span><em>tile size ≈ company size · color = today's move · click to open</em></div><div class="ny-heat" id="nyHeat"></div></div>
-      <div class="ny-two">
-        <div class="ny-pane"><div class="ny-ph"><span>TOP GAINERS</span></div><div id="nyGain"></div></div>
-        <div class="ny-pane"><div class="ny-ph"><span>TOP DECLINERS</span></div><div id="nyLose"></div></div>
+      <div class="ny-pane">
+        <div class="ny-ph"><span>S&amp;P 500 HEATMAP</span><em id="nyHeatNote">all 503 companies · size = market value · color = today's move · click to open</em></div>
+        <div class="ny-hmscale"><span>−3%</span><i></i><span>0</span><i class="p"></i><span>+3%</span></div>
+        <div class="ny-hm" id="nyHeat"><div class="sg-empty">Loading all 503 companies…</div></div>
+        <div class="ny-tip" id="nyHmTip" hidden></div>
       </div>
-      <div class="disc">Covers about 65 of the largest NYSE-listed companies plus the NYSE Composite, Dow, S&amp;P 500 and VIX. Prices refresh every 15 seconds and stream live during market hours. Session times are regular NYSE hours (holidays aren't shown). Company sizes are approximate.</div>
+      <div class="ny-two">
+        <div class="ny-pane"><div class="ny-ph"><span>S&amp;P 500 TOP GAINERS</span></div><div id="nyGain"></div></div>
+        <div class="ny-pane"><div class="ny-ph"><span>S&amp;P 500 TOP DECLINERS</span></div><div id="nyLose"></div></div>
+      </div>
+      <div class="disc">All 503 S&amp;P 500 companies (list as of Nov 5, 2026), refreshed every minute; the biggest names also stream live during market hours. Session times are regular NYSE hours (holidays aren't shown).</div>
     </section>
 
     <!-- SIGNALS: futuristic technical scanner -->
@@ -2327,7 +2347,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Big Board",predict:"Claude Predictor"};
+const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Wall Street",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -2350,11 +2370,12 @@ function acContext(){
     const pf=S.pfs.find(p=>p.id===S.pfActive); L.push(`Portfolio "${pf.name}"`);
     pf.holdings.forEach(h=>{ const q=S.quotes[h.symbol]; const v=q&&!q.error?h.shares*q.price:null; L.push(`- ${h.symbol}: invested $${fmt(h.shares*h.cost)}, now ${v!=null?"$"+fmt(v):"?"} (${v!=null?pct((v/(h.shares*h.cost)-1)*100):"?"}), today ${q&&!q.error?pct(q.changePct):"?"}, sector ${sectorOf(h.symbol)}`); });
   } else if(t==="nyse"){
-    const rows=NY_LIST.map(([s,n,sec])=>({s,n,sec,q:S.quotes[s]})).filter(r=>r.q&&!r.q.error);
-    const ses=nySession(); L.push(`Big Board (NYSE) view. Session: ${ses.label}.`);
+    const rows=nyRows(), ses=nySession(); L.push(`Wall Street view (S&P 500, ${rows.length} companies). Session: ${ses.label}.`);
     NY_IDX.forEach(([k,l])=>{ const q=S.quotes[k]; if(q&&!q.error) L.push(`${l}: ${fmt(q.price)} (${pct(q.changePct)})`); });
-    const up=rows.filter(r=>r.q.changePct>0).length; L.push(`Breadth among ${rows.length} large NYSE stocks: ${up} up, ${rows.length-up} down or flat.`);
-    rows.sort((a,b)=>b.q.changePct-a.q.changePct).forEach(r=>L.push(`- ${r.s} (${r.n}, ${r.sec}): ${fmt(r.q.price)} ${pct(r.q.changePct)}`));
+    const up=rows.filter(r=>r.cp>0).length; L.push(`Breadth: ${up} up, ${rows.length-up} down or flat.`);
+    (NY.secs||[]).forEach(x=>L.push(`Sector ${x.sec}: ${pct(x.a)} (size-weighted)`));
+    const srt=rows.slice().sort((a,b)=>b.cp-a.cp); L.push("Top gainers: "+srt.slice(0,10).map(r=>`${r.s} ${pct(r.cp)}`).join(", ")); L.push("Top decliners: "+srt.slice(-10).reverse().map(r=>`${r.s} ${pct(r.cp)}`).join(", "));
+    L.push("Biggest companies: "+rows.slice().sort((a,b)=>b.mc-a.mc).slice(0,15).map(r=>`${r.s} ${pct(r.cp)}`).join(", "));
   } else if(t==="signals"){
     const rows=Object.values(SG.res).filter(r=>r.ok).sort((a,b)=>b.score-a.score);
     L.push(`Signal scanner results (score −100 bearish … +100 bullish, from daily price history):`);
@@ -2374,7 +2395,7 @@ function acChips(){
     data:["What's driving the market today?","Explain the market mood score","Which sectors look strongest right now?"],
     research:s?[`Is ${s} a good buy right now?`,`Explain ${s}'s financials simply`,`What are the biggest risks for ${s}?`]:["How do I read a stock's key stats?"],
     portfolio:["Build me a balanced $10,000 portfolio","Build me an aggressive growth portfolio","Portfolio check-up","Am I too concentrated anywhere?"],
-    nyse:["What's driving the NYSE today?","Which sectors are leading and lagging?","Explain market breadth in plain English","What does the VIX say about fear right now?"],
+    nyse:["What's driving the market today?","Which sectors are leading and lagging?","Explain market breadth in plain English","What does the VIX say about fear right now?"],
     signals:["Which signals look strongest right now?","Explain the bearish signals on my holdings","What does a golden cross mean?","Which oversold stocks could bounce?"],
     predict:["Build me a portfolio based on today's news and earnings","How is my portfolio positioned for the week ahead?","Summarize today's market in 5 bullets","Which stocks on my watchlist have notable news?"],
   };
@@ -2473,7 +2494,7 @@ $("addForm").onsubmit=e=>{
 
 /* ---------- real-time price stream (when the server has a Finnhub key) ---------- */
 let es=null, streamKey="", streamOn=false, paintPending=false, prevPaint={};
-function streamSyms(){ return [...new Set([...(S.tab==="nyse"?NY_LIST.filter(x=>x[3]>=2).map(x=>x[0]).slice(0,18):[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
+function streamSyms(){ return [...new Set([...(S.tab==="nyse"&&typeof nyRows==="function"?nyRows().sort((a,b)=>b.mc-a.mc).slice(0,20).map(r=>r.s):[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
 function startStream(){
   if(!streamOn||!("EventSource" in window)) return;
   const syms=streamSyms(), key=syms.join(",");
@@ -2881,28 +2902,29 @@ $("clPop").addEventListener("submit",async e=>{ e.preventDefault(); const pw=$("
 document.addEventListener("click",e=>{ if(!$("clPop").hidden&&!e.target.closest(".cl-wrap")&&Date.now()-(CL.openedAt||0)>400) $("clPop").hidden=true; });
 clRender();
 
-/* ---------- BIG BOARD (NYSE live floor) ---------- */
-const NY_LIST=[
- ["JPM","JPMorgan Chase","Financials",3],["V","Visa","Financials",3],["MA","Mastercard","Financials",3],["BRK-B","Berkshire Hathaway","Financials",3],["BAC","Bank of America","Financials",2],["WFC","Wells Fargo","Financials",2],["GS","Goldman Sachs","Financials",2],["MS","Morgan Stanley","Financials",2],["AXP","American Express","Financials",2],["BLK","BlackRock","Financials",1],["C","Citigroup","Financials",1],["SPGI","S&P Global","Financials",1],["SCHW","Charles Schwab","Financials",1],
- ["LLY","Eli Lilly","Health Care",3],["JNJ","Johnson & Johnson","Health Care",3],["UNH","UnitedHealth","Health Care",2],["ABBV","AbbVie","Health Care",2],["MRK","Merck","Health Care",2],["PFE","Pfizer","Health Care",1],["TMO","Thermo Fisher","Health Care",1],["ABT","Abbott","Health Care",1],["DHR","Danaher","Health Care",1],["BMY","Bristol Myers","Health Care",1],
- ["ORCL","Oracle","Technology",3],["TSM","TSMC","Technology",3],["CRM","Salesforce","Technology",2],["IBM","IBM","Technology",2],["NOW","ServiceNow","Technology",2],["ACN","Accenture","Technology",1],["ANET","Arista Networks","Technology",1],["DELL","Dell","Technology",1],["UBER","Uber","Technology",1],
- ["WMT","Walmart","Consumer",3],["PG","Procter & Gamble","Consumer",2],["HD","Home Depot","Consumer",2],["KO","Coca-Cola","Consumer",2],["MCD","McDonald's","Consumer",1],["NKE","Nike","Consumer",1],["LOW","Lowe's","Consumer",1],["PM","Philip Morris","Consumer",1],["CL","Colgate-Palmolive","Consumer",1],
- ["XOM","Exxon Mobil","Energy",3],["CVX","Chevron","Energy",2],["COP","ConocoPhillips","Energy",1],["SLB","SLB","Energy",1],["EOG","EOG Resources","Energy",1],
- ["GE","GE Aerospace","Industrials",2],["CAT","Caterpillar","Industrials",2],["RTX","RTX","Industrials",2],["BA","Boeing","Industrials",1],["UPS","UPS","Industrials",1],["LMT","Lockheed Martin","Industrials",1],["DE","Deere","Industrials",1],["UNP","Union Pacific","Industrials",1],
- ["DIS","Disney","Communication",2],["T","AT&T","Communication",2],["VZ","Verizon","Communication",2],
- ["NEE","NextEra Energy","Utilities & Materials",1],["DUK","Duke Energy","Utilities & Materials",1],["SO","Southern Co.","Utilities & Materials",1],["LIN","Linde","Utilities & Materials",1],["SHW","Sherwin-Williams","Utilities & Materials",1]];
+/* ---------- WALL STREET: live market floor (S&P 500) ---------- */
 const NY_IDX=[["^NYA","NYSE COMPOSITE"],["^DJI","DOW JONES"],["^GSPC","S&P 500"],["^VIX","VIX · FEAR"]];
-const NY_SECS=[...new Set(NY_LIST.map(x=>x[2]))];
-const NY={at:0,loading:false,prev:{},spin:true,pitch:0.62,yaw:0.6,drag:null,hover:null,b:{},raf:0,parts:[]};
+const NY={at:0,loading:false,list:[],snap:null,snapAt:0,prev:{},skyMode:"big",hover:null,anim:null,bars:[],heatKey:"",hmW:0};
+const SEC_SHORT={"Information Technology":"Technology","Communication Services":"Communication","Consumer Discretionary":"Consumer Disc.","Consumer Staples":"Consumer Staples","Health Care":"Health Care","Financials":"Financials","Industrials":"Industrials","Energy":"Energy","Materials":"Materials","Real Estate":"Real Estate","Utilities":"Utilities"};
 const nyQ=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price!=null?q:null; };
-async function nyLoad(){
+async function nyList(){ if(NY.list.length) return; try{ const j=await (await fetch("/sp500.json")).json(); NY.list=j.rows; }catch(e){ console.warn("sp500 list",e); } }
+async function nyLoad(){ // index cards (every 15s)
   if(NY.loading) return; NY.loading=true;
-  try{ const syms=[...NY_LIST.map(x=>x[0]),...NY_IDX.map(x=>x[0])];
-    const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(",")));
-    for(const [k,q] of Object.entries(j.quotes)){ const old=S.quotes[k]; if(old&&old.price!=null&&q.price!=null&&old.price!==q.price) NY.prev[k]={dir:q.price>old.price?1:-1,t:Date.now()}; }
-    S.quotes={...S.quotes,...j.quotes}; NY.at=Date.now(); }
-  catch(e){ console.warn("bigboard",e); }
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(NY_IDX.map(x=>x[0]).join(","))); S.quotes={...S.quotes,...j.quotes}; NY.at=Date.now(); }catch(e){}
   NY.loading=false; if(S.tab==="nyse") nyRender();
+}
+async function nySnap(){ // all S&P 500 prices (every 60s, shared cache on the server)
+  await nyList();
+  try{ const j=await api("/api/sp500"); if(NY.snap) for(const [k,v] of Object.entries(j.quotes)){ const o=NY.snap.quotes[k]; if(o&&o[0]!==v[0]) NY.prev[k]={dir:v[0]>o[0]?1:-1,t:Date.now()}; } NY.snap=j; NY.snapAt=Date.now(); }
+  catch(e){ console.warn("sp500",e); }
+  if(S.tab==="nyse") nyRender(true);
+}
+// rows for all companies; streamed live prices win over the minute snapshot
+function nyRows(){
+  if(!NY.snap||!NY.list.length) return [];
+  return NY.list.map(([s,n,sec,sub])=>{ const v=NY.snap.quotes[s]; if(!v) return null; let [p,ch,cp,mc]=v; const lq=nyQ(s);
+    if(lq&&lq.marketTime&&lq.marketTime>NY.snap.updated&&lq.changePct!=null){ p=lq.price; ch=lq.change; cp=lq.changePct; }
+    return {s,n,sec,ss:SEC_SHORT[sec]||sec,sub,p,ch,cp:cp??0,mc:mc||0}; }).filter(Boolean);
 }
 // NYSE session (Eastern time): pre-market 4:00, open 9:30, close 16:00, after-hours until 20:00
 function nySession(){
@@ -2921,137 +2943,168 @@ function nySession(){
   else left=to-sec;
   const prog=st==="closed"?0:(sec-from)/(to-from);
   const dd=Math.floor(left/86400), hh=Math.floor(left%86400/3600), mm=Math.floor(left%3600/60), ss=left%60;
-  return {st,label,target,prog,left:`${dd?dd+"d ":""}${hh}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`,time:`${parts.hour%24}:${parts.minute}:${parts.second}`.replace(/^(\d):/,"0$1:")};
+  return {st,label,target,prog,left:`${dd?dd+"d ":""}${hh}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`,time:`${String(+parts.hour%24).padStart(2,"0")}:${parts.minute}:${parts.second}`};
 }
-function nyTick(){ // every second: clock, session ring
+function nyTick(){ // every second: clock and session ring
   if(S.tab!=="nyse") return; const s=nySession();
   setHTML("nyClock",s.time); setHTML("nyDate",new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short",month:"short",day:"numeric"}));
   const e=$("nyStatus"); e.textContent=s.label; e.className=s.st;
   const R=78, Cc=2*Math.PI*R, col=s.st==="open"?"#2dffa0":s.st==="closed"?"#4da3ff":"#ffb000";
-  const marks=["4a","9:30","4p","8p"];
   setHTML("nyRing",`<svg viewBox="-100 -100 200 200"><defs><filter id="nyGl"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     <circle r="${R+12}" fill="none" stroke="rgba(245,199,107,.12)" stroke-dasharray="1 5"/>
     <circle r="${R}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
     <circle r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(Cc*s.prog).toFixed(1)} ${Cc.toFixed(1)}" transform="rotate(-90)" filter="url(#nyGl)"/>
-    ${s.st!=="closed"?`<circle r="5" fill="#fff" filter="url(#nyGl)" transform="rotate(${s.prog*360-90}) translate(${R} 0)"/>`:""}</svg>
+    ${s.st!=="closed"?`<circle r="5" fill="#fff" filter="url(#nyGl)" transform="rotate(${(s.prog*360-90).toFixed(2)}) translate(${R} 0)"/>`:""}</svg>
     <div class="lbl"><small>${s.target}</small><b>${s.left}</b><span>${s.st==="open"?"REGULAR SESSION":s.st==="pre"?"PRE-MARKET SESSION":s.st==="post"?"EXTENDED HOURS":"NEXT SESSION"}</span></div>`);
 }
 setInterval(nyTick,1000);
-function nyRender(){
+const capw=r=>r.mc||1;
+function nyRender(dataChanged){
   if(!$("tab-nyse")) return;
-  // index cards
   setHTML("nyIdx",NY_IDX.map(([k,l])=>{ const q=nyQ(k); return `<div class="ny-ic" data-nyopen="${esc(k)}"><span>${l}</span><b>${q?fmt(q.price):"—"}</b><em class="${q?cls(q.change):""}">${q?(q.change>=0?"▲ ":"▼ ")+pct(q.changePct):""}</em>${q&&q.spark?spark(q.spark,70,26,q.prevClose):""}</div>`; }).join(""));
-  // LED board (content duplicated for a seamless loop)
-  const rows=NY_LIST.map(([s,n,sec,t])=>({s,n,sec,t,q:nyQ(s)})).filter(r=>r.q);
-  const now=Date.now();
-  const tape=rows.map(r=>`<span class="ny-bi ${NY.prev[r.s]&&now-NY.prev[r.s].t<1500?"flash":""}" data-nyopen="${esc(r.s)}">${esc(r.s)} <i>${fmt(r.q.price)}</i> <i class="${r.q.change>=0?"u":"d"}">${r.q.change>=0?"▲":"▼"}${Math.abs(r.q.changePct).toFixed(2)}</i></span>`).join("");
-  const tapeHtml=tape+tape; if(NY.lastTape!==tapeHtml){ NY.lastTape=tapeHtml; $("nyBoard").innerHTML=tapeHtml||'<span class="ny-bi">LOADING THE TAPE…</span>'; }
-  if(!rows.length){ setHTML("nyBreadth",'<div class="sg-empty">Loading…</div>'); return; }
-  // breadth
-  const up=rows.filter(r=>r.q.changePct>0.0001).length, dn=rows.filter(r=>r.q.changePct<-0.0001).length, fl=rows.length-up-dn, ratio=up/Math.max(1,up+dn);
-  const ang=-90+ratio*180, avg=rows.reduce((a,r)=>a+r.q.changePct*r.t,0)/rows.reduce((a,r)=>a+r.t,0);
+  const rows=nyRows(); if(!rows.length){ setHTML("nyBreadth",'<div class="sg-empty">Loading the S&amp;P 500…</div>'); return; }
+  const now=Date.now(), byCap=rows.slice().sort((a,b)=>b.mc-a.mc);
+  // LED tape: the 60 biggest companies
+  const tape=byCap.slice(0,60).map(r=>`<span class="ny-bi ${NY.prev[r.s]&&now-NY.prev[r.s].t<1500?"flash":""}" data-nyopen="${esc(r.s)}">${esc(r.s)} <i>${fmt(r.p)}</i> <i class="${r.cp>=0?"u":"d"}">${r.cp>=0?"▲":"▼"}${Math.abs(r.cp).toFixed(2)}</i></span>`).join("");
+  if(NY.lastTape!==tape){ NY.lastTape=tape; $("nyBoard").innerHTML=tape+tape; }
+  // breadth across all 503
+  const up=rows.filter(r=>r.cp>0.0001).length, dn=rows.filter(r=>r.cp<-0.0001).length, fl=rows.length-up-dn, ratio=up/Math.max(1,up+dn);
+  const avg=rows.reduce((a,r)=>a+r.cp*capw(r),0)/rows.reduce((a,r)=>a+capw(r),0);
   const mood=ratio>=0.7?"BROAD RALLY":ratio>=0.55?"MOSTLY HIGHER":ratio>0.45?"MIXED":ratio>0.3?"MOSTLY LOWER":"BROAD SELLOFF";
   setHTML("nyBreadth",`<div class="ny-gauge"><svg viewBox="-120 -110 240 130"><defs><linearGradient id="nyGg" x1="0" x2="1"><stop offset="0" stop-color="#ff4a68"/><stop offset=".5" stop-color="#ffb000"/><stop offset="1" stop-color="#2dffa0"/></linearGradient></defs>
     <path d="M-95 0 A95 95 0 0 1 95 0" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="16"/>
     <path d="M-95 0 A95 95 0 0 1 95 0" fill="none" stroke="url(#nyGg)" stroke-width="16" opacity=".85" stroke-dasharray="2 3"/>
-    <g transform="rotate(${ang.toFixed(1)})" style="transition:transform .8s"><line x1="0" y1="0" x2="0" y2="-82" stroke="#fff" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 0 6px #fff)"/></g>
+    <g transform="rotate(${(-90+ratio*180).toFixed(1)})"><line x1="0" y1="0" x2="0" y2="-82" stroke="#fff" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 0 6px #fff)"/></g>
     <circle r="7" fill="#0b0f1a" stroke="#f5c76b" stroke-width="2"/>
     <text y="-30" text-anchor="middle" style="font-family:var(--mono);font-size:22px;fill:#fff">${Math.round(ratio*100)}%</text>
     <text y="-12" text-anchor="middle" style="font-family:var(--mono);font-size:8px;letter-spacing:2px;fill:#f5c76b">${mood}</text></svg></div>
     <div class="ny-bline"><i class="u" style="width:${up/rows.length*100}%"></i><i style="width:${fl/rows.length*100}%;background:#39414f"></i><i class="d" style="width:${dn/rows.length*100}%"></i></div>
-    <div class="ny-bstat"><span><b class="up">${up}</b> advancing</span><span><b>${fl}</b> flat</span><span><b class="down">${dn}</b> declining</span></div>
-    <div class="ny-bstat" style="margin-top:8px"><span>Size-weighted move</span><b class="${cls(avg)}">${pct(avg)}</b></div>`);
-  // sectors
-  const secs=NY_SECS.map(sec=>{ const rs=rows.filter(r=>r.sec===sec); const a=rs.length?rs.reduce((x,r)=>x+r.q.changePct*r.t,0)/rs.reduce((x,r)=>x+r.t,0):0; return {sec,a,n:rs.length}; }).sort((x,y)=>y.a-x.a);
-  const mx=Math.max(1,...secs.map(x=>Math.abs(x.a)));
-  setHTML("nySectors",secs.map(x=>`<div class="ny-sec"><span>${esc(x.sec)}</span><div class="ny-sbar"><i class="${x.a>=0?"u":"d"}" style="width:${Math.abs(x.a)/mx*50}%"></i></div><b class="${cls(x.a)}">${pct(x.a)}</b></div>`).join(""));
-  // heatmap
-  const heatCol=c=>{ const v=Math.max(-3,Math.min(3,c))/3; return v>=0?`rgba(${Math.round(20+10*(1-v))},${Math.round(120+100*v)},${Math.round(80+30*v)},${0.35+0.55*v})`:`rgba(${Math.round(160+80*-v)},${Math.round(40-20*v)},${Math.round(60-10*v)},${0.35+0.55*-v})`; };
-  setHTML("nyHeat",NY_SECS.map(sec=>{ const rs=rows.filter(r=>r.sec===sec).sort((a,b)=>b.t-a.t); const w=rs.reduce((a,r)=>a+r.t,0);
-    return `<div class="ny-hs" style="flex:${w} 1 ${Math.max(150,w*28)}px"><h6>${esc(sec.toUpperCase())}</h6><div class="ny-ht">${rs.map(r=>`<div class="ny-t" data-nyopen="${esc(r.s)}" title="${esc(r.n)} · ${fmt(r.q.price)} · ${pct(r.q.changePct)}" style="flex-grow:${r.t};flex-basis:${r.t*44}px;min-height:${36+r.t*16}px;background:${heatCol(r.q.changePct)}"><b>${esc(r.s)}</b><span>${pct(r.q.changePct)}</span></div>`).join("")}</div></div>`; }).join(""));
+    <div class="ny-bstat"><span><b class="up">${up}</b> up</span><span><b>${fl}</b> flat</span><span><b class="down">${dn}</b> down</span></div>
+    <div class="ny-bstat" style="margin-top:8px"><span>S&amp;P 500, size-weighted</span><b class="${cls(avg)}">${pct(avg)}</b></div>`);
+  // sectors (size-weighted)
+  const secs=[...new Set(rows.map(r=>r.sec))].map(sec=>{ const rs=rows.filter(r=>r.sec===sec); return {sec,ss:SEC_SHORT[sec]||sec,a:rs.reduce((x,r)=>x+r.cp*capw(r),0)/rs.reduce((x,r)=>x+capw(r),0),n:rs.length,mc:rs.reduce((x,r)=>x+r.mc,0)}; }).sort((x,y)=>y.a-x.a);
+  NY.secs=secs; const mx=Math.max(1,...secs.map(x=>Math.abs(x.a)));
+  setHTML("nySectors",secs.map(x=>`<div class="ny-sec" title="${esc(x.sec)} · ${x.n} companies"><span>${esc(x.ss)}</span><div class="ny-sbar"><i class="${x.a>=0?"u":"d"}" style="width:${Math.abs(x.a)/mx*50}%"></i></div><b class="${cls(x.a)}">${pct(x.a)}</b></div>`).join(""));
   // movers
-  const srt=rows.slice().sort((a,b)=>b.q.changePct-a.q.changePct);
-  const mv=r=>`<div class="ny-mv" data-nyopen="${esc(r.s)}"><div><b>${esc(r.s)}</b><small>${esc(r.n)} · ${esc(r.sec)}</small></div><span>${fmt(r.q.price)}</span><em class="${r.q.change>=0?"u":"d"}">${pct(r.q.changePct)}</em></div>`;
-  setHTML("nyGain",srt.slice(0,6).map(mv).join("")); setHTML("nyLose",srt.slice(-6).reverse().map(mv).join(""));
-  nySkyData(rows);
+  const srt=rows.slice().sort((a,b)=>b.cp-a.cp);
+  const mv=r=>`<div class="ny-mv" data-nyopen="${esc(r.s)}"><div><b>${esc(r.s)}</b><small>${esc(r.n)} · ${esc(r.ss)}</small></div><span>${fmt(r.p)}</span><em class="${r.cp>=0?"u":"d"}">${pct(r.cp)}</em></div>`;
+  setHTML("nyGain",srt.slice(0,8).map(mv).join("")); setHTML("nyLose",srt.slice(-8).reverse().map(mv).join(""));
+  if(dataChanged||!NY.heatKey) nyHeat(rows);
+  nySkyData(rows,secs);
 }
-/* ----- 3D skyline (canvas) ----- */
-function nySkyData(rows){
-  const n=NY_SECS.length, R=230;
-  NY_SECS.forEach((sec,si)=>{ const a=si/n*Math.PI*2, cx=Math.cos(a)*R, cz=Math.sin(a)*R; const rs=rows.filter(r=>r.sec===sec).sort((x,y)=>y.t-x.t);
-    const cols=Math.ceil(Math.sqrt(rs.length)), gap=34;
-    rs.forEach((r,i)=>{ const gx=(i%cols-(cols-1)/2)*gap, gz=(Math.floor(i/cols)-(Math.ceil(rs.length/cols)-1)/2)*gap;
-      const b=NY.b[r.s]||(NY.b[r.s]={h:0}); b.x=cx+gx; b.z=cz+gz; b.w=8+r.t*5; b.t=r.t; b.target=Math.max(-6,Math.min(6,r.q.changePct))*26; b.q=r.q; b.n=r.n; b.sec=r.sec; b.sym=r.s; }); });
-  NY.secPos=NY_SECS.map((sec,si)=>{ const a=si/n*Math.PI*2; return {sec,x:Math.cos(a)*(R+105),z:Math.sin(a)*(R+105),px:Math.cos(a)*R,pz:Math.sin(a)*R}; });
-  if(!NY.raf) nySkyLoop();
+/* ----- S&P 500 heatmap (squarified treemap, like a trading-floor map) ----- */
+function squarify(items,x,y,w,h){
+  const out=[], total=items.reduce((a,i)=>a+i.v,0); if(!total||w<=0||h<=0) return out;
+  let rest=items.map(i=>({...i,a:i.v*w*h/total}));
+  while(rest.length){ const short=Math.min(w,h)||1; const worst=r=>{ const s=r.reduce((a,x)=>a+x.a,0), mxA=Math.max(...r.map(x=>x.a)), mnA=Math.min(...r.map(x=>x.a)); return Math.max(short*short*mxA/(s*s),s*s/(short*short*mnA)); };
+    let row=[rest[0]], i=1; while(i<rest.length&&worst([...row,rest[i]])<=worst(row)){ row.push(rest[i]); i++; }
+    const s=row.reduce((a,x)=>a+x.a,0);
+    if(w>=h){ const cw=s/h; let cy=y; row.forEach(r=>{ const rh=r.a/cw; out.push({...r,x,y:cy,w:cw,h:rh}); cy+=rh; }); x+=cw; w-=cw; }
+    else { const rh=s/w; let cx=x; row.forEach(r=>{ const rw=r.a/rh; out.push({...r,x:cx,y,w:rw,h:rh}); cx+=rw; }); y+=rh; h-=rh; }
+    rest=rest.slice(i); }
+  return out;
 }
-function nySkyLoop(){
-  NY.raf=requestAnimationFrame(nySkyLoop);
-  if(S.tab!=="nyse"||document.hidden) return;
-  const cv=$("nyCanvas"); if(!cv) return; const box=cv.parentElement, W=box.clientWidth, H=box.clientHeight, dpr=Math.min(2,devicePixelRatio||1);
+const hmColor=c=>{ const v=Math.max(-3,Math.min(3,c||0))/3; const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
+  return v>=0?`rgb(${lerp(44,19,v)},${lerp(50,180,v)},${lerp(64,95,v)})`:`rgb(${lerp(44,192,-v)},${lerp(50,33,-v)},${lerp(64,58,-v)})`; };
+function nyHeat(rows){
+  const box=$("nyHeat"); if(!box||!rows.length) return; const W=box.clientWidth, H=box.clientHeight; if(!W) return;
+  NY.hmW=W; const caps=rows.some(r=>r.mc>0);
+  setHTML("nyHeatNote",`all ${rows.length} companies · ${caps?"size = market value":"equal-size tiles (company sizes unavailable right now)"} · color = today's move · click to open`);
+  const secs=[...new Set(rows.map(r=>r.sec))].map(sec=>{ const rs=rows.filter(r=>r.sec===sec).map(r=>({...r,v:caps?Math.max(r.mc,1):1})).sort((a,b)=>b.v-a.v); return {sec,rs,v:rs.reduce((a,r)=>a+r.v,0)}; }).sort((a,b)=>b.v-a.v);
+  const secRects=squarify(secs,0,0,W,H); let html=""; NY.hm=[];
+  secRects.forEach(sr=>{ const head=sr.h>40&&sr.w>60?15:0;
+    html+=`<div class="ny-hs2" style="left:${sr.x}px;top:${sr.y}px;width:${sr.w}px;height:${sr.h}px">${head?`<b>${esc(SEC_SHORT[sr.sec]||sr.sec)}</b>`:""}</div>`;
+    squarify(sr.rs,sr.x,sr.y+head,sr.w,sr.h-head).forEach(t=>{ const i=NY.hm.push(t)-1, fs=Math.max(8,Math.min(22,Math.min(t.w/3.6,t.h/2.6)));
+      const showSym=t.w>=26&&t.h>=14, showPct=t.w>=38&&t.h>=30;
+      html+=`<div class="ny-t2" data-hi="${i}" data-nyopen="${esc(t.s)}" style="left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px;background:${hmColor(t.cp)};font-size:${fs.toFixed(0)}px">${showSym?`<b>${esc(t.s)}</b>`:""}${showPct?`<span style="font-size:${Math.max(8,fs*0.62).toFixed(0)}px">${pct(t.cp)}</span>`:""}</div>`; }); });
+  box.innerHTML=html; NY.heatKey=String(NY.snapAt);
+}
+(function(){ const box=$("nyHeat"), tip=$("nyHmTip"); if(!box) return;
+  box.addEventListener("mousemove",e=>{ const t=e.target.closest("[data-hi]"); if(!t){ tip.hidden=true; return; } const d=NY.hm[+t.dataset.hi]; if(!d) return;
+    tip.hidden=false; tip.style.left=e.clientX+"px"; tip.style.top=e.clientY+"px";
+    tip.innerHTML=`<b>${esc(d.s)}</b> <em class="${cls(d.cp)}">${pct(d.cp)}</em><small>${esc(d.n)}</small><small>${esc(d.sub||d.sec)}</small><small>${fmt(d.p)}${d.mc?" · "+(d.mc>=1e12?(d.mc/1e12).toFixed(2)+"T":(d.mc/1e9).toFixed(1)+"B")+" market value":""}</small>`; });
+  box.addEventListener("mouseleave",()=>{ tip.hidden=true; });
+  let rt=0; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(S.tab==="nyse"){ const r=nyRows(); if(r.length&&$("nyHeat").clientWidth!==NY.hmW) nyHeat(r); nySkyDraw(); } },200); });
+})();
+/* ----- Market skyline: a city at night over a river. Districts = sectors, buildings = companies.
+   Up today: the building rises above the street. Down today: it hangs into the water. ----- */
+const nyHash=s=>{ let h=2166136261; for(const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619); } h^=h>>>13; h=Math.imul(h,2654435761); return (h^(h>>>16))>>>0; };
+const SKY_ABBR={"Technology":"TECH","Health Care":"HEALTH","Consumer Staples":"STAPLES","Consumer Disc.":"CONS. DISC","Communication":"COMM.","Real Estate":"REAL EST.","Utilities":"UTILITIES","Industrials":"INDUSTRIALS","Financials":"FINANCIALS","Materials":"MATERIALS","Energy":"ENERGY"};
+function nySkyData(rows,secs){
+  const narrow=$("nySky").clientWidth<620, N=narrow?3:5;
+  const order=secs.map(x=>x.sec), maxCap=Math.max(1,...rows.map(r=>r.mc)), bars=[];
+  order.forEach((sec,di)=>{ let rs=rows.filter(r=>r.sec===sec);
+    rs=(NY.skyMode==="move"?rs.sort((a,b)=>Math.abs(b.cp)-Math.abs(a.cp)):rs.sort((a,b)=>b.mc-a.mc)).slice(0,N);
+    rs.sort((a,b)=>b.cp-a.cp).forEach((r,i)=>bars.push({...r,d:di,i,wt:r.mc?0.7+Math.sqrt(r.mc/maxCap)*1.3:1})); });
+  const key=bars.map(b=>b.s+b.cp.toFixed(2)).join("|")+NY.skyMode+narrow;
+  if(key===NY.skyKey) return; NY.skyKey=key;
+  const old=Object.fromEntries((NY.bars||[]).map(b=>[b.s,b.k]));
+  bars.forEach(b=>{ b.from=old[b.s]??0; b.k=b.from; });
+  NY.bars=bars; NY.dists=order.map(sec=>{ const x=secs.find(y=>y.sec===sec); return {t:SEC_SHORT[sec]||sec,a:x?x.a:0}; });
+  NY.anim={t0:performance.now(),dur:1000}; nySkyAnim();
+}
+function nySkyAnim(){ if(!NY.anim) return; const k=Math.min(1,(performance.now()-NY.anim.t0)/NY.anim.dur), e=1-Math.pow(1-k,3);
+  NY.bars.forEach(b=>{ b.k=b.from+(1-b.from)*e; }); nySkyDraw(); if(k<1) requestAnimationFrame(nySkyAnim); else NY.anim=null; }
+function nySkyDraw(){
+  const cv=$("nyCanvas"); if(!cv||!NY.bars||!NY.bars.length) return; const box=cv.parentElement, W=box.clientWidth, H=box.clientHeight, dpr=Math.min(2,devicePixelRatio||1);
   if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
   const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
-  if(NY.spin&&!NY.drag) NY.yaw+=0.0022;
-  const cy=Math.cos(NY.yaw), sy=Math.sin(NY.yaw), cp=Math.cos(NY.pitch), sp=Math.sin(NY.pitch), D=900, F=Math.min(W,H)*1.25, ox=W/2, oy=H*0.56;
-  const P=(x,y,z)=>{ const xr=x*cy-z*sy, zr=x*sy+z*cy; const y2=y*cp-zr*sp, z2=y*sp+zr*cp; const f=F/(z2+D); return [ox+xr*f,oy-y2*f,z2]; };
-  const bs=Object.values(NY.b).filter(b=>b.q); bs.forEach(b=>{ b.h+=(b.target-b.h)*0.08; });
-  const depth=b=>{ const zr=b.x*sy+b.z*cy; return 0*cp+zr*cp; };
-  const sorted=bs.slice().sort((a,b)=>depth(b)-depth(a));
-  const colr=(h,a,l)=>h>=0?`hsla(152,95%,${l}%,${a})`:`hsla(350,95%,${l}%,${a})`;
-  const box3=(b,glass)=>{ const w=b.w/2, h=b.h, x0=b.x-w, x1=b.x+w, z0=b.z-w, z1=b.z+w;
-    const top=[P(x0,h,z0),P(x1,h,z0),P(x1,h,z1),P(x0,h,z1)], bot=[P(x0,0,z0),P(x1,0,z0),P(x1,0,z1),P(x0,0,z1)];
-    const mag=Math.min(1,Math.abs(b.target)/80), L=40+mag*22, A=glass?0.35:0.92;
-    const faces=[[0,1],[1,2],[2,3],[3,0]].map(([i,j])=>({pts:[bot[i],bot[j],top[j],top[i]],z:(bot[i][2]+bot[j][2])/2}));
-    faces.sort((a,c)=>c.z-a.z);
-    faces.forEach((f,k)=>{ g.beginPath(); f.pts.forEach((p,m)=>m?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath(); g.fillStyle=colr(h,A*(0.55+0.15*k),L-14+k*3); g.fill(); g.strokeStyle=colr(h,glass?0.25:0.5,L+15); g.lineWidth=0.6; g.stroke(); });
-    g.beginPath(); top.forEach((p,m)=>m?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath();
-    if(!glass&&mag>0.3){ g.shadowColor=colr(h,1,60); g.shadowBlur=18*mag; }
-    g.fillStyle=colr(h,glass?0.5:1,L+12); g.fill(); g.shadowBlur=0;
-    const c=P(b.x,h,b.z); b.sx=c[0]; b.sy=c[1]; };
-  // 1) towers sinking below the glass floor (reflections of today's losers)
-  sorted.filter(b=>b.h<0).forEach(b=>box3(b,true));
-  // 2) glass floor with grid rings
-  g.save(); const rings=[120,230,340];
-  rings.forEach((r,i)=>{ g.beginPath(); for(let k=0;k<=72;k++){ const a=k/72*Math.PI*2, p=P(Math.cos(a)*r,0,Math.sin(a)*r); k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]); } g.closePath();
-    if(i===2){ const gr=g.createRadialGradient(ox,oy,10,ox,oy,F*0.45); gr.addColorStop(0,"rgba(77,163,255,.10)"); gr.addColorStop(1,"rgba(77,163,255,.02)"); g.fillStyle=gr; g.fill(); }
-    g.strokeStyle=i===1?"rgba(245,199,107,.28)":"rgba(77,163,255,.18)"; g.lineWidth=i===1?1.2:0.8; g.setLineDash(i===1?[]:[3,5]); g.stroke(); });
-  g.setLineDash([]);
-  for(let k=0;k<NY_SECS.length;k++){ const a=(k+0.5)/NY_SECS.length*Math.PI*2, p0=P(Math.cos(a)*60,0,Math.sin(a)*60), p1=P(Math.cos(a)*340,0,Math.sin(a)*340); g.beginPath(); g.moveTo(p0[0],p0[1]); g.lineTo(p1[0],p1[1]); g.strokeStyle="rgba(245,199,107,.10)"; g.stroke(); }
-  // district plates + labels
-  (NY.secPos||[]).forEach(s=>{ const r=62; g.beginPath(); for(let k=0;k<=40;k++){ const a=k/40*Math.PI*2, p=P(s.px+Math.cos(a)*r,0,s.pz+Math.sin(a)*r); k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]); } g.fillStyle="rgba(245,199,107,.045)"; g.fill(); g.strokeStyle="rgba(245,199,107,.22)"; g.stroke();
-    const l=P(s.x,0,s.z); g.font="600 10px 'IBM Plex Mono', monospace"; g.textAlign="center"; g.fillStyle="rgba(245,199,107,.85)"; g.fillText(s.sec.toUpperCase(),l[0],l[1]); });
-  const c0=P(0,0,0); g.beginPath(); g.arc(c0[0],c0[1],4,0,Math.PI*2); g.fillStyle="#f5c76b"; g.shadowColor="#f5c76b"; g.shadowBlur=14; g.fill(); g.shadowBlur=0;
-  g.restore();
-  // 3) towers rising above the floor
-  sorted.filter(b=>b.h>=0).forEach(b=>box3(b,false));
-  // particles drifting up from the biggest gainers, down from losers
-  if(NY.parts.length<90&&bs.length){ const b=bs[Math.floor(Math.random()*bs.length)]; if(Math.abs(b.target)>20) NY.parts.push({x:b.x+(Math.random()-.5)*b.w,y:b.h,z:b.z+(Math.random()-.5)*b.w,v:b.target>0?0.7:-0.7,life:1,up:b.target>0}); }
-  NY.parts=NY.parts.filter(p=>(p.life-=0.008)>0); NY.parts.forEach(p=>{ p.y+=p.v; const s=P(p.x,p.y,p.z); g.fillStyle=p.up?`rgba(45,255,160,${p.life*.8})`:`rgba(255,74,104,${p.life*.6})`; g.fillRect(s[0],s[1],1.6,1.6); });
-  // labels for big companies and big movers
-  g.textAlign="center";
-  sorted.forEach(b=>{ if(b.sx==null) return; const show=b.t>=3||Math.abs(b.target)>40||NY.hover===b.sym; if(!show) return;
-    g.font=`${NY.hover===b.sym?"700 12px":"500 10px"} 'IBM Plex Mono', monospace`; g.fillStyle=NY.hover===b.sym?"#fff":"rgba(230,236,247,.8)"; g.fillText(b.sym,b.sx,b.sy-(b.h>=0?8:-14)); });
-  // hover ring
-  const hb=NY.hover&&NY.b[NY.hover]; if(hb&&hb.sx!=null){ g.beginPath(); g.arc(hb.sx,hb.sy,12,0,Math.PI*2); g.strokeStyle="rgba(255,255,255,.85)"; g.lineWidth=1.4; g.stroke(); }
+  const narrow=W<620, padX=14, street=narrow?30:28, horizon=Math.round(H*0.56), upMax=(horizon-40)*0.88, dnMax=(H-horizon-street-22)*0.9;
+  const D=NY.dists.length, gap=narrow?5:14, distW=(W-padX*2-gap*(D-1))/D, bgap=narrow?1.5:3;
+  const maxAbs=Math.max(2,...NY.bars.map(b=>Math.abs(b.cp)));
+  // sky: stars and a soft glow over the city
+  const sky=g.createLinearGradient(0,0,0,horizon); sky.addColorStop(0,"#03050c"); sky.addColorStop(1,"#0b1530"); g.fillStyle=sky; g.fillRect(0,0,W,horizon);
+  for(let i=0;i<70;i++){ const h=nyHash("s"+i), x=h%W, y=(h>>>8)%Math.max(1,horizon-80); g.fillStyle=`rgba(255,255,255,${0.15+((h>>>4)%40)/100})`; g.fillRect(x,y,1,1); }
+  const glow=g.createRadialGradient(W/2,horizon,10,W/2,horizon,W*0.6); glow.addColorStop(0,"rgba(245,199,107,.16)"); glow.addColorStop(1,"rgba(245,199,107,0)"); g.fillStyle=glow; g.fillRect(0,0,W,horizon);
+  // river below the street
+  const river=g.createLinearGradient(0,horizon+street,0,H); river.addColorStop(0,"#071226"); river.addColorStop(1,"#02040a"); g.fillStyle=river; g.fillRect(0,horizon+street,W,H-horizon-street);
+  // buildings
+  const placed=[];
+  NY.dists.forEach((dd,di)=>{ const bs=NY.bars.filter(b=>b.d===di), x0=padX+di*(distW+gap), tw=bs.reduce((a,b)=>a+b.wt,0), inner=distW-(bs.length-1)*bgap-6;
+    let x=x0; bs.forEach(b=>{ const w=Math.max(4,inner*b.wt/tw), mag=Math.min(1,Math.abs(b.cp)/maxAbs), up=b.cp>=0, hov=NY.hover===b.s;
+      const h=Math.max(3,mag*(up?upMax:dnMax))*b.k, side=Math.min(7,w*0.28);
+      const top=up?horizon-h:horizon+street, bot=up?horizon:horizon+street+h;
+      const base=up?[30,200,120]:[230,60,85], L=up?0.55+mag*0.45:0.5+mag*0.5;
+      const col=(a,m=1)=>`rgba(${Math.round(base[0]*m)},${Math.round(base[1]*m)},${Math.round(base[2]*m)},${a})`;
+      if(hov){ g.shadowColor=col(1); g.shadowBlur=20; } else if(mag>0.75){ g.shadowColor=col(.6); g.shadowBlur=8; }
+      const grd=g.createLinearGradient(0,top,0,bot); if(up){ grd.addColorStop(0,col(L,1.15)); grd.addColorStop(1,col(L*0.55,0.7)); } else { grd.addColorStop(0,col(L*0.55,0.7)); grd.addColorStop(1,col(L*0.35,0.6)); }
+      g.fillStyle=hov?"rgba(255,255,255,.95)":grd; g.fillRect(x,top,w,bot-top); g.shadowBlur=0;
+      if(up&&w>6){ g.beginPath(); g.moveTo(x,top); g.lineTo(x+side,top-side*0.6); g.lineTo(x+w+side,top-side*0.6); g.lineTo(x+w,top); g.closePath(); g.fillStyle=hov?"#fff":col(Math.min(1,L+0.15),1.3); g.fill(); }
+      // lit windows
+      if(w>=10&&bot-top>=18&&!hov){ const hs=nyHash(b.s); for(let wy=top+5,row=0;wy<bot-5;wy+=7,row++) for(let wx=x+3,c=0;wx<x+w-4;wx+=5,c++){ if(((hs>>>((row*3+c)%27))&3)===0) continue; g.fillStyle=up?"rgba(220,255,235,.33)":"rgba(255,215,220,.18)"; g.fillRect(wx,wy,2,3); } }
+      if(!up){ g.fillStyle="rgba(4,10,24,.35)"; for(let ry=top+6;ry<bot;ry+=9) g.fillRect(x,ry,w,1.5); } // water ripples over the sunken towers
+      // label inside tall, wide buildings
+      if((w>=15&&bot-top>=38)||hov){ g.save(); g.translate(x+w/2,up?top+6:bot-6); g.rotate(-Math.PI/2); g.font=`${hov?"700 11px":"600 10px"} 'IBM Plex Mono', monospace`; g.textAlign=up?"right":"left"; g.textBaseline="middle"; g.fillStyle=hov?"#000":"rgba(255,255,255,.92)"; g.fillText(b.s,0,0); g.restore(); }
+      placed.push({b,x0:x-1,x1:x+w+side+1,y0:Math.min(top-side,horizon-6),y1:Math.max(bot,horizon+street+6)}); x+=w+bgap; }); });
+  NY.hit=placed;
+  // the street: glowing band with district names
+  const st=g.createLinearGradient(0,horizon,0,horizon+street); st.addColorStop(0,"#1a1408"); st.addColorStop(1,"#0b0905"); g.fillStyle=st; g.fillRect(0,horizon,W,street);
+  g.fillStyle="rgba(245,199,107,.85)"; g.fillRect(0,horizon,W,1.5); g.fillStyle="rgba(77,163,255,.5)"; g.fillRect(0,horizon+street-1,W,1);
+  NY.dists.forEach((dd,di)=>{ const cx=padX+di*(distW+gap)+distW/2; g.textAlign="center"; g.textBaseline="middle";
+    let name=(SKY_ABBR[dd.t]||dd.t).toUpperCase(), fs=narrow?8:10; g.font=`600 ${fs}px 'IBM Plex Mono', monospace`;
+    while(fs>6&&g.measureText(name).width>distW-2){ fs-=0.5; g.font=`600 ${fs}px 'IBM Plex Mono', monospace`; }
+    if(g.measureText(name).width>distW-2) name=name.slice(0,Math.max(3,Math.floor(name.length*(distW-2)/g.measureText(name).width)));
+    g.fillStyle="rgba(245,199,107,.95)"; g.fillText(name,cx,horizon+9); let pf=narrow?8:10; const pt=pct(dd.a); g.font=`500 ${pf}px 'IBM Plex Mono', monospace`; while(pf>6&&g.measureText(pt).width>distW-2){ pf-=0.5; g.font=`500 ${pf}px 'IBM Plex Mono', monospace`; }
+    g.fillStyle=dd.a>=0?"#2dffa0":"#ff4a68"; g.fillText(pt,cx,horizon+(narrow?21:20));
+    if(di) { g.fillStyle="rgba(245,199,107,.25)"; g.fillRect(padX+di*(distW+gap)-gap/2,horizon+4,1,street-8); } });
+  // side legend
+  g.font="500 10px 'IBM Plex Mono', monospace"; g.textAlign="left"; g.fillStyle="rgba(45,255,160,.75)"; g.fillText("▲ UP TODAY",padX,18); g.fillStyle="rgba(255,74,104,.75)"; g.fillText("▼ DOWN TODAY",padX,H-10);
 }
-// interaction: drag to rotate, hover for details, click to open
-(function(){
-  const sky=$("nySky"); if(!sky) return; const cv=$("nyCanvas"), tip=$("nyTip");
-  const pick=(mx,my)=>{ let best=null,bd=22*22; Object.values(NY.b).forEach(b=>{ if(b.sx==null) return; const d=(b.sx-mx)**2+(b.sy-my)**2; if(d<bd){ bd=d; best=b; } }); return best; };
-  cv.addEventListener("pointerdown",e=>{ NY.drag={x:e.clientX,y:e.clientY,yaw:NY.yaw,pitch:NY.pitch,moved:false}; cv.setPointerCapture(e.pointerId); });
-  cv.addEventListener("pointermove",e=>{ const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
-    if(NY.drag){ const dx=e.clientX-NY.drag.x, dy=e.clientY-NY.drag.y; if(Math.abs(dx)+Math.abs(dy)>4) NY.drag.moved=true; NY.yaw=NY.drag.yaw+dx*0.008; NY.pitch=Math.max(0.15,Math.min(1.25,NY.drag.pitch+dy*0.004)); tip.hidden=true; return; }
-    const b=pick(mx,my); NY.hover=b?b.sym:null;
-    if(b){ tip.hidden=false; tip.style.left=mx+"px"; tip.style.top=my+"px"; tip.innerHTML=`<b>${esc(b.sym)}</b> <em class="${cls(b.q.change)}">${pct(b.q.changePct)}</em><small>${esc(b.n)} · ${esc(b.sec)}</small><small>${fmt(b.q.price)} · ${b.q.change>=0?"+":""}${fmt(b.q.change)} today</small>`; }
+(function(){ const cv=$("nyCanvas"), tip=$("nyTip"); if(!cv) return;
+  const pick=(mx,my)=>{ const h=(NY.hit||[]).find(p=>mx>=p.x0&&mx<=p.x1&&my>=p.y0&&my<=p.y1); return h?h.b:null; };
+  cv.addEventListener("mousemove",e=>{ const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, b=pick(mx,my);
+    if((b?b.s:null)!==NY.hover){ NY.hover=b?b.s:null; nySkyDraw(); cv.style.cursor=b?"pointer":"default"; }
+    if(b){ tip.hidden=false; tip.style.left=Math.max(90,Math.min(r.width-90,mx))+"px"; tip.style.top=Math.max(80,my)+"px";
+      tip.innerHTML=`<b>${esc(b.s)}</b> <em class="${cls(b.cp)}">${pct(b.cp)}</em><small>${esc(b.n)} · ${esc(b.ss)}</small><small>${fmt(b.p)}${b.mc?" · "+(b.mc>=1e12?(b.mc/1e12).toFixed(2)+"T":(b.mc/1e9).toFixed(1)+"B")+" market value":""}</small>`; }
     else tip.hidden=true; });
-  cv.addEventListener("pointerup",e=>{ const d=NY.drag; NY.drag=null; if(d&&!d.moved){ const r=cv.getBoundingClientRect(), b=pick(e.clientX-r.left,e.clientY-r.top); if(b) openQuote(b.sym); } });
-  cv.addEventListener("pointerleave",()=>{ NY.hover=null; tip.hidden=true; });
-  $("nySpin").onclick=()=>{ NY.spin=!NY.spin; $("nySpin").classList.toggle("on",NY.spin); };
-  $("nyView").onclick=()=>{ NY.pitch=NY.pitch>0.9?0.35:NY.pitch>0.5?1.1:0.62; };
+  cv.addEventListener("mouseleave",()=>{ NY.hover=null; tip.hidden=true; nySkyDraw(); });
+  cv.addEventListener("click",e=>{ const r=cv.getBoundingClientRect(), b=pick(e.clientX-r.left,e.clientY-r.top); if(b) openQuote(b.s); });
+  $("nySkyMode").addEventListener("click",e=>{ const b=e.target.closest("[data-skym]"); if(!b) return; NY.skyMode=b.dataset.skym; $("nySkyMode").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); NY.skyKey=""; nyRender(); });
   $("tab-nyse").addEventListener("click",e=>{ const o=e.target.closest("[data-nyopen]"); if(o) openQuote(o.dataset.nyopen); });
 })();
-function nyOpen(){ nyTick(); nyRender(); if(!NY.at||Date.now()-NY.at>10e3) nyLoad(); }
+function nyOpen(){ nyTick(); nyRender(); if(!NY.at||Date.now()-NY.at>10e3) nyLoad(); if(!NY.snapAt||Date.now()-NY.snapAt>55e3) nySnap(); else requestAnimationFrame(()=>{ const r=nyRows(); if(r.length){ nyHeat(r); NY.skyKey=""; nySkyData(r,NY.secs||[]); } }); }
 setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nyLoad(); },15e3);
+setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
