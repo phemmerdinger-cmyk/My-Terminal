@@ -702,44 +702,44 @@ body.sg-lock{overflow:hidden}
 .sg-dsec{margin-top:6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#5f7c92} .sg-dsec b{color:#3ef2ff;letter-spacing:.04em;font-weight:500}
 /* ===== News: newspaper front page ===== */
 .feed{list-style:none;margin:0;padding:0}
-.np{--paper:#f4efe4;--ink:#141414;--ink2:#3d3a35;--rule:#1d1b18;--soft:#cfc6b4;background:var(--paper);color:var(--ink);margin:14px;padding:18px 24px 26px;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.45);font-family:"Source Serif 4",Georgia,serif}
+.np{--paper:transparent;--ink:var(--text);--ink2:var(--muted);--rule:var(--line2);--soft:var(--line);background:transparent;color:var(--ink);margin:0;padding:16px 22px 26px;font-family:"Source Serif 4",Georgia,serif}
 .np a{color:inherit;text-decoration:none} .np a:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .np-mast{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:16px;border-bottom:3px double var(--rule);padding-bottom:10px}
 .np-mast h1{margin:0;font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:clamp(30px,4.6vw,56px);letter-spacing:-.01em;line-height:1;text-align:center;white-space:nowrap}
 .np-ear{font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:var(--ink2);line-height:1.5}
-.np-ear span{color:#7a7366} .np-ear.r{text-align:right;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px} .np-ear b{font-family:var(--mono);font-weight:600}
-.np .up{color:#0a7d43} .np .down{color:#b3261e}
-.np-band{text-align:center;font-family:"IBM Plex Sans",sans-serif;font-size:10px;letter-spacing:.22em;color:#5a5348;padding:6px 0;border-bottom:1px solid var(--rule);margin-bottom:16px;text-transform:uppercase}
+.np-ear span{color:var(--dim)} .np-ear.r{text-align:right;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px} .np-ear b{font-family:var(--mono);font-weight:600}
+.np .up{color:var(--up)} .np .down{color:var(--down)}
+.np-band{text-align:center;font-family:"IBM Plex Sans",sans-serif;font-size:10px;letter-spacing:.22em;color:var(--dim);padding:6px 0;border-bottom:1px solid var(--rule);margin-bottom:16px;text-transform:uppercase}
 .np-front{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.05fr) minmax(0,1.1fr);gap:0}
 .np-front > *{padding:0 18px} .np-front > *:first-child{padding-left:0} .np-front > *:last-child{padding-right:0}
 .np-front > * + *{border-left:1px solid var(--soft)}
 .np h4{margin:0 0 10px;font-family:"IBM Plex Sans",sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;border-top:2px solid var(--rule);padding-top:6px}
-.np-wn{padding:9px 0;border-bottom:1px solid #e0d8c8} .np-wn:last-child{border-bottom:0}
+.np-wn{padding:9px 0;border-bottom:1px solid var(--line)} .np-wn:last-child{border-bottom:0}
 .np-wn b{font-family:"Source Serif 4",serif;font-weight:700;font-size:15px;line-height:1.3;display:block}
 .np-wn .np-dek{font-size:13px;margin:4px 0 0}
 .np-lead h2{margin:4px 0 10px;font-family:"Playfair Display",Georgia,serif;font-weight:800;font-size:clamp(28px,3vw,40px);line-height:1.08;letter-spacing:-.005em}
 .np-lead .np-dek{font-size:18px;line-height:1.5;color:var(--ink2)}
-.np-kick{font-family:"IBM Plex Sans",sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8a1c1c}
+.np-kick{font-family:"IBM Plex Sans",sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
 .np-dek{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink2)}
-.np-art{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid #d8cfbd} .np-art:last-child{border-bottom:0;margin-bottom:0}
+.np-art{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid var(--line)} .np-art:last-child{border-bottom:0;margin-bottom:0}
 .np-art h3{margin:4px 0 0;font-family:"Source Serif 4",serif;font-weight:700;font-size:18px;line-height:1.25}
 .np-art.big h3{font-family:"Playfair Display",serif;font-size:24px;font-weight:700;line-height:1.15}
-.np-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:7px;font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:#7a7366}
+.np-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:7px;font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:var(--dim)}
 .np-src{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);border-left:3px solid var(--c);padding-left:5px}
-.np-new{background:#8a1c1c;color:#fff;font-size:9px;letter-spacing:.1em;padding:1px 5px;border-radius:2px}
-.np-up{color:#0a7d43} .np-dn{color:#b3261e}
+.np-new{background:var(--down);color:#fff;font-size:9px;letter-spacing:.1em;padding:1px 5px;border-radius:2px}
+.np-up{color:var(--up)} .np-dn{color:var(--down)}
 .np-also a{text-decoration:underline}
 .np-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-.np .tg{background:#e9e1d1;color:var(--ink);border:1px solid #d5cab5;border-radius:3px;font-family:var(--mono);font-size:11px;padding:2px 6px;cursor:pointer}
+.np .tg{background:var(--panel2);color:var(--text);border:1px solid var(--line2);border-radius:5px;font-family:var(--mono);font-size:11px;padding:2px 6px;cursor:pointer}
 .np .tg .p{margin-left:5px}
 .np-sections{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 0;margin-top:22px;border-top:3px double var(--rule);padding-top:16px}
 .np-sec{padding:0 18px} .np-sec:nth-child(3n+1){padding-left:0} .np-sec:nth-child(3n){padding-right:0}
 .np-sec:not(:nth-child(3n+1)){border-left:1px solid var(--soft)}
-.np-brief{padding:8px 0;border-top:1px solid #e0d8c8} .np-brief h5{margin:0;font-family:"Source Serif 4",serif;font-size:15px;font-weight:600;line-height:1.3}
+.np-brief{padding:8px 0;border-top:1px solid var(--line)} .np-brief h5{margin:0;font-family:"Source Serif 4",serif;font-size:15px;font-weight:600;line-height:1.3}
 .np-brief .np-meta{margin-top:4px}
-.np-x summary{cursor:pointer;font-family:"IBM Plex Sans",sans-serif;font-size:12px;color:#8a1c1c;padding:8px 0;border-top:1px solid #e0d8c8}
+.np-x summary{cursor:pointer;font-family:"IBM Plex Sans",sans-serif;font-size:12px;color:var(--amber);padding:8px 0;border-top:1px solid var(--line)}
 .np-foot{text-align:center;margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
-.np-foot .btn{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.np-foot .btn{}
 @media (max-width:1100px){ .np-front{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)} .np-rail{grid-column:1/-1;order:3;border-left:0!important;padding:16px 0 0!important;border-top:1px solid var(--soft);margin-top:16px} .np-sections{grid-template-columns:repeat(2,minmax(0,1fr))} .np-sec{padding:0 14px!important;border-left:0!important} }
 @media (max-width:760px){ .np{margin:8px;padding:14px} .np-mast{grid-template-columns:1fr} .np-ear.l,.np-ear.r{text-align:center;justify-content:center} .np-front{grid-template-columns:minmax(0,1fr)} .np-front > *{padding:0!important;border-left:0!important} .np-side{border-top:1px solid var(--soft);margin-top:16px;padding-top:16px!important} .np-sections{grid-template-columns:minmax(0,1fr)} .np-sec{padding:0!important} .np-lead .np-dek{font-size:16px} }
 /* ===== NYSE — live exchange floor ===== */
@@ -818,7 +818,12 @@ body.sg-lock{overflow:hidden}
 .ny-seg{display:flex;gap:4px} .ny-seg button{background:rgba(6,9,18,.7);border:1px solid var(--ny-line);color:#9aa3b5;border-radius:7px;padding:4px 10px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;cursor:pointer}
 .ny-seg button.on{color:var(--gold);border-color:rgba(245,199,107,.6);background:rgba(245,199,107,.08)}
 .ny-skyhelp{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:#8b94a7;margin:-2px 0 8px} .ny-skyhelp b{color:#e9eef7;font-weight:600}
-.ny-sky{cursor:default!important;height:460px;background:#03050c}
+.ny-sky{cursor:default!important;height:500px;background:radial-gradient(ellipse at 50% 100%,rgba(77,163,255,.14),transparent 60%),#03050c}
+.ny-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.ny-chips button{background:rgba(6,9,18,.7);border:1px solid var(--ny-line);color:#c8d0de;border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:var(--sans)}
+.ny-chips button b{font-family:var(--mono);font-weight:500;margin-left:5px;font-size:11px}
+.ny-chips button.on{border-color:var(--gold);color:var(--gold);background:rgba(245,199,107,.1);box-shadow:0 0 12px rgba(245,199,107,.2)}
+@media (max-width:760px){ .ny-sky{height:auto} }
 .ny-hm{position:relative;width:100%;height:640px;border-radius:10px;overflow:hidden;background:#05070d}
 .ny-hs2{position:absolute;border:1px solid rgba(5,7,13,1);box-sizing:border-box}
 .ny-hs2 > b{position:absolute;left:4px;top:1px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.75);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;right:4px;pointer-events:none;text-transform:uppercase}
@@ -1015,7 +1020,8 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
       <div class="ny-main">
         <div class="ny-pane ny-skyp">
           <div class="ny-ph"><span>MARKET SKYLINE</span><div class="ny-seg" id="nySkyMode"><button type="button" data-skym="big" class="on">Biggest companies</button><button type="button" data-skym="move">Biggest movers</button></div></div>
-          <div class="ny-skyhelp"><span><b>Each district</b> on the street is a sector</span><span><b>Each building</b> is a company</span><span><span class="up"><b>Rises</b></span> = up today · <span class="down"><b>sinks into the river</b></span> = down today</span><span>taller / deeper = bigger move · wider = bigger company</span></div>
+          <div class="ny-chips" id="nySkySec"></div>
+          <div class="ny-skyhelp"><span><b>Each platform</b> is a sector</span><span><b>Each building</b> is a company</span><span><b>Taller</b> = bigger move today</span><span><span class="up">■ up</span> · <span class="down">■ down</span></span><span>wider = bigger company · pick a sector above to zoom in</span></div>
           <div class="ny-sky" id="nySky"><canvas id="nyCanvas"></canvas><div class="ny-tip" id="nyTip" hidden></div></div>
         </div>
         <div class="ny-col">
@@ -1467,7 +1473,7 @@ function renderFeed(){
   const nNew=S.news?S.news.items.filter(i=>i._new&&now-i._new<10*60e3).length:0;
   $("newsCount").textContent=nNew?nNew+" new":"";
   if(!list.length){ $("feed").innerHTML=`<div class="empty">${S.news?(S.srcOff.size===5?"Pick at least one news source from the Sources menu.":"No headlines match these filters yet."):"Loading…"}</div>`; return; }
-  const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3) return ago(t)+" ago";
+  const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3){ const a=ago(t); return a==="now"?"just now":a+" ago"; }
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
   const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
@@ -3030,80 +3036,73 @@ function nyHeat(rows){
   box.addEventListener("mouseleave",()=>{ tip.hidden=true; });
   let rt=0; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(S.tab==="nyse"){ const r=nyRows(); if(r.length&&$("nyHeat").clientWidth!==NY.hmW) nyHeat(r); nySkyDraw(); } },200); });
 })();
-/* ----- Market skyline: a city at night over a river. Districts = sectors, buildings = companies.
-   Up today: the building rises above the street. Down today: it hangs into the water. ----- */
+/* ----- Market skyline: 3D sector platforms in a grid; every building labeled; pick a sector to zoom in ----- */
 const nyHash=s=>{ let h=2166136261; for(const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619); } h^=h>>>13; h=Math.imul(h,2654435761); return (h^(h>>>16))>>>0; };
-const SKY_ABBR={"Technology":"TECH","Health Care":"HEALTH","Consumer Staples":"STAPLES","Consumer Disc.":"CONS. DISC","Communication":"COMM.","Real Estate":"REAL EST.","Utilities":"UTILITIES","Industrials":"INDUSTRIALS","Financials":"FINANCIALS","Materials":"MATERIALS","Energy":"ENERGY"};
+NY.skySec=null;
 function nySkyData(rows,secs){
-  const narrow=$("nySky").clientWidth<620, N=narrow?3:5;
-  const order=secs.map(x=>x.sec), maxCap=Math.max(1,...rows.map(r=>r.mc)), bars=[];
-  order.forEach((sec,di)=>{ let rs=rows.filter(r=>r.sec===sec);
-    rs=(NY.skyMode==="move"?rs.sort((a,b)=>Math.abs(b.cp)-Math.abs(a.cp)):rs.sort((a,b)=>b.mc-a.mc)).slice(0,N);
-    rs.sort((a,b)=>b.cp-a.cp).forEach((r,i)=>bars.push({...r,d:di,i,wt:r.mc?0.7+Math.sqrt(r.mc/maxCap)*1.3:1})); });
-  const key=bars.map(b=>b.s+b.cp.toFixed(2)).join("|")+NY.skyMode+narrow;
+  NY.skyRows=rows; NY.skySecs=secs;
+  setHTML("nySkySec",`<button type="button" data-skysec="" class="${NY.skySec?"":"on"}">All sectors</button>`+secs.map(x=>`<button type="button" data-skysec="${esc(x.sec)}" class="${NY.skySec===x.sec?"on":""}">${esc(x.ss)}<b class="${cls(x.a)}">${pct(x.a)}</b></button>`).join(""));
+  const narrow=$("nySky").clientWidth<620, zoom=!!NY.skySec, N=zoom?(narrow?8:14):(narrow?4:5);
+  const pickRows=sec=>{ let rs=rows.filter(r=>r.sec===sec); rs=(NY.skyMode==="move"?rs.sort((a,b)=>Math.abs(b.cp)-Math.abs(a.cp)):rs.sort((a,b)=>b.mc-a.mc)).slice(0,N); return rs.sort((a,b)=>b.mc-a.mc); };
+  const plots=(zoom?secs.filter(x=>x.sec===NY.skySec):secs).map(x=>({sec:x.sec,t:x.ss,a:x.a,rs:pickRows(x.sec)}));
+  const key=plots.map(p=>p.sec+":"+p.rs.map(r=>r.s+r.cp.toFixed(2)).join(",")).join("|")+NY.skyMode+narrow;
   if(key===NY.skyKey) return; NY.skyKey=key;
   const old=Object.fromEntries((NY.bars||[]).map(b=>[b.s,b.k]));
-  bars.forEach(b=>{ b.from=old[b.s]??0; b.k=b.from; });
-  NY.bars=bars; NY.dists=order.map(sec=>{ const x=secs.find(y=>y.sec===sec); return {t:SEC_SHORT[sec]||sec,a:x?x.a:0}; });
-  NY.anim={t0:performance.now(),dur:1000}; nySkyAnim();
+  NY.plots=plots; NY.bars=plots.flatMap((p,pi)=>p.rs.map((r,i)=>({...r,pi,i,k:old[r.s]??0,from:old[r.s]??0})));
+  NY.anim={t0:performance.now(),dur:800}; nySkyAnim();
 }
 function nySkyAnim(){ if(!NY.anim) return; const k=Math.min(1,(performance.now()-NY.anim.t0)/NY.anim.dur), e=1-Math.pow(1-k,3);
   NY.bars.forEach(b=>{ b.k=b.from+(1-b.from)*e; }); nySkyDraw(); if(k<1) requestAnimationFrame(nySkyAnim); else NY.anim=null; }
 function nySkyDraw(){
-  const cv=$("nyCanvas"); if(!cv||!NY.bars||!NY.bars.length) return; const box=cv.parentElement, W=box.clientWidth, H=box.clientHeight, dpr=Math.min(2,devicePixelRatio||1);
-  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const cv=$("nyCanvas"); if(!cv||!NY.plots||!NY.plots.length) return; const box=cv.parentElement, W=box.clientWidth, narrow=W<620, zoom=!!NY.skySec;
+  const cols=zoom?1:(narrow?2:4), rowsN=Math.ceil(NY.plots.length/cols), plotH=zoom?(narrow?340:440):(narrow?170:150);
+  const H=narrow?rowsN*plotH+20:Math.max(500,rowsN*plotH+20); if(box.style.height!==H+"px"&&narrow) box.style.height=H+"px";
+  const dpr=Math.min(2,devicePixelRatio||1);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); cv.style.height=H+"px"; }
   const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
-  const narrow=W<620, padX=14, street=narrow?30:28, horizon=Math.round(H*0.56), upMax=(horizon-40)*0.88, dnMax=(H-horizon-street-22)*0.9;
-  const D=NY.dists.length, gap=narrow?5:14, distW=(W-padX*2-gap*(D-1))/D, bgap=narrow?1.5:3;
-  const maxAbs=Math.max(2,...NY.bars.map(b=>Math.abs(b.cp)));
-  // sky: stars and a soft glow over the city
-  const sky=g.createLinearGradient(0,0,0,horizon); sky.addColorStop(0,"#03050c"); sky.addColorStop(1,"#0b1530"); g.fillStyle=sky; g.fillRect(0,0,W,horizon);
-  for(let i=0;i<70;i++){ const h=nyHash("s"+i), x=h%W, y=(h>>>8)%Math.max(1,horizon-80); g.fillStyle=`rgba(255,255,255,${0.15+((h>>>4)%40)/100})`; g.fillRect(x,y,1,1); }
-  const glow=g.createRadialGradient(W/2,horizon,10,W/2,horizon,W*0.6); glow.addColorStop(0,"rgba(245,199,107,.16)"); glow.addColorStop(1,"rgba(245,199,107,0)"); g.fillStyle=glow; g.fillRect(0,0,W,horizon);
-  // river below the street
-  const river=g.createLinearGradient(0,horizon+street,0,H); river.addColorStop(0,"#071226"); river.addColorStop(1,"#02040a"); g.fillStyle=river; g.fillRect(0,horizon+street,W,H-horizon-street);
-  // buildings
-  const placed=[];
-  NY.dists.forEach((dd,di)=>{ const bs=NY.bars.filter(b=>b.d===di), x0=padX+di*(distW+gap), tw=bs.reduce((a,b)=>a+b.wt,0), inner=distW-(bs.length-1)*bgap-6;
-    let x=x0; bs.forEach(b=>{ const w=Math.max(4,inner*b.wt/tw), mag=Math.min(1,Math.abs(b.cp)/maxAbs), up=b.cp>=0, hov=NY.hover===b.s;
-      const h=Math.max(3,mag*(up?upMax:dnMax))*b.k, side=Math.min(7,w*0.28);
-      const top=up?horizon-h:horizon+street, bot=up?horizon:horizon+street+h;
-      const base=up?[30,200,120]:[230,60,85], L=up?0.55+mag*0.45:0.5+mag*0.5;
-      const col=(a,m=1)=>`rgba(${Math.round(base[0]*m)},${Math.round(base[1]*m)},${Math.round(base[2]*m)},${a})`;
-      if(hov){ g.shadowColor=col(1); g.shadowBlur=20; } else if(mag>0.75){ g.shadowColor=col(.6); g.shadowBlur=8; }
-      const grd=g.createLinearGradient(0,top,0,bot); if(up){ grd.addColorStop(0,col(L,1.15)); grd.addColorStop(1,col(L*0.55,0.7)); } else { grd.addColorStop(0,col(L*0.55,0.7)); grd.addColorStop(1,col(L*0.35,0.6)); }
-      g.fillStyle=hov?"rgba(255,255,255,.95)":grd; g.fillRect(x,top,w,bot-top); g.shadowBlur=0;
-      if(up&&w>6){ g.beginPath(); g.moveTo(x,top); g.lineTo(x+side,top-side*0.6); g.lineTo(x+w+side,top-side*0.6); g.lineTo(x+w,top); g.closePath(); g.fillStyle=hov?"#fff":col(Math.min(1,L+0.15),1.3); g.fill(); }
-      // lit windows
-      if(w>=10&&bot-top>=18&&!hov){ const hs=nyHash(b.s); for(let wy=top+5,row=0;wy<bot-5;wy+=7,row++) for(let wx=x+3,c=0;wx<x+w-4;wx+=5,c++){ if(((hs>>>((row*3+c)%27))&3)===0) continue; g.fillStyle=up?"rgba(220,255,235,.33)":"rgba(255,215,220,.18)"; g.fillRect(wx,wy,2,3); } }
-      if(!up){ g.fillStyle="rgba(4,10,24,.35)"; for(let ry=top+6;ry<bot;ry+=9) g.fillRect(x,ry,w,1.5); } // water ripples over the sunken towers
-      // label inside tall, wide buildings
-      if((w>=15&&bot-top>=38)||hov){ g.save(); g.translate(x+w/2,up?top+6:bot-6); g.rotate(-Math.PI/2); g.font=`${hov?"700 11px":"600 10px"} 'IBM Plex Mono', monospace`; g.textAlign=up?"right":"left"; g.textBaseline="middle"; g.fillStyle=hov?"#000":"rgba(255,255,255,.92)"; g.fillText(b.s,0,0); g.restore(); }
-      placed.push({b,x0:x-1,x1:x+w+side+1,y0:Math.min(top-side,horizon-6),y1:Math.max(bot,horizon+street+6)}); x+=w+bgap; }); });
-  NY.hit=placed;
-  // the street: glowing band with district names
-  const st=g.createLinearGradient(0,horizon,0,horizon+street); st.addColorStop(0,"#1a1408"); st.addColorStop(1,"#0b0905"); g.fillStyle=st; g.fillRect(0,horizon,W,street);
-  g.fillStyle="rgba(245,199,107,.85)"; g.fillRect(0,horizon,W,1.5); g.fillStyle="rgba(77,163,255,.5)"; g.fillRect(0,horizon+street-1,W,1);
-  NY.dists.forEach((dd,di)=>{ const cx=padX+di*(distW+gap)+distW/2; g.textAlign="center"; g.textBaseline="middle";
-    let name=(SKY_ABBR[dd.t]||dd.t).toUpperCase(), fs=narrow?8:10; g.font=`600 ${fs}px 'IBM Plex Mono', monospace`;
-    while(fs>6&&g.measureText(name).width>distW-2){ fs-=0.5; g.font=`600 ${fs}px 'IBM Plex Mono', monospace`; }
-    if(g.measureText(name).width>distW-2) name=name.slice(0,Math.max(3,Math.floor(name.length*(distW-2)/g.measureText(name).width)));
-    g.fillStyle="rgba(245,199,107,.95)"; g.fillText(name,cx,horizon+9); let pf=narrow?8:10; const pt=pct(dd.a); g.font=`500 ${pf}px 'IBM Plex Mono', monospace`; while(pf>6&&g.measureText(pt).width>distW-2){ pf-=0.5; g.font=`500 ${pf}px 'IBM Plex Mono', monospace`; }
-    g.fillStyle=dd.a>=0?"#2dffa0":"#ff4a68"; g.fillText(pt,cx,horizon+(narrow?21:20));
-    if(di) { g.fillStyle="rgba(245,199,107,.25)"; g.fillRect(padX+di*(distW+gap)-gap/2,horizon+4,1,street-8); } });
-  // side legend
-  g.font="500 10px 'IBM Plex Mono', monospace"; g.textAlign="left"; g.fillStyle="rgba(45,255,160,.75)"; g.fillText("▲ UP TODAY",padX,18); g.fillStyle="rgba(255,74,104,.75)"; g.fillText("▼ DOWN TODAY",padX,H-10);
+  const pad=12, gap=14, pw=(W-pad*2-gap*(cols-1))/cols, maxAbs=Math.max(1.5,...NY.bars.map(b=>Math.abs(b.cp)));
+  const depth=zoom?12:8, slab=8, hit=[];
+  const shade=(up,l,a=1)=>up?`hsla(152,85%,${l}%,${a})`:`hsla(352,85%,${l}%,${a})`;
+  NY.plots.forEach((p,pi)=>{ const col=pi%cols, row=Math.floor(pi/cols), x0=pad+col*(pw+gap), y0=10+row*plotH, base=y0+plotH-34;
+    // platform (3D slab) with the sector name on its front
+    g.fillStyle="rgba(245,199,107,.08)"; g.beginPath(); g.moveTo(x0,base); g.lineTo(x0+depth,base-depth*0.6); g.lineTo(x0+pw,base-depth*0.6); g.lineTo(x0+pw-depth,base); g.closePath(); g.fill();
+    g.strokeStyle="rgba(245,199,107,.35)"; g.lineWidth=1; g.stroke();
+    const fr=g.createLinearGradient(0,base,0,base+slab+16); fr.addColorStop(0,"rgba(245,199,107,.22)"); fr.addColorStop(1,"rgba(245,199,107,.05)"); g.fillStyle=fr; g.fillRect(x0,base,pw-depth,slab+16);
+    g.font=`600 ${zoom?13:11}px 'IBM Plex Sans', sans-serif`; g.textBaseline="middle"; g.textAlign="left"; g.fillStyle="#f5dca3"; g.fillText(p.t,x0+6,base+12);
+    g.font=`500 ${zoom?12:10}px 'IBM Plex Mono', monospace`; g.textAlign="right"; g.fillStyle=p.a>=0?"#2dffa0":"#ff4a68"; g.fillText(pct(p.a),x0+pw-depth-6,base+12);
+    // buildings in one row on the platform, biggest company first
+    const bs=NY.bars.filter(b=>b.pi===pi), n=bs.length||1, inner=pw-depth-12, slot=inner/n, maxH=plotH-(zoom?90:72);
+    const maxCap=Math.max(1,...bs.map(b=>b.mc));
+    bs.forEach((b,i)=>{ const up=b.cp>=0, mag=Math.min(1,Math.abs(b.cp)/maxAbs), hov=NY.hover===b.s;
+      const w=Math.max(8,Math.min(slot-6,(b.mc?0.5+0.45*Math.sqrt(b.mc/maxCap):0.7)*slot)), d=Math.min(depth*0.8,w*0.35);
+      const cx=x0+6+slot*i+slot/2, xL=cx-w/2-d/3, yB=base-depth*0.3, h=Math.max(6,(8+mag*maxH)*b.k), yT=yB-h, L=36+mag*20;
+      if(hov||mag>0.7){ g.shadowColor=shade(up,60,hov?1:.7); g.shadowBlur=hov?22:10; }
+      const fg=g.createLinearGradient(0,yT,0,yB); fg.addColorStop(0,hov?"#fff":shade(up,L+10)); fg.addColorStop(1,hov?"#dfe6f2":shade(up,L-12,.95));
+      g.fillStyle=fg; g.fillRect(xL,yT,w,h); g.shadowBlur=0;
+      g.beginPath(); g.moveTo(xL+w,yT); g.lineTo(xL+w+d,yT-d*0.6); g.lineTo(xL+w+d,yB-d*0.6); g.lineTo(xL+w,yB); g.closePath(); g.fillStyle=hov?"#c9d2e2":shade(up,L-20); g.fill();
+      g.beginPath(); g.moveTo(xL,yT); g.lineTo(xL+d,yT-d*0.6); g.lineTo(xL+w+d,yT-d*0.6); g.lineTo(xL+w,yT); g.closePath(); g.fillStyle=hov?"#fff":shade(up,L+22); g.fill();
+      if(w>=12&&h>=20&&!hov){ const hs=nyHash(b.s); for(let wy=yT+5,r=0;wy<yB-4;wy+=6,r++) for(let wx=xL+3,c=0;wx<xL+w-3;wx+=5,c++){ if(((hs>>>((r*3+c)%27))&3)===0) continue; g.fillStyle=up?"rgba(225,255,238,.30)":"rgba(255,220,226,.28)"; g.fillRect(wx,wy,2,2.5); } }
+      // label: ticker and today's move, always shown above the building
+      const fs=zoom?(narrow?11:13):(slot>=40?11:slot>=30?10:9);
+      g.textAlign="center"; g.textBaseline="bottom"; g.font=`700 ${fs}px 'IBM Plex Mono', monospace`; g.fillStyle=hov?"#fff":"rgba(236,241,250,.95)";
+      const sym=b.s.length>5&&slot<34?b.s.slice(0,5):b.s; g.fillText(sym,cx,yT-d*0.6-(fs+4));
+      g.font=`500 ${Math.max(8,fs-1)}px 'IBM Plex Mono', monospace`; g.fillStyle=up?"#2dffa0":"#ff4a68"; g.fillText((up?"▲":"▼")+Math.abs(b.cp).toFixed(slot>=34||zoom?2:1)+"%",cx,yT-d*0.6-2);
+      if(zoom&&!narrow){ g.font="400 10px 'IBM Plex Sans', sans-serif"; g.fillStyle="rgba(200,208,222,.75)"; g.textBaseline="top"; let nm=b.n;
+        while(nm.length>3&&g.measureText(nm).width>slot-6) nm=nm.slice(0,-2).trimEnd()+"…"; if(nm.length>3) g.fillText(nm.replace(/……$/,"…"),cx,base+slab+20); }
+      hit.push({b,x0:xL-2,x1:xL+w+d+2,y0:yT-d*0.6-(fs*2+8),y1:yB+2}); }); });
+  NY.hit=hit;
 }
 (function(){ const cv=$("nyCanvas"), tip=$("nyTip"); if(!cv) return;
   const pick=(mx,my)=>{ const h=(NY.hit||[]).find(p=>mx>=p.x0&&mx<=p.x1&&my>=p.y0&&my<=p.y1); return h?h.b:null; };
   cv.addEventListener("mousemove",e=>{ const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top, b=pick(mx,my);
     if((b?b.s:null)!==NY.hover){ NY.hover=b?b.s:null; nySkyDraw(); cv.style.cursor=b?"pointer":"default"; }
     if(b){ tip.hidden=false; tip.style.left=Math.max(90,Math.min(r.width-90,mx))+"px"; tip.style.top=Math.max(80,my)+"px";
-      tip.innerHTML=`<b>${esc(b.s)}</b> <em class="${cls(b.cp)}">${pct(b.cp)}</em><small>${esc(b.n)} · ${esc(b.ss)}</small><small>${fmt(b.p)}${b.mc?" · "+(b.mc>=1e12?(b.mc/1e12).toFixed(2)+"T":(b.mc/1e9).toFixed(1)+"B")+" market value":""}</small>`; }
+      tip.innerHTML=`<b>${esc(b.s)}</b> <em class="${cls(b.cp)}">${pct(b.cp)}</em><small>${esc(b.n)} · ${esc(b.ss)}</small><small>${fmt(b.p)}${b.mc?" · "+(b.mc>=1e12?(b.mc/1e12).toFixed(2)+"T":(b.mc/1e9).toFixed(1)+"B")+" market value":""}</small><small style="color:#f5c76b">click to open the chart</small>`; }
     else tip.hidden=true; });
   cv.addEventListener("mouseleave",()=>{ NY.hover=null; tip.hidden=true; nySkyDraw(); });
   cv.addEventListener("click",e=>{ const r=cv.getBoundingClientRect(), b=pick(e.clientX-r.left,e.clientY-r.top); if(b) openQuote(b.s); });
   $("nySkyMode").addEventListener("click",e=>{ const b=e.target.closest("[data-skym]"); if(!b) return; NY.skyMode=b.dataset.skym; $("nySkyMode").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); NY.skyKey=""; nyRender(); });
+  $("nySkySec").addEventListener("click",e=>{ const b=e.target.closest("[data-skysec]"); if(!b) return; NY.skySec=b.dataset.skysec||null; NY.skyKey=""; if(NY.skyRows) nySkyData(NY.skyRows,NY.skySecs); });
   $("tab-nyse").addEventListener("click",e=>{ const o=e.target.closest("[data-nyopen]"); if(o) openQuote(o.dataset.nyopen); });
 })();
 function nyOpen(){ nyTick(); nyRender(); if(!NY.at||Date.now()-NY.at>10e3) nyLoad(); if(!NY.snapAt||Date.now()-NY.snapAt>55e3) nySnap(); else requestAnimationFrame(()=>{ const r=nyRows(); if(r.length){ nyHeat(r); NY.skyKey=""; nySkyData(r,NY.secs||[]); } }); }
