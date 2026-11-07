@@ -660,6 +660,17 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .cl-err{color:var(--down);font-size:12px;min-height:16px;margin:6px 0}
 .cl-row{display:flex;gap:8px;justify-content:flex-end}
 @media (max-width:760px){ .cl-sw b{display:none} .cl-sw{padding:4px 8px 4px 5px} .cl-pop{left:auto;right:-60px;transform:none} }
+.sg-guide{padding:0} .sg-guide summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--sg-c)}
+.sg-guide summary::-webkit-details-marker{display:none} .sg-guide summary span::before{content:"▸ ";} .sg-guide[open] summary span::before{content:"▾ ";}
+.sg-guide summary em{font-style:normal;letter-spacing:.04em;color:#5f7c92}
+.sg-gwrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;padding:0 14px 14px}
+.sg-gcard{border:1px solid rgba(62,242,255,.12);border-radius:12px;padding:12px 14px;background:rgba(62,242,255,.03)}
+.sg-gcard h3{margin:0 0 8px;font-size:15px;color:#fff;display:flex;align-items:center;gap:8px}
+.sg-gcard h3 b{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--sg-c);color:var(--sg-c);font-family:var(--mono);font-size:11px;box-shadow:0 0 10px rgba(62,242,255,.3)}
+.sg-gcard p,.sg-gcard li{color:#b9d0df;font-size:13px;line-height:1.55;margin:0}
+.sg-gcard ul{margin:6px 0 0;padding-left:16px;display:flex;flex-direction:column;gap:4px}
+.sg-gcard .g{color:var(--sg-g)} .sg-gcard .r{color:var(--sg-r)} .sg-gcard .c{color:var(--sg-c)} .sg-gcard .y{color:var(--sg-y)}
+.sg-gcard b{color:#fff} .sg-warn{margin-top:10px!important;color:#7f9bb0!important;font-size:12px!important}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -840,6 +851,25 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
         </div>
         <div class="sg-stats" id="sgStats"></div>
       </div>
+      <details class="sg-panel sg-guide" id="sgGuide">
+        <summary><span>HOW TO READ THIS</span><em>new here? start with this · 1-minute read</em></summary>
+        <div class="sg-gwrap">
+          <div class="sg-gcard"><h3><b>1</b>What this tab does</h3>
+            <p>It looks at the last year of prices for every stock you follow (watchlist, portfolios and big market names) and asks: <i>is the price trend healthy or weak right now?</i> It doesn't read news or guess the future — it only reads the chart, the way a technical trader would.</p></div>
+          <div class="sg-gcard"><h3><b>2</b>The signal score</h3>
+            <p>Each stock gets one number from <span class="r">−100</span> to <span class="g">+100</span>:</p>
+            <ul><li><span class="g">+50 to +100</span> Strong bullish — trending up on most measures</li><li><span class="g">+20 to +49</span> Bullish — more good signs than bad</li><li><span class="c">−19 to +19</span> Neutral — mixed, no clear direction</li><li><span class="r">−20 to −49</span> Bearish — more weak signs than good</li><li><span class="r">−50 to −100</span> Strong bearish — trending down on most measures</li></ul></div>
+          <div class="sg-gcard"><h3><b>3</b>What goes into the score</h3>
+            <ul><li><b>Trend</b> — is the price above its 50-day and 200-day average? (above = healthy)</li><li><b>Momentum (MACD)</b> — is the recent push up or down getting stronger?</li><li><b>Last month</b> — how much it moved in the past ~21 trading days</li><li><b>RSI</b> — over 70 = ran up fast (could cool off); under 30 = sold off hard (could bounce)</li><li><b>52-week range</b> — near its yearly high scores higher than near its low</li><li><b>Volume</b> — unusually heavy trading makes that day's move count more</li></ul></div>
+          <div class="sg-gcard"><h3><b>4</b>The radar</h3>
+            <p>Each dot is a stock. <span class="g">Outer ring = most bullish</span>, <span class="r">center = most bearish</span>, the dashed middle ring is neutral. Dots are grouped by sector around the circle. A <span class="y">gold ring</span> means you own it. Click any dot to open its details.</p></div>
+          <div class="sg-gcard"><h3><b>5</b>The signal feed — what the alerts mean</h3>
+            <ul class="sg-gloss"><li><b>✦ Golden cross</b> — 50-day average crossed above the 200-day: often seen as a long-term turn up</li><li><b>☠ Death cross</b> — 50-day fell below the 200-day: often seen as a long-term turn down</li><li><b>⇧ Breakout / ▲ 52-week high</b> — price pushed above its recent highs</li><li><b>⇩ Breakdown / ▼ 52-week low</b> — price fell below its recent lows</li><li><b>↗ / ↘ MACD turn</b> — short-term momentum just flipped up or down</li><li><b>◎ Oversold</b> (RSI under 30) · <b>⚠ Overbought</b> (RSI over 70)</li><li><b>⚡ Unusual volume</b> — at least 2× a normal day's trading</li><li><b>↑ / ↓ 50-day cross</b> — price moved above or below its 50-day average</li></ul></div>
+          <div class="sg-gcard"><h3><b>6</b>How to use it</h3>
+            <ul><li>Check <b>My holdings</b> (filter above the table) for anything strongly bearish — worth a closer look at the news.</li><li>Use <b>Bullish</b> + <b>With signals</b> to find stocks with fresh momentum.</li><li>Click a stock, then <b>Ask Claude about this</b> to get the story behind the numbers.</li><li>Type any ticker in <b>Scan any symbol</b> to score something new.</li></ul>
+            <p class="sg-warn">Signals describe what the price has done, not what it will do. Treat them as a starting point for research, not buy or sell advice.</p></div>
+        </div>
+      </details>
       <div class="sg-bar">
         <div class="sg-progress"><i id="sgProg"></i></div>
         <span id="sgStatus">Standing by</span>
@@ -2550,8 +2580,9 @@ function sgRender(){
   // filters + matrix
   const fl=[["all","All"],["bull","Bullish"],["bear","Bearish"],["ev","With signals"],["own","My holdings"],["wl","Watchlist"]];
   setHTML("sgFilters",fl.map(([k,l])=>`<button type="button" data-sgf="${k}" class="${SG.filter===k?"on":""}">${l}</button>`).join(""));
-  const th=(k,l)=>`<th data-sgsort="${k}">${l}${SG.sort.k===k?(SG.sort.d<0?" ▾":" ▴"):""}</th>`;
-  setHTML("sgTable",rows.length?`<thead><tr>${th("sym","SYMBOL")}${th("score","SIGNAL SCORE")}${th("last","PRICE")}${th("d1","1D")}${th("m1","1M")}${th("rsi","RSI")}${th("hist","MACD")}<th>TREND</th>${th("volx","VOLUME")}${th("pos52","52W RANGE")}<th>SIGNALS</th></tr></thead><tbody>${rows.map(r=>{ const w=Math.abs(r.score)/2;
+  const TIPS={sym:"Click a row for details",score:"−100 strongly bearish … +100 strongly bullish",last:"Latest price",d1:"Change today",m1:"Change over the last month",rsi:"Over 70 = overbought (ran up fast), under 30 = oversold (sold off hard)",hist:"MACD momentum: is the short-term push up (pos) or down (neg)?",volx:"Today's volume vs a normal day (2× or more is unusual)",pos52:"Where the price sits between its 52-week low (left) and high (right)"};
+  const th=(k,l)=>`<th data-sgsort="${k}" title="${esc(TIPS[k]||"")}">${l}${SG.sort.k===k?(SG.sort.d<0?" ▾":" ▴"):""}</th>`;
+  setHTML("sgTable",rows.length?`<thead><tr>${th("sym","SYMBOL")}${th("score","SIGNAL SCORE")}${th("last","PRICE")}${th("d1","1D")}${th("m1","1M")}${th("rsi","RSI")}${th("hist","MACD")}<th title="Green = price is above its 50-day / 200-day average (healthy trend); red = below">TREND</th>${th("volx","VOLUME")}${th("pos52","52W RANGE")}<th title="Recent events — hover each icon for what happened">SIGNALS</th></tr></thead><tbody>${rows.map(r=>{ const w=Math.abs(r.score)/2;
     return `<tr data-sgsym="${esc(r.sym)}" class="${SG.sel===r.sym?"sel":""}"><td class="sg-sym"><b>${esc(r.sym)}</b>${own.has(r.sym)?'<span class="sg-own">◆ OWNED</span>':""}<small>${esc(sgName(r.sym))}</small></td>
     <td><div class="sg-score"><div class="sg-meter"><i class="${r.score>=0?"p":"n"}" style="width:${w}%"></i></div><span class="sg-cell ${sigTone(r.score)}">${r.score>0?"+":""}${r.score}</span></div></td>
     <td>${fmt(r.last,r.last<1?4:2)}</td><td class="${cls(r.d1)}">${pct(r.d1)}</td><td class="${cls(r.m1)}">${pct(r.m1)}</td>
@@ -2593,7 +2624,7 @@ $("sgAddForm").addEventListener("submit",e=>{ e.preventDefault(); let s=$("sgAdd
   SG.extra=[s,...SG.extra.filter(x=>x!==s)].slice(0,15); store.set("sgExtra",SG.extra); $("sgAdd").value=""; SG.sel=s;
   api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`).then(h=>{ SG.res[s]=sgAnalyze(s,h.candles); if(!SG.res[s].ok) toast("Not enough history to score "+s+"."); sgRender(); }).catch(()=>{ toast("Couldn't find "+s+"."); SG.extra=SG.extra.filter(x=>x!==s); store.set("sgExtra",SG.extra); SG.sel=null; sgRender(); }); });
 attachSuggest("sgAdd",s=>{ $("sgAdd").value=s; $("sgAddForm").requestSubmit(); });
-function sigOpen(){ sgRender(); sgScan(false); }
+function sigOpen(){ const g=$("sgGuide"); if(!g.dataset.init){ g.dataset.init=1; g.open=!store.get("sgGuideSeen",false); g.addEventListener("toggle",()=>{ if(!g.open) store.set("sgGuideSeen",true); }); } sgRender(); sgScan(false); }
 setInterval(()=>{ if(S.tab==="signals"&&!document.hidden&&!SG.scanning) sgScan(false); },5*60e3);
 
 
