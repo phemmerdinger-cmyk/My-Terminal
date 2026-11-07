@@ -593,7 +593,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .sg-radar{position:relative;aspect-ratio:1/1;max-height:440px;margin:0 auto}
 .sg-radar svg{width:100%;height:100%;overflow:visible}
 .sg-sweep{transform-origin:50% 50%;animation:sgSpin 4.5s linear infinite}
-.sg-blip{cursor:pointer;transition:transform .2s} .sg-blip:hover{transform:scale(1.35)}
+.sg-blip{cursor:pointer} .sg-blip .hov{opacity:0;transition:opacity .15s} .sg-blip:hover .hov{opacity:1}
 .sg-blip text{font-family:var(--mono);font-size:10px;fill:#cfefff;pointer-events:none}
 .sg-legend{display:flex;justify-content:center;gap:16px;font-family:var(--mono);font-size:11px;color:#7f9bb0;margin-top:6px;flex-wrap:wrap}
 .sg-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
@@ -645,7 +645,7 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 @keyframes sgPulse{50%{opacity:.35}}
 @keyframes sgIn{from{opacity:0;transform:translateY(6px)}}
 @media (max-width:980px){ .sg-grid,.sg-dgrid{grid-template-columns:minmax(0,1fr)} .sg-stats{grid-template-columns:repeat(2,minmax(0,1fr))} .sg h1{font-size:26px} }
-@keyframes sgPing{0%,6%{opacity:1;r:7}20%,100%{opacity:.75}}
+@keyframes sgPing{0%,6%{opacity:1}25%,100%{opacity:.7}}
 /* Claude on/off switch (top middle) */
 .cl-wrap{position:relative;margin:0 auto}
 .cl-sw{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:4px 12px 4px 5px;cursor:pointer;color:var(--text);font-size:13px}
@@ -671,6 +671,29 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .sg-gcard ul{margin:6px 0 0;padding-left:16px;display:flex;flex-direction:column;gap:4px}
 .sg-gcard .g{color:var(--sg-g)} .sg-gcard .r{color:var(--sg-r)} .sg-gcard .c{color:var(--sg-c)} .sg-gcard .y{color:var(--sg-y)}
 .sg-gcard b{color:#fff} .sg-warn{margin-top:10px!important;color:#7f9bb0!important;font-size:12px!important}
+.sg-modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px}
+#tab-signals > .sg-modal{position:fixed;z-index:50}
+.sg-modal[hidden]{display:none}
+.sg-mbg{position:absolute;inset:0;background:rgba(2,5,10,.72);backdrop-filter:blur(4px)}
+.sg-modal .sg-detail{position:relative;width:min(1080px,100%);max-height:calc(100vh - 48px);overflow:auto;margin:0;padding:18px 20px;box-shadow:0 0 0 1px rgba(62,242,255,.25),0 30px 80px rgba(0,0,0,.6),0 0 60px rgba(62,242,255,.12);
+  background:linear-gradient(180deg,rgba(10,18,32,.97),rgba(5,8,15,.97));--sg-c:#3ef2ff;--sg-m:#ff3ec8;--sg-g:#38ff9c;--sg-r:#ff4d6d;--sg-y:#ffd23e;--sg-line:rgba(62,242,255,.16)}
+.sg-x{position:absolute;top:12px;right:14px;background:rgba(62,242,255,.1);border:1px solid rgba(62,242,255,.35);color:#3ef2ff;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px;z-index:2}
+.sg-x:hover{background:rgba(62,242,255,.22)}
+.sg-modal .sg-dhead{padding-right:46px}
+body.sg-lock{overflow:hidden}
+.sg-tally{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.sg-tally div{flex:1;min-width:150px;border:1px solid rgba(62,242,255,.12);border-radius:10px;padding:9px 12px;font-size:13px;color:#b9d0df;background:rgba(62,242,255,.03)}
+.sg-tally b{font-family:var(--mono);font-size:20px;margin-right:4px} .sg-tally span{float:right;font-family:var(--mono);font-size:13px}
+.sg-tally .g b,.sg-tally .g span{color:#38ff9c} .sg-tally .r b,.sg-tally .r span{color:#ff4d6d} .sg-tally .n b{color:#3ef2ff}
+.sg-btbl td{vertical-align:top;white-space:normal}
+.sg-btbl td:first-child{min-width:220px} .sg-btbl td:first-child b{color:#fff;font-family:var(--sans);font-size:14px} .sg-btbl td:first-child small{display:block;color:#7f9bb0;font-family:var(--sans);font-size:12px;margin-top:3px;line-height:1.45;max-width:420px}
+.sg-btbl .rd{color:#cfe3f1;font-size:12px;text-align:left;min-width:150px}
+.sg-btbl th:nth-child(2){text-align:left}
+.sg-btbl .pt{min-width:170px} .sg-btbl .pt b{font-family:var(--mono);font-size:15px;margin-left:8px} .sg-btbl .pt small{display:block;color:#5f7c92;font-size:10px;margin-top:2px}
+.sg-pbar{display:inline-block;width:80px;height:6px;background:rgba(255,255,255,.06);border-radius:4px;vertical-align:middle;overflow:hidden}
+.sg-pbar i{display:block;height:100%;border-radius:4px} .sg-pbar i.g{background:#38ff9c;box-shadow:0 0 8px #38ff9c} .sg-pbar i.r{background:#ff4d6d;box-shadow:0 0 8px #ff4d6d}
+.sg-btbl tfoot td{border-top:1px solid rgba(62,242,255,.3);border-bottom:0;padding-top:12px;color:#fff}
+@media (max-width:760px){ .sg-modal{padding:8px} .sg-modal .sg-detail{max-height:calc(100vh - 16px);padding:14px} .sg-btbl td:first-child{min-width:160px} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -887,7 +910,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
           <div class="sg-feed" id="sgFeed"></div>
         </div>
       </div>
-      <div class="sg-panel sg-detail" id="sgDetail" hidden></div>
+      <div class="sg-modal" id="sgModal" hidden><div class="sg-mbg" data-sgclose="1"></div><div class="sg-panel sg-detail" id="sgDetail"></div></div>
       <div class="sg-panel">
         <div class="sg-ph"><span>MATRIX</span><div class="sg-filters" id="sgFilters"></div></div>
         <div class="sg-tblwrap"><table class="sg-tbl" id="sgTable"></table></div>
@@ -2496,17 +2519,24 @@ function sgAnalyze(sym,c){
   if(rsi>=70) add("ob",`Overbought: RSI ${rsi.toFixed(0)}, price looks stretched`,"y","⚠",5); if(rsi<=30) add("os",`Oversold: RSI ${rsi.toFixed(0)}, a bounce is possible`,"b","◎",5);
   if(volx>=2) add("vol",`Unusual volume: ${volx.toFixed(1)}× its normal day`,"y","⚡",6);
   if(sma50&&n>51){ const was=cl[n-2]>sgSma(cl,50,n-2), now=last>sma50; if(!was&&now) add("x50u","Crossed above its 50-day average","b","↑",5); if(was&&!now) add("x50d","Fell below its 50-day average","r","↓",5); }
-  let s=0; const why=[];
-  if(sma50){ s+=last>sma50?20:-20; why.push(`${last>sma50?"Above":"Below"} its 50-day average (${fmt(sma50)})`); }
-  if(sma200){ s+=last>sma200?15:-15; s+=sma50>sma200?10:-10; why.push(`${last>sma200?"Above":"Below"} its 200-day average (${fmt(sma200)}); 50-day is ${sma50>sma200?"above":"below"} the 200-day`); }
-  const h=hist[n-1]; s+=h>0?15:-15; why.push(`MACD momentum ${h>0?"positive":"negative"}`);
-  s+=Math.max(-20,Math.min(20,m1*2)); why.push(`Up ${pct(m1)} over the last month`.replace("Up -","Down "));
-  if(rsi>70){ s-=8; why.push(`RSI ${rsi.toFixed(0)}: overbought, could cool off`); } else if(rsi<30){ s+=8; why.push(`RSI ${rsi.toFixed(0)}: oversold, could bounce`); } else why.push(`RSI ${rsi.toFixed(0)}: neutral range`);
-  s+=(pos52-50)/50*10; why.push(`Sitting ${pos52.toFixed(0)}% of the way from its 52-week low to high`);
-  if(volx>=1.5){ s+=d1>=0?5:-5; why.push(`Volume ${volx.toFixed(1)}× normal on a ${d1>=0?"up":"down"} day`); }
-  s=Math.round(Math.max(-100,Math.min(100,s)));
+  // Score = sum of these parts (each shown in the breakdown), capped at ±100
+  const parts=[], part=(name,reading,pts,max,note)=>parts.push({name,reading,pts:Math.round(pts*10)/10,max,note});
+  const h=hist[n-1];
+  part("Price vs 50-day average",sma50?`${fmt(last)} vs ${fmt(sma50)} (${pct((last/sma50-1)*100)})`:"not enough history",sma50?(last>sma50?20:-20):0,20,
+    sma50?(last>sma50?"Trading above its 50-day average: the medium-term trend is up.":"Trading below its 50-day average: the medium-term trend is down."):"Needs 50 days of prices.");
+  part("Price vs 200-day average",sma200?`${fmt(last)} vs ${fmt(sma200)} (${pct((last/sma200-1)*100)})`:"not enough history",sma200?(last>sma200?15:-15):0,15,
+    sma200?(last>sma200?"Above its 200-day average: the long-term trend is up.":"Below its 200-day average: the long-term trend is down."):"Needs 200 days of prices.");
+  part("50-day vs 200-day (cross)",sma50&&sma200?`${fmt(sma50)} vs ${fmt(sma200)}`:"not enough history",sma50&&sma200?(sma50>sma200?10:-10):0,10,
+    sma50&&sma200?(sma50>sma200?"Short-term average is above the long-term one (the “golden cross” side).":"Short-term average is below the long-term one (the “death cross” side)."):"Needs 200 days of prices.");
+  part("Momentum (MACD)",`histogram ${h>0?"+":""}${h.toFixed(3)}`,h>0?15:-15,15,h>0?"Buying pressure is building: the short-term trend is accelerating up.":"Selling pressure is building: the short-term trend is weakening.");
+  part("Last month's move",`${pct(m1)} in ~21 trading days`,Math.max(-20,Math.min(20,m1*2)),20,`Every 1% gained (or lost) over the month adds (or takes away) 2 points, up to 20.`);
+  part("RSI (overbought / oversold)",`RSI ${rsi.toFixed(1)}`,rsi>70?-8:rsi<30?8:0,8,rsi>70?"Above 70: it ran up fast and may be due to cool off.":rsi<30?"Below 30: it sold off hard and may be due for a bounce.":"Between 30 and 70: normal, no penalty or bonus.");
+  part("52-week range position",`${pos52.toFixed(0)}% (low ${fmt(lo)} · high ${fmt(hi)})`,(pos52-50)/50*10,10,pos52>=50?"Closer to its yearly high than its low.":"Closer to its yearly low than its high.");
+  part("Volume confirmation",`${volx.toFixed(2)}× a normal day`,volx>=1.5?(d1>=0?5:-5):0,5,volx>=1.5?`Heavy trading on a ${d1>=0?"rising":"falling"} day: big money moved it ${d1>=0?"up":"down"}.`:"Normal volume: no extra weight either way.");
+  const raw=parts.reduce((a,p)=>a+p.pts,0), s=Math.round(Math.max(-100,Math.min(100,raw)));
+  const why=parts.map(p=>`${p.name}: ${p.reading}`);
   const tail=130, s50=cl.map((_,i)=>sgSma(cl,50,i)).slice(-tail), s200=cl.map((_,i)=>sgSma(cl,200,i)).slice(-tail);
-  return {sym,ok:true,last,d1,sma50,sma200,rsi,macd:macd[n-1],hist:h,volx,pos52,m1,hi,lo,events:ev.sort((a,b)=>b.w-a.w),score:s,why,closes:cl.slice(-tail),s50,s200,t:Date.now()};
+  return {sym,ok:true,last,d1,sma50,sma200,rsi,macd:macd[n-1],hist:h,volx,pos52,m1,hi,lo,events:ev.sort((a,b)=>b.w-a.w),score:s,raw,parts,why,closes:cl.slice(-tail),s50,s200,t:Date.now()};
 }
 const sigLabel=s=>s>=50?"Strong bullish":s>=20?"Bullish":s<=-50?"Strong bearish":s<=-20?"Bearish":"Neutral";
 const sigTone=s=>s>=20?"g":s<=-20?"r":"n";
@@ -2541,7 +2571,7 @@ function sgRadar(own){
   let gi=0; const glabels=order.map(g=>{ const mid=(gi+groups[g].length/2)/N*Math.PI*2-Math.PI/2; gi+=groups[g].length; return `<text x="${(Math.cos(mid)*(R+16)).toFixed(1)}" y="${(Math.sin(mid)*(R+16)).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" style="font-family:var(--mono);font-size:9px;letter-spacing:.12em;fill:rgba(62,242,255,.55)">${esc(g.toUpperCase().slice(0,14))}</text>`; }).join("");
   const blips=items.map(({r},i)=>{ const a=i/N*Math.PI*2-Math.PI/2+(Math.PI/N), rad=12+(r.score+100)/200*(R-18), x=Math.cos(a)*rad, y=Math.sin(a)*rad, tone=sigTone(r.score);
     const col=tone==="g"?"#38ff9c":tone==="r"?"#ff4d6d":"#3ef2ff", delay=((a+Math.PI/2)/(Math.PI*2)*4.5).toFixed(2);
-    return `<g class="sg-blip" data-sgsym="${esc(r.sym)}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle r="${SG.sel===r.sym?9:5.5}" fill="${col}" filter="url(#sgGlow)" style="animation:sgPing 4.5s ${delay}s infinite"/>${own.has(r.sym)?`<circle r="9" fill="none" stroke="#ffd23e" stroke-width="1.5"/>`:""}${SG.sel===r.sym?`<circle r="14" fill="none" stroke="${col}" stroke-width="1" opacity=".7"/>`:""}<text x="9" y="-7">${esc(r.sym.replace("-USD",""))}</text><title>${esc(r.sym)} · ${r.score} · ${sigLabel(r.score)}</title></g>`; }).join("");
+    return `<g class="sg-blip" data-sgsym="${esc(r.sym)}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle class="hov" r="12" fill="none" stroke="#fff" stroke-width="1.2"/><circle r="14" fill="transparent"/><circle r="${SG.sel===r.sym?8:5.5}" fill="${col}" filter="url(#sgGlow)" style="animation:sgPing 4.5s ${delay}s infinite"/>${own.has(r.sym)?`<circle r="9" fill="none" stroke="#ffd23e" stroke-width="1.5"/>`:""}${SG.sel===r.sym?`<circle r="14" fill="none" stroke="${col}" stroke-width="1" opacity=".7"/>`:""}<text x="9" y="-7">${esc(r.sym.replace("-USD",""))}</text><title>${esc(r.sym)} · ${r.score} · ${sigLabel(r.score)}</title></g>`; }).join("");
   return `<svg viewBox="-215 -215 430 430"><defs><filter id="sgGlow" x="-3" y="-3" width="7" height="7"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <radialGradient id="sgBg"><stop offset="0" stop-color="rgba(255,77,109,.16)"/><stop offset=".5" stop-color="rgba(62,242,255,.04)"/><stop offset="1" stop-color="rgba(56,255,156,.12)"/></radialGradient>
     <linearGradient id="sgSw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(62,242,255,0)"/><stop offset="1" stop-color="rgba(62,242,255,.35)"/></linearGradient></defs>
@@ -2556,10 +2586,11 @@ function sgChart(r){
   const line=(arr)=>arr.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
   const up=r.closes[n-1]>=r.closes[0], col=up?"#38ff9c":"#ff4d6d", by=Y(r.closes[0]), off=Math.max(0,Math.min(1,by/h)).toFixed(4);
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="sgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient>
-      <linearGradient id="sgL" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${h}"><stop offset="${off}" stop-color="#38ff9c"/><stop offset="${off}" stop-color="#ff4d6d"/></linearGradient></defs>
+      <linearGradient id="sgL" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${h}"><stop offset="${off}" stop-color="#38ff9c"/><stop offset="${off}" stop-color="#ff4d6d"/></linearGradient>
+      <linearGradient id="sgF" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="${h}"><stop offset="0" stop-color="#38ff9c" stop-opacity=".30"/><stop offset="${off}" stop-color="#38ff9c" stop-opacity=".04"/><stop offset="${off}" stop-color="#ff4d6d" stop-opacity=".04"/><stop offset="1" stop-color="#ff4d6d" stop-opacity=".30"/></linearGradient></defs>
     <line x1="0" x2="${w}" y1="${by.toFixed(1)}" y2="${by.toFixed(1)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 4"/>
     ${[0.25,0.5,0.75].map(f=>`<line x1="0" x2="${w}" y1="${h*f}" y2="${h*f}" stroke="rgba(62,242,255,.08)"/>`).join("")}
-    <polygon points="${X(0)},${h} ${line(r.closes)} ${X(n-1)},${h}" fill="url(#sgA)"/>
+    <polygon points="${X(0)},${by.toFixed(1)} ${line(r.closes)} ${X(n-1)},${by.toFixed(1)}" fill="url(#sgF)"/>
     <polyline points="${line(r.s200)}" fill="none" stroke="#ff3ec8" stroke-width="1.4" opacity=".85"/>
     <polyline points="${line(r.s50)}" fill="none" stroke="#3ef2ff" stroke-width="1.4" stroke-dasharray="5 4" opacity=".9"/>
     <polyline points="${line(r.closes)}" fill="none" stroke="url(#sgL)" stroke-width="2" style="filter:drop-shadow(0 0 5px rgba(62,242,255,.35))"/></svg>`;
@@ -2572,7 +2603,8 @@ function sgRender(){
   setHTML("sgStats",`<div class="sg-stat c"><span>Scanned</span><b>${all.length}</b></div><div class="sg-stat g"><span>Bullish</span><b>${bull}</b></div><div class="sg-stat r"><span>Bearish</span><b>${bear}</b></div><div class="sg-stat y" title="Based on the S&P 500 (SPY) vs its 50- and 200-day averages"><span>Market regime</span><b>${regime}</b></div>`);
   $("sgProg").style.width=(SG.scanning?SG.done/Math.max(1,SG.total)*100:all.length?100:0)+"%";
   setHTML("sgStatus",SG.scanning?`Scanning ${SG.done}/${SG.total}…`:SG.at?`Scan complete · ${ago(SG.at)==="now"?"just now":ago(SG.at)+" ago"}`:"Standing by");
-  $("sgRadar").innerHTML=all.length?sgRadar(own):`<div class="sg-empty" style="padding-top:40%">${SG.scanning?"ACQUIRING SIGNALS…":"NO DATA YET"}</div>`;
+  const rad=all.length?sgRadar(own):`<div class="sg-empty" style="padding-top:40%">${SG.scanning?"ACQUIRING SIGNALS…":"NO DATA YET"}</div>`;
+  if(rad!==SG.lastRadar){ SG.lastRadar=rad; $("sgRadar").innerHTML=rad; } // only redraw when something changed (keeps dots still)
   // feed
   const feed=all.flatMap(r=>r.events.map(e=>({...e,r}))).sort((a,b)=>b.w-a.w||a.age-b.age||Math.abs(b.r.score)-Math.abs(a.r.score)).slice(0,60);
   setHTML("sgFeedCount",feed.length?feed.length+" active signal"+(feed.length===1?"":"s"):"");
@@ -2592,29 +2624,35 @@ function sgRender(){
     <td style="text-align:left">${r.events.slice(0,4).map(e=>`<span class="sg-tag ${e.tone==="b"?"up":e.tone==="r"?"down":""}" title="${esc(e.t)}">${e.ic}</span>`).join("")||'<span style="color:#3f5a6e">—</span>'}</td></tr>`; }).join("")}</tbody>`
     :`<tbody><tr><td class="sg-empty">${SG.scanning?"SCANNING…":"Nothing matches this filter."}</td></tr></tbody>`);
   // detail
-  const r=SG.sel&&SG.res[SG.sel]; const d=$("sgDetail"); d.hidden=!(r&&r.ok);
-  if(r&&r.ok) setHTML("sgDetail",`<div class="sg-dhead"><div><div class="sg-kicker"><i></i>TARGET LOCK</div><h2>${esc(r.sym)}<small>${esc(sgName(r.sym))}</small></h2>
-      <div style="color:#8aa4b8;font-size:13px;margin-top:4px">${fmt(r.last,r.last<1?4:2)} · <span class="${cls(r.d1)}">${pct(r.d1)} today</span>${own.has(r.sym)?' · <span style="color:#ffd23e">you own it</span>':""}</div></div>
+  const r=SG.sel&&SG.res[SG.sel]; $("sgModal").hidden=!(r&&r.ok); document.body.classList.toggle("sg-lock",!!(r&&r.ok));
+  if(r&&r.ok){
+    const bull=r.parts.filter(p=>p.pts>0), bear=r.parts.filter(p=>p.pts<0);
+    const pts=v=>`${v>0?"+":""}${Number.isInteger(v)?v:v.toFixed(1)}`;
+    const rowsHtml=r.parts.map(p=>{ const t=p.pts>0?"g":p.pts<0?"r":"n", w=p.max?Math.min(100,Math.abs(p.pts)/p.max*100):0;
+      return `<tr><td><b>${esc(p.name)}</b><small>${esc(p.note)}</small></td><td class="rd">${esc(p.reading)}</td>
+        <td><span class="sg-cell ${t}">${p.pts>0?"▲ Bullish":p.pts<0?"▼ Bearish":"● Neutral"}</span></td>
+        <td class="pt"><div class="sg-pbar"><i class="${t}" style="width:${w}%"></i></div><b class="${t==="g"?"up":t==="r"?"down":""}">${pts(p.pts)}</b><small>of ±${p.max}</small></td></tr>`; }).join("");
+    setHTML("sgDetail",`<button type="button" class="sg-x" data-sgclose="1" title="Close (Esc)">✕</button>
+    <div class="sg-dhead"><div><div class="sg-kicker"><i></i>TARGET LOCK · SCORE BREAKDOWN</div><h2>${esc(r.sym)}<small>${esc(sgName(r.sym))}</small></h2>
+      <div style="color:#8aa4b8;font-size:13px;margin-top:4px">${fmt(r.last,r.last<1?4:2)} · <span class="${cls(r.d1)}">${pct(r.d1)} today</span> · <span class="${cls(r.m1)}">${pct(r.m1)} this month</span>${own.has(r.sym)?' · <span style="color:#ffd23e">◆ you own it</span>':""}</div></div>
       <div style="text-align:right"><div class="sg-big ${sigTone(r.score)}">${r.score>0?"+":""}${r.score}</div><div style="font-family:var(--mono);font-size:12px;letter-spacing:.18em;color:#8aa4b8;margin-top:4px">${sigLabel(r.score).toUpperCase()}</div></div></div>
-    <div class="sg-dgrid"><div><div class="sg-chart">${sgChart(r)}</div><div class="sg-legend" style="justify-content:flex-start"><span><i class="b"></i>Price (6 months)</span><span style="color:#3ef2ff">- - 50-day avg</span><span style="color:#ff3ec8">— 200-day avg</span></div></div>
-      <div><div class="sg-gauges">
-        <div class="sg-g"><span>RSI (14)</span><b>${r.rsi.toFixed(1)}</b><small>${r.rsi>=70?"overbought":r.rsi<=30?"oversold":"neutral"}</small></div>
-        <div class="sg-g"><span>MACD</span><b class="${r.hist>0?"up":"down"}">${r.hist>0?"Positive":"Negative"}</b><small>momentum</small></div>
-        <div class="sg-g"><span>VOLUME</span><b>${r.volx.toFixed(2)}×</b><small>vs 20-day average</small></div>
-        <div class="sg-g"><span>52-WEEK</span><b>${r.pos52.toFixed(0)}%</b><small>${fmt(r.lo)} – ${fmt(r.hi)}</small></div>
-        <div class="sg-g"><span>50-DAY AVG</span><b>${r.sma50?fmt(r.sma50):"—"}</b><small>${r.sma50?(r.last>r.sma50?"price above":"price below"):""}</small></div>
-        <div class="sg-g"><span>200-DAY AVG</span><b>${r.sma200?fmt(r.sma200):"—"}</b><small>${r.sma200?(r.last>r.sma200?"price above":"price below"):"needs more history"}</small></div>
-      </div>
-      <ul class="sg-why">${r.why.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>
-      <div class="sg-dbtns"><button type="button" class="sg-btn" data-sgopen="${esc(r.sym)}">◧ Open full chart</button><button type="button" class="sg-btn" data-sgask="${esc(r.sym)}">✦ Ask Claude about this</button><button type="button" class="sg-btn" data-sgclose="1">✕ Close</button></div></div></div>
-    ${r.events.length?`<div class="sg-feed" style="max-height:none;margin-top:12px">${r.events.map(e=>`<div class="sg-ev ${e.tone}"><span class="ic">${e.ic}</span><span class="t">${esc(e.t)}</span><span></span><small>${e.age?e.age+" day"+(e.age>1?"s":"")+" ago":"today"}</small></div>`).join("")}</div>`:""}`);
+    <div class="sg-tally"><div class="g"><b>${bull.length}</b> bullish factor${bull.length===1?"":"s"} <span>${pts(Math.round(bull.reduce((a,p)=>a+p.pts,0)*10)/10)} pts</span></div><div class="r"><b>${bear.length}</b> bearish factor${bear.length===1?"":"s"} <span>${pts(Math.round(bear.reduce((a,p)=>a+p.pts,0)*10)/10)} pts</span></div><div class="n"><b>${r.parts.length-bull.length-bear.length}</b> neutral</div></div>
+    <div class="sg-ph" style="margin-top:14px"><span>WHAT MAKES UP THE SCORE</span><em>each factor adds or subtracts points · total is capped at ±100</em></div>
+    <div class="sg-tblwrap"><table class="sg-tbl sg-btbl"><thead><tr><th>FACTOR</th><th>READING NOW</th><th>VERDICT</th><th>POINTS</th></tr></thead><tbody>${rowsHtml}</tbody>
+      <tfoot><tr><td colspan="3"><b>Total signal score</b>${Math.abs(r.raw)>100?` <small>(raw ${pts(Math.round(r.raw))}, capped)</small>`:""}</td><td class="pt"><b class="${sigTone(r.score)==="g"?"up":sigTone(r.score)==="r"?"down":""}" style="font-size:18px">${r.score>0?"+":""}${r.score}</b></td></tr></tfoot></table></div>
+    <div class="sg-dgrid"><div><div class="sg-ph" style="margin-top:12px"><span>PRICE · 6 MONTHS</span><em>green above where it started, red below</em></div><div class="sg-chart">${sgChart(r)}</div><div class="sg-legend" style="justify-content:flex-start"><span><i class="b"></i>Price</span><span style="color:#3ef2ff">- - 50-day avg</span><span style="color:#ff3ec8">— 200-day avg</span></div></div>
+      <div><div class="sg-ph" style="margin-top:12px"><span>RECENT SIGNALS</span></div>
+      ${r.events.length?`<div class="sg-feed" style="max-height:none">${r.events.map(e=>`<div class="sg-ev ${e.tone}"><span class="ic">${e.ic}</span><span class="t">${esc(e.t)}</span><span></span><small>${e.age?e.age+" day"+(e.age>1?"s":"")+" ago":"today"} · ${e.tone==="b"?"bullish sign":e.tone==="r"?"bearish sign":"caution"}</small></div>`).join("")}</div>`:'<div class="sg-empty" style="padding:16px">No special events right now — just the steady factors above.</div>'}
+      <div class="sg-dbtns"><button type="button" class="sg-btn" data-sgopen="${esc(r.sym)}">◧ Open full chart</button><button type="button" class="sg-btn" data-sgask="${esc(r.sym)}">✦ Ask Claude about this</button></div></div></div>`);
+  }
 }
-function sgSelect(sym){ SG.sel=SG.sel===sym?null:sym; sgRender(); if(SG.sel) $("sgDetail").scrollIntoView({behavior:"smooth",block:"nearest"}); }
+function sgSelect(sym){ SG.sel=sym; sgRender(); $("sgDetail").scrollTop=0; }
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&SG.sel){ SG.sel=null; sgRender(); } });
 $("tab-signals").addEventListener("click",e=>{
   const f=e.target.closest("[data-sgf]"); if(f){ SG.filter=f.dataset.sgf; sgRender(); return; }
   const so=e.target.closest("[data-sgsort]"); if(so){ const k=so.dataset.sgsort; SG.sort=SG.sort.k===k?{k,d:-SG.sort.d}:{k,d:k==="sym"?1:-1}; sgRender(); return; }
-  const o=e.target.closest("[data-sgopen]"); if(o){ openQuote(o.dataset.sgopen); return; }
-  const a=e.target.closest("[data-sgask]"); if(a){ const s=a.dataset.sgask, r=SG.res[s]; $("acFab").click(); setTimeout(()=>{ $("acInput").value=`Explain the ${s} signal (score ${r.score}, ${sigLabel(r.score)}). What's driving it and what should I watch next?`; $("acInput").focus(); },150); return; }
+  const o=e.target.closest("[data-sgopen]"); if(o){ SG.sel=null; sgRender(); openQuote(o.dataset.sgopen); return; }
+  const a=e.target.closest("[data-sgask]"); if(a){ const s=a.dataset.sgask, r=SG.res[s]; SG.sel=null; sgRender(); $("acFab").click(); setTimeout(()=>{ $("acInput").value=`Explain the ${s} signal (score ${r.score}, ${sigLabel(r.score)}). Breakdown: ${r.parts.map(p=>p.name+" "+(p.pts>0?"+":"")+p.pts).join(", ")}. What's driving it and what should I watch next?`; $("acInput").focus(); },150); return; }
   if(e.target.closest("[data-sgclose]")){ SG.sel=null; sgRender(); return; }
   const s=e.target.closest("[data-sgsym]"); if(s){ sgSelect(s.dataset.sgsym); }
 });
