@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Peter's Terminal">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
 <script src="/tickers.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
@@ -700,6 +700,120 @@ body.sg-lock{overflow:hidden}
 .sg-secc{text-align:left!important;font-family:var(--sans)!important;font-size:12px;color:#9fc6dc!important;max-width:170px;overflow:hidden;text-overflow:ellipsis}
 .sg-fsep{width:1px;align-self:stretch;background:var(--sg-line);margin:0 4px}
 .sg-dsec{margin-top:6px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#5f7c92} .sg-dsec b{color:#3ef2ff;letter-spacing:.04em;font-weight:500}
+/* ===== News: newspaper front page ===== */
+.feed{list-style:none;margin:0;padding:0}
+.np{--paper:#f4efe4;--ink:#141414;--ink2:#3d3a35;--rule:#1d1b18;--soft:#cfc6b4;background:var(--paper);color:var(--ink);margin:14px;padding:18px 24px 26px;border-radius:4px;box-shadow:0 10px 40px rgba(0,0,0,.45);font-family:"Source Serif 4",Georgia,serif}
+.np a{color:inherit;text-decoration:none} .np a:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.np-mast{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:16px;border-bottom:3px double var(--rule);padding-bottom:10px}
+.np-mast h1{margin:0;font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:clamp(30px,4.6vw,56px);letter-spacing:-.01em;line-height:1;text-align:center;white-space:nowrap}
+.np-ear{font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:var(--ink2);line-height:1.5}
+.np-ear span{color:#7a7366} .np-ear.r{text-align:right;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px} .np-ear b{font-family:var(--mono);font-weight:600}
+.np .up{color:#0a7d43} .np .down{color:#b3261e}
+.np-band{text-align:center;font-family:"IBM Plex Sans",sans-serif;font-size:10px;letter-spacing:.22em;color:#5a5348;padding:6px 0;border-bottom:1px solid var(--rule);margin-bottom:16px;text-transform:uppercase}
+.np-front{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2.05fr) minmax(0,1.1fr);gap:0}
+.np-front > *{padding:0 18px} .np-front > *:first-child{padding-left:0} .np-front > *:last-child{padding-right:0}
+.np-front > * + *{border-left:1px solid var(--soft)}
+.np h4{margin:0 0 10px;font-family:"IBM Plex Sans",sans-serif;font-size:11px;letter-spacing:.2em;text-transform:uppercase;border-top:2px solid var(--rule);padding-top:6px}
+.np-wn{padding:9px 0;border-bottom:1px solid #e0d8c8} .np-wn:last-child{border-bottom:0}
+.np-wn b{font-family:"Source Serif 4",serif;font-weight:700;font-size:15px;line-height:1.3;display:block}
+.np-wn .np-dek{font-size:13px;margin:4px 0 0}
+.np-lead h2{margin:4px 0 10px;font-family:"Playfair Display",Georgia,serif;font-weight:800;font-size:clamp(28px,3vw,40px);line-height:1.08;letter-spacing:-.005em}
+.np-lead .np-dek{font-size:18px;line-height:1.5;color:var(--ink2)}
+.np-kick{font-family:"IBM Plex Sans",sans-serif;font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8a1c1c}
+.np-dek{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--ink2)}
+.np-art{padding:0 0 14px;margin-bottom:14px;border-bottom:1px solid #d8cfbd} .np-art:last-child{border-bottom:0;margin-bottom:0}
+.np-art h3{margin:4px 0 0;font-family:"Source Serif 4",serif;font-weight:700;font-size:18px;line-height:1.25}
+.np-art.big h3{font-family:"Playfair Display",serif;font-size:24px;font-weight:700;line-height:1.15}
+.np-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:7px;font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:#7a7366}
+.np-src{font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);border-left:3px solid var(--c);padding-left:5px}
+.np-new{background:#8a1c1c;color:#fff;font-size:9px;letter-spacing:.1em;padding:1px 5px;border-radius:2px}
+.np-up{color:#0a7d43} .np-dn{color:#b3261e}
+.np-also a{text-decoration:underline}
+.np-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.np .tg{background:#e9e1d1;color:var(--ink);border:1px solid #d5cab5;border-radius:3px;font-family:var(--mono);font-size:11px;padding:2px 6px;cursor:pointer}
+.np .tg .p{margin-left:5px}
+.np-sections{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 0;margin-top:22px;border-top:3px double var(--rule);padding-top:16px}
+.np-sec{padding:0 18px} .np-sec:nth-child(3n+1){padding-left:0} .np-sec:nth-child(3n){padding-right:0}
+.np-sec:not(:nth-child(3n+1)){border-left:1px solid var(--soft)}
+.np-brief{padding:8px 0;border-top:1px solid #e0d8c8} .np-brief h5{margin:0;font-family:"Source Serif 4",serif;font-size:15px;font-weight:600;line-height:1.3}
+.np-brief .np-meta{margin-top:4px}
+.np-x summary{cursor:pointer;font-family:"IBM Plex Sans",sans-serif;font-size:12px;color:#8a1c1c;padding:8px 0;border-top:1px solid #e0d8c8}
+.np-foot{text-align:center;margin-top:18px;border-top:1px solid var(--rule);padding-top:14px}
+.np-foot .btn{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+@media (max-width:1100px){ .np-front{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)} .np-rail{grid-column:1/-1;order:3;border-left:0!important;padding:16px 0 0!important;border-top:1px solid var(--soft);margin-top:16px} .np-sections{grid-template-columns:repeat(2,minmax(0,1fr))} .np-sec{padding:0 14px!important;border-left:0!important} }
+@media (max-width:760px){ .np{margin:8px;padding:14px} .np-mast{grid-template-columns:1fr} .np-ear.l,.np-ear.r{text-align:center;justify-content:center} .np-front{grid-template-columns:minmax(0,1fr)} .np-front > *{padding:0!important;border-left:0!important} .np-side{border-top:1px solid var(--soft);margin-top:16px;padding-top:16px!important} .np-sections{grid-template-columns:minmax(0,1fr)} .np-sec{padding:0!important} .np-lead .np-dek{font-size:16px} }
+/* ===== NYSE — live exchange floor ===== */
+#tab-nyse{--gold:#f5c76b;--gold2:#ffdf9e;--blue:#4da3ff;--amber:#ffb000;--ny-g:#2dffa0;--ny-r:#ff4a68;--ny-line:rgba(245,199,107,.16);--ny-bg:#04060c;
+  position:relative;overflow:hidden;min-height:calc(100vh - 128px);color:#e9eef7;
+  background:radial-gradient(1100px 600px at 50% -20%,rgba(77,163,255,.16),transparent 60%),radial-gradient(800px 400px at 100% 100%,rgba(245,199,107,.08),transparent 60%),linear-gradient(180deg,#05070e,#03040a)}
+#tab-nyse::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(245,199,107,.035) 0 1px,transparent 1px 90px),repeating-linear-gradient(0deg,rgba(77,163,255,.03) 0 1px,transparent 1px 90px);mask-image:radial-gradient(ellipse at 50% 0%,#000 20%,transparent 75%)}
+#tab-nyse > *{position:relative;z-index:1}
+.ny-hero{display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1.4fr);gap:22px;align-items:center;margin-bottom:16px}
+.ny-kick{font-family:var(--mono);font-size:11px;letter-spacing:.3em;color:var(--gold);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ny-kick span{color:rgba(245,199,107,.5);letter-spacing:.14em}
+.ny-kick i{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 14px var(--gold);animation:nyBlink 1.4s infinite}
+.ny-id h1{margin:6px 0 2px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.ny-id h1 span{font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:64px;line-height:.95;letter-spacing:.04em;background:linear-gradient(180deg,#fff 10%,var(--gold2) 45%,var(--gold) 70%,#9a6b1c 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 24px rgba(245,199,107,.35))}
+.ny-id h1 em{font-style:normal;font-family:var(--mono);font-size:12px;letter-spacing:.2em;padding:6px 12px;border-radius:999px;border:1px solid currentColor}
+.ny-id h1 em.open{color:var(--ny-g);box-shadow:0 0 18px rgba(45,255,160,.35),inset 0 0 12px rgba(45,255,160,.15)} .ny-id h1 em.pre,.ny-id h1 em.post{color:var(--amber);box-shadow:0 0 16px rgba(255,176,0,.25)} .ny-id h1 em.closed{color:#8b94a7}
+.ny-clock{display:flex;align-items:baseline;gap:8px;font-family:var(--mono)} .ny-clock b{font-size:30px;font-weight:500;color:#fff;letter-spacing:.06em;text-shadow:0 0 18px rgba(77,163,255,.5)} .ny-clock span{color:var(--blue);font-size:12px;letter-spacing:.2em} .ny-clock small{color:#7d879a;font-size:12px;margin-left:6px}
+.ny-ring{width:190px;height:190px;position:relative}
+.ny-ring svg{width:100%;height:100%;overflow:visible}
+.ny-ring .lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:var(--mono)}
+.ny-ring .lbl small{font-size:9px;letter-spacing:.22em;color:#8b94a7} .ny-ring .lbl b{font-size:24px;font-weight:500;color:#fff;margin:4px 0;text-shadow:0 0 14px rgba(245,199,107,.45)} .ny-ring .lbl span{font-size:10px;letter-spacing:.16em;color:var(--gold)}
+.ny-idx{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ny-ic{position:relative;border:1px solid var(--ny-line);border-radius:14px;padding:10px 12px;background:linear-gradient(160deg,rgba(245,199,107,.07),rgba(77,163,255,.04));overflow:hidden;cursor:pointer}
+.ny-ic::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.06) 50%,transparent 60%);transform:translateX(-100%);animation:nySheen 6s infinite}
+.ny-ic span{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:#8b94a7} .ny-ic b{display:block;font-family:var(--mono);font-size:19px;font-weight:500;margin-top:2px;color:#fff} .ny-ic em{font-style:normal;font-family:var(--mono);font-size:12px}
+.ny-ic .spark{position:absolute;right:8px;bottom:8px;opacity:.9}
+.ny-board{position:relative;height:46px;border:1px solid rgba(255,176,0,.25);border-radius:10px;background:#090600;overflow:hidden;margin-bottom:16px;box-shadow:inset 0 0 30px rgba(0,0,0,.9),0 0 30px rgba(255,176,0,.06)}
+.ny-board-in{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;animation:nyTape 90s linear infinite;font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:20px;letter-spacing:.08em}
+.ny-board:hover .ny-board-in{animation-play-state:paused}
+.ny-bi{margin-right:44px;color:var(--amber);text-shadow:0 0 6px rgba(255,176,0,.9),0 0 18px rgba(255,140,0,.45);cursor:pointer}
+.ny-bi i{font-style:normal} .ny-bi .u{color:#44ff9a;text-shadow:0 0 6px rgba(68,255,154,.9)} .ny-bi .d{color:#ff5470;text-shadow:0 0 6px rgba(255,84,112,.9)}
+.ny-bi.flash{animation:nyFlash 1s}
+.ny-dots{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 62%,rgba(9,6,0,.55) 70%) 0 0/3px 3px}
+.ny-main{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(280px,1fr);gap:14px;margin-bottom:14px}
+.ny-col{display:flex;flex-direction:column;gap:14px} .ny-col .ny-pane{margin:0}
+.ny-pane{border:1px solid var(--ny-line);border-radius:16px;padding:12px 14px;margin-bottom:14px;background:linear-gradient(180deg,rgba(14,18,30,.85),rgba(6,8,14,.85));box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 20px 50px rgba(0,0,0,.35);backdrop-filter:blur(6px)}
+.ny-main > .ny-pane{margin:0}
+.ny-ph{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-family:var(--mono);font-size:11px;letter-spacing:.24em;color:var(--gold)}
+.ny-ph em{font-style:normal;letter-spacing:.04em;color:#6c7588;font-size:11px}
+.ny-sky{position:relative;height:520px;border-radius:12px;overflow:hidden;background:radial-gradient(ellipse at 50% 85%,rgba(77,163,255,.18),transparent 60%),radial-gradient(ellipse at 50% 0%,rgba(245,199,107,.08),transparent 50%),#02030a;cursor:grab}
+.ny-sky:active{cursor:grabbing}
+.ny-sky canvas{width:100%;height:100%;display:block}
+.ny-tip{position:absolute;pointer-events:none;min-width:170px;padding:9px 11px;border-radius:10px;background:rgba(6,9,18,.92);border:1px solid rgba(245,199,107,.45);box-shadow:0 0 24px rgba(245,199,107,.2);font-size:12px;transform:translate(-50%,-110%)}
+.ny-tip b{font-family:var(--mono);font-size:15px;color:#fff} .ny-tip small{display:block;color:#8b94a7} .ny-tip em{font-style:normal;font-family:var(--mono);font-size:14px}
+.ny-skyctl{position:absolute;right:10px;top:10px;display:flex;gap:6px}
+.ny-skyctl button{background:rgba(6,9,18,.75);border:1px solid var(--ny-line);color:#c8d0de;border-radius:8px;padding:5px 10px;font-family:var(--mono);font-size:11px;cursor:pointer}
+.ny-skyctl button.on{color:var(--gold);border-color:rgba(245,199,107,.55)}
+.ny-gauge svg{width:100%;max-width:300px;display:block;margin:0 auto}
+.ny-bline{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:10px 0 8px;background:#1b2130}
+.ny-bline i{display:block} .ny-bline .u{background:linear-gradient(90deg,#0fae6c,var(--ny-g));box-shadow:0 0 12px rgba(45,255,160,.5)} .ny-bline .d{background:linear-gradient(90deg,var(--ny-r),#a3122c)}
+.ny-bstat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;color:#8b94a7} .ny-bstat b{font-size:16px}
+.ny-sec{display:grid;grid-template-columns:118px 1fr 64px;gap:8px;align-items:center;padding:5px 0;font-size:12px;cursor:default}
+.ny-sec span{color:#c8d0de;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ny-sbar{position:relative;height:8px;background:rgba(255,255,255,.05);border-radius:5px}
+.ny-sbar::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,.25)}
+.ny-sbar i{position:absolute;top:0;bottom:0;border-radius:5px} .ny-sbar i.u{left:50%;background:linear-gradient(90deg,rgba(45,255,160,.3),var(--ny-g));box-shadow:0 0 10px rgba(45,255,160,.5)} .ny-sbar i.d{right:50%;background:linear-gradient(270deg,rgba(255,74,104,.3),var(--ny-r));box-shadow:0 0 10px rgba(255,74,104,.5)}
+.ny-sec b{font-family:var(--mono);font-size:12px;text-align:right}
+.ny-heat{display:flex;flex-wrap:wrap;gap:6px}
+.ny-hs{display:flex;flex-direction:column;gap:3px;min-width:150px}
+.ny-hs h6{margin:0;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:#8b94a7;font-weight:500}
+.ny-ht{display:flex;flex-wrap:wrap;gap:3px;flex:1}
+.ny-t{flex:1 1 auto;min-height:52px;border-radius:6px;padding:6px 7px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;font-family:var(--mono);transition:transform .15s,box-shadow .15s;border:1px solid rgba(255,255,255,.06)}
+.ny-t:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.35)}
+.ny-t b{font-size:13px;color:#fff} .ny-t span{font-size:11px;color:rgba(255,255,255,.85)}
+.ny-two{display:grid;grid-template-columns:1fr 1fr;gap:14px} .ny-two .ny-pane{margin:0 0 14px}
+.ny-mv{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 6px;border-bottom:1px solid rgba(245,199,107,.07);cursor:pointer;font-size:13px}
+.ny-mv:hover{background:rgba(245,199,107,.05)} .ny-mv b{font-family:var(--mono);color:#fff} .ny-mv small{display:block;color:#7d879a;font-size:11px} .ny-mv span{font-family:var(--mono)} .ny-mv em{font-style:normal;font-family:var(--mono);padding:3px 8px;border-radius:6px;font-size:12px}
+.ny-mv em.u{background:rgba(45,255,160,.12);color:var(--ny-g)} .ny-mv em.d{background:rgba(255,74,104,.12);color:var(--ny-r)}
+@keyframes nyTape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes nyBlink{50%{opacity:.3}}
+@keyframes nySheen{0%,70%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes nyFlash{0%{background:rgba(255,176,0,.35)}100%{background:transparent}}
+@media (max-width:1100px){ .ny-hero{grid-template-columns:1fr auto} .ny-idx{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))} .ny-main{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:760px){ .ny-hero{grid-template-columns:1fr} .ny-ring{margin:0 auto;width:170px;height:170px} .ny-idx{grid-template-columns:repeat(2,minmax(0,1fr))} .ny-id h1 span{font-size:48px} .ny-sky{height:380px} .ny-two{grid-template-columns:1fr} .ny-hs{min-width:100%} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -742,7 +856,8 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
   <button data-tab="data"><span class="ti">📊</span>Markets</button>
   <button data-tab="research"><span class="ti">🔎</span>Research</button>
   <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
-  <button data-tab="signals"><span class="ti">◎</span>Signals</button>
+  <button data-tab="nyse"><span class="ti">🏛</span>Big Board</button>
+  <!-- Signals tab is hidden but its code is kept; set SHOW_SIGNALS=true to bring it back -->
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
 
@@ -759,7 +874,7 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
     <section id="tab-news" class="news-grid">
       <div>
         <div class="toolbar" id="toolbar"></div>
-        <ul class="feed" id="feed"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></ul>
+        <div class="feed" id="feed"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
       </div>
       <div class="news-side">
         <div class="sec-h"><span>Watchlist movers</span></div>
@@ -870,6 +985,37 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
     </section>
 
     <!-- PREDICTIONS -->
+    <!-- NYSE: live exchange floor -->
+    <section id="tab-nyse" class="pad ny" hidden>
+      <div class="ny-hero">
+        <div class="ny-id">
+          <div class="ny-kick"><i></i>NEW YORK STOCK EXCHANGE <span>· 11 WALL STREET · LIVE FLOOR</span></div>
+          <h1><span>THE BIG BOARD</span><em id="nyStatus">—</em></h1>
+          <div class="ny-clock"><b id="nyClock">--:--:--</b><span>ET</span><small id="nyDate"></small></div>
+        </div>
+        <div class="ny-ring" id="nyRing"></div>
+        <div class="ny-idx" id="nyIdx"></div>
+      </div>
+      <div class="ny-board"><div class="ny-board-in" id="nyBoard"></div><div class="ny-dots"></div></div>
+      <div class="ny-main">
+        <div class="ny-pane ny-skyp">
+          <div class="ny-ph"><span>MARKET SKYLINE</span><em>each tower is a company · height = today's move · drag to rotate · click a tower</em></div>
+          <div class="ny-sky" id="nySky"><canvas id="nyCanvas"></canvas><div class="ny-tip" id="nyTip" hidden></div>
+            <div class="ny-skyctl"><button type="button" id="nySpin" class="on" title="Auto-rotate">⟳ Rotate</button><button type="button" id="nyView" title="Change camera angle">◩ Angle</button></div></div>
+        </div>
+        <div class="ny-col">
+          <div class="ny-pane"><div class="ny-ph"><span>MARKET BREADTH</span><em>how many are up vs down</em></div><div id="nyBreadth"></div></div>
+          <div class="ny-pane"><div class="ny-ph"><span>SECTOR PULSE</span><em>average move today</em></div><div id="nySectors"></div></div>
+        </div>
+      </div>
+      <div class="ny-pane"><div class="ny-ph"><span>HEATMAP</span><em>tile size ≈ company size · color = today's move · click to open</em></div><div class="ny-heat" id="nyHeat"></div></div>
+      <div class="ny-two">
+        <div class="ny-pane"><div class="ny-ph"><span>TOP GAINERS</span></div><div id="nyGain"></div></div>
+        <div class="ny-pane"><div class="ny-ph"><span>TOP DECLINERS</span></div><div id="nyLose"></div></div>
+      </div>
+      <div class="disc">Covers about 65 of the largest NYSE-listed companies plus the NYSE Composite, Dow, S&amp;P 500 and VIX. Prices refresh every 15 seconds and stream live during market hours. Session times are regular NYSE hours (holidays aren't shown). Company sizes are approximate.</div>
+    </section>
+
     <!-- SIGNALS: futuristic technical scanner -->
     <section id="tab-signals" class="pad sg" hidden>
       <div class="sg-hud">
@@ -1032,7 +1178,8 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 // Typing a coin's symbol adds the crypto (Yahoo uses COIN-USD)
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
-const TABS = ["news","data","research","portfolio","signals","predict"];
+const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
+const TABS = ["news","data","research","portfolio","nyse",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 const MK = {
   mkBonds:[["^IRX","13-week T-bill"],["^FVX","5-year Treasury"],["^TNX","10-year Treasury"],["^TYX","30-year Treasury"]],
   mkBondFunds:[["AGG","US Aggregate Bond"],["BND","Total Bond Market"],["TLT","20+ Yr Treasury"],["IEF","7-10 Yr Treasury"],["SHY","1-3 Yr Treasury"],["TIP","TIPS"],["LQD","Investment-Grade Corp"],["HYG","High-Yield Corp"],["MUB","Municipal Bonds"],["BNDX","International Bond"]],
@@ -1133,6 +1280,7 @@ function setTab(t){
   if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
   if(t==="signals"){ sigOpen(); }
+  if(t==="nyse"){ nyOpen(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -1287,26 +1435,53 @@ function cluster(list){ // merge the same story from different outlets into one 
   return out;
 }
 function usefulSummary(i){ if(!i.summary) return ""; const sw=words(i.summary); return overlap(sw,i._w)>=0.7&&sw.size<=i._w.size+4?"":i.summary; }
+// News as a newspaper front page: lead story, "What's News" rail, secondary stories, sections, more headlines
+const NP_SECTIONS=[["Crypto",/bitcoin|crypto|\bether|ethereum|\bxrp\b|solana|stablecoin|\bcoin(base)?\b/i],["Energy & Commodities",/\boil\b|crude|opec|natural gas|\bgold\b|copper|energy|commodit/i],
+  ["Economy",/\bfed\b|federal reserve|inflation|\bjobs\b|payroll|\bgdp\b|interest rate|rate cut|rate hike|tariff|economy|\bcpi\b|unemployment|recession|powell|treasury secretary/i],
+  ["Tech",/\bai\b|artificial intelligence|chip|semiconductor|nvidia|apple|microsoft|google|alphabet|\bmeta\b|amazon|software|openai|anthropic|data center|cloud/i],
+  ["Companies & Earnings",/earnings|revenue|profit|quarter|guidance|\bceo\b|merger|acquir|\bdeal\b|\bipo\b|layoff|buyback|dividend/i],
+  ["Markets",/stock|s&p|\bdow\b|nasdaq|market|rally|sell-?off|shares|index|treasur|yield|bond|futures|wall street/i]];
+const npSection=i=>{ const t=i.title+" "+(i.summary||""); for(const [n,re] of NP_SECTIONS) if(re.test(t)) return n; return "More News"; };
 function renderFeed(){
   const list=cluster(filtered()); const now=Date.now();
   const nNew=S.news?S.news.items.filter(i=>i._new&&now-i._new<10*60e3).length:0;
   $("newsCount").textContent=nNew?nNew+" new":"";
   if(!list.length){ $("feed").innerHTML=`<div class="empty">${S.news?(S.srcOff.size===5?"Pick at least one news source from the Sources menu.":"No headlines match these filters yet."):"Loading…"}</div>`; return; }
-  const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3) return ago(t);
+  const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3) return ago(t)+" ago";
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
-  const more=list.length>S.newsShow;
-  $("feed").innerHTML=`<div class="feed-count">${list.length.toLocaleString()} stor${list.length===1?"y":"ies"} · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</div>`+list.slice(0,S.newsShow).map(i=>{
-    const s=SRC[i.source]; const isNew=i._new&&now-i._new<10*60e3;
-    const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
-    const tags=shown.slice(0,3).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")+(shown.length>3?`<span class="more-tags">+${shown.length-3}</span>`:"");
-    const also=i.also.length?`<span class="also">also on ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener" style="color:${SRC[a.source].c}">${SRC[a.source].short}</a>`).join(", ")}</span>`:"";
-    const sum=usefulSummary(i);
-    return `<li class="item ${isNew&&now-i._new<5000?"new":""}">
-      <div class="meta"><span class="src" style="background:${s.c}">${s.short}</span><span class="when" title="${i.time?esc(new Date(i.time).toLocaleString("en-US",{timeZone:"America/New_York"})):""}">${when(i.time)}</span>${i.mood>0?'<span class="dot p" title="Positive tone">▲</span>':i.mood<0?'<span class="dot n" title="Negative tone">▼</span>':""}${isNew?'<span class="badge-new">NEW</span>':""}${also}</div>
-      <h3><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>
-      ${sum?`<p>${esc(sum)}</p>`:""}
-      ${tags?`<div class="tags">${tags}</div>`:""}</li>`;
-  }).join("")+(more?`<div style="text-align:center;padding:16px"><button class="btn ghost" id="moreNews">Show more (${(list.length-S.newsShow).toLocaleString()} older)</button></div>`:"");
+  const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
+  const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
+  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
+  const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
+    return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
+  const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
+  // pick the lead: the most-covered, most substantial recent story
+  const top=list.slice(0,12), score=i=>i.also.length*3+(usefulSummary(i)?2:0)+(i.tickers.length?1:0)-(top.indexOf(i)*0.25);
+  const lead=top.slice().sort((a,b)=>score(b)-score(a))[0];
+  const rest=list.filter(i=>i!==lead);
+  const side=rest.splice(0,4), rail=rest.splice(0,9);
+  const groups={}; rest.slice(0,Math.max(0,S.newsShow-14)).forEach(i=>{ const k=npSection(i); (groups[k]=groups[k]||[]).push(i); });
+  const order=[...NP_SECTIONS.map(x=>x[0]),"More News"].filter(k=>groups[k]&&groups[k].length);
+  const sectionHtml=order.map(k=>{ const g=groups[k], f=g[0];
+    return `<section class="np-sec"><h4><span>${esc(k)}</span></h4>
+      <article class="np-art"><h3><a ${A(f)}>${esc(f.title)}</a></h3>${dek(f,180)}${meta(f)}${tags(f)}</article>
+      ${g.slice(1,6).map(i=>`<article class="np-brief"><h5><a ${A(i)}>${esc(i.title)}</a></h5>${meta(i)}</article>`).join("")}
+      ${g.length>6?`<details class="np-x"><summary>${g.length-6} more in ${esc(k)}</summary>${g.slice(6).map(i=>`<article class="np-brief"><h5><a ${A(i)}>${esc(i.title)}</a></h5>${meta(i)}</article>`).join("")}</details>`:""}</section>`; }).join("");
+  const idx=[["^GSPC","S&P 500"],["^DJI","Dow"],["^IXIC","Nasdaq"],["^TNX","10-Yr"],["BTC-USD","Bitcoin"]].map(([k,l])=>{ const q=S.quotes[k]; return q&&!q.error?`<span>${l} <b class="${cls(q.change)}">${pct(q.changePct)}</b></span>`:""; }).join("");
+  const today=new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric",year:"numeric"});
+  const totalShown=Math.min(list.length,S.newsShow), more=list.length>S.newsShow;
+  $("feed").innerHTML=`<div class="np">
+    <div class="np-mast"><div class="np-ear l">${esc(today)}<br><span>${list.length.toLocaleString()} stories · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</span></div>
+      <h1>The Terminal Journal</h1><div class="np-ear r">${idx||"Markets loading…"}</div></div>
+    <div class="np-band">${S.view==="mine"?"MY STOCKS EDITION":S.view!=="all"?esc(S.view)+" EDITION":"LIVE EDITION"} · ${Object.keys(SRC).filter(k=>!S.srcOff.has(k)).map(k=>SRC[k].name).join(" · ")}</div>
+    <div class="np-front">
+      <aside class="np-rail"><h4><span>What's News</span></h4>${rail.map(i=>`<div class="np-wn"><a ${A(i)}><b>${esc(i.title)}</b></a>${dek(i,110)}${meta(i)}</div>`).join("")||'<p class="np-dek">More headlines will appear here as they arrive.</p>'}</aside>
+      <article class="np-lead"><div class="np-kick">${esc(npSection(lead))}</div><h2><a ${A(lead)}>${esc(lead.title)}</a></h2>${dek(lead,420)}${meta(lead)}${tags(lead)}</article>
+      <div class="np-side">${side.map((i,n)=>`<article class="np-art ${n===0?"big":""}"><div class="np-kick">${esc(npSection(i))}</div><h3><a ${A(i)}>${esc(i.title)}</a></h3>${dek(i,n===0?200:120)}${meta(i)}</article>`).join("")}</div>
+    </div>
+    ${sectionHtml?`<div class="np-sections">${sectionHtml}</div>`:""}
+    ${more?`<div class="np-foot"><button class="btn ghost" id="moreNews">Load more stories (${(list.length-S.newsShow).toLocaleString()} older)</button></div>`:""}
+  </div>`;
   if(more) $("moreNews").onclick=()=>{ S.newsShow+=200; renderFeed(); };
 }
 function renderStatus(){
@@ -2152,7 +2327,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",predict:"Claude Predictor"};
+const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Big Board",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -2174,6 +2349,12 @@ function acContext(){
   } else if(t==="portfolio"){
     const pf=S.pfs.find(p=>p.id===S.pfActive); L.push(`Portfolio "${pf.name}"`);
     pf.holdings.forEach(h=>{ const q=S.quotes[h.symbol]; const v=q&&!q.error?h.shares*q.price:null; L.push(`- ${h.symbol}: invested $${fmt(h.shares*h.cost)}, now ${v!=null?"$"+fmt(v):"?"} (${v!=null?pct((v/(h.shares*h.cost)-1)*100):"?"}), today ${q&&!q.error?pct(q.changePct):"?"}, sector ${sectorOf(h.symbol)}`); });
+  } else if(t==="nyse"){
+    const rows=NY_LIST.map(([s,n,sec])=>({s,n,sec,q:S.quotes[s]})).filter(r=>r.q&&!r.q.error);
+    const ses=nySession(); L.push(`Big Board (NYSE) view. Session: ${ses.label}.`);
+    NY_IDX.forEach(([k,l])=>{ const q=S.quotes[k]; if(q&&!q.error) L.push(`${l}: ${fmt(q.price)} (${pct(q.changePct)})`); });
+    const up=rows.filter(r=>r.q.changePct>0).length; L.push(`Breadth among ${rows.length} large NYSE stocks: ${up} up, ${rows.length-up} down or flat.`);
+    rows.sort((a,b)=>b.q.changePct-a.q.changePct).forEach(r=>L.push(`- ${r.s} (${r.n}, ${r.sec}): ${fmt(r.q.price)} ${pct(r.q.changePct)}`));
   } else if(t==="signals"){
     const rows=Object.values(SG.res).filter(r=>r.ok).sort((a,b)=>b.score-a.score);
     L.push(`Signal scanner results (score −100 bearish … +100 bullish, from daily price history):`);
@@ -2193,6 +2374,7 @@ function acChips(){
     data:["What's driving the market today?","Explain the market mood score","Which sectors look strongest right now?"],
     research:s?[`Is ${s} a good buy right now?`,`Explain ${s}'s financials simply`,`What are the biggest risks for ${s}?`]:["How do I read a stock's key stats?"],
     portfolio:["Build me a balanced $10,000 portfolio","Build me an aggressive growth portfolio","Portfolio check-up","Am I too concentrated anywhere?"],
+    nyse:["What's driving the NYSE today?","Which sectors are leading and lagging?","Explain market breadth in plain English","What does the VIX say about fear right now?"],
     signals:["Which signals look strongest right now?","Explain the bearish signals on my holdings","What does a golden cross mean?","Which oversold stocks could bounce?"],
     predict:["Build me a portfolio based on today's news and earnings","How is my portfolio positioned for the week ahead?","Summarize today's market in 5 bullets","Which stocks on my watchlist have notable news?"],
   };
@@ -2291,7 +2473,7 @@ $("addForm").onsubmit=e=>{
 
 /* ---------- real-time price stream (when the server has a Finnhub key) ---------- */
 let es=null, streamKey="", streamOn=false, paintPending=false, prevPaint={};
-function streamSyms(){ return [...new Set([...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
+function streamSyms(){ return [...new Set([...(S.tab==="nyse"?NY_LIST.filter(x=>x[3]>=2).map(x=>x[0]).slice(0,18):[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
 function startStream(){
   if(!streamOn||!("EventSource" in window)) return;
   const syms=streamSyms(), key=syms.join(",");
@@ -2312,7 +2494,7 @@ function startStream(){
     S.lastTick=Date.now(); S.streaming=true;
     if(!paintPending){ paintPending=true; requestAnimationFrame(()=>{ paintPending=false;
       renderTape(); renderWL(prevPaint); renderMovers(); checkAlerts();
-      if(S.tab==="data") renderData(); if(S.tab==="portfolio") renderPortfolio();  if(S.tab==="research"&&S.rq.sym) renderResearchHead(); }); }
+      if(S.tab==="data") renderData(); if(S.tab==="portfolio") renderPortfolio(); if(S.tab==="nyse") nyRender();  if(S.tab==="research"&&S.rq.sym) renderResearchHead(); }); }
   };
   es.onerror=()=>{ S.streaming=false; }; // EventSource reconnects by itself
 }
@@ -2698,6 +2880,178 @@ $("clPop").addEventListener("submit",async e=>{ e.preventDefault(); const pw=$("
   $("clGo").disabled=false; });
 document.addEventListener("click",e=>{ if(!$("clPop").hidden&&!e.target.closest(".cl-wrap")&&Date.now()-(CL.openedAt||0)>400) $("clPop").hidden=true; });
 clRender();
+
+/* ---------- BIG BOARD (NYSE live floor) ---------- */
+const NY_LIST=[
+ ["JPM","JPMorgan Chase","Financials",3],["V","Visa","Financials",3],["MA","Mastercard","Financials",3],["BRK-B","Berkshire Hathaway","Financials",3],["BAC","Bank of America","Financials",2],["WFC","Wells Fargo","Financials",2],["GS","Goldman Sachs","Financials",2],["MS","Morgan Stanley","Financials",2],["AXP","American Express","Financials",2],["BLK","BlackRock","Financials",1],["C","Citigroup","Financials",1],["SPGI","S&P Global","Financials",1],["SCHW","Charles Schwab","Financials",1],
+ ["LLY","Eli Lilly","Health Care",3],["JNJ","Johnson & Johnson","Health Care",3],["UNH","UnitedHealth","Health Care",2],["ABBV","AbbVie","Health Care",2],["MRK","Merck","Health Care",2],["PFE","Pfizer","Health Care",1],["TMO","Thermo Fisher","Health Care",1],["ABT","Abbott","Health Care",1],["DHR","Danaher","Health Care",1],["BMY","Bristol Myers","Health Care",1],
+ ["ORCL","Oracle","Technology",3],["TSM","TSMC","Technology",3],["CRM","Salesforce","Technology",2],["IBM","IBM","Technology",2],["NOW","ServiceNow","Technology",2],["ACN","Accenture","Technology",1],["ANET","Arista Networks","Technology",1],["DELL","Dell","Technology",1],["UBER","Uber","Technology",1],
+ ["WMT","Walmart","Consumer",3],["PG","Procter & Gamble","Consumer",2],["HD","Home Depot","Consumer",2],["KO","Coca-Cola","Consumer",2],["MCD","McDonald's","Consumer",1],["NKE","Nike","Consumer",1],["LOW","Lowe's","Consumer",1],["PM","Philip Morris","Consumer",1],["CL","Colgate-Palmolive","Consumer",1],
+ ["XOM","Exxon Mobil","Energy",3],["CVX","Chevron","Energy",2],["COP","ConocoPhillips","Energy",1],["SLB","SLB","Energy",1],["EOG","EOG Resources","Energy",1],
+ ["GE","GE Aerospace","Industrials",2],["CAT","Caterpillar","Industrials",2],["RTX","RTX","Industrials",2],["BA","Boeing","Industrials",1],["UPS","UPS","Industrials",1],["LMT","Lockheed Martin","Industrials",1],["DE","Deere","Industrials",1],["UNP","Union Pacific","Industrials",1],
+ ["DIS","Disney","Communication",2],["T","AT&T","Communication",2],["VZ","Verizon","Communication",2],
+ ["NEE","NextEra Energy","Utilities & Materials",1],["DUK","Duke Energy","Utilities & Materials",1],["SO","Southern Co.","Utilities & Materials",1],["LIN","Linde","Utilities & Materials",1],["SHW","Sherwin-Williams","Utilities & Materials",1]];
+const NY_IDX=[["^NYA","NYSE COMPOSITE"],["^DJI","DOW JONES"],["^GSPC","S&P 500"],["^VIX","VIX · FEAR"]];
+const NY_SECS=[...new Set(NY_LIST.map(x=>x[2]))];
+const NY={at:0,loading:false,prev:{},spin:true,pitch:0.62,yaw:0.6,drag:null,hover:null,b:{},raf:0,parts:[]};
+const nyQ=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price!=null?q:null; };
+async function nyLoad(){
+  if(NY.loading) return; NY.loading=true;
+  try{ const syms=[...NY_LIST.map(x=>x[0]),...NY_IDX.map(x=>x[0])];
+    const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(",")));
+    for(const [k,q] of Object.entries(j.quotes)){ const old=S.quotes[k]; if(old&&old.price!=null&&q.price!=null&&old.price!==q.price) NY.prev[k]={dir:q.price>old.price?1:-1,t:Date.now()}; }
+    S.quotes={...S.quotes,...j.quotes}; NY.at=Date.now(); }
+  catch(e){ console.warn("bigboard",e); }
+  NY.loading=false; if(S.tab==="nyse") nyRender();
+}
+// NYSE session (Eastern time): pre-market 4:00, open 9:30, close 16:00, after-hours until 20:00
+function nySession(){
+  const parts=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour12:false,weekday:"short",hour:"2-digit",minute:"2-digit",second:"2-digit"}).formatToParts(new Date()).map(p=>[p.type,p.value]));
+  const wd=parts.weekday, sec=(+parts.hour%24)*3600+ +parts.minute*60+ +parts.second, wkend=wd==="Sat"||wd==="Sun";
+  const P=4*3600, O=9.5*3600, C=16*3600, A=20*3600;
+  let st,label,target,from,to;
+  if(!wkend&&sec>=O&&sec<C){ st="open"; label="MARKET OPEN"; target="CLOSING BELL IN"; from=O; to=C; }
+  else if(!wkend&&sec>=P&&sec<O){ st="pre"; label="PRE-MARKET"; target="OPENING BELL IN"; from=P; to=O; }
+  else if(!wkend&&sec>=C&&sec<A){ st="post"; label="AFTER HOURS"; target="AFTER-HOURS ENDS IN"; from=C; to=A; }
+  else { st="closed"; label="CLOSED"; target="OPENING BELL IN"; }
+  let left;
+  if(st==="closed"){ const dayIdx=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(wd); let add=0;
+    if(!wkend&&sec<P) add=0; else { add=1; let d=(dayIdx+1)%7; while(d===0||d===6){ add++; d=(d+1)%7; } }
+    left=add*86400+O-sec; from=0; to=1; }
+  else left=to-sec;
+  const prog=st==="closed"?0:(sec-from)/(to-from);
+  const dd=Math.floor(left/86400), hh=Math.floor(left%86400/3600), mm=Math.floor(left%3600/60), ss=left%60;
+  return {st,label,target,prog,left:`${dd?dd+"d ":""}${hh}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`,time:`${parts.hour%24}:${parts.minute}:${parts.second}`.replace(/^(\d):/,"0$1:")};
+}
+function nyTick(){ // every second: clock, session ring
+  if(S.tab!=="nyse") return; const s=nySession();
+  setHTML("nyClock",s.time); setHTML("nyDate",new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"short",month:"short",day:"numeric"}));
+  const e=$("nyStatus"); e.textContent=s.label; e.className=s.st;
+  const R=78, Cc=2*Math.PI*R, col=s.st==="open"?"#2dffa0":s.st==="closed"?"#4da3ff":"#ffb000";
+  const marks=["4a","9:30","4p","8p"];
+  setHTML("nyRing",`<svg viewBox="-100 -100 200 200"><defs><filter id="nyGl"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <circle r="${R+12}" fill="none" stroke="rgba(245,199,107,.12)" stroke-dasharray="1 5"/>
+    <circle r="${R}" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
+    <circle r="${R}" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(Cc*s.prog).toFixed(1)} ${Cc.toFixed(1)}" transform="rotate(-90)" filter="url(#nyGl)"/>
+    ${s.st!=="closed"?`<circle r="5" fill="#fff" filter="url(#nyGl)" transform="rotate(${s.prog*360-90}) translate(${R} 0)"/>`:""}</svg>
+    <div class="lbl"><small>${s.target}</small><b>${s.left}</b><span>${s.st==="open"?"REGULAR SESSION":s.st==="pre"?"PRE-MARKET SESSION":s.st==="post"?"EXTENDED HOURS":"NEXT SESSION"}</span></div>`);
+}
+setInterval(nyTick,1000);
+function nyRender(){
+  if(!$("tab-nyse")) return;
+  // index cards
+  setHTML("nyIdx",NY_IDX.map(([k,l])=>{ const q=nyQ(k); return `<div class="ny-ic" data-nyopen="${esc(k)}"><span>${l}</span><b>${q?fmt(q.price):"—"}</b><em class="${q?cls(q.change):""}">${q?(q.change>=0?"▲ ":"▼ ")+pct(q.changePct):""}</em>${q&&q.spark?spark(q.spark,70,26,q.prevClose):""}</div>`; }).join(""));
+  // LED board (content duplicated for a seamless loop)
+  const rows=NY_LIST.map(([s,n,sec,t])=>({s,n,sec,t,q:nyQ(s)})).filter(r=>r.q);
+  const now=Date.now();
+  const tape=rows.map(r=>`<span class="ny-bi ${NY.prev[r.s]&&now-NY.prev[r.s].t<1500?"flash":""}" data-nyopen="${esc(r.s)}">${esc(r.s)} <i>${fmt(r.q.price)}</i> <i class="${r.q.change>=0?"u":"d"}">${r.q.change>=0?"▲":"▼"}${Math.abs(r.q.changePct).toFixed(2)}</i></span>`).join("");
+  const tapeHtml=tape+tape; if(NY.lastTape!==tapeHtml){ NY.lastTape=tapeHtml; $("nyBoard").innerHTML=tapeHtml||'<span class="ny-bi">LOADING THE TAPE…</span>'; }
+  if(!rows.length){ setHTML("nyBreadth",'<div class="sg-empty">Loading…</div>'); return; }
+  // breadth
+  const up=rows.filter(r=>r.q.changePct>0.0001).length, dn=rows.filter(r=>r.q.changePct<-0.0001).length, fl=rows.length-up-dn, ratio=up/Math.max(1,up+dn);
+  const ang=-90+ratio*180, avg=rows.reduce((a,r)=>a+r.q.changePct*r.t,0)/rows.reduce((a,r)=>a+r.t,0);
+  const mood=ratio>=0.7?"BROAD RALLY":ratio>=0.55?"MOSTLY HIGHER":ratio>0.45?"MIXED":ratio>0.3?"MOSTLY LOWER":"BROAD SELLOFF";
+  setHTML("nyBreadth",`<div class="ny-gauge"><svg viewBox="-120 -110 240 130"><defs><linearGradient id="nyGg" x1="0" x2="1"><stop offset="0" stop-color="#ff4a68"/><stop offset=".5" stop-color="#ffb000"/><stop offset="1" stop-color="#2dffa0"/></linearGradient></defs>
+    <path d="M-95 0 A95 95 0 0 1 95 0" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="16"/>
+    <path d="M-95 0 A95 95 0 0 1 95 0" fill="none" stroke="url(#nyGg)" stroke-width="16" opacity=".85" stroke-dasharray="2 3"/>
+    <g transform="rotate(${ang.toFixed(1)})" style="transition:transform .8s"><line x1="0" y1="0" x2="0" y2="-82" stroke="#fff" stroke-width="3" stroke-linecap="round" style="filter:drop-shadow(0 0 6px #fff)"/></g>
+    <circle r="7" fill="#0b0f1a" stroke="#f5c76b" stroke-width="2"/>
+    <text y="-30" text-anchor="middle" style="font-family:var(--mono);font-size:22px;fill:#fff">${Math.round(ratio*100)}%</text>
+    <text y="-12" text-anchor="middle" style="font-family:var(--mono);font-size:8px;letter-spacing:2px;fill:#f5c76b">${mood}</text></svg></div>
+    <div class="ny-bline"><i class="u" style="width:${up/rows.length*100}%"></i><i style="width:${fl/rows.length*100}%;background:#39414f"></i><i class="d" style="width:${dn/rows.length*100}%"></i></div>
+    <div class="ny-bstat"><span><b class="up">${up}</b> advancing</span><span><b>${fl}</b> flat</span><span><b class="down">${dn}</b> declining</span></div>
+    <div class="ny-bstat" style="margin-top:8px"><span>Size-weighted move</span><b class="${cls(avg)}">${pct(avg)}</b></div>`);
+  // sectors
+  const secs=NY_SECS.map(sec=>{ const rs=rows.filter(r=>r.sec===sec); const a=rs.length?rs.reduce((x,r)=>x+r.q.changePct*r.t,0)/rs.reduce((x,r)=>x+r.t,0):0; return {sec,a,n:rs.length}; }).sort((x,y)=>y.a-x.a);
+  const mx=Math.max(1,...secs.map(x=>Math.abs(x.a)));
+  setHTML("nySectors",secs.map(x=>`<div class="ny-sec"><span>${esc(x.sec)}</span><div class="ny-sbar"><i class="${x.a>=0?"u":"d"}" style="width:${Math.abs(x.a)/mx*50}%"></i></div><b class="${cls(x.a)}">${pct(x.a)}</b></div>`).join(""));
+  // heatmap
+  const heatCol=c=>{ const v=Math.max(-3,Math.min(3,c))/3; return v>=0?`rgba(${Math.round(20+10*(1-v))},${Math.round(120+100*v)},${Math.round(80+30*v)},${0.35+0.55*v})`:`rgba(${Math.round(160+80*-v)},${Math.round(40-20*v)},${Math.round(60-10*v)},${0.35+0.55*-v})`; };
+  setHTML("nyHeat",NY_SECS.map(sec=>{ const rs=rows.filter(r=>r.sec===sec).sort((a,b)=>b.t-a.t); const w=rs.reduce((a,r)=>a+r.t,0);
+    return `<div class="ny-hs" style="flex:${w} 1 ${Math.max(150,w*28)}px"><h6>${esc(sec.toUpperCase())}</h6><div class="ny-ht">${rs.map(r=>`<div class="ny-t" data-nyopen="${esc(r.s)}" title="${esc(r.n)} · ${fmt(r.q.price)} · ${pct(r.q.changePct)}" style="flex-grow:${r.t};flex-basis:${r.t*44}px;min-height:${36+r.t*16}px;background:${heatCol(r.q.changePct)}"><b>${esc(r.s)}</b><span>${pct(r.q.changePct)}</span></div>`).join("")}</div></div>`; }).join(""));
+  // movers
+  const srt=rows.slice().sort((a,b)=>b.q.changePct-a.q.changePct);
+  const mv=r=>`<div class="ny-mv" data-nyopen="${esc(r.s)}"><div><b>${esc(r.s)}</b><small>${esc(r.n)} · ${esc(r.sec)}</small></div><span>${fmt(r.q.price)}</span><em class="${r.q.change>=0?"u":"d"}">${pct(r.q.changePct)}</em></div>`;
+  setHTML("nyGain",srt.slice(0,6).map(mv).join("")); setHTML("nyLose",srt.slice(-6).reverse().map(mv).join(""));
+  nySkyData(rows);
+}
+/* ----- 3D skyline (canvas) ----- */
+function nySkyData(rows){
+  const n=NY_SECS.length, R=230;
+  NY_SECS.forEach((sec,si)=>{ const a=si/n*Math.PI*2, cx=Math.cos(a)*R, cz=Math.sin(a)*R; const rs=rows.filter(r=>r.sec===sec).sort((x,y)=>y.t-x.t);
+    const cols=Math.ceil(Math.sqrt(rs.length)), gap=34;
+    rs.forEach((r,i)=>{ const gx=(i%cols-(cols-1)/2)*gap, gz=(Math.floor(i/cols)-(Math.ceil(rs.length/cols)-1)/2)*gap;
+      const b=NY.b[r.s]||(NY.b[r.s]={h:0}); b.x=cx+gx; b.z=cz+gz; b.w=8+r.t*5; b.t=r.t; b.target=Math.max(-6,Math.min(6,r.q.changePct))*26; b.q=r.q; b.n=r.n; b.sec=r.sec; b.sym=r.s; }); });
+  NY.secPos=NY_SECS.map((sec,si)=>{ const a=si/n*Math.PI*2; return {sec,x:Math.cos(a)*(R+105),z:Math.sin(a)*(R+105),px:Math.cos(a)*R,pz:Math.sin(a)*R}; });
+  if(!NY.raf) nySkyLoop();
+}
+function nySkyLoop(){
+  NY.raf=requestAnimationFrame(nySkyLoop);
+  if(S.tab!=="nyse"||document.hidden) return;
+  const cv=$("nyCanvas"); if(!cv) return; const box=cv.parentElement, W=box.clientWidth, H=box.clientHeight, dpr=Math.min(2,devicePixelRatio||1);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+  const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+  if(NY.spin&&!NY.drag) NY.yaw+=0.0022;
+  const cy=Math.cos(NY.yaw), sy=Math.sin(NY.yaw), cp=Math.cos(NY.pitch), sp=Math.sin(NY.pitch), D=900, F=Math.min(W,H)*1.25, ox=W/2, oy=H*0.56;
+  const P=(x,y,z)=>{ const xr=x*cy-z*sy, zr=x*sy+z*cy; const y2=y*cp-zr*sp, z2=y*sp+zr*cp; const f=F/(z2+D); return [ox+xr*f,oy-y2*f,z2]; };
+  const bs=Object.values(NY.b).filter(b=>b.q); bs.forEach(b=>{ b.h+=(b.target-b.h)*0.08; });
+  const depth=b=>{ const zr=b.x*sy+b.z*cy; return 0*cp+zr*cp; };
+  const sorted=bs.slice().sort((a,b)=>depth(b)-depth(a));
+  const colr=(h,a,l)=>h>=0?`hsla(152,95%,${l}%,${a})`:`hsla(350,95%,${l}%,${a})`;
+  const box3=(b,glass)=>{ const w=b.w/2, h=b.h, x0=b.x-w, x1=b.x+w, z0=b.z-w, z1=b.z+w;
+    const top=[P(x0,h,z0),P(x1,h,z0),P(x1,h,z1),P(x0,h,z1)], bot=[P(x0,0,z0),P(x1,0,z0),P(x1,0,z1),P(x0,0,z1)];
+    const mag=Math.min(1,Math.abs(b.target)/80), L=40+mag*22, A=glass?0.35:0.92;
+    const faces=[[0,1],[1,2],[2,3],[3,0]].map(([i,j])=>({pts:[bot[i],bot[j],top[j],top[i]],z:(bot[i][2]+bot[j][2])/2}));
+    faces.sort((a,c)=>c.z-a.z);
+    faces.forEach((f,k)=>{ g.beginPath(); f.pts.forEach((p,m)=>m?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath(); g.fillStyle=colr(h,A*(0.55+0.15*k),L-14+k*3); g.fill(); g.strokeStyle=colr(h,glass?0.25:0.5,L+15); g.lineWidth=0.6; g.stroke(); });
+    g.beginPath(); top.forEach((p,m)=>m?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1])); g.closePath();
+    if(!glass&&mag>0.3){ g.shadowColor=colr(h,1,60); g.shadowBlur=18*mag; }
+    g.fillStyle=colr(h,glass?0.5:1,L+12); g.fill(); g.shadowBlur=0;
+    const c=P(b.x,h,b.z); b.sx=c[0]; b.sy=c[1]; };
+  // 1) towers sinking below the glass floor (reflections of today's losers)
+  sorted.filter(b=>b.h<0).forEach(b=>box3(b,true));
+  // 2) glass floor with grid rings
+  g.save(); const rings=[120,230,340];
+  rings.forEach((r,i)=>{ g.beginPath(); for(let k=0;k<=72;k++){ const a=k/72*Math.PI*2, p=P(Math.cos(a)*r,0,Math.sin(a)*r); k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]); } g.closePath();
+    if(i===2){ const gr=g.createRadialGradient(ox,oy,10,ox,oy,F*0.45); gr.addColorStop(0,"rgba(77,163,255,.10)"); gr.addColorStop(1,"rgba(77,163,255,.02)"); g.fillStyle=gr; g.fill(); }
+    g.strokeStyle=i===1?"rgba(245,199,107,.28)":"rgba(77,163,255,.18)"; g.lineWidth=i===1?1.2:0.8; g.setLineDash(i===1?[]:[3,5]); g.stroke(); });
+  g.setLineDash([]);
+  for(let k=0;k<NY_SECS.length;k++){ const a=(k+0.5)/NY_SECS.length*Math.PI*2, p0=P(Math.cos(a)*60,0,Math.sin(a)*60), p1=P(Math.cos(a)*340,0,Math.sin(a)*340); g.beginPath(); g.moveTo(p0[0],p0[1]); g.lineTo(p1[0],p1[1]); g.strokeStyle="rgba(245,199,107,.10)"; g.stroke(); }
+  // district plates + labels
+  (NY.secPos||[]).forEach(s=>{ const r=62; g.beginPath(); for(let k=0;k<=40;k++){ const a=k/40*Math.PI*2, p=P(s.px+Math.cos(a)*r,0,s.pz+Math.sin(a)*r); k?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]); } g.fillStyle="rgba(245,199,107,.045)"; g.fill(); g.strokeStyle="rgba(245,199,107,.22)"; g.stroke();
+    const l=P(s.x,0,s.z); g.font="600 10px 'IBM Plex Mono', monospace"; g.textAlign="center"; g.fillStyle="rgba(245,199,107,.85)"; g.fillText(s.sec.toUpperCase(),l[0],l[1]); });
+  const c0=P(0,0,0); g.beginPath(); g.arc(c0[0],c0[1],4,0,Math.PI*2); g.fillStyle="#f5c76b"; g.shadowColor="#f5c76b"; g.shadowBlur=14; g.fill(); g.shadowBlur=0;
+  g.restore();
+  // 3) towers rising above the floor
+  sorted.filter(b=>b.h>=0).forEach(b=>box3(b,false));
+  // particles drifting up from the biggest gainers, down from losers
+  if(NY.parts.length<90&&bs.length){ const b=bs[Math.floor(Math.random()*bs.length)]; if(Math.abs(b.target)>20) NY.parts.push({x:b.x+(Math.random()-.5)*b.w,y:b.h,z:b.z+(Math.random()-.5)*b.w,v:b.target>0?0.7:-0.7,life:1,up:b.target>0}); }
+  NY.parts=NY.parts.filter(p=>(p.life-=0.008)>0); NY.parts.forEach(p=>{ p.y+=p.v; const s=P(p.x,p.y,p.z); g.fillStyle=p.up?`rgba(45,255,160,${p.life*.8})`:`rgba(255,74,104,${p.life*.6})`; g.fillRect(s[0],s[1],1.6,1.6); });
+  // labels for big companies and big movers
+  g.textAlign="center";
+  sorted.forEach(b=>{ if(b.sx==null) return; const show=b.t>=3||Math.abs(b.target)>40||NY.hover===b.sym; if(!show) return;
+    g.font=`${NY.hover===b.sym?"700 12px":"500 10px"} 'IBM Plex Mono', monospace`; g.fillStyle=NY.hover===b.sym?"#fff":"rgba(230,236,247,.8)"; g.fillText(b.sym,b.sx,b.sy-(b.h>=0?8:-14)); });
+  // hover ring
+  const hb=NY.hover&&NY.b[NY.hover]; if(hb&&hb.sx!=null){ g.beginPath(); g.arc(hb.sx,hb.sy,12,0,Math.PI*2); g.strokeStyle="rgba(255,255,255,.85)"; g.lineWidth=1.4; g.stroke(); }
+}
+// interaction: drag to rotate, hover for details, click to open
+(function(){
+  const sky=$("nySky"); if(!sky) return; const cv=$("nyCanvas"), tip=$("nyTip");
+  const pick=(mx,my)=>{ let best=null,bd=22*22; Object.values(NY.b).forEach(b=>{ if(b.sx==null) return; const d=(b.sx-mx)**2+(b.sy-my)**2; if(d<bd){ bd=d; best=b; } }); return best; };
+  cv.addEventListener("pointerdown",e=>{ NY.drag={x:e.clientX,y:e.clientY,yaw:NY.yaw,pitch:NY.pitch,moved:false}; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove",e=>{ const r=cv.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+    if(NY.drag){ const dx=e.clientX-NY.drag.x, dy=e.clientY-NY.drag.y; if(Math.abs(dx)+Math.abs(dy)>4) NY.drag.moved=true; NY.yaw=NY.drag.yaw+dx*0.008; NY.pitch=Math.max(0.15,Math.min(1.25,NY.drag.pitch+dy*0.004)); tip.hidden=true; return; }
+    const b=pick(mx,my); NY.hover=b?b.sym:null;
+    if(b){ tip.hidden=false; tip.style.left=mx+"px"; tip.style.top=my+"px"; tip.innerHTML=`<b>${esc(b.sym)}</b> <em class="${cls(b.q.change)}">${pct(b.q.changePct)}</em><small>${esc(b.n)} · ${esc(b.sec)}</small><small>${fmt(b.q.price)} · ${b.q.change>=0?"+":""}${fmt(b.q.change)} today</small>`; }
+    else tip.hidden=true; });
+  cv.addEventListener("pointerup",e=>{ const d=NY.drag; NY.drag=null; if(d&&!d.moved){ const r=cv.getBoundingClientRect(), b=pick(e.clientX-r.left,e.clientY-r.top); if(b) openQuote(b.sym); } });
+  cv.addEventListener("pointerleave",()=>{ NY.hover=null; tip.hidden=true; });
+  $("nySpin").onclick=()=>{ NY.spin=!NY.spin; $("nySpin").classList.toggle("on",NY.spin); };
+  $("nyView").onclick=()=>{ NY.pitch=NY.pitch>0.9?0.35:NY.pitch>0.5?1.1:0.62; };
+  $("tab-nyse").addEventListener("click",e=>{ const o=e.target.closest("[data-nyopen]"); if(o) openQuote(o.dataset.nyopen); });
+})();
+function nyOpen(){ nyTick(); nyRender(); if(!NY.at||Date.now()-NY.at>10e3) nyLoad(); }
+setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nyLoad(); },15e3);
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
