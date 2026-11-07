@@ -2442,14 +2442,16 @@ const sigLabel=s=>s>=50?"Strong bullish":s>=20?"Bullish":s<=-50?"Strong bearish"
 const sigTone=s=>s>=20?"g":s<=-20?"r":"n";
 const sgName=s=>{ const q=S.quotes[s]; return q&&q.name&&q.name!==s?q.name:(IDX_NAME&&IDX_NAME[s])||""; };
 async function sgScan(force){
-  const {list}=sgUniverse(); const todo=list.filter(s=>force||!SG.res[s]||Date.now()-SG.res[s].t>15*60e3);
+  const {list}=sgUniverse(); const todo=list.filter(s=>force||!SG.res[s]||Date.now()-SG.res[s].t>(SG.res[s].ok?15*60e3:20e3)); // failed symbols retry soon
   if(!todo.length||SG.scanning){ sgRender(); return; }
   SG.total=todo.length; SG.done=0; SG.scanning=true; sgRender();
   let i=0; const worker=async()=>{ while(i<todo.length){ const s=todo[i++];
     try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`); SG.res[s]=sgAnalyze(s,h.candles); }catch{ SG.res[s]={sym:s,ok:false,t:Date.now()}; }
     SG.done++; sgSoon(); } };
   await Promise.all([worker(),worker(),worker(),worker()]);
-  SG.scanning=false; SG.at=Date.now(); if(!SG.sel){ const top=Object.values(SG.res).filter(r=>r.ok).sort((a,b)=>Math.abs(b.score)-Math.abs(a.score))[0]; } sgRender();
+  SG.scanning=false; SG.at=Date.now(); sgRender();
+  const failed=list.filter(s=>SG.res[s]&&!SG.res[s].ok); // the data source sometimes rate-limits: try misses again shortly
+  if(failed.length&&(SG.retries=(SG.retries||0)+1)<=3) setTimeout(()=>{ if(S.tab==="signals") sgScan(false); },25e3); else if(!failed.length) SG.retries=0;
 }
 function sgSoon(){ if(SG.raf) return; SG.raf=requestAnimationFrame(()=>{ SG.raf=0; sgRender(); }); }
 function sigLive(){ sgSoon(); }
