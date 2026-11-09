@@ -1,6 +1,6 @@
 {
- "name": "Market Hub",
- "short_name": "Market Hub",
+ "name": "Market Desk",
+ "short_name": "Market Desk",
  "description": "Live stock news, markets, research and predictions",
  "start_url": "/",
  "display": "standalone",
