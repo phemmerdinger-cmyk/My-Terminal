@@ -949,6 +949,20 @@ html.viewonly.vo-dismissed .vo-hello{display:none}
 .sm-srcs span.off{opacity:.45;text-decoration:line-through}
 .sm-foot{font-size:11.5px;color:var(--dim);margin:14px 0 0}
 @media (max-width:900px){ .sm-grid{grid-template-columns:minmax(0,1fr)} .sm-head h2{font-size:22px} .sm-tb-note{display:none} }
+/* ===== API balance card (Claude Predictor, bottom right) ===== */
+.api-bal{display:none;position:fixed;right:18px;bottom:78px;z-index:40;width:250px;background:var(--panel);border:1px solid var(--line2);border-top:3px solid var(--claude);border-radius:12px;padding:12px 14px;box-shadow:0 18px 40px rgba(0,0,0,.45);font-size:12.5px}
+body.on-predict .api-bal{display:block} html.viewonly .api-bal{display:none!important}
+.ab-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--claude)}
+.ab-v{font-family:var(--mono);font-size:24px;font-weight:600;margin:4px 0 2px} .ab-v small{font-size:12px;color:var(--dim);font-weight:400}
+.ab-v.ok{color:var(--up)} .ab-v.mid{color:#f5c518} .ab-v.low{color:var(--down)}
+.ab-s{color:var(--dim);font-size:11.5px;line-height:1.4;margin-bottom:8px}
+.ab-row{display:flex;gap:8px;align-items:baseline;border-top:1px solid var(--line);padding:6px 0;font-size:12px} .ab-row span:first-child{flex:1;color:var(--dim)} .ab-row b{font-family:var(--mono);font-weight:500} .ab-row span:last-child:not(:first-child){color:var(--dim);font-size:11px}
+.ab-set{display:flex;gap:6px;margin:6px 0} .ab-set input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;color:var(--text);padding:6px 8px;font-family:var(--mono)} .ab-set .btn{padding:6px 10px;font-size:12px}
+.ab-act{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.ab-act button{background:none;border:0;color:var(--claude);cursor:pointer;font-size:12px;padding:0} .ab-act a{color:var(--dim);font-size:11.5px;text-decoration:none}
+@media (max-width:760px){ .api-bal{left:10px;right:auto;width:auto;max-width:calc(100% - 96px);bottom:calc(84px + env(safe-area-inset-bottom));padding:8px 12px;border-radius:999px;cursor:pointer}
+  .api-bal:not(.open) > :not(.ab-v){display:none} .api-bal:not(.open) .ab-v{font-size:15px;margin:0} .api-bal:not(.open) .ab-v::before{content:"API ";font-size:11px;color:var(--dim);font-weight:400}
+  .api-bal.open{right:10px;max-width:none;border-radius:12px;padding:12px 14px;z-index:60} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1431,7 +1445,7 @@ function clNeed(run){ if(CL.pass) return false; CL.pending=run; clOpen(); toast(
 try{ localStorage.removeItem("claudePass"); }catch{}
 const api = (p,opt={})=>{
   if(/^\/api\/(predict|ask)/.test(p)&&CL.pass) opt={...opt,headers:{...(opt.headers||{}),"x-claude-pass":CL.pass}};
-  return fetch(p,opt).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||r.status);e.code=j.code||j.error;if(e.code==="locked"&&typeof clLocked==="function") clLocked(j.error);throw e;}return j;});
+  return fetch(p,opt).then(async r=>{const c=+r.headers.get("x-api-cost")||0; if(c>0&&typeof apiSpent==="function") apiSpent(c,p);const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||r.status);e.code=j.code||j.error;if(e.code==="locked"&&typeof clLocked==="function") clLocked(j.error);throw e;}return j;});
 };
 
 /* ---------- clock & market status ---------- */
@@ -1460,6 +1474,7 @@ setInterval(tick,1000); tick();
 function setTab(t){
   if(VIEW&&t==="predict") t="news";
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
+  document.body.classList.toggle("on-predict",t==="predict"); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
   TABS.forEach(k=>$("tab-"+k).hidden=k!==t);
   if(typeof acRender==="function"&&!$("acPanel").hidden) acRender();
@@ -2738,7 +2753,7 @@ setInterval(startStream,3000);
 
 
 /* ---------- SYNC: same portfolios, watchlist, alerts and predictions on every device ---------- */
-const SYNC_KEYS=new Set(["portfolios","pfActive","wl","alerts","predDB"]);
+const SYNC_KEYS=new Set(["portfolios","pfActive","wl","alerts","predDB","apiLedger","apiBalance"]);
 S.sync={code:VIEW?"":store.get("syncCode",""),updated:store.get("syncUpdated",0),last:0,status:"",durable:null,applying:false,timer:0};
 window.__syncHook=k=>{ if(!SYNC_KEYS.has(k)||S.sync.applying||!S.sync.code) return; S.sync.updated=Date.now(); try{localStorage.setItem("syncUpdated",JSON.stringify(S.sync.updated))}catch{} clearTimeout(S.sync.timer); S.sync.timer=setTimeout(syncPush,1500); };
 const syncDoc=()=>({updated:S.sync.updated||Date.now(),portfolios:S.pfs,pfActive:S.pfActive,wl:S.wl,alerts:S.alerts,predDB:S.db.slice(0,500)});
@@ -2748,6 +2763,10 @@ function syncApply(d){
     if(Array.isArray(d.portfolios)&&d.portfolios.length){ S.pfs=d.portfolios; S.pfActive=S.pfs.some(p=>p.id===d.pfActive)?d.pfActive:S.pfs[0].id; S.port=S.pfs.find(p=>p.id===S.pfActive).holdings; store.set("portfolios",S.pfs); store.set("pfActive",S.pfActive); }
     if(Array.isArray(d.wl)){ S.wl=d.wl; store.set("wl",S.wl); }
     if(Array.isArray(d.alerts)){ S.alerts=d.alerts; store.set("alerts",S.alerts); }
+    if(Array.isArray(d.apiLedger)){ // Claude spending: merge both devices' entries
+      const m=new Map([...API.ledger,...d.apiLedger].map(x=>[x.id,x])); API.ledger=[...m.values()].sort((a,b)=>a.t-b.t).slice(-3000); store.set("apiLedger",API.ledger); }
+    if(d.apiBalance&&d.apiBalance.setAt>(API.bal?.setAt||0)){ API.bal=d.apiBalance; store.set("apiBalance",API.bal); }
+    if(typeof renderApiBal==="function") renderApiBal();
     if(Array.isArray(d.predDB)){ // saved predictions only ever get added, so merge both devices' lists
       const byId=new Map([...S.db,...d.predDB].map(x=>[x.id,x])); S.db=[...byId.values()].sort((a,b)=>b.generated-a.generated).slice(0,500); store.set("predDB",S.db);
       if(S.db.length>d.predDB.length) setTimeout(syncPush,500); }
@@ -3362,6 +3381,28 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuo
   $("voX").onclick=()=>{ document.documentElement.classList.add("vo-dismissed"); try{ if(!window.__VISITOR) localStorage.setItem("voHelloX","1"); }catch{} };
   $("voHello").addEventListener("click",e=>{ if(e.target.closest("a[data-gotab]")) e.preventDefault(); });
 })();
+
+/* ---------- API balance (bottom right of Claude Predictor): your balance minus what this site has spent ---------- */
+const API={ledger:store.get("apiLedger",[]), bal:store.get("apiBalance",null)};
+function apiSpent(cost,path){ API.ledger.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:Date.now(),c:+cost.toFixed(6),k:/predict/.test(path)?"predict":"ask"}); API.ledger=API.ledger.slice(-3000); store.set("apiLedger",API.ledger); renderApiBal(); }
+function renderApiBal(){
+  const el=$("apiBal"); if(!el) return;
+  const now=Date.now(), day0=new Date(new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"})).getTime();
+  const sum=f=>API.ledger.filter(f).reduce((a,x)=>a+x.c,0), money=v=>"$"+(v<10?v.toFixed(2):v.toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  const today=sum(x=>x.t>=day0), nToday=API.ledger.filter(x=>x.t>=day0).length, month=sum(x=>now-x.t<30*864e5);
+  const b=API.bal, left=b?b.amount-sum(x=>x.t>b.setAt):null;
+  const tone=left==null?"":left<2?"low":left<5?"mid":"ok";
+  el.innerHTML=`<div class="ab-k">✦ CLAUDE API BALANCE</div>
+    ${b?`<div class="ab-v ${tone}">≈ ${money(Math.max(0,left))}<small> left</small></div><div class="ab-s">${money(b.amount)} on ${new Date(b.setAt).toLocaleDateString("en-US",{month:"short",day:"numeric"})} − ${money(b.amount-left)} spent since</div>`:`<div class="ab-v">Not set</div><div class="ab-s">Enter your balance from the Anthropic Console to track what's left.</div>`}
+    <div class="ab-row"><span>Today</span><b>${money(today)}</b><span>${nToday} request${nToday===1?"":"s"}</span></div>
+    <div class="ab-row"><span>Last 30 days</span><b>${money(month)}</b></div>
+    <form class="ab-set" id="abForm" hidden><input id="abIn" inputmode="decimal" placeholder="Balance, e.g. 25.00"><button class="btn">Save</button></form>
+    <div class="ab-act"><button type="button" id="abEdit">${b?"Update balance":"Set balance"}</button><a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Exact balance ↗</a></div>`;
+  $("abEdit").onclick=()=>{ $("abForm").hidden=!$("abForm").hidden; if(!$("abForm").hidden){ $("abIn").value=b?Math.max(0,left).toFixed(2):""; $("abIn").focus(); } };
+  $("abForm").onsubmit=e=>{ e.preventDefault(); const v=parseFloat(String($("abIn").value).replace(/[$,\s]/g,"")); if(!(v>=0)) return toast("Enter a dollar amount, like 25.00");
+    API.bal={amount:+v.toFixed(2),setAt:Date.now()}; store.set("apiBalance",API.bal); renderApiBal(); toast("Balance saved"); };
+}
+(function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; document.body.appendChild(d); d.addEventListener("click",e=>{ if(innerWidth<=760&&!e.target.closest("button,a,input,form")) d.classList.toggle("open"); }); renderApiBal(); setInterval(renderApiBal,60e3); })();
 </script>
 </body>
 </html>

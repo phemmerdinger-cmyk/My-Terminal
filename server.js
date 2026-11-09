@@ -6,6 +6,8 @@
 //   PORT=8080 node server.js
 
 const http = require("http");
+const { AsyncLocalStorage } = require("node:async_hooks");
+const costCtx = new AsyncLocalStorage(); // adds up what each request spends on Claude
 const fs = require("fs");
 const path = require("path");
 
@@ -324,8 +326,11 @@ async function smartSource(src) {
 }
 async function getSmart() {
   return cached("smart", 10 * 60_000, async () => {
-    let ri = 0;
+    let ri = 0; const perHost = {};
     const res = await Promise.all(SMART.map(async (s) => {
+      const host = (s.urls[0].match(/\/\/([^/]+)/) || [])[1] || "";
+      const k = /substack|apricitas|overshoot|netinterest/.test(host) ? "substack" : host;
+      if (s.g !== "reddit") { await new Promise((ok) => setTimeout(ok, 1200 * (perHost[k] = (perHost[k] || 0) + 1) - 1200)); }
       if (s.g === "reddit") { await new Promise((ok) => setTimeout(ok, 1800 * ri++)); let r = await smartSource(s); if (!r.ok) { await new Promise((ok) => setTimeout(ok, 4000)); r = await smartSource({ ...s, urls: s.urls.map((u) => u + "&limit=15") }); } return { s, ...r }; }
       return { s, ...(await smartSource(s)) };
     }));
@@ -545,8 +550,13 @@ async function anthropic(apiKey, body) {
     const msg = (j.error && j.error.message) || `Anthropic API error ${res.status}`;
     throw new Error(/credit balance/i.test(msg) ? "Your Anthropic credit balance is too low. Add credits at platform.claude.com/settings/billing." : msg);
   }
+  // real cost of this call from the token counts Anthropic reports (prices per million tokens; override with env vars)
+  const u = j.usage || {};
+  const cost = ((u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) * 1.25 + (u.cache_read_input_tokens || 0) * 0.1) * PRICE_IN / 1e6 + (u.output_tokens || 0) * PRICE_OUT / 1e6;
+  const st = costCtx.getStore(); if (st) st.cost += cost;
   return j;
 }
+const PRICE_IN = +process.env.CLAUDE_PRICE_IN || 2, PRICE_OUT = +process.env.CLAUDE_PRICE_OUT || 10;
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-5-5";
 
 function perf(c, days) {
@@ -1171,7 +1181,8 @@ function parseList(v, max) {
 }
 
 function send(res, code, body, type = "application/json") {
-  res.writeHead(code, { "Content-Type": type, "Cache-Control": "no-store" });
+  const st = costCtx.getStore();
+  res.writeHead(code, { "Content-Type": type, "Cache-Control": "no-store", ...(st && st.cost > 0 ? { "X-Api-Cost": st.cost.toFixed(6) } : {}) });
   res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 }
 
@@ -1179,7 +1190,9 @@ process.on("unhandledRejection", (e) => console.error("unhandled:", e && e.messa
 process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message));
 
 http
-  .createServer(async (req, res) => {
+  .createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
+  .listen(PORT, () => console.log(`Stock News Hub running at http://localhost:${PORT}`));
+async function handle(req, res) {
     const u = new URL(req.url, "http://x");
     try {
       if (u.pathname === "/api/news") {
@@ -1266,5 +1279,4 @@ http
     } catch (e) {
       send(res, 500, { error: String(e.message || e) });
     }
-  })
-  .listen(PORT, () => console.log(`Stock News Hub running at http://localhost:${PORT}`));
+}
