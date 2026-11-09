@@ -289,6 +289,37 @@ async function getNews(tickers, range) {
 }
 
 
+
+// ---------------------------------------------------------------- "Most popular" signals
+// No outlet publishes view counts. The best free stand-ins: Google News' Business "Top stories" (ranked by
+// importance, and each story lists how many publishers across the web cover it) and CNBC's editor-picked Top News.
+const TREND_FEEDS = [
+  { key: "google", url: "https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US:en" },
+  { key: "google", url: "https://news.google.com/rss/search?q=stock+market+OR+stocks+OR+economy+when:1d&hl=en-US&gl=US&ceid=US:en" },
+  { key: "cnbc", url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114" },
+];
+async function getTrending() {
+  return cached("trending", 10 * 60_000, async () => {
+    const out = [];
+    await Promise.all(TREND_FEEDS.map(async (f, fi) => {
+      try {
+        const xml = await get(f.url, "application/rss+xml, application/xml, text/xml");
+        const items = xml.split(/<item[\s>]/).slice(1);
+        items.forEach((raw, i) => {
+          const t = (raw.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || "";
+          const d = decode((raw.match(/<description>([\s\S]*?)<\/description>/) || [])[1] || "");
+          const title = decode(t.replace(/<!\[CDATA\[|\]\]>/g, "")).replace(/\s+-\s+[^-]+$/, "").trim();
+          if (!title) return;
+          // Google lists the other publishers covering the same story inside the description
+          const related = f.key === "google" ? Math.max(1, (d.match(/<li>/gi) || []).length) : 1;
+          out.push({ title, feed: f.key, list: fi, rank: i, of: items.length, related });
+        });
+      } catch {}
+    }));
+    return { updated: Date.now(), items: out };
+  });
+}
+
 // ---------------------------------------------------------------- Smart Money (free feeds: regulators, newsletters, earnings calls, Reddit)
 const SMART = [
   { g: "policy", key: "fed", name: "Federal Reserve", urls: ["https://www.federalreserve.gov/feeds/press_all.xml", gnews("site:federalreserve.gov when:14d")], days: 21 },
@@ -1312,6 +1343,7 @@ async function handle(req, res) {
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
       }
       if (u.pathname === "/api/bestbuys") return send(res, 200, await bestBuys());
+      if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
       if (u.pathname === "/api/sp500") return send(res, 200, await sp500Snapshot());

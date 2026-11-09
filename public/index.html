@@ -1704,18 +1704,31 @@ function cluster(list){ // merge the same story from different outlets into one 
 }
 
 /* "Most popular" ranking. No outlet publishes view counts, so a story's fame is estimated from:
-   1) how many of the active outlets are covering it (coverage %),
-   2) where it sits in each outlet's own feed, as a percentage of that feed (so busy sites don't dominate),
-   3) freshness (half-life depends on the timeline picked). */
+   1) Google News Business "Top stories" — Google's own importance ranking, plus how many publishers
+      across the web cover the story (the closest free stand-in for views),
+   2) CNBC's editor-picked Top News,
+   3) how many of your five outlets carry the story.
+   Freshness only pushes OLD stories down; it never pushes a brand-new story up. */
+S.trend=null; S.trendAt=0;
+async function loadTrending(){ if(S.trendBusy||(S.trend&&Date.now()-S.trendAt<9*60e3)) return; S.trendBusy=true;
+  try{ const j=await api("/api/trending"); S.trend=j.items.map(t=>({...t,_w:words(t.title)})); S.trendAt=Date.now(); if(S.tab==="news") renderFeed(); }catch{} S.trendBusy=false; }
 function newsHeat(list){
-  const active=Math.max(1,5-S.srcOff.size), now=Date.now();
-  const half={today:8,"24h":10,week:40,month:150,"6m":900,year:1800,all:2400}[S.newsRange]||12;
+  loadTrending();
+  const now=Date.now(), T=S.trend||[];
+  const keep={today:18,"24h":24,week:96,month:400,"6m":2400,year:4800,all:6000}[S.newsRange]||24;
   for(const i of list){
-    const cov=Math.min(1,(1+i.also.length)/Math.min(active,4));
-    const prom=1-i._pcts.reduce((a,b)=>a+b,0)/i._pcts.length;
-    const age=Math.max(0,(now-(i.time||now))/3600e3), rec=Math.pow(.5,age/half);
-    i._heat=(0.55*cov+0.45*prom)*(0.3+0.7*rec);
-    i._cov=1+i.also.length;
+    // match against the "top stories" lists
+    let g=0,c=0,rel=1;
+    for(const t of T){ if(Math.min(t._w.size,i._w.size)<3||overlap(t._w,i._w)<0.5) continue;
+      const pos=1-t.rank/Math.max(1,t.of);
+      if(t.feed==="google"){ g=Math.max(g,(t.list===0?1:.75)*(.5+.5*pos)); rel=Math.max(rel,t.related); } else c=Math.max(c,.5+.5*pos); }
+    const outlets=1+i.also.length;
+    const cov=Math.min(1,(outlets-1)/3);                 // 1 outlet = 0, 4+ outlets = 1
+    const web=Math.min(1,Math.log2(rel)/4);               // publishers across the web: 1 → 0, 16+ → 1
+    const age=Math.max(0,(now-(i.time||now))/3600e3);
+    const fade=age<=keep*.35?1:Math.pow(.5,(age-keep*.35)/(keep*.35));  // only old stories lose points
+    i._heat=(0.32*g+0.28*web+0.22*cov+0.18*c)*fade + (g||c||outlets>1?0:-0.01)*age/24; // single-outlet, untracked stories sink with age
+    i._cov=outlets; i._web=rel; i._top=g>0||c>0;
   }
   return list;
 }
@@ -1774,7 +1787,7 @@ function renderFeed(){
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
   const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
-  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._cov>=3?`<b class="np-hot" title="Covered by ${i._cov} of your news sources">🔥 ${i._cov} outlets</b>`:i._cov===2?`<span class="np-two" title="Covered by 2 of your news sources">2 outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
+  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
     return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
   const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
