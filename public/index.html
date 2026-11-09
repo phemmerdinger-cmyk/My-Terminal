@@ -1012,6 +1012,12 @@ html.viewonly .api-bal-wrap{display:none!important}
 .bb-foot{font-size:11.5px;color:var(--dim);margin:12px 0 0;line-height:1.5}
 @media (max-width:1100px){ .bb-cols{grid-template-columns:minmax(0,1fr)} }
 @media (max-width:520px){ .bb-row{grid-template-columns:18px minmax(0,1fr) auto;grid-template-areas:"r id big" ". px px" ". rate rate" ". meta meta" ". news news"} .bb-px{text-align:left;display:flex;gap:8px;align-items:baseline} .bb-head h2{font-size:20px} }
+.bb-row{grid-template-columns:22px minmax(0,1.3fr) 92px minmax(0,1fr) 54px 46px!important;grid-template-areas:"r id px rate big ds" ". why why why why why" ". meta meta meta meta meta" ". news news news news news"!important}
+.bb-ds{grid-area:ds;text-align:center;border-radius:8px;padding:4px 0;font-family:var(--mono);border:1px solid var(--line2)} .bb-ds b{display:block;font-size:16px} .bb-ds small{font-size:9px;color:var(--dim);letter-spacing:.06em}
+.bb-ds.hi{border-color:rgba(33,195,122,.6);background:rgba(33,195,122,.10)} .bb-ds.hi b{color:var(--up)} .bb-ds.mid b{color:#f5c518} .bb-ds.lo{border-color:rgba(255,77,94,.55);background:rgba(255,77,94,.08)} .bb-ds.lo b{color:var(--down)}
+.bb-why{grid-area:why;display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:2px} .bb-why span{font-size:11px;border-radius:999px;padding:2px 8px;border:1px solid var(--line2)}
+.bb-why .p{color:#7ee2a8;border-color:rgba(33,195,122,.35)} .bb-why .c{color:#ff9aa5;border-color:rgba(255,77,94,.35)}
+@media (max-width:520px){ .bb-row{grid-template-columns:18px minmax(0,1fr) auto auto!important;grid-template-areas:"r id big ds" ". px px px" ". rate rate rate" ". why why why" ". meta meta meta" ". news news news"!important} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -3460,6 +3466,30 @@ function renderApiBal(){
 }
 (function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; const w=document.createElement("div"); w.className="api-bal-wrap"; w.appendChild(d); const host=$("tab-predict")?.parentElement||document.body; host.appendChild(w); renderApiBal(); setInterval(renderApiBal,60e3); })();
 
+
+/* Desk Score: a rules-based model (designed by Claude, runs in your browser, uses no API credits).
+   Analyst consensus 40% · growth 20% · valuation 15% · price vs 52-week high 15% · news attention 10%. */
+function deskScore(t,all){
+  const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+  const sc=all.map(x=>x.score), lo=Math.min(...sc), hi=Math.max(...sc);
+  const fA=hi>lo?(t.score-lo)/(hi-lo):cl((t.score+2)/4);
+  const g=[t.revG,t.epsG].filter(v=>v!=null&&isFinite(v)); const gAvg=g.length?g.reduce((a,b)=>a+b,0)/g.length:null;
+  const fG=gAvg==null?.5:cl((Math.min(gAvg,60)+10)/45);
+  const pe=t.pe; const fV=pe==null?.5:pe<=0?.15:pe<12?.9:pe<20?.78:pe<30?.62:pe<45?.42:.22;
+  const off=t.hi52&&t.price?(t.price/t.hi52-1)*100:null;
+  const fP=off==null?.5:off>-3?.62:off>-25?.82:off>-40?.5:.28;
+  const nc=t.news?t.news.count:0; const fN=.4+.6*cl(nc/5);
+  const total=Math.round(100*(.4*fA+.2*fG+.15*fV+.15*fP+.1*fN));
+  // plain-English reasons, strongest first
+  const pros=[],cons=[];
+  if(t.buyPct>=.8) pros.push(`${Math.round(t.buyPct*100)}% of ${t.n} analysts say Buy`); else if(t.buyPct<.4) cons.push(`only ${Math.round(t.buyPct*100)}% of ${t.n} analysts say Buy`);
+  if(t.s+t.ss>0&&(t.s+t.ss)/t.n>=.1) cons.push(`${t.s+t.ss} analysts say Sell`);
+  if(gAvg!=null){ if(gAvg>=15) pros.push(`growing fast (~${Math.round(gAvg)}% a year)`); else if(gAvg>=5) pros.push(`steady growth (~${Math.round(gAvg)}%)`); else if(gAvg<0) cons.push(`sales/earnings shrinking (${Math.round(gAvg)}%)`); }
+  if(pe!=null){ if(pe<=0) cons.push("currently losing money"); else if(pe<15) pros.push(`cheap at ${pe.toFixed(0)}× earnings`); else if(pe>45) cons.push(`pricey at ${pe.toFixed(0)}× earnings`); }
+  if(off!=null){ if(off<=-25&&off>-40) pros.push(`${Math.abs(off).toFixed(0)}% below its high — room to recover`); else if(off<=-40) cons.push(`down ${Math.abs(off).toFixed(0)}% from its high`); else if(off>-3) pros.push("trading near its 52-week high"); }
+  if(nc>=4) pros.push(`in the news (${nc} stories this week)`);
+  return {total,pros,cons,f:{fA,fG,fV,fP,fN}};
+}
 /* ---------- BEST BUYS / BEST SELLS (Markets tab): Wall Street analyst consensus + the site's own news ---------- */
 const BBN={yahoo:"Yahoo Finance",cnbc:"CNBC",morningstar:"Morningstar",seekingalpha:"Seeking Alpha",wsj:"WSJ"};
 S.bb=null; S.bbAt=0;
@@ -3481,6 +3511,10 @@ function renderBestBuys(){
   const pctc=v=>v==null?'<span class="dim">—</span>':`<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(2)}%</span>`;
   const bar=t=>{ const w=x=>(x/t.n*100).toFixed(1)+"%"; return `<div class="bb-bar" title="Strong buy ${t.sb} · Buy ${t.b} · Hold ${t.h} · Sell ${t.s} · Strong sell ${t.ss}"><i class="sb" style="width:${w(t.sb)}"></i><i class="b" style="width:${w(t.b)}"></i><i class="h" style="width:${w(t.h)}"></i><i class="s" style="width:${w(t.s+t.ss)}"></i></div>`; };
   const off=t=>t.hi52&&t.price?((t.price/t.hi52-1)*100):null;
+  const pool=[...d.items,...(d.sells||[])];
+  d.items.forEach(t=>t.ds=deskScore(t,pool)); (d.sells||[]).forEach(t=>t.ds=deskScore(t,pool));
+  const buys=[...d.items].sort((a,b)=>b.ds.total-a.ds.total), sells=[...(d.sells||[])].sort((a,b)=>a.ds.total-b.ds.total);
+  const why=(t,kind)=>{ const a=kind==="buy"?[...t.ds.pros.slice(0,2),...t.ds.cons.slice(0,1)]:[...t.ds.cons.slice(0,2),...t.ds.pros.slice(0,1)]; return a.length?`<div class="bb-why">${a.map((x,j)=>`<span class="${(kind==="buy"?j<Math.min(2,t.ds.pros.length):j>=Math.min(2,t.ds.cons.length))?"p":"c"}">${esc(x)}</span>`).join("")}</div>`:""; };
   const row=(t,i,kind)=>{
     const big=kind==="buy"?`<b class="up">${Math.round(t.buyPct*100)}%</b><small>buy</small>`:`<b class="${t.sellPct>0?"down":"amber"}">${Math.round((t.sellPct>0?t.sellPct:t.holdPct)*100)}%</b><small>${t.sellPct>0?"sell":"hold"}</small>`;
     const o=off(t), nw=t.news&&t.news.top;
@@ -3489,14 +3523,16 @@ function renderBestBuys(){
       <div class="bb-px"><b>${t.price!=null?"$"+t.price.toFixed(2):"—"}</b>${pctc(t.chgPct)}</div>
       <div class="bb-rate">${bar(t)}<span class="dim">${t.n} analysts</span></div>
       <div class="bb-big">${big}</div>
+      <div class="bb-ds ${t.ds.total>=70?"hi":t.ds.total>=50?"mid":"lo"}" title="Desk Score: analysts 40% · growth 20% · valuation 15% · price vs 52-wk high 15% · news 10%"><b>${t.ds.total}</b><small>score</small></div>
+      ${why(t,kind)}
       <div class="bb-meta"><span>P/E <b>${t.pe!=null?t.pe.toFixed(1):"—"}</b></span><span>vs 52-wk high <b class="${o!=null&&o<-15?"down":""}">${o!=null?o.toFixed(0)+"%":"—"}</b></span>${t.revG!=null?`<span>Rev growth <b class="${t.revG>=0?"up":"down"}">${t.revG>=0?"+":""}${t.revG.toFixed(0)}%</b></span>`:""}</div>
       ${nw?`<a class="bb-news" href="${esc(nw.link)}" target="_blank" rel="noopener"><em>${esc(BBN[nw.source]||nw.source||"News")}${nw.time?" · "+ago(nw.time):""}</em> ${esc(nw.title)}${t.news.count>1?` <span class="dim">· ${t.news.count} stories this week</span>`:""}</a>`:(d.newsReady?"":`<span class="bb-news dim">Checking the news…</span>`)}
     </div>`;
   };
   setHTML("bestBuys",head+`<div class="bb-cols">
-    <section class="bb-col buy"><h3>▲ Best Buys <span>highest analyst ratings</span></h3>${d.items.map((t,i)=>row(t,i,"buy")).join("")}</section>
-    <section class="bb-col sell"><h3>▼ Best Sells <span>lowest analyst ratings</span></h3>${(d.sells||[]).map((t,i)=>row(t,i,"sell")).join("")}</section></div>
-    <p class="bb-foot">Ranked by the latest Wall Street analyst ratings (Finnhub), with headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. "Best Sells" are the lowest-rated large companies — often mostly Hold ratings. Analyst views can be wrong; this isn't personal financial advice. Tap any stock to research it.</p>`);
+    <section class="bb-col buy"><h3>▲ Best Buys <span>highest analyst ratings</span></h3>${buys.map((t,i)=>row(t,i,"buy")).join("")}</section>
+    <section class="bb-col sell"><h3>▼ Best Sells <span>lowest analyst ratings</span></h3>${sells.map((t,i)=>row(t,i,"sell")).join("")}</section></div>
+    <p class="bb-foot"><b>Desk Score</b> is a rules-based model Claude designed for this site: analyst consensus 40%, revenue &amp; earnings growth 20%, valuation 15%, price vs 52-week high 15%, news attention 10%. It runs in your browser, so it uses no Claude credits. Ratings from Finnhub, with headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. "Best Sells" are the lowest-rated large companies — often mostly Hold ratings. Analyst views can be wrong; this isn't personal financial advice. Tap any stock to research it.</p>`);
 }
 $("bestBuys")&&$("bestBuys").addEventListener("click",e=>{ if(e.target.closest("a")) return; const r=e.target.closest("[data-nyopen]"); if(r) openQuote(r.dataset.nyopen); });
 setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*60e3);
