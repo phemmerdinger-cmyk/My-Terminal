@@ -1023,6 +1023,9 @@ html.viewonly .api-bal-wrap{display:none!important}
 .bb-note .spin{width:10px;height:10px;margin-right:6px;vertical-align:-1px}
 .np-hot,.np-rail .np-hot{font-family:var(--sans)!important;font-size:10.5px!important;font-weight:600;color:#ff9e1b;white-space:nowrap;border:1px solid rgba(255,158,27,.4);border-radius:999px;padding:0 7px;line-height:16px}
 .np-two{font-size:10.5px;color:var(--dim)}
+.np-trend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:10px 0 2px;font-size:12px}
+.np-trend > b{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#ff9e1b;margin-right:4px}
+.np-trend .tg i{font-style:normal;color:var(--dim);font-size:11px;margin:0 4px}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1712,8 +1715,40 @@ function cluster(list){ // merge the same story from different outlets into one 
 S.trend=null; S.trendAt=0;
 async function loadTrending(){ if(S.trendBusy||(S.trend&&Date.now()-S.trendAt<9*60e3)) return; S.trendBusy=true;
   try{ const j=await api("/api/trending"); S.trend=j.items.map(t=>({...t,_w:words(t.title)})); S.trendAt=Date.now(); if(S.tab==="news") renderFeed(); }catch{} S.trendBusy=false; }
+/* Trending companies: count the headlines that NAME each company (not watchlist tags, which would favor
+   stocks you follow). Uses the S&P 500 company list plus your watchlist names, with a few common aliases. */
+const TOPIC_ALIAS={NVDA:["Nvidia","Jensen Huang"],GOOGL:["Google","Alphabet"],GOOG:[],META:["Meta","Facebook","Instagram","Zuckerberg"],AMZN:["Amazon","AWS"],MSFT:["Microsoft"],AAPL:["Apple","iPhone"],TSLA:["Tesla"],JPM:["JPMorgan","Dimon"],"BRK-B":["Berkshire","Buffett"],AMD:["AMD"],AVGO:["Broadcom"],NFLX:["Netflix"],BA:["Boeing"],INTC:["Intel"],ORCL:["Oracle"],DIS:["Disney"],WMT:["Walmart"],COST:["Costco"],GS:["Goldman"],MS:["Morgan Stanley"],UNH:["UnitedHealth"],LLY:["Eli Lilly","Lilly"],NVO:["Novo Nordisk"],PLTR:["Palantir"],UBER:["Uber"],CRM:["Salesforce"],XOM:["Exxon"],CVX:["Chevron"],KO:["Coca-Cola"],PEP:["PepsiCo"],MCD:["McDonald's"],SBUX:["Starbucks"],NKE:["Nike"],F:["Ford"],GM:["General Motors","GM"],PFE:["Pfizer"],V:["Visa"],MA:["Mastercard"],PYPL:["PayPal"],HD:["Home Depot"],BAC:["Bank of America"],WFC:["Wells Fargo"],C:["Citigroup","Citi"],T:["AT&T"],VZ:["Verizon"],CSCO:["Cisco"],IBM:["IBM"],QCOM:["Qualcomm"],MU:["Micron"],SMCI:["Supermicro"],COIN:["Coinbase"],HOOD:["Robinhood"],LCID:["Lucid"],RIVN:["Rivian"]};
+const TOPIC_SKIP=new Set(["target","block","ball","best","fox","match","general","first","american","united","global","international","southern","public","progressive","digital","federal","pool","host","edison","universal","national","eastern","western","central","state","news","quest","snap","chart","arch","axon","align","copart","waters","gap","ford"]);
+let SPN=null; fetch("/sp500.json").then(r=>r.json()).then(j=>{SPN=j; TOPIC_RE=null;}).catch(()=>{});
+let TOPIC_RE=null;
+function topicRegexes(){
+  if(TOPIC_RE) return TOPIC_RE;
+  const names={};
+  for(const r of SPN||[]) names[r[0]]=r[1];
+  for(const [t,q] of Object.entries(S.quotes||{})) if(q&&q.name&&!names[t]&&!/^\^|=|-USD$/.test(t)) names[t]=q.name;
+  const out=[];
+  const esc2=x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  for(const [t,n] of Object.entries(names)){
+    let keys=TOPIC_ALIAS[t];
+    if(!keys){ const w=String(n).replace(/,?\s+(Inc\.?|Corp(oration)?\.?|Co\.?|Company|Holdings?|Group|Ltd\.?|plc|N\.V\.|Incorporated|Platforms|Technologies|\.com).*$/i,"").replace(/^The\s+/i,"").trim().split(/\s+/);
+      let k=w[0]; if(w.length>1&&(k.length<4||TOPIC_SKIP.has(k.toLowerCase()))) k=w.slice(0,2).join(" ");
+      keys=k&&!TOPIC_SKIP.has(k.toLowerCase())&&k.length>=4?[k]:[]; }
+    const parts=[...keys.map(esc2),t.length>=3&&!/-/.test(t)?esc2(t):null].filter(Boolean);
+    if(parts.length) out.push([t,new RegExp("(^|[^A-Za-z])("+parts.join("|")+")(?![A-Za-z])")]);
+  }
+  return TOPIC_RE=out;
+}
+function newsTopics(){
+  if(S._tpAt&&Date.now()-S._tpAt<60e3&&S._tp) return S._tp;
+  const day=Date.now()-24*3600e3, cnt={}, R=topicRegexes();
+  const titles=[...(S.news?S.news.items.filter(i=>(i.time||0)>day).map(i=>i.title):[]),...(S.trend||[]).map(t=>t.title)];
+  for(const title of new Set(titles)) for(const [t,re] of R) if(re.test(title)) cnt[t]=(cnt[t]||0)+1;
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+  S._tp={cnt,top,max:top.length?top[0][1]:1}; S._tpAt=Date.now(); return S._tp;
+}
 function newsHeat(list){
   loadTrending();
+  const TP=newsTopics();
   const now=Date.now(), T=S.trend||[];
   const keep={today:18,"24h":24,week:96,month:400,"6m":2400,year:4800,all:6000}[S.newsRange]||24;
   for(const i of list){
@@ -1727,7 +1762,10 @@ function newsHeat(list){
     const web=Math.min(1,Math.log2(rel)/4);               // publishers across the web: 1 → 0, 16+ → 1
     const age=Math.max(0,(now-(i.time||now))/3600e3);
     const fade=age<=keep*.35?1:Math.pow(.5,(age-keep*.35)/(keep*.35));  // only old stories lose points
-    i._heat=(0.32*g+0.28*web+0.22*cov+0.18*c)*fade + (g||c||outlets>1?0:-0.01)*age/24; // single-outlet, untracked stories sink with age
+    // topic boost: stories about the day's most-talked-about companies (relative to the #1 company)
+    const tb=Math.max(0,...topicRegexes().filter(([t,re])=>TP.cnt[t]&&re.test(i.title)).map(([t])=>TP.cnt[t]/TP.max));
+    i._topic=tb;
+    i._heat=(0.26*g+0.22*web+0.17*cov+0.13*c+0.22*Math.pow(tb,1.5))*fade + (g||c||outlets>1?0:-0.01)*age/24; // single-outlet, untracked stories sink with age
     i._cov=outlets; i._web=rel; i._top=g>0||c>0;
   }
   return list;
@@ -1809,6 +1847,7 @@ function renderFeed(){
   $("feed").innerHTML=`<div class="np">
     <div class="np-mast"><div class="np-ear l">${esc(today)}<br><span>${list.length.toLocaleString()} stories · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</span></div>
       <h1>The Terminal Journal</h1><div class="np-ear r">${idx||"Markets loading…"}</div></div>
+    ${(()=>{ const TP=newsTopics(); const hot=TP.top.slice(0,8).filter(([,n])=>n>=3); return hot.length&&S.view==="all"?`<div class="np-trend"><b>🔥 Trending now</b>${hot.map(([t,n])=>{ const q=S.quotes[t]; return `<span class="tg" data-view="${esc(t)}">${esc(t)} <i>${n} stories</i>${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`; }).join("")}</div>`:""; })()}
     <div class="np-band">${S.view==="mine"?"MY STOCKS EDITION":S.view!=="all"?esc(S.view)+" EDITION":"LIVE EDITION"} · ${Object.keys(SRC).filter(k=>!S.srcOff.has(k)).map(k=>SRC[k].name).join(" · ")}</div>
     <div class="np-front">
       <aside class="np-rail"><h4><span>What's News</span></h4>${rail.map(i=>`<div class="np-wn"><a ${A(i)}><b>${esc(i.title)}</b></a>${dek(i,110)}${meta(i)}</div>`).join("")||'<p class="np-dek">More headlines will appear here as they arrive.</p>'}</aside>
