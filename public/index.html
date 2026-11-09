@@ -957,7 +957,7 @@ html.viewonly.vo-dismissed .vo-hello{display:none}
 .sm-foot{font-size:11.5px;color:var(--dim);margin:14px 0 0}
 @media (max-width:900px){ .sm-grid{grid-template-columns:minmax(0,1fr)} .sm-head h2{font-size:22px} .sm-tb-note{display:none} }
 /* ===== API balance card (Claude Predictor, bottom right of the page, never over text) ===== */
-.api-bal-wrap{display:flex;justify-content:flex-end;clear:both;padding:0 16px 20px}
+.api-bal-wrap{display:flex;justify-content:flex-start;clear:both;margin:24px 0 8px}
 .api-bal{width:260px;max-width:100%;background:var(--panel);border:1px solid var(--line2);border-top:3px solid var(--claude);border-radius:12px;padding:12px 14px;font-size:12.5px}
 html.viewonly .api-bal-wrap{display:none!important}
 .ab-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--claude)}
@@ -968,7 +968,7 @@ html.viewonly .api-bal-wrap{display:none!important}
 .ab-set{display:flex;gap:6px;margin:6px 0} .ab-set input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;color:var(--text);padding:6px 8px;font-family:var(--mono)} .ab-set .btn{padding:6px 10px;font-size:12px}
 .ab-act{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
 .ab-act button{background:none;border:0;color:var(--claude);cursor:pointer;font-size:12px;padding:0} .ab-act a{color:var(--dim);font-size:11.5px;text-decoration:none}
-@media (max-width:760px){ .api-bal{width:100%} .api-bal-wrap{padding:0 16px 96px} }
+@media (max-width:760px){ .api-bal{width:100%} .api-bal-wrap{margin:20px 0 90px} }
 /* ===== Portfolio layout: slim summary, big chart, holdings | allocation · risk · alerts ===== */
 .pfx .pf-sum{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .pfx .pf-sum .kpi{padding:9px 12px;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
@@ -3467,7 +3467,7 @@ function renderApiBal(){
   $("abForm").onsubmit=e=>{ e.preventDefault(); const v=parseFloat(String($("abIn").value).replace(/[$,\s]/g,"")); if(!(v>=0)) return toast("Enter a dollar amount, like 25.00");
     API.bal={amount:+v.toFixed(2),setAt:Date.now()}; store.set("apiBalance",API.bal); renderApiBal(); toast("Balance saved"); };
 }
-(function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; const w=document.createElement("div"); w.className="api-bal-wrap"; w.appendChild(d); const host=$("tab-predict")?.parentElement||document.body; host.appendChild(w); renderApiBal(); setInterval(renderApiBal,60e3); })();
+(function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; const w=document.createElement("div"); w.className="api-bal-wrap"; w.appendChild(d); ($("tab-predict")||document.body).appendChild(w); renderApiBal(); setInterval(renderApiBal,60e3); })();
 
 
 /* Desk Score: a rules-based model (designed by Claude, runs in your browser, uses no API credits).
