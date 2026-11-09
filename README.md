@@ -1,4 +1,4 @@
-# Peter's Finance Terminal
+# Meridian Terminal
 
 **Live site:** https://my-terminal-28tq.onrender.com
 
