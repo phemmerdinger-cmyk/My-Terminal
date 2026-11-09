@@ -293,12 +293,12 @@ const SMART = [
   { g: "policy", key: "bls", name: "Bureau of Labor Statistics", urls: ["https://www.bls.gov/feed/bls_latest.rss", gnews("site:bls.gov when:14d")], days: 21 },
   { g: "letters", key: "abnormal", name: "Abnormal Returns", urls: ["https://abnormalreturns.com/feed/"], days: 10 },
   { g: "letters", key: "carlson", name: "A Wealth of Common Sense", urls: ["https://awealthofcommonsense.com/feed/"], days: 21 },
-  { g: "letters", key: "batnick", name: "The Irrelevant Investor", urls: ["https://theirrelevantinvestor.com/feed/"], days: 21 },
+  { g: "letters", key: "batnick", name: "The Irrelevant Investor", urls: ["https://theirrelevantinvestor.com/feed/", "https://theirrelevantinvestor.com/feed/?x=1", gnews("site:theirrelevantinvestor.com when:30d")], days: 21 },
   { g: "letters", key: "netinterest", name: "Net Interest", urls: ["https://www.netinterest.co/feed"], days: 30 },
   { g: "letters", key: "apricitas", name: "Apricitas Economics", urls: ["https://www.apricitas.io/feed"], days: 30 },
   { g: "letters", key: "overshoot", name: "The Overshoot", urls: ["https://theovershoot.co/feed"], days: 30 },
   { g: "letters", key: "kyla", name: "Kyla Scanlon", urls: ["https://kyla.substack.com/feed"], days: 30 },
-  { g: "letters", key: "calcrisk", name: "Calculated Risk", urls: ["https://www.calculatedriskblog.com/feeds/posts/default"], days: 7 },
+  { g: "letters", key: "calcrisk", name: "Calculated Risk", urls: ["https://www.calculatedriskblog.com/feeds/posts/default?alt=rss", "https://www.calculatedriskblog.com/feeds/posts/default", gnews("site:calculatedriskblog.com when:7d")], days: 7 },
   { g: "calls", key: "calls", name: "Earnings calls", urls: [gnews('"earnings call" CEO said when:3d'), gnews('"conference call" guidance analysts when:3d')], days: 4 },
   { g: "reddit", key: "r_investing", name: "r/investing", urls: ["https://www.reddit.com/r/investing/top/.rss?t=day", "https://old.reddit.com/r/investing/top/.rss?t=day"], days: 3 },
   { g: "reddit", key: "r_stocks", name: "r/stocks", urls: ["https://www.reddit.com/r/stocks/top/.rss?t=day", "https://old.reddit.com/r/stocks/top/.rss?t=day"], days: 3 },
@@ -324,7 +324,11 @@ async function smartSource(src) {
 }
 async function getSmart() {
   return cached("smart", 10 * 60_000, async () => {
-    const res = await Promise.all(SMART.map((s) => smartSource(s).then((r) => ({ s, ...r }))));
+    let ri = 0;
+    const res = await Promise.all(SMART.map(async (s) => {
+      if (s.g === "reddit") { await new Promise((ok) => setTimeout(ok, 1800 * ri++)); let r = await smartSource(s); if (!r.ok) { await new Promise((ok) => setTimeout(ok, 4000)); r = await smartSource({ ...s, urls: s.urls.map((u) => u + "&limit=15") }); } return { s, ...r }; }
+      return { s, ...(await smartSource(s)) };
+    }));
     const seen = new Set(), items = [];
     for (const r of res) for (const it of r.items) { const k = it.title.toLowerCase().replace(/\W+/g, "").slice(0, 80); if (!seen.has(k)) { seen.add(k); items.push(it); } }
     items.sort((a, b) => (b.time || 0) - (a.time || 0));
