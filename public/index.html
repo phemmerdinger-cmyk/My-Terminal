@@ -7,6 +7,8 @@
    The owner opens the site once with ?owner and enters the Claude password to unlock this device
    (?viewer switches a device back to view-only). */
 (function(){var o=false;try{var q=location.search;if(/[?&]viewer\b/.test(q))localStorage.removeItem("ownerMode");o=localStorage.getItem("ownerMode")==="1";}catch(e){}
+/* ?visitor always shows the public view-only site, even on an unlocked device, and never touches this device's saved data */
+if(/[?&]visitor\b/.test(location.search)){o=false;window.__VISITOR=true;}
 if(!o)document.documentElement.classList.add("viewonly");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1344,8 +1346,8 @@ const MK = {
 const RANGES = [["1d","1D"],["5d","5D"],["1mo","1M"],["6mo","6M"],["ytd","YTD"],["1y","1Y"],["5y","5Y"]];
 
 const store = {
-  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
-  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{} if(window.__syncHook) window.__syncHook(k);}
+  get(k,d){if(window.__VISITOR) return d; try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
+  set(k,v){if(window.__VISITOR) return; try{localStorage.setItem(k,JSON.stringify(v))}catch{} if(window.__syncHook) window.__syncHook(k);}
 };
 const S = {
   tab: "news",
@@ -3289,11 +3291,11 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuo
 
 /* visitor welcome strip + About modal (view-only visitors only) */
 (function(){ if(!document.documentElement.classList.contains("viewonly")) return;
-  try{ if(localStorage.getItem("voHelloX")==="1") document.documentElement.classList.add("vo-dismissed"); }catch{}
+  try{ if(!window.__VISITOR&&localStorage.getItem("voHelloX")==="1") document.documentElement.classList.add("vo-dismissed"); }catch{}
   const m=$("voModal"), open=()=>{ m.hidden=false; }, close=()=>{ m.hidden=true; };
   $("voAbout").onclick=open; $("voClose").onclick=close; $("voGoHm").addEventListener("click",close);
   m.addEventListener("click",e=>{ if(e.target===m) close(); }); document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!m.hidden) close(); });
-  $("voX").onclick=()=>{ document.documentElement.classList.add("vo-dismissed"); try{ localStorage.setItem("voHelloX","1"); }catch{} };
+  $("voX").onclick=()=>{ document.documentElement.classList.add("vo-dismissed"); try{ if(!window.__VISITOR) localStorage.setItem("voHelloX","1"); }catch{} };
   $("voHello").addEventListener("click",e=>{ if(e.target.closest("a[data-gotab]")) e.preventDefault(); });
 })();
 </script>
