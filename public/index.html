@@ -1719,12 +1719,12 @@ async function loadTrending(){ if(S.trendBusy||(S.trend&&Date.now()-S.trendAt<9*
    stocks you follow). Uses the S&P 500 company list plus your watchlist names, with a few common aliases. */
 const TOPIC_ALIAS={NVDA:["Nvidia","Jensen Huang"],GOOGL:["Google","Alphabet"],GOOG:[],META:["Meta","Facebook","Instagram","Zuckerberg"],AMZN:["Amazon","AWS"],MSFT:["Microsoft"],AAPL:["Apple","iPhone"],TSLA:["Tesla"],JPM:["JPMorgan","Dimon"],"BRK-B":["Berkshire","Buffett"],AMD:["AMD"],AVGO:["Broadcom"],NFLX:["Netflix"],BA:["Boeing"],INTC:["Intel"],ORCL:["Oracle"],DIS:["Disney"],WMT:["Walmart"],COST:["Costco"],GS:["Goldman"],MS:["Morgan Stanley"],UNH:["UnitedHealth"],LLY:["Eli Lilly","Lilly"],NVO:["Novo Nordisk"],PLTR:["Palantir"],UBER:["Uber"],CRM:["Salesforce"],XOM:["Exxon"],CVX:["Chevron"],KO:["Coca-Cola"],PEP:["PepsiCo"],MCD:["McDonald's"],SBUX:["Starbucks"],NKE:["Nike"],F:["Ford"],GM:["General Motors","GM"],PFE:["Pfizer"],V:["Visa"],MA:["Mastercard"],PYPL:["PayPal"],HD:["Home Depot"],BAC:["Bank of America"],WFC:["Wells Fargo"],C:["Citigroup","Citi"],T:["AT&T"],VZ:["Verizon"],CSCO:["Cisco"],IBM:["IBM"],QCOM:["Qualcomm"],MU:["Micron"],SMCI:["Supermicro"],COIN:["Coinbase"],HOOD:["Robinhood"],LCID:["Lucid"],RIVN:["Rivian"]};
 const TOPIC_SKIP=new Set(["target","block","ball","best","fox","match","general","first","american","united","global","international","southern","public","progressive","digital","federal","pool","host","edison","universal","national","eastern","western","central","state","news","quest","snap","chart","arch","axon","align","copart","waters","gap","ford"]);
-let SPN=null; fetch("/sp500.json").then(r=>r.json()).then(j=>{SPN=j; TOPIC_RE=null;}).catch(()=>{});
+let SPN=null; fetch("/sp500.json").then(r=>r.json()).then(j=>{ const L=Array.isArray(j)?j:(j.list||j.rows||j.companies||j.data||[]); SPN=Array.isArray(L)?L:[]; TOPIC_RE=null; S._tpAt=0; }).catch(()=>{});
 let TOPIC_RE=null;
 function topicRegexes(){
   if(TOPIC_RE) return TOPIC_RE;
   const names={};
-  for(const r of SPN||[]) names[r[0]]=r[1];
+  for(const r of (Array.isArray(SPN)?SPN:[])) if(Array.isArray(r)) names[r[0]]=r[1]; else if(r&&r.symbol) names[r.symbol]=r.name;
   for(const [t,q] of Object.entries(S.quotes||{})) if(q&&q.name&&!names[t]&&!/^\^|=|-USD$/.test(t)) names[t]=q.name;
   const out=[];
   const esc2=x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
