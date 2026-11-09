@@ -24,9 +24,14 @@ if(!o)document.documentElement.classList.add("viewonly");})();
 <meta property="og:image:height" content="627">
 <meta property="og:image:alt" content="Market Desk: live S&amp;P 500 heatmap, portfolio risk analytics and market news">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff9e1b'/><path d='M7 22l6-7 5 4 7-9' stroke='%23111' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" id="favIcon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff9e1b'/><path d='M7 22l6-7 5 4 7-9' stroke='%23111' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="manifest" id="appManifest" href="/manifest.json">
+<link rel="apple-touch-icon" id="touchIcon" href="/apple-touch-icon.png">
+<script>/* tab + home-screen icon: pink on your unlocked (owner) devices, orange for visitors */
+(function(){try{var q=location.search,own=!/[?&](visitor|viewer)\b/.test(q)&&localStorage.getItem("ownerMode")==="1";if(!own)return;
+var c="%23ff4fa3",f=document.getElementById("favIcon");f.href=f.href.replace(/%23ff9e1b/g,c);
+document.getElementById("touchIcon").href="/apple-touch-icon-owner.png";document.getElementById("appManifest").href="/manifest-owner.json";
+document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <meta name="theme-color" content="#0b0d10">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Market Desk">
@@ -539,6 +544,7 @@ body{font-variant-numeric:tabular-nums}
 .btn{background:var(--amber);color:#fff;border-radius:8px}
 .btn.ghost{background:var(--panel2);color:var(--text)}
 .brand i{background:var(--amber)} .brand span{color:var(--amber)}
+html.owner-icon .brand i{background:#ff4fa3} html:not(.owner-icon) .brand i{background:#ff9e1b}
 .tk .s,.wl .sym,.sym-cell,.mini .top b,.earn-list .s,.big-sym,.rs-name small{color:var(--text)}
 .wl .sym{font-weight:700}
 .sym-cell{font-weight:700}

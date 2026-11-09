@@ -1,0 +1,22 @@
+{
+ "name": "Market Desk",
+ "short_name": "Market Desk",
+ "description": "Live stock news, markets, research and predictions",
+ "start_url": "/",
+ "display": "standalone",
+ "background_color": "#0b0d10",
+ "theme_color": "#0b0d10",
+ "icons": [
+  {
+   "src": "/icon-192-owner.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/icon-512-owner.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}
