@@ -10,7 +10,20 @@
 if(!o)document.documentElement.classList.add("viewonly");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Market Desk</title>
+<title>Market Desk · Live market dashboard by Peter Hemmerdinger</title>
+<meta name="description" content="A live markets dashboard built by Peter Hemmerdinger, a finance student at Bryant University: real-time prices and news, an S&amp;P 500 heatmap, portfolio risk analytics and AI research tools.">
+<meta name="author" content="Peter Hemmerdinger">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Market Desk">
+<meta property="og:title" content="Market Desk · Live market dashboard">
+<meta property="og:description" content="A live markets dashboard built by Peter Hemmerdinger, a finance student at Bryant University: real-time prices and news, an S&amp;P 500 heatmap, portfolio risk analytics and AI research tools.">
+<meta property="og:url" content="https://my-terminal-28tq.onrender.com/">
+<meta property="og:image" content="https://my-terminal-28tq.onrender.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="627">
+<meta property="og:image:alt" content="Market Desk: live S&amp;P 500 heatmap, portfolio risk analytics and market news">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://my-terminal-28tq.onrender.com/">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%23ff9e1b'/><path d='M7 22l6-7 5 4 7-9' stroke='%23111' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -889,6 +902,27 @@ body.sg-lock{overflow:hidden}
 @keyframes hmFlashD{0%{box-shadow:inset 0 0 0 2px #ff98aa,0 0 18px #ff4a68}100%{box-shadow:none}}
 @media (max-width:1200px){ .hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:760px){ #tab-nyse .ny-hm{height:1100px} .hm-grid{grid-template-columns:minmax(0,1fr)} .hm-scale{display:none} .hm-find input{width:120px} }
+/* ===== visitor welcome + about (view-only only) ===== */
+.vo-hello,.vo-modal{display:none} html.viewonly .vo-hello{display:block} html.viewonly .vo-modal:not([hidden]){display:grid}
+html.viewonly.vo-dismissed .vo-hello{display:none}
+.vo-hello{border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(77,163,255,.10),rgba(77,163,255,.02) 60%,transparent)}
+.vo-in{display:flex;align-items:center;gap:10px 16px;padding:9px 16px;flex-wrap:wrap;max-width:1600px}
+.vo-hi{font-weight:600;font-size:13px;white-space:nowrap}
+.vo-in p{margin:0;flex:1 1 360px;font-size:13px;color:var(--dim);line-height:1.45} .vo-in p b{color:var(--text)}
+.vo-in p a{color:#4da3ff;text-decoration:none;border-bottom:1px dotted rgba(77,163,255,.5)}
+.vo-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .vo-acts .btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 12px;font-size:12.5px;text-decoration:none;line-height:1.2}
+.vo-x{background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px;padding:4px 6px}
+.vo-modal{position:fixed;inset:0;z-index:9000;background:rgba(3,5,10,.72);backdrop-filter:blur(4px);place-items:center;padding:16px}
+.vo-card{position:relative;width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:26px 26px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.vo-close{position:absolute;right:12px;top:12px}
+.vo-k{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:#4da3ff}
+.vo-card h2{margin:6px 0 2px;font-size:28px} .vo-by{margin:0 0 12px;color:var(--dim);font-size:13.5px} .vo-by b{color:var(--text)}
+.vo-card > p{font-size:14px;line-height:1.55}
+.vo-feats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.vo-feats div{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--panel2)} .vo-feats b{display:block;font-size:13.5px;margin-bottom:4px} .vo-feats span{font-size:12.5px;color:var(--dim);line-height:1.45}
+.vo-stack{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px} .vo-stack span{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-radius:999px;padding:3px 9px;color:var(--dim)}
+.vo-small{font-size:12px!important;color:var(--dim)}
+@media (max-width:640px){ .vo-feats{grid-template-columns:1fr} .vo-card{padding:22px 18px 18px} .vo-in{padding:8px 12px} .vo-in p{flex-basis:100%} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -941,6 +975,28 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <!-- Signals tab is hidden but its code is kept; set SHOW_SIGNALS=true to bring it back -->
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
+
+<div class="vo-hello" id="voHello"><div class="vo-in">
+  <span class="vo-hi">👋 Welcome</span>
+  <p><b>Market Desk</b> is a live markets dashboard I built as a finance student at Bryant University. Try the <a href="#nyse" data-gotab="nyse">S&amp;P 500 heatmap</a>, look up any stock in <a href="#research" data-gotab="research">Research</a>, or see the risk analytics in the <a href="#portfolio" data-gotab="portfolio">sample portfolio</a>.</p>
+  <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><button type="button" class="vo-x" id="voX" title="Hide">✕</button></div>
+</div></div>
+<div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-labelledby="voT">
+  <button type="button" class="vo-x vo-close" id="voClose" title="Close">✕</button>
+  <div class="vo-k">ABOUT THIS PROJECT</div>
+  <h2 id="voT">Market Desk</h2>
+  <p class="vo-by">Built by <b>Peter Hemmerdinger</b> · Finance, Bryant University</p>
+  <p>I built Market Desk to bring the information I use to follow the markets into a single dashboard, and to apply the concepts from my finance coursework to real, live data. My goal was to understand not just how a portfolio performs, but how much risk it takes to get there.</p>
+  <div class="vo-feats">
+    <div><b>Live market data</b><span>Streaming prices and headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and The Wall Street Journal.</span></div>
+    <div><b>S&amp;P 500 heatmap</b><span>All 503 companies, sized by market value and colored by today's move, with sector zoom and search.</span></div>
+    <div><b>Portfolio risk analytics</b><span>Annualized return, volatility, Sharpe ratio, beta vs. the S&amp;P 500 and max drawdown, for the portfolio and each holding.</span></div>
+    <div><b>AI research</b><span>Stock outlooks, screening and portfolio building with the Claude API (owner only, to protect the API budget).</span></div>
+  </div>
+  <div class="vo-stack"><span>Node.js</span><span>JavaScript</span><span>Claude API</span><span>Finnhub</span><span>Yahoo Finance data</span><span>Render</span></div>
+  <p class="vo-small">You're in view-only mode: everything is live, but editing and AI features are turned off for visitors.</p>
+  <div class="vo-acts"><a class="btn" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">Connect on LinkedIn ↗</a><button type="button" class="btn ghost" data-gotab="nyse" id="voGoHm">Explore the heatmap</button></div>
+</div></div>
 
 <div class="wrap">
   <aside class="left">
@@ -3230,6 +3286,16 @@ setInterval(()=>{ if(!document.hidden&&S.tab==="data"){ S.moversAt=Date.now(); l
 setInterval(()=>{ if(S.news) renderFeed(); },30000);
 setInterval(()=>{ if(!document.hidden&&S.tab==="research"&&S.rq.sym&&["1d","5d"].includes(S.chartRange)) loadChart(); },60000);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuotes(); loadNews(); } });
+
+/* visitor welcome strip + About modal (view-only visitors only) */
+(function(){ if(!document.documentElement.classList.contains("viewonly")) return;
+  try{ if(localStorage.getItem("voHelloX")==="1") document.documentElement.classList.add("vo-dismissed"); }catch{}
+  const m=$("voModal"), open=()=>{ m.hidden=false; }, close=()=>{ m.hidden=true; };
+  $("voAbout").onclick=open; $("voClose").onclick=close; $("voGoHm").addEventListener("click",close);
+  m.addEventListener("click",e=>{ if(e.target===m) close(); }); document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!m.hidden) close(); });
+  $("voX").onclick=()=>{ document.documentElement.classList.add("vo-dismissed"); try{ localStorage.setItem("voHelloX","1"); }catch{} };
+  $("voHello").addEventListener("click",e=>{ if(e.target.closest("a[data-gotab]")) e.preventDefault(); });
+})();
 </script>
 </body>
 </html>
