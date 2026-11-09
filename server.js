@@ -442,6 +442,7 @@ function startShareJob() {
   shareJob = (async () => {
     let n = 0;
     for (const s of todo) {
+      if (spShares[s] || spCaps[s]) continue; // already sized by the live quote feed, no need to ask Finnhub
       try {
         const j = JSON.parse(await get(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(s.replace("-", "."))}&token=${FINNHUB}`, "application/json"));
         if (j && j.shareOutstanding) spShares[s] = j.shareOutstanding * 1e6;
