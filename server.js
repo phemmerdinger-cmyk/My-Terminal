@@ -526,7 +526,7 @@ async function bestBuys() {
   return { status: bbJob ? "refreshing" : "ready", updated: BB.updated, checked: BB.checked, rated: BB.rated, newsReady: !!Object.keys(news).length,
     items: BB.items.slice(0, 12).map(shape), sells: (BB.sells || []).slice(0, 10).map(shape) };
 }
-setTimeout(startShareJob, 20_000);
+setTimeout(async () => { try { await sp500Snapshot(); } catch {} startShareJob(); }, 20_000); // load live sizes first so only missing ones go to Finnhub
 async function sp500Snapshot() {
   return cached("sp500", 60_000, async () => {
     const syms = SP500.map(r => r[0]), out = {}; let source = "quote";
