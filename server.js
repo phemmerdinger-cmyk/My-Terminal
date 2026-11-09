@@ -438,7 +438,7 @@ let shareJob = null;
 function startShareJob() {
   if (shareJob || !FINNHUB || !SP500.length) return;
   const todo = SP500.map(r => r[0]).filter(s => !spShares[s] && !spCaps[s]);
-  if (!todo.length) return startBestBuys();
+  if (!todo.length) return;
   shareJob = (async () => {
     let n = 0;
     for (const s of todo) {
@@ -452,63 +452,80 @@ function startShareJob() {
     }
     try { fs.writeFileSync(SHARES_FILE, JSON.stringify(spShares)); } catch {}
     shareJob = null;
-    startBestBuys();
   })();
 }
 
-// ---------------------------------------------------------------- Best Buys: S&P 500 stocks Wall Street analysts rate highest
-// Finnhub's free analyst-recommendation data for the ~150 largest S&P 500 companies, gathered slowly in the
-// background (after the share job, so both stay under Finnhub's free limit), refreshed twice a day.
-const BB_FILE = path.join(require("os").tmpdir(), "best-buys.json");
-let BB = (() => { try { return JSON.parse(fs.readFileSync(BB_FILE, "utf8")); } catch { return null; } })();
-let bbJob = null, bbProgress = 0;
+// ---------------------------------------------------------------- Best Buys / Best Sells: the WHOLE US market
+// A slow, continuous background scan of every common stock on the NYSE, Nasdaq and NYSE American using Finnhub's
+// free analyst-recommendation data (~45 requests/min, under the free limit). Largest companies first, then the rest;
+// each stock is re-rated daily and the rankings update as the scan goes. Saved to a temp file between restarts.
+const BB_FILE = path.join(require("os").tmpdir(), "best-buys-market.json");
+let BB = (() => { try { const j = JSON.parse(fs.readFileSync(BB_FILE, "utf8")); return j.ratings ? j : null; } catch { return null; } })()
+  || { ratings: {}, metrics: {}, names: {}, universe: [], uniAt: 0 };
+let bbJob = null;
+const BB_PAUSE = +process.env.BB_PAUSE_MS || 1350; // ~45 Finnhub calls a minute
+const BB_MIN_N = 5, BB_PRIOR = 0.6, BB_K = 6; // shrink thinly-covered stocks toward an average rating
+function bbAdj(r) { return (2 * r.sb + r.b - r.s - 2 * r.ss + BB_PRIOR * BB_K) / (r.n + BB_K); }
+function bbRank() {
+  const all = Object.entries(BB.ratings).filter(([, r]) => r && r.n >= BB_MIN_N).map(([sym, r]) => ({ sym, ...r, adj: bbAdj(r) }));
+  all.sort((a, b) => b.adj - a.adj || b.n - a.n);
+  return { all, top: all.slice(0, 20), bottom: all.slice(-15).reverse() };
+}
+function bbSave() { try { fs.writeFileSync(BB_FILE, JSON.stringify(BB)); } catch {} }
 function startBestBuys() {
-  if (bbJob || !FINNHUB || !SP500.length) return;
-  if (BB && Date.now() - BB.updated < 12 * 3600e3) return;
+  if (bbJob || !FINNHUB) return;
   bbJob = (async () => {
     const pause = (ms) => new Promise((r) => setTimeout(r, ms));
-    let snap = {}; try { snap = (await sp500Snapshot()).quotes || {}; } catch {}
-    const size = (sym) => (snap[sym] && snap[sym][3]) || (spShares[sym] && snap[sym] ? spShares[sym] * snap[sym][0] : 0);
-    const cands = SP500.map((r) => r[0]).sort((a, b) => size(b) - size(a)).slice(0, 150);
-    const rated = [];
-    bbProgress = 0;
-    for (const sym of cands) {
-      try {
-        const rec = await fh(`/stock/recommendation?symbol=${encodeURIComponent(sym.replace("-", "."))}`);
-        const r = Array.isArray(rec) && rec[0];
-        if (r) {
-          const n = (r.strongBuy || 0) + (r.buy || 0) + (r.hold || 0) + (r.sell || 0) + (r.strongSell || 0);
-          if (n >= 8) rated.push({ sym, period: r.period, sb: r.strongBuy || 0, b: r.buy || 0, h: r.hold || 0, s: r.sell || 0, ss: r.strongSell || 0, n,
-            buyPct: ((r.strongBuy || 0) + (r.buy || 0)) / n, score: (2 * (r.strongBuy || 0) + (r.buy || 0) - (r.sell || 0) - 2 * (r.strongSell || 0)) / n });
+    const call = async (p) => { try { return await fh(p); } catch (e) { if (/429/.test(String(e.message))) await pause(30_000); return null; } finally { await pause(BB_PAUSE); } };
+    for (;;) {
+      // 1) the universe: every US common stock on the major exchanges (refreshed daily)
+      if (!BB.universe.length || Date.now() - BB.uniAt > 24 * 3600e3) {
+        const list = await call("/stock/symbol?exchange=US");
+        if (Array.isArray(list) && list.length) {
+          const MICS = new Set(["XNYS", "XNAS", "XASE", "ARCX", "BATS"]);
+          const keep = list.filter((x) => x.type === "Common Stock" && MICS.has(x.mic) && /^[A-Z]{1,5}(\.[A-Z])?$/.test(x.symbol));
+          keep.forEach((x) => (BB.names[x.symbol] = x.description));
+          let snap = {}; try { snap = (await sp500Snapshot()).quotes || {}; } catch {}
+          const sp = SP500.map((r) => r[0].replace("-", ".")).sort((a, b) => ((snap[b.replace(".", "-")] || [])[3] || 0) - ((snap[a.replace(".", "-")] || [])[3] || 0));
+          const spSet = new Set(sp);
+          BB.universe = [...sp, ...keep.map((x) => x.symbol).filter((s) => !spSet.has(s)).sort((a, b) => a.length - b.length || a.localeCompare(b))];
+          BB.uniAt = Date.now(); bbSave();
+        } else if (!BB.universe.length) { await pause(10 * 60_000); continue; }
+      }
+      // 2) rate the stock whose rating is oldest (never-rated first)
+      const due = BB.universe.find((s) => !BB.ratings[s] || Date.now() - BB.ratings[s].t > 24 * 3600e3);
+      if (!due) { await pause(10 * 60_000); continue; }
+      const rec = await call(`/stock/recommendation?symbol=${encodeURIComponent(due)}`);
+      const r = Array.isArray(rec) && rec[0];
+      BB.ratings[due] = r ? { t: Date.now(), period: r.period, sb: r.strongBuy || 0, b: r.buy || 0, h: r.hold || 0, s: r.sell || 0, ss: r.strongSell || 0,
+        n: (r.strongBuy || 0) + (r.buy || 0) + (r.hold || 0) + (r.sell || 0) + (r.strongSell || 0) } : { t: Date.now(), n: 0 };
+      // 3) every 25 stocks: re-rank, fetch valuation/growth for any new finalists, save
+      if (Object.keys(BB.ratings).length % 25 === 0) {
+        const { top, bottom } = bbRank();
+        for (const f of [...top.slice(0, 14), ...bottom.slice(0, 12)]) {
+          const m = BB.metrics[f.sym];
+          if (m && Date.now() - m.t < 24 * 3600e3) continue;
+          const j = await call(`/stock/metric?symbol=${encodeURIComponent(f.sym)}&metric=all`);
+          const x = (j && j.metric) || {};
+          BB.metrics[f.sym] = { t: Date.now(), hi52: x["52WeekHigh"] ?? null, lo52: x["52WeekLow"] ?? null, pe: x.peTTM ?? x.peBasicExclExtraTTM ?? null, revG: x.revenueGrowthTTMYoy ?? null, epsG: x.epsGrowthTTMYoy ?? null, beta: x.beta ?? null };
         }
-      } catch (e) { if (/429/.test(String(e.message))) await pause(30_000); }
-      bbProgress++;
-      await pause(1500);
+        bbSave();
+      }
     }
-    rated.sort((a, b) => b.score - a.score || b.buyPct - a.buyPct || b.n - a.n);
-    const top = rated.slice(0, 20);
-    // Best Sells: the lowest-rated names (fewest buys / most holds and sells)
-    const bottom = rated.slice(-15).reverse().map((t) => ({ ...t, sellPct: (t.s + t.ss) / t.n, holdPct: t.h / t.n }));
-    for (const t of [...top, ...bottom]) { // valuation + growth for the finalists
-      try {
-        const m = (await fh(`/stock/metric?symbol=${encodeURIComponent(t.sym.replace("-", "."))}&metric=all`)).metric || {};
-        Object.assign(t, { hi52: m["52WeekHigh"], lo52: m["52WeekLow"], pe: m.peTTM ?? m.peBasicExclExtraTTM ?? null, revG: m.revenueGrowthTTMYoy ?? null, epsG: m.epsGrowthTTMYoy ?? null, beta: m.beta ?? null });
-      } catch (e) { if (/429/.test(String(e.message))) await pause(30_000); }
-      await pause(1500);
-    }
-    if (top.length) { BB = { updated: Date.now(), checked: cands.length, rated: rated.length, items: top, sells: bottom }; try { fs.writeFileSync(BB_FILE, JSON.stringify(BB)); } catch {} }
-    bbJob = null;
-  })().catch(() => { bbJob = null; });
+  })().catch(() => { bbJob = null; setTimeout(startBestBuys, 60_000); });
 }
-setInterval(startBestBuys, 60 * 60_000);
+setInterval(startBestBuys, 30 * 60_000);
 async function bestBuys() {
   startBestBuys();
-  if (!BB) return { status: FINNHUB ? "building" : "unavailable", progress: bbProgress, total: 150, items: [] };
-  let snap = {}; try { snap = (await sp500Snapshot()).quotes || {}; } catch {}
-  const names = Object.fromEntries(SP500.map((r) => [r[0], [r[1], r[2]]]));
-  // latest headline for each pick, from the site's own news sources (Yahoo, CNBC, Morningstar, Seeking Alpha, WSJ)
-  const syms = [...BB.items.slice(0, 12), ...(BB.sells || []).slice(0, 10)].map((t) => t.sym);
-  const newsP = cached("bbnews:" + BB.updated, 15 * 60_000, async () => {
+  const total = BB.universe.length, rated = Object.values(BB.ratings).filter((r) => Date.now() - r.t < 36 * 3600e3).length;
+  const { all, top, bottom } = bbRank();
+  if (!FINNHUB) return { status: "unavailable", items: [] };
+  if (all.length < 30) return { status: "building", progress: Object.keys(BB.ratings).length, total: total || 6000, items: [] };
+  const buys = top.slice(0, 12), sells = bottom.slice(0, 10), syms = [...buys, ...sells].map((t) => t.sym.replace(".", "-"));
+  const q = await Promise.race([getQuotes(syms).catch(() => ({})), new Promise((r) => setTimeout(() => r({}), 6000))]);
+  const quotes = (q && q.quotes) || {};
+  const spNames = Object.fromEntries(SP500.map((r) => [r[0].replace("-", "."), [r[1], r[2]]]));
+  const newsP = cached("bbnews:" + syms.join(","), 15 * 60_000, async () => {
     const out = {};
     for (let i = 0; i < syms.length; i += 12) {
       const chunk = syms.slice(i, i + 12);
@@ -516,17 +533,23 @@ async function bestBuys() {
       for (const it of n.items || []) for (const t of it.tickers || []) if (chunk.includes(t)) {
         const o = (out[t] = out[t] || { count: 0, top: null });
         if (Date.now() - (it.time || 0) < 7 * 864e5) o.count++;
-        if (!o.top || (it.time || 0) > (o.top.time || 0)) o.top = { title: it.title, link: it.link, source: it.source || it.src || "", time: it.time };
+        if (!o.top || (it.time || 0) > (o.top.time || 0)) o.top = { title: it.title, link: it.link, source: it.source || "", time: it.time };
       }
     }
     return out;
   });
-  const news = await Promise.race([newsP, new Promise((r) => setTimeout(() => r(null), 7000))]) || {};
-  const shape = (t) => { const q = snap[t.sym] || []; return { ...t, name: (names[t.sym] || [])[0] || t.sym, sector: (names[t.sym] || [])[1] || "", price: q[0] ?? null, chgPct: q[2] ?? null, news: news[t.sym] || null }; };
-  return { status: bbJob ? "refreshing" : "ready", updated: BB.updated, checked: BB.checked, rated: BB.rated, newsReady: !!Object.keys(news).length,
-    items: BB.items.slice(0, 12).map(shape), sells: (BB.sells || []).slice(0, 10).map(shape) };
+  const news = (await Promise.race([newsP, new Promise((r) => setTimeout(() => r(null), 7000))])) || {};
+  const shape = (t) => {
+    const ys = t.sym.replace(".", "-"), qq = quotes[ys] || {}, m = BB.metrics[t.sym] || {};
+    return { ...t, ...m, sym: ys, score: t.adj, buyPct: (t.sb + t.b) / t.n, sellPct: (t.s + t.ss) / t.n, holdPct: t.h / t.n,
+      name: (spNames[t.sym] || [])[0] || (BB.names[t.sym] ? BB.names[t.sym].replace(/\b(\w)(\w*)/g, (a, b, c) => b + c.toLowerCase()) : t.sym),
+      sector: (spNames[t.sym] || [])[1] || "", sp500: !!spNames[t.sym], price: qq.price ?? null, chgPct: qq.changePct ?? null, news: news[ys] || null };
+  };
+  return { status: rated < total * 0.9 ? "scanning" : "ready", progress: rated, total, rated: all.length, updated: Date.now(),
+    newsReady: !!Object.keys(news).length, items: buys.map(shape), sells: sells.map(shape) };
 }
-setTimeout(async () => { try { await sp500Snapshot(); } catch {} startShareJob(); }, 20_000); // load live sizes first so only missing ones go to Finnhub
+setTimeout(async () => { try { await sp500Snapshot(); } catch {} startShareJob(); }, 20_000);
+setTimeout(startBestBuys, 45_000); // load live sizes first so only missing ones go to Finnhub
 async function sp500Snapshot() {
   return cached("sp500", 60_000, async () => {
     const syms = SP500.map(r => r[0]), out = {}; let source = "quote";

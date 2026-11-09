@@ -1019,6 +1019,8 @@ html.viewonly .api-bal-wrap{display:none!important}
 .bb-why{grid-area:why;display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:2px} .bb-why span{font-size:11px;border-radius:999px;padding:2px 8px;border:1px solid var(--line2)}
 .bb-why .p{color:#7ee2a8;border-color:rgba(33,195,122,.35)} .bb-why .c{color:#ff9aa5;border-color:rgba(255,77,94,.35)}
 @media (max-width:520px){ .bb-row{grid-template-columns:18px minmax(0,1fr) auto auto!important;grid-template-areas:"r id big ds" ". px px px" ". rate rate rate" ". why why why" ". meta meta meta" ". news news news"!important} }
+.bb-tag{font-style:normal;font-family:var(--sans);font-size:9.5px;font-weight:500;color:#4da3ff;border:1px solid rgba(77,163,255,.4);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:2px}
+.bb-note .spin{width:10px;height:10px;margin-right:6px;vertical-align:-1px}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -3499,16 +3501,16 @@ async function loadBestBuys(force){
   S.bbBusy=true; renderBestBuys();
   try{ S.bb=await api("/api/bestbuys"); S.bbAt=Date.now(); }catch(e){ S.bbErr=String(e.message||e); }
   S.bbBusy=false; renderBestBuys();
-  if(S.bb&&(S.bb.status==="building"||!S.bb.newsReady)) setTimeout(()=>{ if(S.tab==="data") loadBestBuys(true); }, S.bb.status==="building"?45e3:15e3);
+  if(S.bb&&(S.bb.status==="building"||S.bb.status==="scanning"||!S.bb.newsReady)) setTimeout(()=>{ if(S.tab==="data") loadBestBuys(true); }, S.bb.status==="building"?45e3:S.bb.status==="scanning"?120e3:15e3);
 }
 function renderBestBuys(){
   const el=$("bestBuys"); if(!el) return;
   const d=S.bb;
-  const head=`<div class="bb-head"><div><div class="bb-k">★ ANALYST CONSENSUS · S&amp;P 500</div><h2>Best Buys &amp; Best Sells</h2></div>
-    <div class="bb-note">${d&&d.updated?`Ratings from ${d.rated||d.checked} of the largest S&amp;P 500 companies · updated ${new Date(d.updated).toLocaleDateString("en-US",{month:"short",day:"numeric"})}`:""}</div></div>`;
+  const head=`<div class="bb-head"><div><div class="bb-k">★ ANALYST CONSENSUS · WHOLE US MARKET</div><h2>Best Buys &amp; Best Sells</h2></div>
+    <div class="bb-note">${d&&d.total?(d.status==="scanning"?`<span class="spin"></span>Scanning the market: ${d.progress.toLocaleString()} of ${d.total.toLocaleString()} US stocks rated · rankings update as it goes`:`${(d.rated||0).toLocaleString()} rated stocks across the NYSE, Nasdaq &amp; NYSE American · re-rated daily`):""}</div></div>`;
   if(!d){ el.innerHTML=head+`<div class="bb-wait">${S.bbErr?esc(S.bbErr):'<span class="spin"></span>Loading analyst ratings…'}</div>`; return; }
   if(d.status==="unavailable"){ el.innerHTML=head+'<div class="bb-wait">Best Buys needs the Finnhub key on the server.</div>'; return; }
-  if(d.status==="building"){ el.innerHTML=head+`<div class="bb-wait"><span class="spin"></span>Collecting Wall Street ratings for the ${d.total} largest S&amp;P 500 companies — ${d.progress} of ${d.total} done. This takes a few minutes the first time.</div>`; return; }
+  if(d.status==="building"){ el.innerHTML=head+`<div class="bb-wait"><span class="spin"></span>Starting the whole-market scan of Wall Street ratings — ${d.progress} stocks checked so far. The first rankings appear in a few minutes; the full market (~${Math.round(d.total/100)*100} stocks) takes a couple of hours and then refreshes daily.</div>`; return; }
   const pctc=v=>v==null?'<span class="dim">—</span>':`<span class="${v>=0?"up":"down"}">${v>=0?"+":""}${v.toFixed(2)}%</span>`;
   const bar=t=>{ const w=x=>(x/t.n*100).toFixed(1)+"%"; return `<div class="bb-bar" title="Strong buy ${t.sb} · Buy ${t.b} · Hold ${t.h} · Sell ${t.s} · Strong sell ${t.ss}"><i class="sb" style="width:${w(t.sb)}"></i><i class="b" style="width:${w(t.b)}"></i><i class="h" style="width:${w(t.h)}"></i><i class="s" style="width:${w(t.s+t.ss)}"></i></div>`; };
   const off=t=>t.hi52&&t.price?((t.price/t.hi52-1)*100):null;
@@ -3520,7 +3522,7 @@ function renderBestBuys(){
     const big=kind==="buy"?`<b class="up">${Math.round(t.buyPct*100)}%</b><small>buy</small>`:`<b class="${t.sellPct>0?"down":"amber"}">${Math.round((t.sellPct>0?t.sellPct:t.holdPct)*100)}%</b><small>${t.sellPct>0?"sell":"hold"}</small>`;
     const o=off(t), nw=t.news&&t.news.top;
     return `<div class="bb-row" data-nyopen="${esc(t.sym)}"><span class="bb-rank">${i+1}</span>
-      <div class="bb-id"><b>${esc(t.sym)}</b><span>${esc(t.name)}</span></div>
+      <div class="bb-id"><b>${esc(t.sym)}${t.sp500?'':' <i class="bb-tag">non-S&amp;P</i>'}</b><span>${esc(t.name)}</span></div>
       <div class="bb-px"><b>${t.price!=null?"$"+t.price.toFixed(2):"—"}</b>${pctc(t.chgPct)}</div>
       <div class="bb-rate">${bar(t)}<span class="dim">${t.n} analysts</span></div>
       <div class="bb-big">${big}</div>
@@ -3533,7 +3535,7 @@ function renderBestBuys(){
   setHTML("bestBuys",head+`<div class="bb-cols">
     <section class="bb-col buy"><h3>▲ Best Buys <span>highest analyst ratings</span></h3>${buys.map((t,i)=>row(t,i,"buy")).join("")}</section>
     <section class="bb-col sell"><h3>▼ Best Sells <span>lowest analyst ratings</span></h3>${sells.map((t,i)=>row(t,i,"sell")).join("")}</section></div>
-    <p class="bb-foot"><b>Desk Score</b> is a rules-based model Claude designed for this site: analyst consensus 40%, revenue &amp; earnings growth 20%, valuation 15%, price vs 52-week high 15%, news attention 10%. It runs in your browser, so it uses no Claude credits. Ratings from Finnhub, with headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. "Best Sells" are the lowest-rated large companies — often mostly Hold ratings. Analyst views can be wrong; this isn't personal financial advice. Tap any stock to research it.</p>`);
+    <p class="bb-foot"><b>Desk Score</b> is a rules-based model Claude designed for this site: analyst consensus 40%, revenue &amp; earnings growth 20%, valuation 15%, price vs 52-week high 15%, news attention 10%. It runs in your browser, so it uses no Claude credits. Ratings from Finnhub, with headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. Covers every common stock on the NYSE, Nasdaq and NYSE American with at least 5 analysts; stocks with few analysts are pulled toward an average rating so a couple of votes can't top the list. "Best Sells" are the lowest-rated names. Analyst views can be wrong; this isn't personal financial advice. Tap any stock to research it.</p>`);
 }
 $("bestBuys")&&$("bestBuys").addEventListener("click",e=>{ if(e.target.closest("a")) return; const r=e.target.closest("[data-nyopen]"); if(r) openQuote(r.dataset.nyopen); });
 setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*60e3);
