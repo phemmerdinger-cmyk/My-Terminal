@@ -2034,9 +2034,9 @@ async function runAsk(){
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port})});
-    const did=j.action?await applyAction(j.action):"";
+    const acts=j.actions||(j.action?[j.action]:[]); let did=""; for(const a of acts){ const m=await applyAction(a); did+=(did?"\n":"")+m; }
     out.textContent=j.answer+(did?"\n\n"+did:"");
-    if(did.startsWith("✓")){ const b=document.createElement("button"); b.className="btn"; b.style.marginTop="10px"; b.dataset.gotab="portfolio"; b.textContent="Open portfolio →"; out.appendChild(b); }
+    if(did.includes("✓")){ const b=document.createElement("button"); b.className="btn"; b.style.marginTop="10px"; b.dataset.gotab="portfolio"; b.textContent="Open portfolio →"; out.appendChild(b); }
     const st=document.createElement("div"); st.className="stamp"; st.style.cssText="font-size:11px;color:var(--dim);margin-top:12px";
     st.textContent=`${j.model} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`; out.appendChild(st);
   }catch(e){ out.innerHTML=`<span class="bad">${esc(e.code==="no_key"?"No API key is set up yet.":"Couldn't get an answer: "+e.message)}</span>`; }
@@ -2470,8 +2470,8 @@ async function acSend(q){
   $("acInput").value=""; S.ac.thread.push({me:true,text:q}); S.ac.busy=true; acRender();
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port,context:acContext()})});
-    const did=j.action?await applyAction(j.action):"";
-    S.ac.thread.push({me:false,text:j.answer+(did?"\n\n"+did:""),meta:`${TAB_NAMES[S.tab]} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`,go:j.action&&did.startsWith("✓")?"portfolio":null});
+    const acts=j.actions||(j.action?[j.action]:[]); let did=""; for(const a of acts){ const m=await applyAction(a); did+=(did?"\n":"")+m; }
+    S.ac.thread.push({me:false,text:j.answer+(did?"\n\n"+did:""),meta:`${TAB_NAMES[S.tab]} · ${new Date(j.generated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`,go:did.includes("✓")?"portfolio":null});
   }catch(e){ S.ac.thread.push({me:false,text:"Sorry, I couldn't answer that: "+e.message}); }
   S.ac.busy=false; acRender(); refreshUsage();
 }

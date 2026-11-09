@@ -647,29 +647,30 @@ function parsePairs(str) {
 }
 async function askWithActions(apiKey, prompt) {
   const j = await anthropic(apiKey, {
-      model: MODEL, max_tokens: 3000, tools: ACTION_TOOLS, tool_choice: { type: "auto" },
+      model: MODEL, max_tokens: 4000, tools: ACTION_TOOLS, tool_choice: { type: "auto" },
       system:
         "You are a sharp, balanced investing assistant inside one person's personal stock dashboard. Use the data provided plus general market knowledge, " +
         "cite specific numbers and headlines, and be honest about uncertainty. This is an opinion, not financial advice. " +
-        "You can take actions: when the user asks you to make/build/create a portfolio, CALL create_portfolio (don't just describe one). " +
+        "You can take actions: when the user asks you to make/build/create a portfolio, CALL create_portfolio (don't just describe one); if they ask for several portfolios, call it once per portfolio in the same reply. " +
         "When they ask to add stocks to their current portfolio, CALL add_holdings. Otherwise just answer. " +
         "Always also write a short plain-text reply (no markdown headings, '- ' bullets are fine, under 220 words).",
       messages: [{ role: "user", content: prompt }],
   });
   const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
-  const tu = (j.content || []).find((b) => b.type === "tool_use");
-  let action = null;
-  if (tu && tu.name === "create_portfolio") {
-    const pairs = parsePairs(tu.input.holdings);
-    const sum = pairs.reduce((a, b) => a + b.value, 0) || 1;
-    if (pairs.length) action = { type: "create_portfolio", name: String(tu.input.name || "Claude's portfolio").slice(0, 40), total: Math.max(1, +tu.input.total || 10000),
-      holdings: pairs.map((p) => ({ symbol: p.symbol, pct: (p.value / sum) * 100 })), rationale: tu.input.rationale || "" };
-  } else if (tu && tu.name === "add_holdings") {
-    const pairs = parsePairs(tu.input.holdings);
-    if (pairs.length) action = { type: "add_holdings", holdings: pairs.map((p) => ({ symbol: p.symbol, amount: p.value })), rationale: tu.input.rationale || "" };
+  const actions = [];
+  for (const tu of (j.content || []).filter((b) => b.type === "tool_use").slice(0, 4)) {
+    const pairs = parsePairs(tu.input && tu.input.holdings);
+    if (!pairs.length) continue;
+    if (tu.name === "create_portfolio") {
+      const sum = pairs.reduce((a, b) => a + b.value, 0) || 1;
+      actions.push({ type: "create_portfolio", name: String(tu.input.name || "Claude's portfolio").slice(0, 40), total: Math.max(1, +tu.input.total || 10000),
+        holdings: pairs.map((p) => ({ symbol: p.symbol, pct: (p.value / sum) * 100 })), rationale: tu.input.rationale || "" });
+    } else if (tu.name === "add_holdings") {
+      actions.push({ type: "add_holdings", holdings: pairs.map((p) => ({ symbol: p.symbol, amount: p.value })), rationale: tu.input.rationale || "" });
+    }
   }
-  const answer = text || (action ? action.rationale : "") || "Done.";
-  return { answer, action };
+  const answer = text || actions.map((x) => x.rationale).filter(Boolean).join("\n\n") || "Done.";
+  return { answer, action: actions[0] || null, actions };
 }
 
 // Free-form question, with the viewer's watchlist / portfolio as context
