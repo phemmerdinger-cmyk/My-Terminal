@@ -284,6 +284,54 @@ async function getNews(tickers, range) {
   };
 }
 
+
+// ---------------------------------------------------------------- Smart Money (free feeds: regulators, newsletters, earnings calls, Reddit)
+const SMART = [
+  { g: "policy", key: "fed", name: "Federal Reserve", urls: ["https://www.federalreserve.gov/feeds/press_all.xml", gnews("site:federalreserve.gov when:14d")], days: 21 },
+  { g: "policy", key: "sec", name: "SEC", urls: ["https://www.sec.gov/news/pressreleases.rss", gnews("site:sec.gov press release when:14d")], days: 21 },
+  { g: "policy", key: "treasury", name: "U.S. Treasury", urls: [gnews("site:home.treasury.gov when:14d")], days: 21 },
+  { g: "policy", key: "bls", name: "Bureau of Labor Statistics", urls: ["https://www.bls.gov/feed/bls_latest.rss", gnews("site:bls.gov when:14d")], days: 21 },
+  { g: "letters", key: "abnormal", name: "Abnormal Returns", urls: ["https://abnormalreturns.com/feed/"], days: 10 },
+  { g: "letters", key: "carlson", name: "A Wealth of Common Sense", urls: ["https://awealthofcommonsense.com/feed/"], days: 21 },
+  { g: "letters", key: "batnick", name: "The Irrelevant Investor", urls: ["https://theirrelevantinvestor.com/feed/"], days: 21 },
+  { g: "letters", key: "netinterest", name: "Net Interest", urls: ["https://www.netinterest.co/feed"], days: 30 },
+  { g: "letters", key: "apricitas", name: "Apricitas Economics", urls: ["https://www.apricitas.io/feed"], days: 30 },
+  { g: "letters", key: "overshoot", name: "The Overshoot", urls: ["https://theovershoot.co/feed"], days: 30 },
+  { g: "letters", key: "kyla", name: "Kyla Scanlon", urls: ["https://kyla.substack.com/feed"], days: 30 },
+  { g: "letters", key: "calcrisk", name: "Calculated Risk", urls: ["https://www.calculatedriskblog.com/feeds/posts/default"], days: 7 },
+  { g: "calls", key: "calls", name: "Earnings calls", urls: [gnews('"earnings call" CEO said when:3d'), gnews('"conference call" guidance analysts when:3d')], days: 4 },
+  { g: "reddit", key: "r_investing", name: "r/investing", urls: ["https://www.reddit.com/r/investing/top/.rss?t=day", "https://old.reddit.com/r/investing/top/.rss?t=day"], days: 3 },
+  { g: "reddit", key: "r_stocks", name: "r/stocks", urls: ["https://www.reddit.com/r/stocks/top/.rss?t=day", "https://old.reddit.com/r/stocks/top/.rss?t=day"], days: 3 },
+  { g: "reddit", key: "r_secanalysis", name: "r/SecurityAnalysis", urls: ["https://www.reddit.com/r/SecurityAnalysis/top/.rss?t=week", "https://old.reddit.com/r/SecurityAnalysis/top/.rss?t=week"], days: 10 },
+];
+async function smartSource(src) {
+  for (const url of src.urls) {
+    try {
+      const items = await fetchFeed(url);
+      if (!items.length) continue;
+      const since = Date.now() - src.days * 86400e3;
+      const isG = url.includes("news.google.com"), isR = url.includes("reddit.com");
+      const out = items.filter((i) => !i.time || i.time >= since).slice(0, 10).map((i) => ({
+        g: src.g, src: src.key, name: isG && src.g === "calls" && i.publisher ? i.publisher : src.name,
+        title: isG ? i.title.replace(/\s+-\s+[^-]+$/, "") : i.title,
+        link: i.link, time: i.time,
+        summary: isG || isR ? "" : i.summary.replace(/The post .* appeared first on .*$/i, "").trim().slice(0, 240),
+      }));
+      if (out.length) return { ok: true, items: out };
+    } catch {}
+  }
+  return { ok: false, items: [] };
+}
+async function getSmart() {
+  return cached("smart", 10 * 60_000, async () => {
+    const res = await Promise.all(SMART.map((s) => smartSource(s).then((r) => ({ s, ...r }))));
+    const seen = new Set(), items = [];
+    for (const r of res) for (const it of r.items) { const k = it.title.toLowerCase().replace(/\W+/g, "").slice(0, 80); if (!seen.has(k)) { seen.add(k); items.push(it); } }
+    items.sort((a, b) => (b.time || 0) - (a.time || 0));
+    return { updated: Date.now(), sources: res.map((r) => ({ key: r.s.key, name: r.s.name, g: r.s.g, ok: r.ok })), items };
+  });
+}
+
 // ---------------------------------------------------------------- quotes (Yahoo Finance chart API)
 async function quote(sym) {
   return cached("q:" + sym, 15_000, async () => {
@@ -1134,6 +1182,7 @@ http
         const r = String(u.searchParams.get("range") || "");
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
       }
+      if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
       if (u.pathname === "/api/sp500") return send(res, 200, await sp500Snapshot());
       if (u.pathname === "/api/history") {

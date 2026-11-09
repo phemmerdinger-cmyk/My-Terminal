@@ -923,6 +923,32 @@ html.viewonly.vo-dismissed .vo-hello{display:none}
 .vo-stack{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px} .vo-stack span{font-family:var(--mono);font-size:11px;border:1px solid var(--line2);border-radius:999px;padding:3px 9px;color:var(--dim)}
 .vo-small{font-size:12px!important;color:var(--dim)}
 @media (max-width:640px){ .vo-feats{grid-template-columns:1fr} .vo-card{padding:22px 18px 18px} .vo-in{padding:8px 12px} .vo-in p{flex-basis:100%} }
+/* ===== Smart Money ===== */
+.sm-tb-note{font-size:12px;color:var(--dim);align-self:center;margin-left:4px}
+.sm-wrap{padding:4px 2px 20px}
+.sm-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px 20px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding:8px 0 14px;margin-bottom:16px}
+.sm-k{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#f5c518}
+.sm-head h2{margin:4px 0 0;font-family:Georgia,"Times New Roman",serif;font-size:28px;font-weight:700;letter-spacing:-.01em}
+.sm-stat{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.sm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.sm-panel{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--c);border-radius:10px;padding:14px 16px 12px;display:flex;flex-direction:column;min-width:0}
+.sm-panel .sm-ph{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.sm-panel h3{margin:0;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--c)}
+.sm-n{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.sm-blurb{margin:4px 0 10px;font-size:12.5px;color:var(--dim);line-height:1.45}
+.sm-lead,.sm-row{display:block;text-decoration:none;color:inherit;border-top:1px solid var(--line);padding:10px 0}
+.sm-lead:hover .sm-lt,.sm-row:hover .sm-t{color:var(--c)}
+.sm-meta{display:flex;gap:8px;align-items:center;font-size:11px;color:var(--dim);margin-bottom:3px}
+.sm-who{font-weight:600;color:var(--text);opacity:.85}
+.sm-lt{font-family:Georgia,"Times New Roman",serif;font-size:19px;line-height:1.25;font-weight:700}
+.sm-t{font-size:14px;line-height:1.35;font-weight:500}
+.sm-d{margin:5px 0 0;font-size:12.5px;color:var(--dim);line-height:1.45}
+.sm-empty{border-top:1px solid var(--line);padding:14px 0;font-size:13px;color:var(--dim)}
+.sm-srcs{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.sm-srcs span{font-size:10.5px;border:1px solid var(--line2);border-radius:999px;padding:2px 8px;color:var(--dim)}
+.sm-srcs span.off{opacity:.45;text-decoration:line-through}
+.sm-foot{font-size:11.5px;color:var(--dim);margin:14px 0 0}
+@media (max-width:900px){ .sm-grid{grid-template-columns:minmax(0,1fr)} .sm-head h2{font-size:22px} .sm-tb-note{display:none} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1538,17 +1564,19 @@ function renderMovers(){
 const NEWS_RANGES=[["today","Today"],["24h","Last 24 hours"],["week","Past week"],["month","Past month"],["6m","Past 6 months"],["year","Past year"],["all","All time"]];
 S.newsRange=store.get("newsRange","24h"); S.newsShow=150;
 function renderToolbar(){
-  const views=[["all","All news"],["mine","My stocks"]];
-  if(S.view!=="all"&&S.view!=="mine") views.push([S.view,S.view+" ✕"]);
+  const views=[["all","All news"],["mine","My stocks"],["smart","✦ Smart Money"]];
+  if(!["all","mine","smart"].includes(S.view)) views.push([S.view,S.view+" ✕"]);
+  const SMV=S.view==="smart";
   const on=Object.keys(SRC).filter(k=>!S.srcOff.has(k));
   const srcLabel=on.length===5?"All sources":on.length===0?"No sources":on.length===1?SRC[on[0]].name:on.length+" sources";
   $("toolbar").innerHTML=
     views.map(([k,l])=>`<span class="chip ${S.view===k?"on":""}" data-view="${esc(k)}">${esc(l)}</span>`).join("")+
-    `<div class="dd" id="srcDD"><button class="dd-btn" type="button" data-dd="srcDD">${esc(srcLabel)} <span class="car">▾</span></button>
+    (SMV?`<span class="sm-tb-note">Free feeds from regulators, top finance writers, earnings calls and Reddit · refreshes every 10 min</span>`:`<div class="dd" id="srcDD"><button class="dd-btn" type="button" data-dd="srcDD">${esc(srcLabel)} <span class="car">▾</span></button>
       <div class="dd-menu"><div class="dd-title">News sources</div>${Object.entries(SRC).map(([k,s])=>`<div class="src-row"><label><input type="checkbox" data-srcbox="${k}" ${S.srcOff.has(k)?"":"checked"}><span class="sw" style="background:${s.c}"></span>${s.name}</label><button type="button" class="only" data-srconly="${k}">Only</button></div>`).join("")}
       <div class="dd-act"><button type="button" data-srcall="1">Select all</button><button type="button" data-srcall="0">Clear</button></div></div></div>`+
     `<div class="dd"><select class="dd-btn" id="newsRange" title="Timeline">${NEWS_RANGES.map(([k,l])=>`<option value="${k}" ${S.newsRange===k?"selected":""}>🕒 ${l}</option>`).join("")}</select></div>`+
-    `<input class="search" id="search" placeholder="Search headlines…" value="${esc(S.q)}">`;
+    `<input class="search" id="search" placeholder="Search headlines…" value="${esc(S.q)}">`);
+  if(SMV) return;
   $("search").oninput=e=>{S.q=e.target.value;S.newsShow=150;renderFeed();};
   $("newsRange").onchange=e=>{ S.newsRange=e.target.value; store.set("newsRange",S.newsRange); S.newsShow=150; renderFeed(); loadNews(); };
 }
@@ -1576,7 +1604,7 @@ function filtered(){
     if(S.srcOff.has(i.source)) return false;
     if(since&&i.time&&i.time<since) return false;
     if(S.view==="mine"&&!i.tickers.some(t=>S.wl.includes(t)||S.port.some(h=>h.symbol===t))) return false;
-    if(S.view!=="all"&&S.view!=="mine"&&!i.tickers.includes(S.view)) return false;
+    if(!["all","mine","smart"].includes(S.view)&&!i.tickers.includes(S.view)) return false;
     if(q&&!(i.title+" "+i.summary+" "+i.tickers.join(" ")).toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1602,7 +1630,44 @@ const NP_SECTIONS=[["Crypto",/bitcoin|crypto|\bether|ethereum|\bxrp\b|solana|sta
   ["Companies & Earnings",/earnings|revenue|profit|quarter|guidance|\bceo\b|merger|acquir|\bdeal\b|\bipo\b|layoff|buyback|dividend/i],
   ["Markets",/stock|s&p|\bdow\b|nasdaq|market|rally|sell-?off|shares|index|treasur|yield|bond|futures|wall street/i]];
 const npSection=i=>{ const t=i.title+" "+(i.summary||""); for(const [n,re] of NP_SECTIONS) if(re.test(t)) return n; return "More News"; };
+
+/* ---------- SMART MONEY: regulators, finance writers, earnings calls, Reddit (free feeds) ---------- */
+const SM_GROUPS=[
+  ["policy","Policy & Regulators","Straight from the Fed, SEC, Treasury and BLS — rate decisions, enforcement, jobs and inflation data.","#f5c518"],
+  ["letters","Newsletters & Analysts","What respected finance writers and economists are saying, without the paywall.","#4da3ff"],
+  ["calls","Earnings Calls","What CEOs and CFOs are telling analysts on this week's calls.","#2dd4bf"],
+  ["reddit","Reddit Pulse","The day's most upvoted threads from r/investing, r/stocks and r/SecurityAnalysis — sentiment, not advice.","#ff6b3d"]];
+S.smart=null; S.smartAt=0;
+async function loadSmart(force){
+  if(S.smartBusy||(!force&&S.smart&&Date.now()-S.smartAt<9*60e3)) return;
+  S.smartBusy=true;
+  try{ const j=await api("/api/smart"); S.smart=j; S.smartAt=Date.now(); }catch(e){ if(!S.smart) S.smartErr=String(e.message||e); }
+  S.smartBusy=false; if(S.tab==="news"&&S.view==="smart") renderSmart();
+}
+setInterval(()=>{ if(S.tab==="news"&&S.view==="smart"&&!document.hidden) loadSmart(true); },10*60e3);
+function renderSmart(){
+  $("newsCount").textContent="";
+  const d=S.smart;
+  if(!d){ $("feed").innerHTML=S.smartErr?`<div class="empty">Couldn't load Smart Money right now (${esc(S.smartErr)}). Try again in a minute.</div>`:'<div class="empty"><span class="spin"></span>Gathering the Fed, SEC, newsletters, earnings calls and Reddit…</div>'; loadSmart(); return; }
+  const now=Date.now(), q=(S.q||"").toLowerCase();
+  const when=t=>{ if(!t) return ""; if(now-t<20*3600e3){ const a=ago(t); return a==="now"?"just now":a+" ago"; } return new Date(t).toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric"}); };
+  const items=d.items.filter(i=>!q||(i.title+" "+i.name+" "+(i.summary||"")).toLowerCase().includes(q));
+  const live=d.sources.filter(x=>x.ok).length;
+  const panel=([g,label,blurb,c])=>{
+    const list=items.filter(i=>i.g===g).slice(0,g==="letters"?12:8);
+    const srcs=d.sources.filter(x=>x.g===g);
+    const lead=list[0];
+    const row=i=>`<a class="sm-row" href="${esc(i.link)}" target="_blank" rel="noopener"><div class="sm-meta"><span class="sm-who">${esc(i.name)}</span><span>${when(i.time)}</span></div><div class="sm-t">${esc(i.title)}</div>${i.summary?`<p class="sm-d">${esc(i.summary.length>150?i.summary.slice(0,150).replace(/\s+\S*$/,"")+"…":i.summary)}</p>`:""}</a>`;
+    return `<section class="sm-panel" style="--c:${c}"><div class="sm-ph"><h3>${label}</h3><span class="sm-n">${srcs.filter(x=>x.ok).length}/${srcs.length} live</span></div><p class="sm-blurb">${blurb}</p>
+      ${list.length?`<a class="sm-lead" href="${esc(lead.link)}" target="_blank" rel="noopener"><div class="sm-meta"><span class="sm-who">${esc(lead.name)}</span><span>${when(lead.time)}</span></div><div class="sm-lt">${esc(lead.title)}</div>${lead.summary?`<p class="sm-d">${esc(lead.summary)}</p>`:""}</a>${list.slice(1).map(row).join("")}`:`<div class="sm-empty">${q?"Nothing matches your search here.":"No fresh posts from these sources right now."}</div>`}
+      <div class="sm-srcs">${srcs.map(x=>`<span class="${x.ok?"":"off"}" title="${x.ok?"Live":"Not responding right now"}">${esc(x.name)}</span>`).join("")}</div></section>`;
+  };
+  setHTML("feed",`<div class="sm-wrap"><div class="sm-head"><div><div class="sm-k">✦ SMART MONEY</div><h2>What the people who move markets are saying</h2></div><div class="sm-stat">${live} of ${d.sources.length} sources live · updated ${new Date(d.updated).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET</div></div>
+    <div class="sm-grid">${SM_GROUPS.map(panel).join("")}</div>
+    <p class="sm-foot">Reddit threads are crowd opinion, not research. Newsletter links open the writer's own site.</p></div>`);
+}
 function renderFeed(){
+  if(S.view==="smart") return renderSmart();
   const list=cluster(filtered()); const now=Date.now();
   const nNew=S.news?S.news.items.filter(i=>i._new&&now-i._new<10*60e3).length:0;
   $("newsCount").textContent=nNew?nNew+" new":"";
@@ -2494,6 +2559,7 @@ function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
   if(t==="news"){
+    if(S.view==="smart"&&S.smart){ L.push("Viewing SMART MONEY (regulators, newsletters, earnings calls, Reddit):"); S.smart.items.slice(0,40).forEach(i=>L.push(`- [${i.name}] ${i.title}`)); }
     L.push(`Filters: ${S.view==="all"?"all news":S.view==="mine"?"my stocks":S.view}, timeline ${NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]}, sources ${Object.keys(SRC).filter(k=>!S.srcOff.has(k)).map(k=>SRC[k].name).join(", ")}`);
     filtered().slice(0,30).forEach(i=>L.push(`- [${SRC[i.source].name}${i.time?", "+new Date(i.time).toISOString().slice(0,16).replace("T"," "):""}] ${i.title}`));
   } else if(t==="data"){
@@ -2622,7 +2688,7 @@ document.addEventListener("click",e=>{
   const pd=e.target.closest("[data-pred]"); if(pd){ runPredict(pd.dataset.pred); return; }
   const qo=e.target.closest("[data-quote]"); if(qo){ openQuote(qo.dataset.quote); return; }
   const ch=e.target.closest("[data-chart]"); if(ch){ openChart(ch.dataset.chart); return; }
-  const v=e.target.closest("[data-view]"); if(v){ S.view=S.view===v.dataset.view&&!["all","mine"].includes(v.dataset.view)?"all":v.dataset.view; renderToolbar(); renderFeed(); return; }
+  const v=e.target.closest("[data-view]"); if(v){ S.view=S.view===v.dataset.view&&!["all","mine","smart"].includes(v.dataset.view)?"all":v.dataset.view; if(S.view==="smart") loadSmart(); renderToolbar(); renderFeed(); return; }
   const src=e.target.closest("[data-src]"); if(src){ const k=src.dataset.src; S.srcOff.has(k)?S.srcOff.delete(k):S.srcOff.add(k); store.set("srcOff",[...S.srcOff]); renderToolbar(); renderFeed(); renderWL(); return; }
   const li=e.target.closest(".wl li"); if(li){ selectSym(li.dataset.s); return; }
   const tk=e.target.closest(".tk"); if(tk){ openQuote(tk.dataset.s); }
