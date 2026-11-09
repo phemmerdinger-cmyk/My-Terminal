@@ -949,9 +949,10 @@ html.viewonly.vo-dismissed .vo-hello{display:none}
 .sm-srcs span.off{opacity:.45;text-decoration:line-through}
 .sm-foot{font-size:11.5px;color:var(--dim);margin:14px 0 0}
 @media (max-width:900px){ .sm-grid{grid-template-columns:minmax(0,1fr)} .sm-head h2{font-size:22px} .sm-tb-note{display:none} }
-/* ===== API balance card (Claude Predictor, bottom right) ===== */
-.api-bal{display:none;position:fixed;right:18px;bottom:78px;z-index:40;width:250px;background:var(--panel);border:1px solid var(--line2);border-top:3px solid var(--claude);border-radius:12px;padding:12px 14px;box-shadow:0 18px 40px rgba(0,0,0,.45);font-size:12.5px}
-body.on-predict .api-bal{display:block} html.viewonly .api-bal{display:none!important}
+/* ===== API balance card (Claude Predictor, bottom right of the page, never over text) ===== */
+.api-bal-wrap{display:flex;justify-content:flex-end;clear:both;margin:24px 0 8px}
+.api-bal{width:260px;max-width:100%;background:var(--panel);border:1px solid var(--line2);border-top:3px solid var(--claude);border-radius:12px;padding:12px 14px;font-size:12.5px}
+html.viewonly .api-bal-wrap{display:none!important}
 .ab-k{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--claude)}
 .ab-v{font-family:var(--mono);font-size:24px;font-weight:600;margin:4px 0 2px} .ab-v small{font-size:12px;color:var(--dim);font-weight:400}
 .ab-v.ok{color:var(--up)} .ab-v.mid{color:#f5c518} .ab-v.low{color:var(--down)}
@@ -960,9 +961,7 @@ body.on-predict .api-bal{display:block} html.viewonly .api-bal{display:none!impo
 .ab-set{display:flex;gap:6px;margin:6px 0} .ab-set input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line2);border-radius:7px;color:var(--text);padding:6px 8px;font-family:var(--mono)} .ab-set .btn{padding:6px 10px;font-size:12px}
 .ab-act{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
 .ab-act button{background:none;border:0;color:var(--claude);cursor:pointer;font-size:12px;padding:0} .ab-act a{color:var(--dim);font-size:11.5px;text-decoration:none}
-@media (max-width:760px){ .api-bal{left:10px;right:auto;width:auto;max-width:calc(100% - 96px);bottom:calc(84px + env(safe-area-inset-bottom));padding:8px 12px;border-radius:999px;cursor:pointer}
-  .api-bal:not(.open) > :not(.ab-v){display:none} .api-bal:not(.open) .ab-v{font-size:15px;margin:0} .api-bal:not(.open) .ab-v::before{content:"API ";font-size:11px;color:var(--dim);font-weight:400}
-  .api-bal.open{right:10px;max-width:none;border-radius:12px;padding:12px 14px;z-index:60} }
+@media (max-width:760px){ .api-bal{width:100%} .api-bal-wrap{margin:20px 0 90px} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -3406,7 +3405,7 @@ function renderApiBal(){
   $("abForm").onsubmit=e=>{ e.preventDefault(); const v=parseFloat(String($("abIn").value).replace(/[$,\s]/g,"")); if(!(v>=0)) return toast("Enter a dollar amount, like 25.00");
     API.bal={amount:+v.toFixed(2),setAt:Date.now()}; store.set("apiBalance",API.bal); renderApiBal(); toast("Balance saved"); };
 }
-(function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; document.body.appendChild(d); d.addEventListener("click",e=>{ if(innerWidth<=760&&!e.target.closest("button,a,input,form")) d.classList.toggle("open"); }); renderApiBal(); setInterval(renderApiBal,60e3); })();
+(function(){ const d=document.createElement("div"); d.id="apiBal"; d.className="api-bal"; const w=document.createElement("div"); w.className="api-bal-wrap"; w.appendChild(d); ($("tab-predict")||document.body).appendChild(w); renderApiBal(); setInterval(renderApiBal,60e3); })();
 </script>
 </body>
 </html>
