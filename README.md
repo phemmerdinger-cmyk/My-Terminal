@@ -64,6 +64,11 @@ Railway, Fly.io or any VPS also work (there's a `Dockerfile`). Free tiers may sl
 
 > **Note:** if you set `ANTHROPIC_API_KEY` on a public server, anyone with the link can run predictions on your key. Keep the URL private. Each prediction is cached for 30 minutes to limit cost.
 
+## View-only for visitors
+Anyone who opens the link sees the site in **view-only** mode: they can browse news, markets, research, the heatmap and a sample portfolio with its risk analysis, but the Claude tab, Ask Claude, the Claude switch, Sync, and all portfolio/watchlist editing are hidden and turned off. Claude requests are also blocked on the server without the password.
+
+To use the full site on your own device, open it once as `…onrender.com/?owner` and enter the Claude password. That device stays unlocked. Open `?viewer` to switch a device back to view-only.
+
 ## Settings
 - `PORT`: default 3000
 - `ANTHROPIC_API_KEY`: turns on predictions and Ask Claude
