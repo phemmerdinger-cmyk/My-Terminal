@@ -395,19 +395,33 @@ async function history(sym, range = "6mo", interval) {
   let [r, iv] = RANGES[range] || RANGES["6mo"];
   if (interval && HIST_IVS.has(interval) && HIST_RANGES.has(range)) { r = range; iv = interval === "1h" ? "60m" : interval; }
   return cached(`h:${sym}:${r}:${iv}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=${r}&interval=${iv}${range && range.startsWith("intraday") ? "&includePrePost=true" : ""}`;
-    const j = JSON.parse(await get(url, "application/json"));
-    const res = j.chart && j.chart.result && j.chart.result[0];
-    if (!res || !res.timestamp) throw new Error("no history");
+    const qs = `${encodeURIComponent(sym)}?range=${r}&interval=${iv}${range && range.startsWith("intraday") ? "&includePrePost=true" : ""}`;
+    const key = `${sym}:${r}:${iv}`;
+    // Yahoo throttles bursts of clicks: try both hosts with a short pause, and fall back to the last good copy
+    let res = null, lastErr;
+    for (const [i, host] of ["query1", "query2", "query1"].entries()) {
+      try {
+        if (i) await new Promise((ok) => setTimeout(ok, 600 * i));
+        const j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${qs}`, "application/json"));
+        res = j.chart && j.chart.result && j.chart.result[0];
+        if (res && res.timestamp) break;
+        if (j.chart && j.chart.error) { lastErr = new Error(j.chart.error.description || "no history"); break; } // a bad symbol: don't retry
+        res = null;
+      } catch (e) { lastErr = e; }
+    }
+    if (!res || !res.timestamp) { if (HIST_LAST.has(key)) return HIST_LAST.get(key); throw lastErr || new Error("no history"); }
     const q = res.indicators.quote[0];
     const candles = [];
     res.timestamp.forEach((t, i) => {
       if (q.open[i] == null || q.close[i] == null) return;
       candles.push({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
     });
-    return { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles };
+    const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles };
+    HIST_LAST.set(key, out); if (HIST_LAST.size > 400) HIST_LAST.delete(HIST_LAST.keys().next().value);
+    return out;
   });
 }
+const HIST_LAST = new Map(); // last good chart per symbol/range, served if Yahoo is throttling
 
 
 

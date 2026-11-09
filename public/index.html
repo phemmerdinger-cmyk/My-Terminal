@@ -1920,7 +1920,7 @@ document.addEventListener("click",e=>{ const th=e.target.closest("th[data-sort]"
 let chart, mainSeries, volSeries;
 function ensureChart(){
   if(chart||!window.LightweightCharts) return !!chart;
-  const el=$("chart");
+  const el=$("chart"); el.innerHTML=""; // clear any "No chart data" message so the new chart gets the full box
   chart=LightweightCharts.createChart(el,{
     autoSize:true,
     layout:{background:{type:"solid",color:"#12151a"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},
@@ -1945,8 +1945,11 @@ async function loadChart(){
   document.querySelectorAll("#typeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.type===S.chartType));
   if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes};renderChartTitle();}).catch(()=>{});
   let h;
-  try{ h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=${S.chartRange}`); }
-  catch{ $("chartStats").innerHTML=""; if(chart){chart.remove();chart=null;} $("chart").innerHTML=`<div class="empty">No chart data for ${esc(s)}. Check the ticker symbol.</div>`; return; }
+  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${S.chartRange}`;
+  try{ h=await api(hurl); }
+  catch{ if(s===S.chartSym){ await new Promise(r=>setTimeout(r,1500)); try{ if(s===S.chartSym) h=await api(hurl); }catch{} } }
+  if(s!==S.chartSym) return;
+  if(!h){ $("chartStats").innerHTML=""; if(chart){chart.remove();chart=null;} $("chart").innerHTML=`<div class="empty">Couldn't load the ${esc(s)} chart — the price feed is busy for a moment.<br><button class="btn ghost" type="button" data-chart-retry style="margin-top:10px">↻ Try again</button></div>`; return; }
   if(s!==S.chartSym) return;
   const c=h.candles;
   if(ensureChart()){
@@ -2565,6 +2568,7 @@ async function applyAction(a){
   if(missing.length) msg+=` Skipped (no price found): ${missing.join(", ")}.`;
   return msg;
 }
+document.addEventListener("click",e=>{ if(e.target.closest("[data-chart-retry]")){ loadChart(); return; } });
 document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]"); if(g){ setTab(g.dataset.gotab); if(window.innerWidth<760){ $("acPanel").hidden=true; $("acFab").hidden=false; } } });
 
 /* ---------- ASK CLAUDE on every page ---------- */
