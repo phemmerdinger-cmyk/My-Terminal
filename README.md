@@ -1,5 +1,13 @@
 # Peter's Finance Terminal
 
+**Live site:** https://my-terminal-28tq.onrender.com
+
+## About this project
+
+I'm a finance student at Bryant University, and I built this terminal to follow the markets in one place instead of jumping between Yahoo Finance, CNBC and the WSJ. It also gave me a way to practice what I'm learning in class: the **Portfolio** tab doesn't just track gains. It measures a portfolio's **annualized return, volatility, Sharpe ratio, beta against the S&P 500 and maximum drawdown** over the past year, for the whole portfolio and for each holding. It also uses AI (Claude) to explore how AI can support investment research.
+
+Built with Node.js and plain JavaScript (no frameworks), using public Yahoo Finance price data and news RSS feeds, and hosted on Render.
+
 A real, self-hosted website that pulls **live headlines** from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and The Wall Street Journal, along with **live prices**. It also gives you charts, a portfolio tracker, price alerts and **Claude predictions**.
 
 No build step and **no dependencies**. All you need is Node.js 22 or newer.
@@ -11,7 +19,7 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **News** | One live feed from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. Sources dropdown (with "Only" buttons), timeline from Today to All time, positive/negative tags, ticker labels, search. |
 | **Markets** | Market mood gauge, upcoming earnings, top gainers/losers/most active, watchlist heatmap and table, sectors, indexes, Treasury yields, bond funds, crypto, ETFs, mutual funds, futures and currencies. |
 | **Research** | A Yahoo Finance-style page for any stock, ETF, fund, crypto, index or future: interactive chart first, then Summary, Statistics, Financials, Analysis, Holders, Holdings, Performance, Profile, News and Compare. |
-| **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts. |
+| **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts, and a **Risk & performance** panel (1-year return vs. the S&P 500, annualized volatility, Sharpe ratio, beta, max drawdown, best/worst day, plus the same for each holding). |
 | **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
 **Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".

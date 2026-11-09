@@ -1047,6 +1047,12 @@ body.wl-narrow .wl li{grid-template-columns:1fr auto} body.wl-narrow .wl li svg{
             <div id="pfChart"></div>
             <div class="pfc-legend" id="pfcLegend"></div>
           </div>
+          <div class="pfc" id="pfRisk" hidden>
+            <div class="pfc-head"><h2 class="h" style="margin:0">Risk &amp; performance · past year</h2><span id="pfRiskStat" style="color:var(--dim);font-size:12px"></span></div>
+            <div class="kpis" id="pfRiskKpis" style="margin:10px 0 12px;grid-template-columns:repeat(2,minmax(0,1fr))"></div>
+            <div class="tbl-wrap"><table id="pfRiskTable"></table></div>
+            <div class="disc" id="pfRiskNote"></div>
+          </div>
         </div>
       </div>
       <div class="disc">Saved on this device. Turn on ☁ Sync (top bar) to see the same portfolios on your phone and computer.</div>
@@ -1638,6 +1644,7 @@ function renderPortfolio(){
     <div class="sec-list">${alloc.map(([k,g],i)=>`<div><span><i class="sw" style="background:${PALETTE[i%PALETTE.length]}"></i>${esc(k)}</span><b>${(g.v/val*100).toFixed(1)}%</b><small>${g.syms.map(esc).join(", ")}</small></div>`).join("")}</div>`:"";
   loadSectors(rows.map(r=>r.symbol));
   if(S.pfc&&S.tab==="portfolio") pfcLoad();
+  if(S.pfr&&S.tab==="portfolio") pfRiskLoad();
   $("holdTable").innerHTML=S.port.length?`<thead><tr><th>Symbol</th><th>Invested</th><th>Value now</th><th>Today</th><th>Total gain</th><th>Weight</th><th></th></tr></thead><tbody>${
     rows.map((r,i)=>{const g=r.v!=null?Math.round((r.v-r.c)*100)/100+0:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}</td>
       <td class="${cls(r.d)}">${r.d!=null?(r.d>=0?"+":"−")+"$"+fmt(Math.abs(r.d)):"—"}</td><td class="${cls(g)}">${g!=null?(g>=0?"+":"−")+"$"+fmt(Math.abs(g))+` (${pct(r.c?g/r.c*100:0)})`:"—"}</td>
@@ -2692,6 +2699,64 @@ function pfcCombine(series,hold){
   const times=[...new Set(series.flatMap(x=>x.c.map(k=>k.time)))].sort((a,b)=>a-b);
   const idx=series.map(()=>0), last=series.map(x=>x.c.length?x.c[0].close:0);
   return times.map(t=>{ let v=0; series.forEach((x,i)=>{ while(idx[i]<x.c.length&&x.c[idx[i]].time<=t){ last[i]=x.c[idx[i]].close; idx[i]++; } v+=last[i]*hold[x.sym]; }); return {time:t,value:v}; });
+}
+/* ---------- risk & performance (past year, daily data) ----------
+   Treats today's holdings as if they had been held for the whole year, and measures them against the S&P 500:
+   annualized return and volatility, Sharpe ratio (vs the 13-week T-bill yield), beta, max drawdown, best/worst day. */
+S.pfr={key:"",busy:false};
+function etDate(t){ return new Date(t*1000).toLocaleDateString("en-CA",{timeZone:"America/New_York"}); }
+function riskStats(vals,mkt,rf){
+  // vals/mkt: arrays of daily closes on the same dates
+  const rets=a=>a.slice(1).map((v,i)=>a[i]?v/a[i]-1:0);
+  const rp=rets(vals), rm=mkt?rets(mkt):null, n=rp.length; if(n<20) return null;
+  const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const mp=mean(rp), sd=Math.sqrt(rp.reduce((x,r)=>x+(r-mp)**2,0)/(n-1));
+  const total=vals[vals.length-1]/vals[0]-1, years=n/252, annRet=Math.pow(1+total,1/years)-1, vol=sd*Math.sqrt(252);
+  let beta=null, mktTotal=null;
+  if(rm){ const mm=mean(rm); let cov=0,vm=0; for(let i=0;i<n;i++){ cov+=(rp[i]-mp)*(rm[i]-mm); vm+=(rm[i]-mm)**2; } beta=vm?cov/vm:null; mktTotal=mkt[mkt.length-1]/mkt[0]-1; }
+  let peak=vals[0], mdd=0; for(const v of vals){ if(v>peak) peak=v; mdd=Math.min(mdd,v/peak-1); }
+  return {total,annRet,vol,sharpe:vol?(annRet-rf)/vol:null,beta,mdd,best:Math.max(...rp),worst:Math.min(...rp),mktTotal,days:n};
+}
+async function pfRiskLoad(){
+  const hold={}; S.port.forEach(h=>hold[h.symbol]=(hold[h.symbol]||0)+h.shares);
+  const syms=Object.keys(hold);
+  if(!syms.length){ $("pfRisk").hidden=true; return; }
+  const key=JSON.stringify([S.pfActive,hold]); if(key===S.pfr.key||S.pfr.busy) return;
+  S.pfr.busy=true; $("pfRisk").hidden=false; $("pfRiskStat").innerHTML='<span class="spin" style="width:10px;height:10px"></span> Crunching a year of prices…';
+  try{
+    const get=s=>api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`).then(h=>h.candles).catch(()=>[]);
+    const [spx,...cs]=await Promise.all(["^GSPC",...syms].map(get));
+    if(!S.quotes["^IRX"]) await api("/api/quotes?symbols=%5EIRX").then(j=>{S.quotes={...S.quotes,...j.quotes};}).catch(()=>{});
+    const irx=S.quotes["^IRX"], rf=irx&&!irx.error&&irx.price>0?irx.price/100:0.04;
+    if(!spx.length) throw new Error("no S&P data");
+    const dates=spx.map(k=>etDate(k.time)), mkt=spx.map(k=>k.close);
+    // each holding's close on each S&P trading day (last known close if it didn't trade that day)
+    const aligned=cs.map(c=>{ const byDate=new Map(c.map(k=>[etDate(k.time),k.close])); let last=c.length?c[0].close:null; return dates.map(d=>{ if(byDate.has(d)) last=byDate.get(d); return last; }); });
+    const ok=syms.map((s,i)=>cs[i].length>=20);
+    const vals=dates.map((_,j)=>syms.reduce((a,s,i)=>a+(ok[i]&&aligned[i][j]!=null?aligned[i][j]*hold[s]:0),0));
+    const st=riskStats(vals,mkt,rf);
+    if(!st) throw new Error("not enough history");
+    const per=syms.map((s,i)=>ok[i]?{s,st:riskStats(aligned[i],mkt,rf),w:(aligned[i][aligned[i].length-1]*hold[s])/vals[vals.length-1]}:{s,st:null,w:null}).sort((a,b)=>(b.w||0)-(a.w||0));
+    const P=x=>x==null?"—":pct(x*100), V=x=>x==null?"—":(x*100).toFixed(1)+"%", N=(x,d=2)=>x==null?"—":x.toFixed(d), ex=st.total-st.mktTotal;
+    const kpi=(k,v,s)=>`<div class="kpi"><span>${k}</span><b>${v}</b>${s?`<small style="color:var(--dim)">${s}</small>`:""}</div>`;
+    $("pfRiskKpis").innerHTML=[
+      kpi("1-year return",`<span class="${cls(st.total)}">${P(st.total)}</span>`,`S&P 500 ${P(st.mktTotal)}`),
+      kpi("vs. S&P 500",`<span class="${cls(ex)}">${ex>=0?"+":""}${(ex*100).toFixed(1)} pts</span>`,ex>=0?"Beat the market":"Trailed the market"),
+      kpi("Volatility (annual)",V(st.vol),st.vol<0.15?"Lower than typical stocks":st.vol<0.30?"About market-like":"High swings"),
+      kpi("Sharpe ratio",N(st.sharpe),`Return per unit of risk · T-bill ${(rf*100).toFixed(2)}%`),
+      kpi("Beta",N(st.beta),st.beta==null?"":st.beta>1.1?"Moves more than the market":st.beta<0.9?"Moves less than the market":"Moves with the market"),
+      kpi("Max drawdown",`<span class="down">${P(st.mdd)}</span>`,"Worst drop from a high"),
+      kpi("Best day",`<span class="up">${P(st.best)}</span>`,""),
+      kpi("Worst day",`<span class="down">${P(st.worst)}</span>`,""),
+    ].join("");
+    $("pfRiskTable").innerHTML=`<thead><tr><th>Holding</th><th>Weight</th><th>1Y return</th><th>Volatility</th><th>Beta</th><th>Max drawdown</th></tr></thead><tbody>${
+      per.map(r=>`<tr data-quote="${esc(r.s)}"><td class="sym-cell">${esc(r.s)}</td><td>${r.w!=null?(r.w*100).toFixed(1)+"%":"—"}</td><td class="${r.st?cls(r.st.total):""}">${r.st?P(r.st.total):"Not enough history"}</td><td>${r.st?V(r.st.vol):"—"}</td><td>${r.st?N(r.st.beta):"—"}</td><td class="down">${r.st?P(r.st.mdd):"—"}</td></tr>`).join("")}</tbody>`;
+    $("pfRiskStat").textContent=`${st.days} trading days`;
+    const skipped=syms.filter((s,i)=>!ok[i]);
+    $("pfRiskNote").innerHTML=`Shows how today's holdings would have done if held for the past year, using daily closing prices. Sharpe uses the 13-week Treasury bill yield as the risk-free rate; beta is measured against the S&P 500.${skipped.length?` Left out (under a month of history): ${skipped.map(esc).join(", ")}.`:""} Past performance doesn't predict future results.`;
+    S.pfr.key=key;
+  }catch(e){ $("pfRiskStat").textContent="Couldn't load enough price history right now."; $("pfRiskKpis").innerHTML=""; $("pfRiskTable").innerHTML=""; $("pfRiskNote").innerHTML=""; }
+  S.pfr.busy=false;
 }
 function pfcControls(){
   const opts=[["__all","Whole portfolio"],...S.port.map(h=>[h.symbol,h.symbol])];
