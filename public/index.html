@@ -1021,6 +1021,8 @@ html.viewonly .api-bal-wrap{display:none!important}
 @media (max-width:520px){ .bb-row{grid-template-columns:18px minmax(0,1fr) auto auto!important;grid-template-areas:"r id big ds" ". px px px" ". rate rate rate" ". why why why" ". meta meta meta" ". news news news"!important} }
 .bb-tag{font-style:normal;font-family:var(--sans);font-size:9.5px;font-weight:500;color:#4da3ff;border:1px solid rgba(77,163,255,.4);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:2px}
 .bb-note .spin{width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+.np-hot,.np-rail .np-hot{font-family:var(--sans)!important;font-size:10.5px!important;font-weight:600;color:#ff9e1b;white-space:nowrap;border:1px solid rgba(255,158,27,.4);border-radius:999px;padding:0 7px;line-height:16px}
+.np-two{font-size:10.5px;color:var(--dim)}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1650,10 +1652,12 @@ function renderToolbar(){
     (SMV?`<span class="sm-tb-note">Free feeds from regulators, top finance writers, earnings calls and Reddit · refreshes every 10 min</span>`:`<div class="dd" id="srcDD"><button class="dd-btn" type="button" data-dd="srcDD">${esc(srcLabel)} <span class="car">▾</span></button>
       <div class="dd-menu"><div class="dd-title">News sources</div>${Object.entries(SRC).map(([k,s])=>`<div class="src-row"><label><input type="checkbox" data-srcbox="${k}" ${S.srcOff.has(k)?"":"checked"}><span class="sw" style="background:${s.c}"></span>${s.name}</label><button type="button" class="only" data-srconly="${k}">Only</button></div>`).join("")}
       <div class="dd-act"><button type="button" data-srcall="1">Select all</button><button type="button" data-srcall="0">Clear</button></div></div></div>`+
+    `<div class="dd"><select class="dd-btn" id="newsSort" title="Order">${[["top","🔥 Most popular"],["latest","⏱ Latest first"]].map(([k,l])=>`<option value="${k}" ${(S.newsSort||"top")===k?"selected":""}>${l}</option>`).join("")}</select></div>`+
     `<div class="dd"><select class="dd-btn" id="newsRange" title="Timeline">${NEWS_RANGES.map(([k,l])=>`<option value="${k}" ${S.newsRange===k?"selected":""}>🕒 ${l}</option>`).join("")}</select></div>`+
     `<input class="search" id="search" placeholder="Search headlines…" value="${esc(S.q)}">`);
   if(SMV) return;
   $("search").oninput=e=>{S.q=e.target.value;S.newsShow=150;renderFeed();};
+  $("newsSort").onchange=e=>{ S.newsSort=e.target.value; store.set("newsSort",S.newsSort); renderFeed(); };
   $("newsRange").onchange=e=>{ S.newsRange=e.target.value; store.set("newsRange",S.newsRange); S.newsShow=150; renderFeed(); loadNews(); };
 }
 document.addEventListener("click",e=>{
@@ -1693,10 +1697,27 @@ function cluster(list){ // merge the same story from different outlets into one 
   for(const i of list){
     const w=words(i.title);
     const hit=out.find(g=>Math.abs((g.time||0)-(i.time||0))<36*3600e3&&overlap(g._w,w)>=0.75&&Math.min(g._w.size,w.size)>=3);
-    if(hit){ if(!hit.also.some(a=>a.source===i.source)&&hit.source!==i.source) hit.also.push({source:i.source,link:i.link}); if(!hit.summary&&i.summary) hit.summary=i.summary; hit.tickers=[...new Set([...hit.tickers,...i.tickers])]; continue; }
-    out.push({...i,_w:w,also:[]});
+    if(hit){ if(!hit.also.some(a=>a.source===i.source)&&hit.source!==i.source){ hit.also.push({source:i.source,link:i.link}); hit._pcts.push(i.pct??.5); } else if(hit.source===i.source) hit._pcts[0]=Math.min(hit._pcts[0],i.pct??.5); if(!hit.summary&&i.summary) hit.summary=i.summary; hit.tickers=[...new Set([...hit.tickers,...i.tickers])]; continue; }
+    out.push({...i,_w:w,also:[],_pcts:[i.pct??.5]});
   }
   return out;
+}
+
+/* "Most popular" ranking. No outlet publishes view counts, so a story's fame is estimated from:
+   1) how many of the active outlets are covering it (coverage %),
+   2) where it sits in each outlet's own feed, as a percentage of that feed (so busy sites don't dominate),
+   3) freshness (half-life depends on the timeline picked). */
+function newsHeat(list){
+  const active=Math.max(1,5-S.srcOff.size), now=Date.now();
+  const half={today:8,"24h":10,week:40,month:150,"6m":900,year:1800,all:2400}[S.newsRange]||12;
+  for(const i of list){
+    const cov=Math.min(1,(1+i.also.length)/Math.min(active,4));
+    const prom=1-i._pcts.reduce((a,b)=>a+b,0)/i._pcts.length;
+    const age=Math.max(0,(now-(i.time||now))/3600e3), rec=Math.pow(.5,age/half);
+    i._heat=(0.55*cov+0.45*prom)*(0.3+0.7*rec);
+    i._cov=1+i.also.length;
+  }
+  return list;
 }
 function usefulSummary(i){ if(!i.summary) return ""; const sw=words(i.summary); return overlap(sw,i._w)>=0.7&&sw.size<=i._w.size+4?"":i.summary; }
 // News as a newspaper front page: lead story, "What's News" rail, secondary stories, sections, more headlines
@@ -1713,7 +1734,7 @@ const SM_GROUPS=[
   ["letters","Newsletters & Analysts","What respected finance writers and economists are saying, without the paywall.","#4da3ff"],
   ["calls","Earnings Calls","What CEOs and CFOs are telling analysts on this week's calls.","#2dd4bf"],
   ["reddit","Reddit Pulse","The day's most upvoted threads from r/investing, r/stocks and r/SecurityAnalysis — sentiment, not advice.","#ff6b3d"]];
-S.smart=null; S.smartAt=0;
+S.smart=null; S.smartAt=0; S.newsSort=store.get("newsSort","top");
 async function loadSmart(force){
   if(S.smartBusy||(!force&&S.smart&&Date.now()-S.smartAt<9*60e3)) return;
   S.smartBusy=true;
@@ -1744,7 +1765,8 @@ function renderSmart(){
 }
 function renderFeed(){
   if(S.view==="smart") return renderSmart();
-  const list=cluster(filtered()); const now=Date.now();
+  let list=cluster(filtered()); const now=Date.now();
+  newsHeat(list); if((S.newsSort||"top")==="top") list=list.slice().sort((a,b)=>b._heat-a._heat);
   const nNew=S.news?S.news.items.filter(i=>i._new&&now-i._new<10*60e3).length:0;
   $("newsCount").textContent=nNew?nNew+" new":"";
   if(!list.length){ $("feed").innerHTML=`<div class="empty">${S.news?(S.srcOff.size===5?"Pick at least one news source from the Sources menu.":"No headlines match these filters yet."):"Loading…"}</div>`; return; }
@@ -1752,12 +1774,12 @@ function renderFeed(){
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
   const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
-  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
+  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._cov>=3?`<b class="np-hot" title="Covered by ${i._cov} of your news sources">🔥 ${i._cov} outlets</b>`:i._cov===2?`<span class="np-two" title="Covered by 2 of your news sources">2 outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
     return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
   const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
   // pick the lead: the most-covered, most substantial recent story
-  const top=list.slice(0,12), score=i=>i.also.length*3+(usefulSummary(i)?2:0)+(i.tickers.length?1:0)-(top.indexOf(i)*0.25);
+  const top=list.slice(0,12), score=i=>(S.newsSort||"top")==="top"?i._heat*10+(usefulSummary(i)?.3:0):i.also.length*3+(usefulSummary(i)?2:0)+(i.tickers.length?1:0)-(top.indexOf(i)*0.25);
   const lead=top.slice().sort((a,b)=>score(b)-score(a))[0];
   const rest=list.filter(i=>i!==lead);
   const side=rest.splice(0,4), rail=rest.splice(0,9);

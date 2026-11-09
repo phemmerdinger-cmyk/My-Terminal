@@ -181,20 +181,22 @@ function cleanItem(it, srcKey, ticker) {
     time: it.time,
     mood: sentiment(title),
     tickers: ticker ? [ticker] : [],
+    pct: it._pct ?? 0.5, // position in the outlet's own feed: 0 = its top story, 1 = its last
   };
 }
 
 async function loadSource(srcKey, urls, ticker) {
   const src = SOURCES[srcKey];
   const results = await Promise.allSettled(urls.map(fetchFeed));
-  let items = results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const ranked = (list) => list.map((it, i, a) => ({ ...it, _pct: a.length > 1 ? i / (a.length - 1) : 0 }));
+  let items = results.flatMap((r) => (r.status === "fulfilled" ? ranked(r.value) : []));
   const fresh = (list) => list.some((i) => i.time && i.time > Date.now() - 3 * 86400e3);
   let ok = results.some((r) => r.status === "fulfilled" && r.value.length && fresh(r.value));
   // Fallback: if the outlet's own feed failed, use Google News for that site
   if (!ok) {
     const q = ticker ? `${base(ticker)} ${kind(ticker)} site:${src.domain} when:7d` : `site:${src.domain} stocks when:2d`;
     try {
-      items = items.concat(await fetchFeed(gnews(q)));
+      items = items.concat(ranked(await fetchFeed(gnews(q))));
       ok = fresh(items);
     } catch {}
   }
