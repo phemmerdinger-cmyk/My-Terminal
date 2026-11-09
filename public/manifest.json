@@ -1,6 +1,6 @@
 {
- "name": "Meridian Terminal",
- "short_name": "Meridian",
+ "name": "Market Hub",
+ "short_name": "Market Hub",
  "description": "Live stock news, markets, research and predictions",
  "start_url": "/",
  "display": "standalone",

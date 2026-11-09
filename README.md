@@ -1,4 +1,4 @@
-# Meridian Terminal
+# Market Hub
 
 **Live site:** https://my-terminal-28tq.onrender.com
 
