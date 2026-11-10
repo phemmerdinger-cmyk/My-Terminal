@@ -1026,6 +1026,11 @@ html.viewonly .api-bal-wrap{display:none!important}
 .np-trend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:10px 0 2px;font-size:12px}
 .np-trend > b{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#ff9e1b;margin-right:4px}
 .np-trend .tg i{font-style:normal;color:var(--dim);font-size:11px;margin:0 4px}
+.np-swan{font-size:10.5px;font-weight:700;color:#fff;background:#d0243f;border-radius:999px;padding:0 8px;line-height:17px;font-family:var(--sans)!important;white-space:nowrap}
+.np-shock{font-size:10.5px;font-weight:600;color:#ff8a98;border:1px solid rgba(255,77,94,.5);border-radius:999px;padding:0 7px;line-height:16px;font-family:var(--sans)!important;white-space:nowrap}
+.np-swanbar{display:flex;align-items:flex-start;gap:10px;background:linear-gradient(90deg,rgba(208,36,63,.22),rgba(208,36,63,.06));border:1px solid rgba(208,36,63,.6);border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.45}
+.np-swanbar > b{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#ff6b7d;white-space:nowrap;padding-top:2px}
+.np-swanbar span{flex:1} .np-swanbar a{color:var(--text);font-weight:600} .np-swanbar i{font-style:normal;cursor:help;border:1px solid var(--line2);border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;color:var(--dim);flex:0 0 auto}
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1768,7 +1773,36 @@ function newsHeat(list){
     i._heat=(0.26*g+0.22*web+0.17*cov+0.13*c+0.22*Math.pow(tb,1.5))*fade + (g||c||outlets>1?0:-0.01)*age/24; // single-outlet, untracked stories sink with age
     i._cov=outlets; i._web=rel; i._top=g>0||c>0;
   }
+  const stress=marketStress();
+  for(const i of list){ i._bs=blackSwan(i,stress); if(i._bs===2) i._heat+=1; else if(i._bs===1) i._heat+=0.15; }
+  S._stress=stress;
   return list;
+}
+
+/* BLACK SWAN WATCH — rare, unexpected, high-impact events. Rules-based (no AI credits):
+   strong wording in the headline + how big the story is + whether the market itself is under stress. */
+const BS_STRONG=[/circuit breaker/i,/(market|trading)[- ]wide halt|halts? (all )?trading on|exchange (halted|outage)/i,/flash crash/i,/bank run|run on (the )?bank/i,
+  /(bank|lender|exchange|insurer|fund)\b.{0,40}\b(collapses?|fails?|failure|seized|insolven)/i,/(collapse|failure) of\b/i,/emergency (rate|interest[- ]rate) cut|emergency (fed|central bank) (meeting|action)|inter-?meeting (rate )?cut/i,
+  /sovereign default|defaults? on (its |sovereign )?debt|debt default/i,/declares? war|invad(es|ed|ing)|invasion of|military strikes? on|missile strikes? on|act of war/i,
+  /nuclear (attack|strike|detonation|test)|martial law|coup\b|assassinat/i,/pandemic|outbreak .{0,30}(spreads|emergency)|state of emergency/i,/terror(ist)? attack/i,
+  /worst (day|week|month|selloff|sell-off|crash) since (19\d\d|20(0[0-9]|1\d|20))|biggest (one-day|single-day|daily) (drop|decline|fall|plunge|loss) (since|in|ever)|record (one-day|single-day) (drop|plunge|loss)/i,
+  /(stocks?|markets?|dow|s&p|nasdaq) (crash|plunge|tumble|plummet)s? .{0,20}(\d{2,}|[3-9](\.\d)?)%/i,/black swan/i,/(cyberattack|hack|outage) (cripples|shuts down|halts) /i,/government shutdown|debt ceiling breach|downgrades? (u\.?s\.?|united states) (credit|debt)/i];
+const BS_MED=[/\bcrash(es|ed)?\b|\bplunge[sd]?\b|\bplummet|\bfreefall|\bpanic\b|\bmeltdown\b|\bturmoil\b|\bcontagion\b/i,/\bcrisis\b|\bcollapse\b|\bbankrupt|\bchapter 11\b/i,/\bsanctions?\b|\btariffs? (shock|surge)|\bembargo\b/i,/\bhalt(s|ed)?\b.{0,20}\btrading\b/i];
+function marketStress(){
+  const sp=S.quotes["^GSPC"], vix=S.quotes["^VIX"];
+  const r=[]; if(sp&&!sp.error&&sp.changePct<=-3) r.push(`S&P 500 ${sp.changePct.toFixed(1)}% today`);
+  if(vix&&!vix.error&&(vix.price>=35||vix.changePct>=40)) r.push(`VIX fear index at ${vix.price.toFixed(1)}${vix.changePct>=40?` (+${vix.changePct.toFixed(0)}%)`:""}`);
+  const nq=S.quotes["^IXIC"]; if(nq&&!nq.error&&nq.changePct<=-4) r.push(`Nasdaq ${nq.changePct.toFixed(1)}% today`);
+  return r;
+}
+function blackSwan(i,stress){
+  const t=i.title+" "+(i.summary||"");
+  const strong=BS_STRONG.filter(re=>re.test(t)).length, med=BS_MED.filter(re=>re.test(i.title)).length;
+  if(!strong&&!med) return 0;
+  let sc=strong*2+Math.min(med,2);
+  if(i._top) sc+=1; if((i._cov||1)>=3) sc+=1; if((i._web||1)>=5) sc+=0.5;
+  if(stress.length) sc+=2;
+  return sc>=4?2:sc>=3&&strong?1:0;   // 2 = black swan, 1 = shock watch
 }
 function usefulSummary(i){ if(!i.summary) return ""; const sw=words(i.summary); return overlap(sw,i._w)>=0.7&&sw.size<=i._w.size+4?"":i.summary; }
 // News as a newspaper front page: lead story, "What's News" rail, secondary stories, sections, more headlines
@@ -1825,7 +1859,7 @@ function renderFeed(){
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
   const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
-  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
+  const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._bs===2?`<b class="np-swan" title="Black swan: a rare, unexpected event with outsized market impact">⚠ Black swan</b>`:i._bs===1?`<b class="np-shock" title="Shock watch: unusual, potentially market-moving event">⚠ Shock watch</b>`:""}${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
     return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
   const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
@@ -1844,7 +1878,9 @@ function renderFeed(){
   const idx=[["^GSPC","S&P 500"],["^DJI","Dow"],["^IXIC","Nasdaq"],["^TNX","10-Yr"],["BTC-USD","Bitcoin"]].map(([k,l])=>{ const q=S.quotes[k]; return q&&!q.error?`<span>${l} <b class="${cls(q.change)}">${pct(q.changePct)}</b></span>`:""; }).join("");
   const today=new Date().toLocaleDateString("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric",year:"numeric"});
   const totalShown=Math.min(list.length,S.newsShow), more=list.length>S.newsShow;
-  $("feed").innerHTML=`<div class="np">
+  const swans=list.filter(i=>i._bs===2).slice(0,3), stress=S._stress||[];
+  const swanBar=swans.length||stress.length?`<div class="np-swanbar"><b>⚠ BLACK SWAN WATCH</b><span>${stress.length?`Market stress: ${esc(stress.join(" · "))}. `:""}${swans.length?swans.map(i=>`<a ${A(i)}>${esc(i.title)}</a>`).join(" · "):"No single headline flagged yet."}</span><i title="A black swan is a rare, unexpected event with an outsized market impact (2008 bank failures, the 2020 COVID crash). Flagged from headline wording, how widely it's covered, and whether the market itself is under stress.">?</i></div>`:"";
+  $("feed").innerHTML=swanBar+`<div class="np">
     <div class="np-mast"><div class="np-ear l">${esc(today)}<br><span>${list.length.toLocaleString()} stories · ${esc(NEWS_RANGES.find(r=>r[0]===S.newsRange)?.[1]||"")}</span></div>
       <h1>The Terminal Journal</h1><div class="np-ear r">${idx||"Markets loading…"}</div></div>
     ${(()=>{ const TP=newsTopics(); const hot=TP.top.slice(0,8).filter(([,n])=>n>=3); return hot.length&&S.view==="all"?`<div class="np-trend"><b>🔥 Trending now</b>${hot.map(([t,n])=>{ const q=S.quotes[t]; return `<span class="tg" data-view="${esc(t)}">${esc(t)} <i>${n} stories</i>${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`; }).join("")}</div>`:""; })()}
