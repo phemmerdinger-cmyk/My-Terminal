@@ -1343,11 +1343,11 @@ async function syncPut(code, doc) {
 // sells anything that falls out of the top 15 or below its 200-day average, and keeps 50% in cash
 // when the S&P 500 is below its own 200-day average. A trailing stop (-12% from entry or -15% from
 // the high) is checked every 5 minutes while the market is open.
-const AP_FILE = path.join(require("os").tmpdir(), "autopilot.json");
-const AP_KEY = "pft:autopilot:v1";
-const AP_START = 100_000, AP_SLOTS = 10, AP_KEEP = 15, AP_SLIP = 0.0005;
+const AP_FILE = path.join(require("os").tmpdir(), "autopilot-v2.json");
+const AP_KEY = "pft:autopilot:v2";
+const AP_START = 10_000, AP_SLOTS = 10, AP_KEEP = 15, AP_SLIP = 0.0005;
 const AP_FALLBACK = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","TSLA","BRK-B","JPM","LLY","V","UNH","XOM","MA","COST","HD","PG","JNJ","WMT","NFLX","ABBV","BAC","CRM","ORCL","AMD","KO","MRK","CVX","PEP","ADBE","TMO","LIN","MCD","CSCO","ACN","ABT","WFC","GE","QCOM","INTU","CAT","TXN","DIS","IBM"];
-const apFresh = () => ({ v: 1, start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], lastRebalance: "", updated: Date.now() });
+const apFresh = () => ({ v: 2, start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], lastRebalance: "", updated: Date.now() });
 let AP = apFresh(), apBusy = false, apLoaded = false;
 const etParts = (d = new Date()) => {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d).map((x) => [x.type, x.value]));
@@ -1357,10 +1357,11 @@ async function apLoad() {
   try {
     if (UP_URL && UP_TOKEN) {
       const r = await fetch(`${UP_URL}/get/${AP_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) });
-      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apLoaded = true; return; }
+      const j = await r.json(); if (j.result) { const d = JSON.parse(j.result); if (d && d.v === 2) { AP = d; apLoaded = true; return; } }
     }
   } catch {}
   try { AP = JSON.parse(fs.readFileSync(AP_FILE, "utf8")); } catch {}
+  if (!AP || AP.v !== 2) AP = apFresh();
   apLoaded = true;
 }
 async function apSave() {
@@ -1419,6 +1420,7 @@ async function apRebalance(spy) {
   const by = Object.fromEntries(scored.map((x) => [x.sym, x]));
   let spx = null; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((x) => x.close); spx = { px: cl[cl.length - 1], m200: sma(cl, 200) }; } catch {}
   const riskOff = !!(spx && spx.m200 && spx.px < spx.m200);
+  if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = Date.now(); } catch {} }
   // 1) sells: dropped out of the top 15, or broke below its 200-day average
   for (const [sym, p] of Object.entries(AP.positions)) {
     const x = by[sym]; if (!x) continue;
@@ -1437,7 +1439,7 @@ async function apRebalance(spy) {
   for (const x of scored) {
     if (Object.keys(AP.positions).length >= AP_SLOTS) break;
     if (AP.positions[x.sym] || x.px < x.m200) continue;
-    const amt = Math.min(target, AP.cash - 50); if (amt < 500) break;
+    const amt = Math.min(target, AP.cash - 5); if (amt < 50) break;
     apTrade("BUY", x.sym, amt / (x.px * (1 + AP_SLIP)), x.px, why(x), x.name);
   }
   AP.lastRebalance = etParts().day; AP.lastScan = { t: Date.now(), riskOff, top: scored.slice(0, 15).map((x) => ({ sym: x.sym, name: x.name, score: +x.score.toFixed(3), mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend })) };
@@ -1478,9 +1480,9 @@ async function apView() {
 }
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
-  if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !doc.positions || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
+  if (!doc || typeof doc !== "object" || doc.v !== 2 || typeof doc.cash !== "number" || !doc.positions || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
   if ((AP.trades.length && doc.updated <= AP.updated) || doc.trades.length < AP.trades.length) return { ok: false, error: "server copy is newer" };
-  AP = { v: 1, start: +doc.start || Date.now(), cash: doc.cash, positions: doc.positions, trades: doc.trades.slice(0, 400), equity: (doc.equity || []).slice(-2000), lastRebalance: String(doc.lastRebalance || ""), lastScan: doc.lastScan, updated: +doc.updated || Date.now() };
+  AP = { v: 2, spx0: +doc.spx0 || null, firstTrade: +doc.firstTrade || null, start: +doc.start || Date.now(), cash: doc.cash, positions: doc.positions, trades: doc.trades.slice(0, 400), equity: (doc.equity || []).slice(-2000), lastRebalance: String(doc.lastRebalance || ""), lastScan: doc.lastScan, updated: +doc.updated || Date.now() };
   apSave(); return { ok: true };
 }
 setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 8000 : 5 * 60e3); }, process.env.AP_TEST ? 3000 : 90_000);
@@ -1592,7 +1594,7 @@ async function handle(req, res) {
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
-      let file = path.normalize(path.join(PUBLIC, u.pathname === "/" ? "index.html" : u.pathname));
+      let file = path.normalize(path.join(PUBLIC, u.pathname === "/" || u.pathname === "/ai-vs-sp500" ? "index.html" : u.pathname));
       if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden", "text/plain");
       fs.readFile(file, (err, data) => {
         if (err) return send(res, 404, "Not found", "text/plain");

@@ -427,7 +427,26 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .scr-detail .pcard{border-color:var(--claude)}
 .ai-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:4px}
 .ai-sub{font-size:13px;color:var(--muted);margin-top:4px}
-/* Autopilot paper account */
+/* AI vs S&P (Autopilot) */
+.aitrade .ap-head{margin-bottom:16px}
+.ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff9f43}
+.aitrade h1{margin:6px 0 6px;font-size:clamp(24px,3.4vw,34px);letter-spacing:-.02em}
+.ap-lede{margin:0;max-width:780px;color:var(--muted);font-size:14px;line-height:1.55}
+.ap-lede b{color:var(--text)}
+.ap-vs{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch}
+.ap-side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.ap-side span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ap-side b{font-family:var(--mono);font-size:clamp(22px,3.2vw,34px);font-weight:500}
+.ap-side small{font-family:var(--mono);font-size:14px}
+.ap-side.ai{border-color:color-mix(in srgb,#ff9f43 45%,var(--line))}
+.ap-side.sp{text-align:right}
+.ap-side.lead{box-shadow:0 0 0 1px currentColor inset}
+.ap-side.ai.lead{color:#ff9f43}.ap-side.sp.lead{color:#8a93a3}
+.ap-side.lead b,.ap-side.lead span{color:var(--text)}
+.ap-mid{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:0 6px;min-width:110px}
+.ap-mid b{font-size:15px;font-weight:600}.ap-mid small{font-size:12px;color:var(--muted);font-family:var(--mono)}
+@media (max-width:640px){.ap-vs{grid-template-columns:1fr 1fr}.ap-mid{grid-column:1/-1;order:3;flex-direction:row;gap:8px;min-width:0}.ap-side.sp{text-align:left}}
+
 .apx{display:flex;flex-direction:column;gap:14px}
 .ap-empty{padding:30px;color:var(--muted);text-align:center}
 .ap-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
@@ -435,9 +454,9 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-k span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .ap-k b{display:block;font-family:var(--mono);font-size:20px;font-weight:500;margin-top:4px}
 .ap-k small{font-size:12px;color:var(--muted)}
-.ap-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.ap-card h4{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.ap-card h4 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400}
+.bt-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.bt-card h4{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.bt-card h4 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400}
 .ap-chart svg{width:100%;height:220px;display:block}
 .ap-leg{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
 .ap-leg i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
@@ -1157,13 +1176,14 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
   <button data-tab="analysis"><span class="ti">◈</span>Analysis</button>
   <button data-tab="nyse"><span class="ti">▦</span>Heatmap</button>
+  <button data-tab="aitrade"><span class="ti">🤖</span>AI vs S&amp;P</button>
   <!-- Signals tab is hidden but its code is kept; set SHOW_SIGNALS=true to bring it back -->
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
 </nav>
 
 <div class="vo-hello" id="voHello"><div class="vo-in">
   <span class="vo-hi">👋 Welcome</span>
-  <p><b>Market Desk</b> is a live markets dashboard I built as a finance student at Bryant University. Try the <a href="#nyse" data-gotab="nyse">S&amp;P 500 heatmap</a>, look up any stock in <a href="#research" data-gotab="research">Research</a>, or see the risk analytics in the <a href="#portfolio" data-gotab="portfolio">sample portfolio</a>.</p>
+  <p><b>Market Desk</b> is a live markets dashboard I built as a finance student at Bryant University. Try the <a href="#nyse" data-gotab="nyse">S&amp;P 500 heatmap</a>, look up any stock in <a href="#research" data-gotab="research">Research</a>, see the risk analytics in the <a href="#portfolio" data-gotab="portfolio">sample portfolio</a>, or follow my <a href="#aitrade" data-gotab="aitrade">AI vs. S&amp;P 500 trading experiment</a>.</p>
   <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><button type="button" class="vo-x" id="voX" title="Hide">✕</button></div>
 </div></div>
 <div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-labelledby="voT">
@@ -1320,6 +1340,11 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- PREDICTIONS -->
     <!-- WALL STREET: live market floor (S&P 500) -->
+    <section id="tab-aitrade" class="pad aitrade" hidden>
+      <div class="ap-head"><div><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1>
+        <p class="ap-lede">I gave a trading bot <b>$10,000</b> of paper money and pitted it against simply buying the S&amp;P 500 with the same $10,000. Can it beat the market — or how fast does it lose it all? Claude designed the strategy; the server runs it every trading day on live prices, with no human input.</p></div></div>
+      <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
+    </section>
     <section id="tab-analysis" class="pad an" hidden>
       <div class="an-head"><div><div class="an-k">◈ MARKET ANALYSIS</div><h1 id="anTitle">Today's market, explained</h1><div class="an-sub" id="anSub"></div></div><div class="an-verdict" id="anVerdict"></div></div>
       <div class="an-brief" id="anBrief"><div class="skeleton"></div></div>
@@ -1436,7 +1461,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <button data-ai="h2h">Head-to-head</button>
         <button data-ai="db">Prediction database</button>
         <button data-ai="ask">Ask Claude</button>
-        <button data-ai="auto">🤖 Autopilot</button>
       </nav>
 
       <div data-aipane="predict">
@@ -1483,10 +1507,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <div class="tbl-wrap"><table id="dbTable"></table></div>
         <div class="disc">Every prediction is saved here and graded 2 weeks later against what the price actually did. Bullish counts as correct if the price rose more than 1%, Bearish if it fell more than 1%, and Neutral if it stayed within ±3%. Until then it shows whether the call is currently on track. Saved in this browser.</div>
         <div id="dbDetail"></div>
-      </div>
-
-      <div data-aipane="auto" hidden>
-        <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the paper account…</div></div>
       </div>
 
       <div data-aipane="ask" hidden>
@@ -1538,7 +1558,7 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","research","portfolio","analysis","nyse",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","research","portfolio","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 const MK = {
   mkBonds:[["^IRX","13-week T-bill"],["^FVX","5-year Treasury"],["^TNX","10-year Treasury"],["^TYX","30-year Treasury"]],
   mkBondFunds:[["AGG","US Aggregate Bond"],["BND","Total Bond Market"],["TLT","20+ Yr Treasury"],["IEF","7-10 Yr Treasury"],["SHY","1-3 Yr Treasury"],["TIP","TIPS"],["LQD","Investment-Grade Corp"],["HYG","High-Yield Corp"],["MUB","Municipal Bonds"],["BNDX","International Bond"]],
@@ -1649,6 +1669,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
+  if(t==="aitrade"){ apLoadView(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -2350,41 +2371,51 @@ function aiStats(){
 
 /* ---------- Autopilot: free rules-based paper trading (no Claude API) ---------- */
 const $m=n=>n==null||isNaN(n)?"—":(n<0?"−$":"$")+fmt(Math.abs(n));
-function apChart(eq,startV){
+function apChart(eq,startV,spx0){
   const pts=(eq||[]).filter(p=>p&&p.v);
-  if(pts.length<2) return `<div class="ap-empty" style="padding:40px 10px">The chart fills in day by day — one point per trading day.${pts.length?` Today: <b>${$m(pts[0].v)}</b>`:""}</div>`;
-  const s0=pts.find(p=>p.spx)?.spx, a=pts.map(p=>(p.v/startV-1)*100), b=pts.map(p=>s0&&p.spx?(p.spx/s0-1)*100:null);
-  const all=[...a,...b.filter(x=>x!=null),0], lo=Math.min(...all), hi=Math.max(...all), pad=(hi-lo||1)*0.12, y0=lo-pad, y1=hi+pad;
-  const W=800,H=220, X=i=>i/(pts.length-1)*W, Y=v=>H-(v-y0)/(y1-y0)*H;
+  if(pts.length<2) return `<div class="ap-empty" style="padding:40px 10px">The race chart fills in one point per trading day.${pts.length?` Day 1 close: <b>${$m(pts[0].v)}</b>`:""}</div>`;
+  const s0=spx0||pts.find(p=>p.spx)?.spx, a=pts.map(p=>p.v), b=pts.map(p=>s0&&p.spx?startV*p.spx/s0:null);
+  const all=[...a,...b.filter(x=>x!=null),startV], lo=Math.min(...all), hi=Math.max(...all), pad=(hi-lo||1)*0.12, y0=lo-pad, y1=hi+pad;
+  const W=800,H=240, X=i=>i/(pts.length-1)*W, Y=v=>H-(v-y0)/(y1-y0)*H;
   const line=(arr,c,w)=>`<polyline fill="none" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" points="${arr.map((v,i)=>v==null?"":`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ")}"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>${line(b,"var(--muted)",1.5)}${line(a,"var(--claude)",2.5)}</svg>
-  <div class="ap-leg"><span><i style="background:var(--claude)"></i>Autopilot ${pct(a[a.length-1])}</span>${b[b.length-1]!=null?`<span><i style="background:var(--muted)"></i>S&amp;P 500 ${pct(b[b.length-1])}</span>`:""}<span>${esc(pts[0].d)} → ${esc(pts[pts.length-1].d)}</span></div>`;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(startV)}" y2="${Y(startV)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>${line(b,"#8a93a3",2)}${line(a,"#ff9f43",2.5)}</svg>
+  <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot ${$m(a[a.length-1])}</span>${b[b.length-1]!=null?`<span><i style="background:#8a93a3"></i>S&amp;P 500 ${$m(b[b.length-1])}</span>`:""}<span>dashed line = the $10,000 start · ${esc(pts[0].d)} → ${esc(pts[pts.length-1].d)}</span></div>`;
 }
 function apRender(d){
   const ret=(d.value/d.startValue-1)*100, inv=d.positions.reduce((s,p)=>s+p.value,0);
-  const s0=(d.equity||[]).find(p=>p.spx)?.spx, spxRet=s0&&d.spxNow?(d.spxNow/s0-1)*100:null;
+  const spxV=d.spx0&&d.spxNow?d.startValue*d.spxNow/d.spx0:d.startValue, spxRet=(spxV/d.startValue-1)*100, lead=d.value-spxV;
   const sells=d.trades.filter(t=>t.side==="SELL"), wins=sells.filter(t=>/\(\+/.test(t.why)).length;
+  const vals=[d.startValue,...(d.equity||[]).map(p=>p.v),d.value], peak=Math.max(...vals), low=Math.min(...vals);
+  let dd=0,pk=d.startValue; for(const v of vals){ pk=Math.max(pk,v); dd=Math.min(dd,(v/pk-1)*100); }
+  const days=d.firstTrade?Math.max(1,Math.round((Date.now()-d.firstTrade)/864e5)):0, bust=d.value<100;
   const ago=t=>new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  const started=!!d.trades.length;
   $("apBox").innerHTML=`
-  <div class="ap-top">
-    <div class="ap-k"><span>Account value</span><b>${$m(d.value)}</b><small>Started with ${$m(d.startValue)}</small></div>
-    <div class="ap-k"><span>Total return</span><b class="${cls(ret)}">${pct(ret)}</b><small>${spxRet!=null?`S&amp;P 500 over the same days: <span class="${cls(spxRet)}">${pct(spxRet)}</span>`:"vs. S&amp;P 500 once it has a day of history"}</small></div>
-    <div class="ap-k"><span>Invested / cash</span><b>${d.value?Math.round(inv/d.value*100):0}%</b><small>${$m(d.cash)} in cash</small></div>
-    <div class="ap-k"><span>Trades</span><b>${d.trades.length}</b><small>${sells.length?`${wins} of ${sells.length} sells were winners`:"no sells yet"}</small></div>
+  <div class="ap-vs">
+    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>🤖 AI bot</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret)}</small></div>
+    <div class="ap-mid">${bust?`<b class="down">💀 BUSTED</b><small>it lost the money</small>`:started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts next market open</small>`}</div>
+    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet)}</small></div>
   </div>
-  <div class="ap-card"><h4>Account vs. S&amp;P 500 <em>${esc(d.status)}${d.marketOpen?" · checks stops every 5 min":""}</em></h4><div class="ap-chart">${apChart(d.equity,d.startValue)}</div></div>
-  <div class="ap-card"><h4>Holdings <em>${d.positions.length} of 10 slots</em></h4>${d.positions.length?`<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Value</th><th>Bought at</th><th>Now</th><th>Gain</th><th>Today</th><th>Stop</th></tr></thead><tbody>${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b><small>${esc(p.name||"")}</small></td><td>${$m(p.value)}</td><td>${$m(p.cost)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${pct(p.pnlPct)}</td><td class="${cls(p.dayPct)}">${pct(p.dayPct)}</td><td>${$m(p.stop)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No positions yet. ${esc(d.status)}.</div>`}</div>
-  <div class="ap-card"><h4>Trade log <em>every trade with the reason the rules made it</em></h4>${d.trades.length?`<div class="ap-log">${d.trades.slice(0,120).map(t=>`<div class="ap-tr"><span class="sd ${t.side}">${t.side}</span><div><b>${esc(t.sym)}</b> · ${(+t.shares).toFixed(2)} sh @ ${$m(t.price)} = ${$m(t.amount)}<p>${esc(t.why)}</p></div><time>${ago(t.t)}</time></div>`).join("")}</div>`:`<div class="ap-note">Nothing yet — the first trades happen the next time the market is open.</div>`}</div>
-  ${d.lastScan?`<div class="ap-card"><h4>Latest rankings <em>${ago(d.lastScan.t)}${d.lastScan.riskOff?" · ⚠ S&amp;P below its 200-day average: 50% cash":""}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>#</th><th>Stock</th><th>Score</th><th>3-mo</th><th>Analysts</th><th>Trend</th></tr></thead><tbody>${d.lastScan.top.map((x,i)=>`<tr><td>${i+1}</td><td class="n"><b>${esc(x.sym)}</b><small>${esc(x.name||"")}</small></td><td>${Math.round(x.score*100)}</td><td class="${cls(x.mom)}">${pct(x.mom*100)}</td><td>${x.adj==null?"—":x.adj.toFixed(2)}</td><td>${x.trend===1?"▲▲":x.trend?"▲":"▼"}</td></tr>`).join("")}</tbody></table></div></div>`:""}
-  <div class="ap-card"><h4>The rules <em>free — runs on the server, no Claude API credits, paper money only</em></h4>
+  <div class="ap-top">
+    <div class="ap-k"><span>Days running</span><b>${days}</b><small>${d.firstTrade?`since ${new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`:"not started yet"}</small></div>
+    <div class="ap-k"><span>Peak / low</span><b>${$m(peak)}</b><small>lowest ${$m(low)}</small></div>
+    <div class="ap-k"><span>Worst drop from a peak</span><b class="${dd<0?"down":""}">${dd.toFixed(1)}%</b><small>${$m(d.value)} to go before $0</small></div>
+    <div class="ap-k"><span>Trades</span><b>${d.trades.length}</b><small>${sells.length?`${wins} of ${sells.length} sells were winners`:"no sells yet"} · ${d.value?Math.round(inv/d.value*100):0}% invested</small></div>
+  </div>
+  <div class="bt-card"><h4>The race <em>${esc(d.status)}${d.marketOpen?" · checks stops every 5 min":""}</em></h4><div class="ap-chart">${apChart(d.equity,d.startValue,d.spx0)}</div></div>
+  <div class="bt-card"><h4>Holdings <em>${d.positions.length} of 10 slots</em></h4>${d.positions.length?`<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Value</th><th>Bought at</th><th>Now</th><th>Gain</th><th>Today</th><th>Stop</th></tr></thead><tbody>${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b><small>${esc(p.name||"")}</small></td><td>${$m(p.value)}</td><td>${$m(p.cost)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${pct(p.pnlPct)}</td><td class="${cls(p.dayPct)}">${pct(p.dayPct)}</td><td>${$m(p.stop)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No positions yet. ${esc(d.status)}.</div>`}</div>
+  <div class="bt-card"><h4>Trade log <em>every trade with the reason the rules made it</em></h4>${d.trades.length?`<div class="ap-log">${d.trades.slice(0,120).map(t=>`<div class="ap-tr"><span class="sd ${t.side}">${t.side}</span><div><b>${esc(t.sym)}</b> · ${(+t.shares).toFixed(2)} sh @ ${$m(t.price)} = ${$m(t.amount)}<p>${esc(t.why)}</p></div><time>${ago(t.t)}</time></div>`).join("")}</div>`:`<div class="ap-note">Nothing yet — the bot makes its first trades the next time the market is open (weekdays 9:30 AM–4 PM ET).</div>`}</div>
+  ${d.lastScan?`<div class="bt-card"><h4>Latest rankings <em>${ago(d.lastScan.t)}${d.lastScan.riskOff?" · ⚠ S&amp;P below its 200-day average: 50% cash":""}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>#</th><th>Stock</th><th>Score</th><th>3-mo</th><th>Analysts</th><th>Trend</th></tr></thead><tbody>${d.lastScan.top.map((x,i)=>`<tr><td>${i+1}</td><td class="n"><b>${esc(x.sym)}</b><small>${esc(x.name||"")}</small></td><td>${Math.round(x.score*100)}</td><td class="${cls(x.mom)}">${pct(x.mom*100)}</td><td>${x.adj==null?"—":x.adj.toFixed(2)}</td><td>${x.trend===1?"▲▲":x.trend?"▲":"▼"}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+  <div class="bt-card"><h4>How the AI trades <em>paper money only · not financial advice</em></h4>
   <ul class="ap-rules">
-    <li><b>Once a day near the close</b> (~3:40 PM ET) it ranks about 45 stocks — the top-rated names from the Best Buys scan.</li>
+    <li><b>Who decides?</b> Claude (Anthropic's AI) wrote these rules; the server follows them exactly, so the experiment costs nothing to run and no person picks the trades.</li>
+    <li><b>Once a day near the close</b> (~3:40 PM ET) it ranks about 45 stocks — the best-rated names from a scan of the whole US market.</li>
     <li><b>Score</b> = analyst consensus 40% + 3-month momentum 30% + trend 30% (above its 50- and 200-day averages).</li>
     <li><b>Holds the top 10</b> at about 10% each. A stock is only sold when it drops out of the top 15 — this stops it churning.</li>
     <li><b>Never buys a downtrend:</b> a stock under its 200-day average is skipped, and sold if it's already held.</li>
     <li><b>Stops:</b> sells if a stock falls 12% below where it was bought, or 15% below its high since buying.</li>
     <li><b>Market filter:</b> when the S&amp;P 500 is below its own 200-day average, it keeps half the account in cash.</li>
-    <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. Not financial advice.</li>
+    <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. The S&amp;P 500 side is the same $10,000 put into the index on the bot's first day.</li>
   </ul>
   <p class="ap-note" style="margin:10px 0 0">${d.durable?"Saved in permanent storage.":"The server forgets its copy when the site updates; your owner browser keeps a backup and puts it back automatically."}</p></div>`;
 }
@@ -2394,24 +2425,24 @@ async function apLoadView(){
     const d=await api("/api/autopilot");
     // owner backup: keep the newest copy here, and put it back if a redeploy wiped the server
     if(!window.__VISITOR){
-      let bk=null; try{ bk=JSON.parse(localStorage.getItem("apBackup")||"null"); }catch{}
+      let bk=null; try{ bk=JSON.parse(localStorage.getItem("apBackup2")||"null"); }catch{}
       if(bk&&bk.trades&&bk.trades.length>d.trades.length&&CL.pass){
         const r=await api("/api/autopilot/restore",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(bk)}).catch(()=>null);
         if(r&&r.ok){ toast("🤖 Autopilot history restored from this browser's backup."); return apLoadView(); }
       } else if(bk&&bk.trades&&bk.trades.length>d.trades.length&&!CL.pass){ toast("🤖 The server lost Autopilot's history in an update — unlock Claude once and it restores from this browser."); }
       if(!bk||d.trades.length>=((bk.trades||[]).length)){
-        const raw={v:1,start:d.start,cash:d.cash,positions:Object.fromEntries(d.positions.map(p=>[p.sym,{shares:p.shares,cost:p.cost,at:p.at,peak:Math.max(p.cost,p.price),name:p.name}])),trades:d.trades,equity:d.equity,lastRebalance:d.lastRebalance,lastScan:d.lastScan,updated:d.updated};
-        try{ localStorage.setItem("apBackup",JSON.stringify(raw)); }catch{}
+        const raw={v:2,spx0:d.spx0,firstTrade:d.firstTrade,start:d.start,cash:d.cash,positions:Object.fromEntries(d.positions.map(p=>[p.sym,{shares:p.shares,cost:p.cost,at:p.at,peak:Math.max(p.cost,p.price),name:p.name}])),trades:d.trades,equity:d.equity,lastRebalance:d.lastRebalance,lastScan:d.lastScan,updated:d.updated};
+        try{ localStorage.setItem("apBackup2",JSON.stringify(raw)); }catch{}
       }
     }
     apRender(d);
   }catch(e){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load the paper account (${esc(e.message)}). <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; }
 }
-setInterval(()=>{ if(S.tab==="predict"&&S.aiPane==="auto") apLoadView(); },60_000);
+setInterval(()=>{ if(S.tab==="aitrade") apLoadView(); },60_000);
 function aiShow(k){
   S.aiPane=k; document.querySelectorAll("#aiNav [data-ai]").forEach(b=>b.classList.toggle("on",b.dataset.ai===k));
   document.querySelectorAll("[data-aipane]").forEach(d=>d.hidden=d.dataset.aipane!==k);
-  if(k==="db"){ renderDB(); dbMature(); } if(k==="screener") renderScreener(); if(k==="auto") apLoadView();
+  if(k==="db"){ renderDB(); dbMature(); } if(k==="screener") renderScreener();
 }
 $("aiNav").onclick=e=>{ const b=e.target.closest("[data-ai]"); if(b) aiShow(b.dataset.ai); };
 
@@ -3681,7 +3712,7 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-setTab(TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news");
+setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";
