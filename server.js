@@ -335,7 +335,7 @@ async function articlePreview(url) {
       if (m) return decode(m[1]).trim(); } return null; };
     const img = meta(["og:image", "twitter:image", "twitter:image:src"]);
     return { url, title: meta(["og:title", "twitter:title"]), description: meta(["og:description", "twitter:description", "description"]),
-      image: img && /^https:\/\//.test(img) ? img : null, author: meta(["author", "article:author", "parsely-author", "sailthru.author"]),
+      image: img && /^https:\/\//.test(img) ? img : null, author: ((a) => a && /^https?:\/\//.test(a) ? a.replace(/\/+$/, "").split("/").pop().replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : a)(meta(["author", "article:author", "parsely-author", "sailthru.author"])),
       published: meta(["article:published_time", "parsely-pub-date", "pubdate", "date"]), site: meta(["og:site_name"]) };
   });
 }
