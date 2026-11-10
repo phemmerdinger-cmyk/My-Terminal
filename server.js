@@ -320,6 +320,26 @@ async function getTrending() {
   });
 }
 
+
+// ---------------------------------------------------------------- article preview (publisher's own share metadata)
+// Only the preview info publishers provide for link sharing (og:title / description / image / author / time).
+// Full article text is NOT copied: sites block embedding, WSJ/Morningstar are paywalled, and it isn't ours to republish.
+const PREVIEW_HOSTS = /(^|\.)(yahoo\.com|cnbc\.com|morningstar\.com|seekingalpha\.com|wsj\.com|reuters\.com|bloomberg\.com|marketwatch\.com|barrons\.com|ft\.com|nytimes\.com|apnews\.com|forbes\.com|fool\.com|investopedia\.com|businessinsider\.com|axios\.com|cnn\.com|bbc\.co\.uk|bbc\.com|theverge\.com|techcrunch\.com|federalreserve\.gov|sec\.gov)$/i;
+async function articlePreview(url) {
+  let u; try { u = new URL(url); } catch { throw new Error("bad url"); }
+  if (u.protocol !== "https:" || !PREVIEW_HOSTS.test(u.hostname)) return { url, limited: true };
+  return cached("pv:" + url, 60 * 60_000, async () => {
+    const html = (await get(url, "text/html")).slice(0, 400_000);
+    const meta = (names) => { for (const n of names) {
+      const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${n}["'][^>]*content=["']([^"']+)["']`, "i")) || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${n}["']`, "i"));
+      if (m) return decode(m[1]).trim(); } return null; };
+    const img = meta(["og:image", "twitter:image", "twitter:image:src"]);
+    return { url, title: meta(["og:title", "twitter:title"]), description: meta(["og:description", "twitter:description", "description"]),
+      image: img && /^https:\/\//.test(img) ? img : null, author: meta(["author", "article:author", "parsely-author", "sailthru.author"]),
+      published: meta(["article:published_time", "parsely-pub-date", "pubdate", "date"]), site: meta(["og:site_name"]) };
+  });
+}
+
 // ---------------------------------------------------------------- Smart Money (free feeds: regulators, newsletters, earnings calls, Reddit)
 const SMART = [
   { g: "policy", key: "fed", name: "Federal Reserve", urls: ["https://www.federalreserve.gov/feeds/press_all.xml", gnews("site:federalreserve.gov when:14d")], days: 21 },
@@ -1344,6 +1364,7 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/bestbuys") return send(res, 200, await bestBuys());
       if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
+      if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
       if (u.pathname === "/api/sp500") return send(res, 200, await sp500Snapshot());

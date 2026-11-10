@@ -1031,6 +1031,23 @@ html.viewonly .api-bal-wrap{display:none!important}
 .np-swanbar{display:flex;align-items:flex-start;gap:10px;background:linear-gradient(90deg,rgba(208,36,63,.22),rgba(208,36,63,.06));border:1px solid rgba(208,36,63,.6);border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px;line-height:1.45}
 .np-swanbar > b{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#ff6b7d;white-space:nowrap;padding-top:2px}
 .np-swanbar span{flex:1} .np-swanbar a{color:var(--text);font-weight:600} .np-swanbar i{font-style:normal;cursor:help;border:1px solid var(--line2);border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;color:var(--dim);flex:0 0 auto}
+/* ===== Article preview panel ===== */
+.ap-modal{position:fixed;inset:0;z-index:9500;background:rgba(3,5,10,.72);backdrop-filter:blur(4px);display:grid;place-items:center;padding:16px}
+.ap-modal[hidden]{display:none} body.ap-open{overflow:hidden}
+.ap-card{position:relative;width:min(720px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line2);border-radius:14px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.ap-x{position:absolute;right:10px;top:10px;z-index:2;background:rgba(0,0,0,.55);border:1px solid var(--line2);color:#fff;border-radius:50%;width:32px;height:32px;cursor:pointer}
+.ap-body{padding:0 0 18px}
+.ap-img{aspect-ratio:16/8;overflow:hidden;background:#000;border-radius:14px 14px 0 0} .ap-img img{width:100%;height:100%;object-fit:cover;display:block}
+.ap-src{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px;color:var(--dim);padding:16px 22px 0}
+.ap-h{font-family:Georgia,"Times New Roman",serif;font-size:28px;line-height:1.2;margin:10px 22px 0;padding-right:20px}
+.ap-tags{display:flex;flex-wrap:wrap;gap:6px;margin:10px 22px 0}
+.ap-mood{font-size:11px;border:1px solid var(--line2);border-radius:999px;padding:0 8px;line-height:17px} .ap-mood.up{color:var(--up)} .ap-mood.down{color:var(--down)}
+.ap-d{font-size:16px;line-height:1.6;margin:14px 22px 0;color:var(--text)} .ap-d.dim{color:var(--dim);font-size:14px}
+.ap-sec{margin:16px 22px 0;border-top:1px solid var(--line);padding-top:12px} .ap-sec h4{margin:0 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.ap-also{display:flex;flex-wrap:wrap;gap:8px} .ap-also a{font-size:13px;color:#4da3ff;text-decoration:none;border:1px solid rgba(77,163,255,.35);border-radius:999px;padding:3px 10px}
+.ap-act{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 22px 0;padding-top:14px;border-top:1px solid var(--line)} .ap-act .btn{text-decoration:none;display:inline-flex;align-items:center}
+.ap-note{font-size:12px;color:var(--dim)}
+@media (max-width:640px){ .ap-modal{padding:0;place-items:end stretch} .ap-card{border-radius:16px 16px 0 0;max-height:92vh} .ap-img{border-radius:16px 16px 0 0} .ap-h{font-size:22px;margin:10px 16px 0} .ap-src,.ap-d{padding-left:0} .ap-src{padding:14px 16px 0} .ap-d,.ap-sec,.ap-act,.ap-tags{margin-left:16px;margin-right:16px} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1857,7 +1874,8 @@ function renderFeed(){
   if(!list.length){ $("feed").innerHTML=`<div class="empty">${S.news?(S.srcOff.size===5?"Pick at least one news source from the Sources menu.":"No headlines match these filters yet."):"Loading…"}</div>`; return; }
   const when=t=>{ if(!t) return ""; const d=new Date(t); if(now-t<20*3600e3){ const a=ago(t); return a==="now"?"just now":a+" ago"; }
     return d.toLocaleDateString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",...(d.getFullYear()!==new Date().getFullYear()?{year:"numeric"}:{})}); };
-  const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener"`;
+  S._feedMap=new Map(list.map(i=>[i.id,i]));
+  const A=i=>`href="${esc(i.link)}" target="_blank" rel="noopener" data-story="${esc(i.id)}"`;
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
   const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._bs===2?`<b class="np-swan" title="Black swan: a rare, unexpected event with outsized market impact">⚠ Black swan</b>`:i._bs===1?`<b class="np-shock" title="Shock watch: unusual, potentially market-moving event">⚠ Shock watch</b>`:""}${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
@@ -3649,6 +3667,43 @@ function renderBestBuys(){
 }
 $("bestBuys")&&$("bestBuys").addEventListener("click",e=>{ if(e.target.closest("a")) return; const r=e.target.closest("[data-nyopen]"); if(r) openQuote(r.dataset.nyopen); });
 setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*60e3);
+
+/* ---------- Article preview panel: click a headline to read the preview on the site ---------- */
+(function(){
+  const box=document.createElement("div"); box.className="ap-modal"; box.hidden=true; box.innerHTML='<div class="ap-card" role="dialog" aria-modal="true"><button class="ap-x" type="button" title="Close">✕</button><div class="ap-body"></div></div>';
+  document.body.appendChild(box);
+  const close=()=>{ box.hidden=true; document.body.classList.remove("ap-open"); };
+  box.addEventListener("click",e=>{ if(e.target===box||e.target.closest(".ap-x")) close(); });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!box.hidden) close(); });
+  function render(i,pv){
+    const now=Date.now(), s=SRC[i.source]||{name:i.source,c:"#888",short:i.source};
+    const when=i.time?new Date(i.time).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET":"";
+    const desc=(pv&&pv.description&&pv.description.length>(i.summary||"").length?pv.description:i.summary)||"";
+    const chips=(i.tickers||[]).slice(0,6).map(t=>{const q=S.quotes[t];return `<span class="tg" data-ap-open="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("");
+    const tags=[i._bs===2?'<b class="np-swan">⚠ Black swan</b>':i._bs===1?'<b class="np-shock">⚠ Shock watch</b>':"",i._top?`<b class="np-hot">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:"",i.mood>0?'<span class="ap-mood up">▲ Positive tone</span>':i.mood<0?'<span class="ap-mood down">▼ Negative tone</span>':""].join("");
+    const paid=/wsj\.com|morningstar\.com|barrons\.com|ft\.com/.test(i.link);
+    box.querySelector(".ap-body").innerHTML=`
+      ${pv&&pv.image?`<div class="ap-img"><img src="${esc(pv.image)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`:""}
+      <div class="ap-src"><span class="np-src" style="--c:${s.c}">${esc(s.name||s.short)}</span>${pv&&pv.author?`<span>By ${esc(pv.author.replace(/^by\s+/i,""))}</span>`:""}<span>${esc(when)}</span></div>
+      <h2 class="ap-h">${esc((pv&&pv.title)||i.title)}</h2>
+      ${tags?`<div class="ap-tags">${tags}</div>`:""}
+      ${desc?`<p class="ap-d">${esc(desc)}</p>`:pv===undefined?'<p class="ap-d dim"><span class="spin"></span>Loading the preview…</p>':'<p class="ap-d dim">The publisher doesn\'t share a summary for this one. Open the full article below.</p>'}
+      ${chips?`<div class="ap-sec"><h4>Stocks in this story</h4><div class="np-tags">${chips}</div></div>`:""}
+      ${i.also&&i.also.length?`<div class="ap-sec"><h4>Also covered by</h4><div class="ap-also">${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc((SRC[a.source]||{name:a.source}).name)} ↗</a>`).join("")}</div></div>`:""}
+      <div class="ap-act"><a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Read full article on ${esc(s.name||"the site")} ↗</a>${paid?'<span class="ap-note">May require a subscription</span>':""}</div>`;
+  }
+  async function open(i){
+    box.hidden=false; document.body.classList.add("ap-open"); render(i,undefined);
+    let pv=null; try{ pv=await api("/api/preview?url="+encodeURIComponent(i.link)); if(pv&&pv.limited) pv=null; }catch{}
+    if(!box.hidden) render(i,pv);
+  }
+  document.addEventListener("click",e=>{
+    const a=e.target.closest("a[data-story]"); if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button!==0) return;
+    const i=S._feedMap&&S._feedMap.get(a.dataset.story); if(!i) return;
+    e.preventDefault(); open(i);
+  });
+  box.addEventListener("click",e=>{ const t=e.target.closest("[data-ap-open]"); if(t){ close(); openQuote(t.dataset.apOpen); } });
+})();
 </script>
 </body>
 </html>
