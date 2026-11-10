@@ -1349,6 +1349,7 @@ async function syncPut(code, doc) {
 // archived as a "test run" and a fresh $10,000 run starts.
 const AP_FILE = path.join(require("os").tmpdir(), "autopilot-v2.json");
 const AP_KEY = "pft:autopilot:v2";
+const AP_RISK_SLOTS = 8; // 80% risk: 8 of the 10 equal slots go to high-volatility names
 const AP_START = 10_000, AP_BUST = process.env.AP_TEST_BUST ? 9_990 : 1_000, AP_SLOTS = 10, AP_SLIP = 0.0005, AP_HOLD_MIN = 60 * 60e3;
 const AP_FALLBACK = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","TSLA","BRK-B","JPM","LLY","V","UNH","XOM","MA","COST","HD","PG","JNJ","WMT","NFLX","ABBV","BAC","CRM","ORCL","AMD","KO","MRK","CVX","PEP","ADBE","TMO","LIN","MCD","CSCO","ACN","ABT","WFC","GE","QCOM","INTU","CAT","TXN","DIS","IBM"];
 const apFresh = () => ({ v: 2, run: 1, runs: [], start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], lastRebalance: "", updated: Date.now() });
@@ -1387,13 +1388,13 @@ async function apMarketOpen() {
   if (t.wd === "Sat" || t.wd === "Sun" || t.min < 9 * 60 + 30 || t.min >= 16 * 60) return { open: false, t };
   try { const q = await quote("SPY"); return { open: Date.now() - q.marketTime < 20 * 60e3, t, spy: q }; } catch { return { open: false, t }; }
 }
-function apTrade(st, side, sym, shares, price, why, name) {
+function apTrade(st, side, sym, shares, price, why, name, sleeve) {
   const px = side === "BUY" ? price * (1 + AP_SLIP) : price * (1 - AP_SLIP), amt = shares * px;
   const p = st.positions[sym];
   if (side === "BUY") {
     st.cash -= amt;
     if (p) { p.cost = (p.cost * p.shares + amt) / (p.shares + shares); p.shares += shares; p.peak = Math.max(p.peak, px); }
-    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym };
+    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym, sleeve: sleeve || "risk" };
   } else {
     if (!p) return;
     st.cash += amt;
@@ -1476,7 +1477,9 @@ async function apBaseFor(sym, day) {
   const b = apBase.get(sym); if (b && b.day === day) return b;
   const h = await history(sym, "1y"); const cl = h.candles.map((x) => x.close);
   if (cl.length < 120) throw new Error("short history");
-  const out = { day, name: h.name, last: cl[cl.length - 1], m50: sma(cl, 50), m200: sma(cl, Math.min(200, cl.length)), past: cl[Math.max(0, cl.length - 64)], re: apMatcher(sym, h.name) };
+  const rets = cl.slice(-127).map((c, i, a) => (i ? Math.log(c / a[i - 1]) : 0)).slice(1), mu = rets.reduce((a, b) => a + b, 0) / rets.length;
+  const vol = Math.sqrt(rets.reduce((a, b) => a + (b - mu) ** 2, 0) / rets.length) * Math.sqrt(252);
+  const out = { day, name: h.name, vol, last: cl[cl.length - 1], m50: sma(cl, 50), m200: sma(cl, Math.min(200, cl.length)), past: cl[Math.max(0, cl.length - 64)], re: apMatcher(sym, h.name) };
   apBase.set(sym, out); if (apBase.size > 400) apBase.delete(apBase.keys().next().value);
   return out;
 }
@@ -1516,6 +1519,9 @@ async function apScore(live) {
     x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj;
   }
   out.sort((a, b) => b.score - a.score); out.forEach((x, i) => (x.rank = i + 1));
+  // 80% risk: the more volatile 60% of names feed the risk sleeve (8 slots), the calmest 40% the safe sleeve (2 slots)
+  const vols = out.map((x) => x.vol).sort((a, b) => a - b), cut = vols[Math.floor(vols.length * 0.4)] || 0;
+  let rr = 0, sr = 0; for (const x of out) { x.sleeve = x.vol > cut ? "risk" : "safe"; x.srank = x.sleeve === "risk" ? ++rr : ++sr; }
   let spx = null; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((c) => c.close); spx = { px: (q["^GSPC"] && q["^GSPC"].price) || cl[cl.length - 1], m200: sma(cl, 200), day: q["^GSPC"] && q["^GSPC"].changePct }; } catch {}
   const vix = q["^VIX"] && !q["^VIX"].error ? q["^VIX"] : null;
   const riskOff = !!(spx && spx.m200 && spx.px < spx.m200);
@@ -1528,25 +1534,30 @@ function apDecide(st, sc, opening) {
   const cool = (s) => st.recent && st.recent[s] && now - st.recent[s] < AP_HOLD_MIN;
   const val = () => st.cash + Object.entries(st.positions).reduce((s, [k, p]) => s + p.shares * (by[k] ? by[k].px : p.cost), 0);
   const fmtE = (e) => e.kind === "beat" ? `earnings beat by ${(e.surprise * 100).toFixed(0)}%` : `earnings missed by ${(-e.surprise * 100).toFixed(0)}%`;
+  const slv = (s) => (st.positions[s] && st.positions[s].sleeve) || "risk";
+  const held = (sl) => Object.keys(st.positions).filter((s) => slv(s) === sl);
+  const SLOTS = { risk: AP_RISK_SLOTS, safe: AP_SLOTS - AP_RISK_SLOTS };
   // 1) sells
   for (const [sym, p] of Object.entries(st.positions)) {
-    const x = by[sym]; if (!x) continue;
+    const x = by[sym]; if (!x) continue; const risk = slv(sym) === "risk";
     if (x.earn && x.earn.kind === "miss") apTrade(st, "SELL", sym, p.shares, x.px, `${opening ? "At the opening bell: " : ""}${fmtE(x.earn)} — sold before it can fall further`);
     else if (x.news <= -2.5) apTrade(st, "SELL", sym, p.shares, x.px, `Bad news: “${(x.headlines[0] || "").slice(0, 120)}”`);
-    else if (x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, "Price broke below its 200-day average — trend turned down");
-    else if (x.rank > 22 && !cool(sym)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the live rankings`);
+    else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
+    else if (x.rank > (risk ? 25 : 35) && !cool(sym)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the live rankings`);
   }
-  const exposure = sc.stress ? 0.3 : sc.riskOff ? 0.5 : 0.98;
+  // 80% risk profile: fully invested normally; still cuts back when the whole market breaks down
+  const exposure = sc.stress ? 0.5 : sc.riskOff ? 0.8 : 0.99;
   const target = (val() * exposure) / AP_SLOTS;
   // 2) trims
   for (const [sym, p] of Object.entries(st.positions)) {
     const x = by[sym]; if (!x) continue; const v = p.shares * x.px;
-    if (v > target * 1.5) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot holds 50% cash" : "Trimmed back to an equal slot after a big run-up");
+    if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
   }
   if (sc.stress) return;
-  const ok = (x) => !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && (x.px > x.m200 || (x.earn && x.earn.kind === "beat" && x.px > x.m50)) && x.news > -1.5 && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon"));
+  const ok = (x, sl) => x.sleeve === sl && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+    (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
-    const bits = [];
+    const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
     if (x.earn && x.earn.kind === "beat") bits.push(`${opening ? "reported overnight: " : ""}${fmtE(x.earn)}`);
     if (x.news >= 1 && x.headlines[0]) bits.push(`good news: “${x.headlines[0].slice(0, 90)}”`);
     if (x.adj != null) bits.push(`analysts ${x.adj >= 1 ? "strongly positive" : x.adj >= 0.5 ? "positive" : "mixed"}`);
@@ -1554,24 +1565,27 @@ function apDecide(st, sc, opening) {
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
     return `Ranked #${x.rank}: ` + bits.join(", ");
   };
-  // 3) swaps: a much stronger name replaces the weakest holding (held at least an hour)
-  let swaps = 0;
-  for (const x of sc.list) {
-    if (swaps >= 2 || Object.keys(st.positions).length < AP_SLOTS) break;
-    if (!ok(x)) continue;
-    const weakest = Object.keys(st.positions).filter((s) => by[s] && !cool(s)).sort((a, b) => by[a].score - by[b].score)[0];
-    if (!weakest || x.score < by[weakest].score + 0.1) break;
-    apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores much higher (#${by[weakest].rank} vs #${x.rank})`);
-    swaps++;
-  }
-  // 4) buys into empty slots
-  for (const x of sc.list) {
-    if (Object.keys(st.positions).length >= AP_SLOTS) break;
-    if (!ok(x)) continue;
-    const amt = Math.min(target, st.cash - 5); if (amt < 50) break;
-    apTrade(st, "BUY", x.sym, amt / (x.px * (1 + AP_SLIP)), x.px, why(x), x.name);
+  for (const sl of ["risk", "safe"]) {
+    // 3) swaps inside the sleeve: a much stronger name replaces the weakest holding (held at least an hour)
+    let swaps = 0;
+    for (const x of sc.list) {
+      if (swaps >= 2 || held(sl).length < SLOTS[sl]) break;
+      if (!ok(x, sl)) continue;
+      const weakest = held(sl).filter((s) => by[s] && !cool(s)).sort((a, b) => by[a].score - by[b].score)[0];
+      if (!weakest || x.score < by[weakest].score + 0.1) break;
+      apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores much higher (#${by[weakest].rank} vs #${x.rank})`);
+      swaps++;
+    }
+    // 4) buys into empty slots
+    for (const x of sc.list) {
+      if (held(sl).length >= SLOTS[sl]) break;
+      if (!ok(x, sl)) continue;
+      const amt = Math.min(target, st.cash - 5); if (amt < 50) break;
+      apTrade(st, "BUY", x.sym, amt / (x.px * (1 + AP_SLIP)), x.px, why(x), x.name, sl);
+    }
   }
 }
+const apStops = (p) => (p.sleeve === "safe" ? [0.08, 0.1] : [0.15, 0.2]); // risk sleeve gets room to swing
 function apValueNow(q) { return AP.cash + Object.entries(AP.positions).reduce((s, [k, p]) => s + p.shares * (q[k] && q[k].price ? q[k].price : p.cost), 0); }
 function apSummary(end, busted, spxNow) {
   const vals = [AP_START, ...AP.equity.map((p) => p.v)], last = end;
@@ -1579,7 +1593,7 @@ function apSummary(end, busted, spxNow) {
     trades: AP.trades.length, days: AP.equity.length, spxRet: AP.spx0 && spxNow ? +((spxNow / AP.spx0 - 1) * 100).toFixed(2) : null, busted };
 }
 function apSignals(sc) {
-  const pick = (x) => ({ sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym] });
+  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym] });
   return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
@@ -1607,8 +1621,8 @@ async function apTick() {
     for (const s of syms) {
       const p = AP.positions[s], x = q[s]; if (!x || x.error || !x.price) continue;
       p.peak = Math.max(p.peak || p.cost, x.price);
-      const stop = Math.max(p.cost * 0.92, p.peak * 0.9);
-      if (x.price <= stop) apTrade(AP, "SELL", s, p.shares, x.price, x.price <= p.cost * 0.92 ? "Stop-loss: down 8% from where it was bought" : "Trailing stop: fell 10% from its high");
+      const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), p.peak * (1 - tr));
+      if (x.price <= stop) apTrade(AP, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
     }
     // full re-score every 10 minutes (and right at the opening bell)
     const opening = AP.lastRebalance !== m.t.day;
@@ -1639,7 +1653,7 @@ async function apView() {
   if (!apLoaded) await apLoad();
   const syms = Object.keys(AP.positions);
   const q = (await getQuotes([...syms, "^GSPC"])).quotes;
-  const positions = syms.map((s) => { const p = AP.positions[s], x = q[s] || {}; const price = x.price || p.cost; return { sym: s, name: p.name, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, pnlPct: (price / p.cost - 1) * 100, dayPct: x.changePct || 0, at: p.at, peak: p.peak, stop: Math.max(p.cost * 0.92, Math.max(p.peak || p.cost, price) * 0.9) }; }).sort((a, b) => b.value - a.value);
+  const positions = syms.map((s) => { const p = AP.positions[s], x = q[s] || {}; const price = x.price || p.cost; return { sym: s, name: p.name, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, pnlPct: (price / p.cost - 1) * 100, dayPct: x.changePct || 0, at: p.at, peak: p.peak, sleeve: p.sleeve || "risk", stop: Math.max(p.cost * (1 - apStops(p)[0]), Math.max(p.peak || p.cost, price) * (1 - apStops(p)[1])) }; }).sort((a, b) => b.value - a.value);
   const value = AP.cash + positions.reduce((s, p) => s + p.value, 0);
   const t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun"), open = wk && t.min >= 570 && t.min < 960;
   const mode = open ? "Trading live — stops checked every minute, full re-score every 10 minutes" : "Market closed — reading news and earnings overnight, ready for the opening bell";
