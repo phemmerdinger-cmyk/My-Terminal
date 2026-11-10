@@ -1336,6 +1336,155 @@ async function syncPut(code, doc) {
   fs.mkdirSync(SYNC_DIR, { recursive: true }); fs.writeFileSync(path.join(SYNC_DIR, k + ".json"), body);
 }
 
+// ---------------------------------------------------------------- Autopilot (free paper-trading bot)
+// A $100,000 paper account traded by fixed rules — no Claude API calls, no real money, no broker.
+// Rules: once per trading day near the close it scores ~45 candidates (analyst consensus 40%,
+// 3-month momentum 30%, trend vs 50/200-day averages 30%), holds the top 10 at equal weight,
+// sells anything that falls out of the top 15 or below its 200-day average, and keeps 50% in cash
+// when the S&P 500 is below its own 200-day average. A trailing stop (-12% from entry or -15% from
+// the high) is checked every 5 minutes while the market is open.
+const AP_FILE = path.join(require("os").tmpdir(), "autopilot.json");
+const AP_KEY = "pft:autopilot:v1";
+const AP_START = 100_000, AP_SLOTS = 10, AP_KEEP = 15, AP_SLIP = 0.0005;
+const AP_FALLBACK = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","TSLA","BRK-B","JPM","LLY","V","UNH","XOM","MA","COST","HD","PG","JNJ","WMT","NFLX","ABBV","BAC","CRM","ORCL","AMD","KO","MRK","CVX","PEP","ADBE","TMO","LIN","MCD","CSCO","ACN","ABT","WFC","GE","QCOM","INTU","CAT","TXN","DIS","IBM"];
+const apFresh = () => ({ v: 1, start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], lastRebalance: "", updated: Date.now() });
+let AP = apFresh(), apBusy = false, apLoaded = false;
+const etParts = (d = new Date()) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, wd: p.weekday, min: (+p.hour % 24) * 60 + +p.minute };
+};
+async function apLoad() {
+  try {
+    if (UP_URL && UP_TOKEN) {
+      const r = await fetch(`${UP_URL}/get/${AP_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) });
+      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apLoaded = true; return; }
+    }
+  } catch {}
+  try { AP = JSON.parse(fs.readFileSync(AP_FILE, "utf8")); } catch {}
+  apLoaded = true;
+}
+async function apSave() {
+  AP.updated = Date.now();
+  const body = JSON.stringify(AP);
+  try { fs.writeFileSync(AP_FILE, body); } catch {}
+  if (UP_URL && UP_TOKEN) { try { await fetch(`${UP_URL}/set/${AP_KEY}`, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}` }, body, signal: AbortSignal.timeout(8000) }); } catch {} }
+}
+const ySym = (s) => s.replace(".", "-");
+const sma = (a, n) => (a.length >= n ? a.slice(-n).reduce((x, y) => x + y, 0) / n : null);
+async function apMarketOpen() {
+  const t = etParts();
+  if (process.env.AP_TEST) return { open: true, t: { ...t, wd: "Tue", min: 15 * 60 + 45 } };
+  if (t.wd === "Sat" || t.wd === "Sun" || t.min < 9 * 60 + 30 || t.min >= 16 * 60) return { open: false, t };
+  try { const q = await quote("SPY"); return { open: Date.now() - q.marketTime < 20 * 60e3, t, spy: q }; } catch { return { open: false, t }; }
+}
+function apTrade(side, sym, shares, price, why, name) {
+  const px = side === "BUY" ? price * (1 + AP_SLIP) : price * (1 - AP_SLIP), amt = shares * px;
+  const p = AP.positions[sym];
+  if (side === "BUY") {
+    AP.cash -= amt;
+    if (p) { p.cost = (p.cost * p.shares + amt) / (p.shares + shares); p.shares += shares; p.peak = Math.max(p.peak, px); }
+    else AP.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym };
+  } else {
+    AP.cash += amt;
+    const pnl = (px - p.cost) * shares;
+    p.shares -= shares; if (p.shares < 1e-6) delete AP.positions[sym];
+    why += ` (${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(0)})`;
+  }
+  AP.trades.unshift({ t: Date.now(), side, sym, shares: +shares.toFixed(4), price: +px.toFixed(2), amount: +amt.toFixed(2), why });
+  AP.trades = AP.trades.slice(0, 400);
+}
+async function apScore() {
+  const ranked = bbRank().all;
+  let cands = ranked.length >= 30 ? ranked.slice(0, 45).map((r) => ({ sym: ySym(r.sym), adj: r.adj, n: r.n })) : AP_FALLBACK.map((s) => ({ sym: s, adj: null }));
+  for (const s of Object.keys(AP.positions)) if (!cands.find((c) => c.sym === s)) { const r = BB.ratings[s.replace("-", ".")]; cands.push({ sym: s, adj: r && r.n >= BB_MIN_N ? bbAdj(r) : null }); }
+  const out = [];
+  for (const c of cands) {
+    try {
+      const h = await history(c.sym, "1y"); const cl = h.candles.map((x) => x.close);
+      if (cl.length < 150) continue;
+      const px = cl[cl.length - 1], m50 = sma(cl, 50), m200 = sma(cl, Math.min(200, cl.length)), past = cl[Math.max(0, cl.length - 64)];
+      if (px < 5) continue;
+      out.push({ ...c, name: h.name, px, m50, m200, mom: px / past - 1, trend: (px > m50 ? 0.5 : 0) + (px > m200 ? 0.5 : 0) });
+    } catch {}
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  const pctRank = (k) => { const v = out.filter((x) => x[k] != null).map((x) => x[k]).sort((a, b) => a - b); return (x) => (x == null || !v.length ? 0.5 : v.filter((y) => y <= x).length / v.length); };
+  const ra = pctRank("adj"), rm = pctRank("mom");
+  out.forEach((x) => { x.score = 0.4 * ra(x.adj) + 0.3 * rm(x.mom) + 0.3 * x.trend; });
+  out.sort((a, b) => b.score - a.score); out.forEach((x, i) => (x.rank = i + 1));
+  return out;
+}
+async function apRebalance(spy) {
+  const scored = await apScore(); if (scored.length < AP_SLOTS) return;
+  const by = Object.fromEntries(scored.map((x) => [x.sym, x]));
+  let spx = null; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((x) => x.close); spx = { px: cl[cl.length - 1], m200: sma(cl, 200) }; } catch {}
+  const riskOff = !!(spx && spx.m200 && spx.px < spx.m200);
+  // 1) sells: dropped out of the top 15, or broke below its 200-day average
+  for (const [sym, p] of Object.entries(AP.positions)) {
+    const x = by[sym]; if (!x) continue;
+    if (x.rank > AP_KEEP) apTrade("SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the rankings (keeps only the top ${AP_KEEP})`);
+    else if (x.px < x.m200) apTrade("SELL", sym, p.shares, x.px, "Price broke below its 200-day average — trend turned down");
+  }
+  const val = () => AP.cash + Object.entries(AP.positions).reduce((s, [k, p]) => s + p.shares * (by[k] ? by[k].px : p.cost), 0);
+  const target = (val() * (riskOff ? 0.5 : 0.98)) / AP_SLOTS;
+  // 2) trim anything far above its equal-weight slot (also how the risk-off cash cut happens)
+  for (const [sym, p] of Object.entries(AP.positions)) {
+    const x = by[sym]; if (!x) continue; const v = p.shares * x.px;
+    if (v > target * 1.5) apTrade("SELL", sym, (v - target) / x.px, x.px, riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot holds 50% cash" : "Trimmed back to an equal 10% slot after a big run-up");
+  }
+  // 3) buys: fill empty slots with the best-ranked stocks that are in an uptrend
+  const why = (x) => `Ranked #${x.rank}: ${x.adj != null ? `analysts ${x.adj >= 1 ? "strongly positive" : x.adj >= 0.5 ? "positive" : "mixed"}, ` : ""}${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months, ${x.trend === 1 ? "above both its 50- and 200-day averages" : "above its 200-day average"}`;
+  for (const x of scored) {
+    if (Object.keys(AP.positions).length >= AP_SLOTS) break;
+    if (AP.positions[x.sym] || x.px < x.m200) continue;
+    const amt = Math.min(target, AP.cash - 50); if (amt < 500) break;
+    apTrade("BUY", x.sym, amt / (x.px * (1 + AP_SLIP)), x.px, why(x), x.name);
+  }
+  AP.lastRebalance = etParts().day; AP.lastScan = { t: Date.now(), riskOff, top: scored.slice(0, 15).map((x) => ({ sym: x.sym, name: x.name, score: +x.score.toFixed(3), mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend })) };
+}
+async function apTick() {
+  if (apBusy) return; apBusy = true;
+  try {
+    if (!apLoaded) await apLoad();
+    const m = await apMarketOpen(); if (!m.open) return;
+    const syms = Object.keys(AP.positions);
+    const q = syms.length ? (await getQuotes(syms)).quotes : {};
+    // trailing stop
+    for (const s of syms) {
+      const p = AP.positions[s], x = q[s]; if (!x || x.error || !x.price) continue;
+      p.peak = Math.max(p.peak || p.cost, x.price);
+      const stop = Math.max(p.cost * 0.88, p.peak * 0.85);
+      if (x.price <= stop) apTrade("SELL", s, p.shares, x.price, x.price <= p.cost * 0.88 ? "Stop-loss: down 12% from where it was bought" : "Trailing stop: fell 15% from its high");
+    }
+    if (!AP.lastRebalance || (AP.lastRebalance !== m.t.day && m.t.min >= 15 * 60 + 40)) await apRebalance(m.spy);
+    // one equity point per trading day (kept up to date through the day)
+    const q2 = Object.keys(AP.positions).length ? (await getQuotes(Object.keys(AP.positions))).quotes : {};
+    const eq = AP.cash + Object.entries(AP.positions).reduce((s, [k, p]) => s + p.shares * (q2[k] && q2[k].price ? q2[k].price : p.cost), 0);
+    let spx = null; try { spx = (await quote("^GSPC")).price; } catch {}
+    const pt = { d: m.t.day, v: +eq.toFixed(2), spx };
+    if (AP.equity.length && AP.equity[AP.equity.length - 1].d === pt.d) AP.equity[AP.equity.length - 1] = pt; else AP.equity.push(pt);
+    await apSave();
+  } catch (e) { console.error("autopilot", e.message); } finally { apBusy = false; }
+}
+async function apView() {
+  if (!apLoaded) await apLoad();
+  const syms = Object.keys(AP.positions);
+  const q = (await getQuotes([...syms, "^GSPC"])).quotes;
+  const positions = syms.map((s) => { const p = AP.positions[s], x = q[s] || {}; const price = x.price || p.cost; return { sym: s, name: p.name, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, pnlPct: (price / p.cost - 1) * 100, dayPct: x.changePct || 0, at: p.at, stop: Math.max(p.cost * 0.88, (p.peak || p.cost) * 0.85) }; }).sort((a, b) => b.value - a.value);
+  const value = AP.cash + positions.reduce((s, p) => s + p.value, 0);
+  const t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun");
+  return { ...AP, positions, value, startValue: AP_START, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: wk && t.min >= 570 && t.min < 960,
+    status: !AP.lastRebalance ? "Waiting for the market to open to make its first trades" : `Next rebalance: ${AP.lastRebalance === t.day || !wk || t.min >= 960 ? "next trading day" : "today"} ~3:40 PM ET`, durable: !!(UP_URL && UP_TOKEN) };
+}
+// The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
+function apRestore(doc) {
+  if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !doc.positions || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
+  if ((AP.trades.length && doc.updated <= AP.updated) || doc.trades.length < AP.trades.length) return { ok: false, error: "server copy is newer" };
+  AP = { v: 1, start: +doc.start || Date.now(), cash: doc.cash, positions: doc.positions, trades: doc.trades.slice(0, 400), equity: (doc.equity || []).slice(-2000), lastRebalance: String(doc.lastRebalance || ""), lastScan: doc.lastScan, updated: +doc.updated || Date.now() };
+  apSave(); return { ok: true };
+}
+setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 8000 : 5 * 60e3); }, process.env.AP_TEST ? 3000 : 90_000);
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -1366,6 +1515,13 @@ async function handle(req, res) {
       if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
       if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
+      if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
+      if (u.pathname === "/api/autopilot/restore" && req.method === "POST") {
+        { const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g); }
+        if (!apLoaded) await apLoad();
+        let doc = null; try { doc = await readBody(req); } catch {}
+        return send(res, 200, apRestore(doc));
+      }
       if (u.pathname === "/api/quotes") return send(res, 200, await getQuotes(parseList(u.searchParams.get("symbols"), 160)));
       if (u.pathname === "/api/sp500") return send(res, 200, await sp500Snapshot());
       if (u.pathname === "/api/history") {
