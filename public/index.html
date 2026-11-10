@@ -1048,6 +1048,34 @@ html.viewonly .api-bal-wrap{display:none!important}
 .ap-act{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 22px 0;padding-top:14px;border-top:1px solid var(--line)} .ap-act .btn{text-decoration:none;display:inline-flex;align-items:center}
 .ap-note{font-size:12px;color:var(--dim)}
 @media (max-width:640px){ .ap-modal{padding:0;place-items:end stretch} .ap-card{border-radius:16px 16px 0 0;max-height:92vh} .ap-img{border-radius:16px 16px 0 0} .ap-h{font-size:22px;margin:10px 16px 0} .ap-src,.ap-d{padding-left:0} .ap-src{padding:14px 16px 0} .ap-d,.ap-sec,.ap-act,.ap-tags{margin-left:16px;margin-right:16px} }
+/* ===== Analysis tab ===== */
+.an-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px 20px;flex-wrap:wrap;margin-bottom:14px}
+.an-k{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#4da3ff}
+.an-head h1{margin:4px 0 2px;font-family:Georgia,"Times New Roman",serif;font-size:30px}
+.an-sub{font-size:12px;color:var(--dim)}
+.an-verdict{text-align:right;border:1px solid var(--line2);border-radius:12px;padding:8px 14px;background:var(--panel)} .an-verdict b{display:block;font-size:22px} .an-verdict span{font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+.an-brief{background:var(--panel);border:1px solid var(--line);border-left:3px solid #4da3ff;border-radius:10px;padding:14px 18px;margin-bottom:12px} .an-brief p{margin:0;font-size:15.5px;line-height:1.65}
+.an-claude{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:18px} .an-cnote{font-size:12px;color:var(--dim)} #anClaudeOut{flex-basis:100%}
+.an-cl{background:var(--panel);border:1px solid rgba(217,119,87,.45);border-radius:10px;padding:14px 18px;font-size:14.5px;line-height:1.6}
+.an-score{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.an-g{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px} .an-gt{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--dim)} .an-gt b{font-family:var(--mono);font-size:20px}
+.an-bar{height:6px;background:var(--line);border-radius:3px;margin:6px 0} .an-bar i{display:block;height:100%;border-radius:3px}
+.an-g p{margin:0;font-size:11.5px;color:var(--dim);line-height:1.4}
+.an-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:12px}
+.an-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0} .an-card > .h{margin-top:0}
+.an-sec{display:grid;grid-template-columns:120px 1fr 64px;gap:8px;align-items:center;padding:4px 0;font-size:13px;cursor:pointer}
+.an-sb{position:relative;height:10px;background:var(--line);border-radius:5px} .an-sb i{position:absolute;top:0;height:100%;border-radius:5px} .an-sb i.u{left:50%;background:var(--up)} .an-sb i.d{right:50%;background:var(--down)}
+.an-sec b{text-align:right;font-family:var(--mono);font-weight:500}
+.an-note{font-size:12.5px;color:var(--dim);margin:8px 0 0;line-height:1.45}
+.an-dr{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .an-dr:last-child{border-bottom:0} .an-n{font-family:var(--mono);color:var(--dim);font-size:12px;min-width:14px}
+.an-dr a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px;line-height:1.35} .an-dr a:hover{text-decoration:underline}
+.an-dm{font-size:11.5px;color:var(--dim);margin-top:3px}
+.an-pf b{font-family:var(--mono);font-size:22px;display:block} .an-pf span{font-size:12.5px;color:var(--dim)}
+.an-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px} .an-two h4{margin:0 0 4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.an-li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer} .an-li b{font-family:var(--mono);font-weight:500}
+.an-y{font-style:normal;font-size:10px;color:#4da3ff;border:1px solid rgba(77,163,255,.4);border-radius:999px;padding:0 6px;margin-left:4px}
+@media (max-width:1100px){ .an-score{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:760px){ .an-grid{grid-template-columns:minmax(0,1fr)} .an-score{grid-template-columns:repeat(2,minmax(0,1fr))} .an-head h1{font-size:24px} .an-verdict{text-align:left} .an-brief p{font-size:14.5px} }
 /* resizable watchlist */
 .wrap{grid-template-columns:var(--wlw,280px) minmax(0,1fr)}
 .left{position:relative}
@@ -1096,6 +1124,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-tab="data"><span class="ti">📊</span>Markets</button>
   <button data-tab="research"><span class="ti">🔎</span>Research</button>
   <button data-tab="portfolio"><span class="ti">💼</span>Portfolio</button>
+  <button data-tab="analysis"><span class="ti">◈</span>Analysis</button>
   <button data-tab="nyse"><span class="ti">▦</span>Heatmap</button>
   <!-- Signals tab is hidden but its code is kept; set SHOW_SIGNALS=true to bring it back -->
   <button data-tab="predict" class="claude"><span class="ti">✦</span>Claude<span class="tlong"> Predictor</span></button>
@@ -1260,6 +1289,19 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- PREDICTIONS -->
     <!-- WALL STREET: live market floor (S&P 500) -->
+    <section id="tab-analysis" class="pad an" hidden>
+      <div class="an-head"><div><div class="an-k">◈ MARKET ANALYSIS</div><h1 id="anTitle">Today's market, explained</h1><div class="an-sub" id="anSub"></div></div><div class="an-verdict" id="anVerdict"></div></div>
+      <div class="an-brief" id="anBrief"><div class="skeleton"></div></div>
+      <div class="an-claude no-vo" id="anClaude"><button class="btn" type="button" id="anClaudeBtn">✦ Deeper Claude analysis</button><span class="an-cnote">Uses a few cents of Claude credits · everything else on this page is free</span><div id="anClaudeOut"></div></div>
+      <h2 class="h">Market scorecard</h2><div class="an-score" id="anScore"></div>
+      <div class="an-grid">
+        <div class="an-card"><h2 class="h">Sector leadership today</h2><div id="anSectors"></div><p class="an-note" id="anSecNote"></p></div>
+        <div class="an-card"><h2 class="h">What's driving the market</h2><div id="anDrivers"></div></div>
+        <div class="an-card"><h2 class="h" id="anPfH">Your portfolio today</h2><div id="anPf"></div></div>
+        <div class="an-card"><h2 class="h">Coming up: earnings</h2><div id="anEarn"></div></div>
+      </div>
+      <div class="disc">Automatic analysis built from live prices, sector ETFs, S&amp;P 500 breadth, VIX, and headlines from your news sources, using fixed rules (no AI credits). It describes what the market is doing; it isn't financial advice.</div>
+    </section>
     <section id="tab-nyse" class="pad ny" hidden>
       <div class="ny-hero">
         <div class="ny-id">
@@ -1460,7 +1502,7 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","research","portfolio","nyse",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","research","portfolio","analysis","nyse",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 const MK = {
   mkBonds:[["^IRX","13-week T-bill"],["^FVX","5-year Treasury"],["^TNX","10-year Treasury"],["^TYX","30-year Treasury"]],
   mkBondFunds:[["AGG","US Aggregate Bond"],["BND","Total Bond Market"],["TLT","20+ Yr Treasury"],["IEF","7-10 Yr Treasury"],["SHY","1-3 Yr Treasury"],["TIP","TIPS"],["LQD","Investment-Grade Corp"],["HYG","High-Yield Corp"],["MUB","Municipal Bonds"],["BNDX","International Bond"]],
@@ -1570,6 +1612,7 @@ function setTab(t){
   if(t==="portfolio"){ renderPortfolio(); }
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
+  if(t==="analysis"){ anOpen(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -1601,7 +1644,7 @@ async function loadNews(){
     const old=new Map((S.news?.items||[]).map(i=>[i.id,i._new]));
     j.items.forEach(i=>{ if(old.get(i.id)) i._new=old.get(i.id); });
     if(!S.firstLoad && fresh.length){ fresh.forEach(i=>i._new=Date.now()); notify(fresh.filter(i=>i.tickers.length)); }
-    S.news=j; S.firstLoad=false; S.lastOk=Date.now(); S.newsAt=Date.now();
+    S.news=j; S.firstLoad=false; S.lastOk=Date.now(); S.newsAt=Date.now(); if(S.tab==="analysis"&&typeof anRender==="function") setTimeout(anRender,0);
     renderFeed(); renderStatus(); renderWL(); tick();
     if(S.tab==="data") renderData();
   }catch(e){
@@ -2659,7 +2702,7 @@ function renderMovers2(){
 async function loadEarnings(){
   const syms=[...new Set([...S.wl,...S.port.map(h=>h.symbol)])].filter(s=>!/[\^=]|-USD$/.test(s));
   try{ S.earn=await api("/api/earnings?symbols="+encodeURIComponent(syms.join(","))); }catch{ S.earn={error:true}; }
-  renderEarnings();
+  renderEarnings(); if(S.tab==="analysis"&&typeof anRender==="function") anRender();
 }
 function renderEarnings(){
   const e=S.earn; if(!e){ return; }
@@ -2762,7 +2805,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
+const TAB_NAMES={analysis:"Analysis",news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -3704,6 +3747,106 @@ setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*
   });
   box.addEventListener("click",e=>{ const t=e.target.closest("[data-ap-open]"); if(t){ close(); openQuote(t.dataset.apOpen); } });
 })();
+
+/* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
+async function anQuotes(){
+  const syms=[...INDEXES.map(x=>x[0]),...SECTORS.map(x=>x[0]),...S.port.map(h=>h.symbol)];
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent([...new Set(syms)].join(","))); S.quotes={...S.quotes,...j.quotes}; }catch{}
+}
+async function anOpen(){
+  S.an=S.an||{snap:null,at:0};
+  anRender();
+  anQuotes().then(()=>{ if(S.tab==="analysis") anRender(); }); if(!S.earn) loadEarnings(); loadTrending();
+  if(!S.an.snap||Date.now()-S.an.at>60e3){ try{ S.an.snap=await api("/api/sp500"); S.an.at=Date.now(); }catch{} }
+  if(S.tab==="analysis") anRender();
+}
+setInterval(()=>{ if(S.tab==="analysis"&&!document.hidden){ anQuotes().then(()=>anRender()); } },30e3);
+function anData(){
+  const q=s=>{const x=S.quotes[s];return x&&!x.error?x:null};
+  const spx=q("^GSPC"), ndq=q("^IXIC"), dji=q("^DJI"), rut=q("^RUT"), vix=q("^VIX");
+  const sec=SECTORS.map(([s,n])=>({s,n,q:q(s)})).filter(x=>x.q&&x.q.changePct!=null).sort((a,b)=>b.q.changePct-a.q.changePct);
+  let up=0,down=0; const snap=S.an&&S.an.snap&&S.an.snap.quotes; if(snap) for(const v of Object.values(snap)){ if(v[2]>0) up++; else if(v[2]<0) down++; }
+  let items=(S.news?S.news.items:[]).filter(i=>Date.now()-(i.time||0)<24*3600e3); if(items.length<10) items=(S.news?S.news.items:[]).slice(0,80);
+  const pos=items.filter(i=>i.mood>0).length, neg=items.filter(i=>i.mood<0).length;
+  let list=[]; try{ list=cluster(items); newsHeat(list); list.sort((a,b)=>b._heat-a._heat); }catch{}
+  return {spx,ndq,dji,rut,vix,sec,up,down,pos,neg,list,stress:marketStress()};
+}
+function anScores(d){
+  const cl=x=>Math.max(0,Math.min(100,Math.round(x)));
+  const out=[];
+  if(d.spx){ const r=d.spx.high52&&d.spx.low52?(d.spx.price-d.spx.low52)/(d.spx.high52-d.spx.low52)*100:50;
+    out.push({k:"Trend",v:cl(r*.7+(50+d.spx.changePct*20)*.3),t:d.spx.high52?`S&P 500 is ${((1-d.spx.price/d.spx.high52)*100).toFixed(1)}% below its 52-week high`:"S&P 500 trend"}); }
+  if(d.up+d.down>50){ const b=d.up/(d.up+d.down)*100; out.push({k:"Breadth",v:cl(b),t:`${d.up} of ${d.up+d.down} S&P 500 stocks are up today`}); }
+  else if(d.sec.length){ const b=d.sec.filter(x=>x.q.changePct>0).length/d.sec.length*100; out.push({k:"Breadth",v:cl(b),t:`${d.sec.filter(x=>x.q.changePct>0).length} of ${d.sec.length} sectors are up`}); }
+  if(d.vix) out.push({k:"Calm",v:cl((35-d.vix.price)/(35-12)*100),t:`VIX ${d.vix.price.toFixed(1)}${d.vix.price<15?" — very calm":d.vix.price<20?" — normal":d.vix.price<30?" — nervous":" — fearful"}`});
+  if(d.pos+d.neg>=10) out.push({k:"News tone",v:cl(d.pos/(d.pos+d.neg)*100),t:`${d.pos} positive vs ${d.neg} negative headlines (24h)`});
+  const sw=d.list.filter(i=>i._bs===2).length, sh=d.list.filter(i=>i._bs===1).length;
+  out.push({k:"Shock risk",v:cl(100-(d.stress.length?60:0)-sw*30-sh*10),t:d.stress.length?d.stress.join(" · "):sw?`${sw} black swan headline${sw>1?"s":""}`:sh?`${sh} shock-watch headline${sh>1?"s":""}`:"No black swan signals"});
+  const avg=out.length?Math.round(out.reduce((a,x)=>a+x.v,0)/out.length):50;
+  return {out,avg};
+}
+function anBrief(d,sc){
+  const f=v=>(v>=0?"up ":"down ")+Math.abs(v).toFixed(2)+"%";
+  const S1=[]; const now=new Date(), et=now.toLocaleString("en-US",{timeZone:"America/New_York",weekday:"long"});
+  if(d.spx){ const big=Math.abs(d.spx.changePct)>=1.5?(d.spx.changePct>0?"a strong rally":"a sharp sell-off"):Math.abs(d.spx.changePct)>=.6?(d.spx.changePct>0?"a solid gain":"a clear decline"):"a quiet, mostly flat session";
+    S1.push(`<b>${et}: ${big}.</b> The S&amp;P 500 is ${f(d.spx.changePct)}${d.ndq?`, the Nasdaq ${f(d.ndq.changePct)}`:""}${d.dji?` and the Dow ${f(d.dji.changePct)}`:""}.`);
+    if(d.ndq&&d.dji){ const gap=d.ndq.changePct-d.dji.changePct; if(Math.abs(gap)>=.7) S1.push(gap>0?"Tech and growth stocks are leading — the Nasdaq is outpacing the Dow.":"Investors are favoring old-economy names over tech — the Dow is beating the Nasdaq."); }
+    if(d.rut&&d.spx&&Math.abs(d.rut.changePct-d.spx.changePct)>=.8) S1.push(d.rut.changePct>d.spx.changePct?"Small caps (Russell 2000) are beating large caps, a sign of broad risk appetite.":"Small caps are lagging large caps, which usually means investors are playing it safe."); }
+  if(d.up+d.down>50){ const r=d.up/(d.up+d.down); S1.push(r>=.7?`The move is broad: ${d.up} of ${d.up+d.down} S&amp;P 500 stocks are higher.`:r<=.3?`Selling is widespread: only ${d.up} of ${d.up+d.down} S&amp;P 500 stocks are up.`:d.spx&&d.spx.changePct>0&&r<.5?`Under the surface it's narrow — the index is up but most stocks (${d.down}) are down, so a few giants are doing the lifting.`:d.spx&&d.spx.changePct<0&&r>.5?`The index is down but most stocks (${d.up}) are actually up — a handful of heavyweights are dragging it.`:`Breadth is mixed: ${d.up} stocks up, ${d.down} down.`); }
+  if(d.sec.length>=6){ const top=d.sec.slice(0,2), bot=d.sec.slice(-2); const def=["XLU","XLP","XLV","XLRE"], cyc=["XLK","XLY","XLC","XLI","XLF"];
+    S1.push(`${top.map(x=>x.n).join(" and ")} lead (${top.map(x=>pct(x.q.changePct)).join(", ")}); ${bot.map(x=>x.n).join(" and ")} lag (${bot.map(x=>pct(x.q.changePct)).join(", ")}).`);
+    const defTop=d.sec.slice(0,3).filter(x=>def.includes(x.s)).length, cycTop=d.sec.slice(0,3).filter(x=>cyc.includes(x.s)).length;
+    if(defTop>=2) S1.push("Defensive sectors on top is a cautious, risk-off signal."); else if(cycTop>=2) S1.push("Growth and economically sensitive sectors on top is a risk-on signal."); }
+  if(d.vix) S1.push(d.vix.price>=30?`Fear is high: the VIX is at ${d.vix.price.toFixed(1)}.`:d.vix.price>=20?`Investors are a bit nervous (VIX ${d.vix.price.toFixed(1)}).`:`Volatility is low (VIX ${d.vix.price.toFixed(1)}), so markets are calm.`);
+  const TP=newsTopics(); if(TP.top.length&&TP.top[0][1]>=5){ const [t,n]=TP.top[0], qq=S.quotes[t]; S1.push(`The biggest story is <b>${esc(t)}</b> (${n} headlines in 24h)${qq&&!qq.error?`, with the stock ${f(qq.changePct)}`:""}.`); }
+  if(d.stress.length) S1.push(`<b class="down">⚠ Market stress:</b> ${esc(d.stress.join(", "))}.`);
+  return S1.length?S1.join(" "):"Waiting for live market data…";
+}
+function anRender(){
+  if(!$("anBrief")) return; S.an=S.an||{snap:null,at:0};
+  const d=anData(), sc=anScores(d);
+  $("anSub").textContent=new Date().toLocaleString("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET · updates every 30 seconds";
+  const v=sc.avg, [lab,c]=v>=65?["Risk-on","var(--up)"]:v>=45?["Mixed","#f5c518"]:["Risk-off","var(--down)"];
+  $("anVerdict").innerHTML=`<b style="color:${c}">${lab}</b><span>Market health ${v}/100</span>`;
+  $("anBrief").innerHTML=`<p>${anBrief(d,sc)}</p>`;
+  $("anScore").innerHTML=sc.out.map(x=>{ const col=x.v>=65?"var(--up)":x.v>=45?"#f5c518":"var(--down)"; return `<div class="an-g"><div class="an-gt"><span>${x.k}</span><b style="color:${col}">${x.v}</b></div><div class="an-bar"><i style="width:${x.v}%;background:${col}"></i></div><p>${esc(x.t)}</p></div>`; }).join("");
+  const mx=Math.max(1,...d.sec.map(x=>Math.abs(x.q.changePct)));
+  $("anSectors").innerHTML=d.sec.length?d.sec.map(x=>`<div class="an-sec" data-nyopen="${x.s}"><span>${esc(x.n)}</span><div class="an-sb"><i class="${x.q.changePct>=0?"u":"d"}" style="width:${(Math.abs(x.q.changePct)/mx*50).toFixed(1)}%"></i></div><b class="${cls(x.q.changePct)}">${pct(x.q.changePct)}</b></div>`).join(""):'<div class="skeleton"></div>';
+  const def=["XLU","XLP","XLV","XLRE"]; const t3=d.sec.slice(0,3).map(x=>x.s);
+  $("anSecNote").textContent=d.sec.length?(t3.filter(s=>def.includes(s)).length>=2?"Defensive leadership (utilities, staples, health care) — investors are seeking safety.":t3.filter(s=>["XLK","XLY","XLC"].includes(s)).length>=2?"Growth leadership (tech, consumer, communication) — investors are leaning into risk.":"No clear rotation — leadership is mixed."):"";
+  S._feedMap=S._feedMap||new Map(); d.list.slice(0,6).forEach(i=>S._feedMap.set(i.id,i));
+  $("anDrivers").innerHTML=d.list.length?d.list.slice(0,6).map((i,n)=>{ const t=(i.tickers||[]).slice(0,3); return `<div class="an-dr"><span class="an-n">${n+1}</span><div><a href="${esc(i.link)}" target="_blank" rel="noopener" data-story="${esc(i.id)}">${esc(i.title)}</a><div class="an-dm">${esc((SRC[i.source]||{name:i.source}).name)}${i._top?' · <b class="np-hot">🔥 Top story</b>':""}${i._bs===2?' · <b class="np-swan">⚠ Black swan</b>':""}${i.mood>0?' · <span class="up">positive</span>':i.mood<0?' · <span class="down">negative</span>':""}${t.map(x=>{const q=S.quotes[x];return ` · ${esc(x)}${q&&!q.error?` <span class="${cls(q.change)}">${pct(q.changePct)}</span>`:""}`}).join("")}</div></div></div>`; }).join(""):'<div class="skeleton"></div>';
+  // portfolio
+  const rows=S.port.map(h=>({h,q:S.quotes[h.symbol]})).filter(r=>r.q&&!r.q.error&&r.q.change!=null);
+  if(!S.port.length){ $("anPf").innerHTML='<p class="an-note">Add holdings on the Portfolio tab to see how today\'s market is hitting them.</p>'; }
+  else if(!rows.length){ $("anPf").innerHTML='<div class="skeleton"></div>'; }
+  else { const val=rows.reduce((a,r)=>a+r.h.shares*r.q.price,0), day=rows.reduce((a,r)=>a+r.h.shares*r.q.change,0), dp=val?day/(val-day)*100:0;
+    const contrib=rows.map(r=>({s:r.h.symbol,c:r.h.shares*r.q.change,w:r.h.shares*r.q.price/val})).sort((a,b)=>b.c-a.c);
+    const big=contrib.slice().sort((a,b)=>b.w-a.w)[0]; const vsSpx=d.spx?dp-d.spx.changePct:null;
+    $("anPfH").textContent=`${((S.pfs||[]).find(p=>p.id===S.pfActive)||{}).name||"Your portfolio"} today`;
+    $("anPf").innerHTML=`<div class="an-pf"><b class="${cls(day)}">${day>=0?"+":"−"}$${Math.abs(day).toFixed(2)} (${pct(dp)})</b>${vsSpx!=null?`<span>${vsSpx>=0?"beating":"trailing"} the S&amp;P 500 by ${Math.abs(vsSpx).toFixed(2)} pts</span>`:""}</div>
+      <div class="an-two"><div><h4>Helping most</h4>${contrib.filter(x=>x.c>0).slice(0,3).map(x=>`<div class="an-li"><span>${esc(x.s)}</span><b class="up">+$${x.c.toFixed(2)}</b></div>`).join("")||'<p class="an-note">Nothing up today.</p>'}</div>
+      <div><h4>Hurting most</h4>${contrib.filter(x=>x.c<0).reverse().slice(0,3).map(x=>`<div class="an-li"><span>${esc(x.s)}</span><b class="down">−$${Math.abs(x.c).toFixed(2)}</b></div>`).join("")||'<p class="an-note">Nothing down today.</p>'}</div></div>
+      ${big&&big.w>=.25?`<p class="an-note">⚠ ${esc(big.s)} is ${(big.w*100).toFixed(0)}% of this portfolio — one stock is driving most of your results.</p>`:""}`; }
+  // earnings
+  const e=S.earn; if(!e){ $("anEarn").innerHTML='<div class="skeleton"></div>'; }
+  else if(e.error){ $("anEarn").innerHTML='<p class="an-note">Earnings calendar unavailable right now.</p>'; }
+  else { const L=[...(e.yours||[]).map(x=>({...x,y:1})),...(e.notable||[])].filter((x,i,a)=>a.findIndex(z=>z.symbol===x.symbol)===i).slice(0,8);
+    $("anEarn").innerHTML=L.length?L.map(x=>`<div class="an-li" data-nyopen="${esc(x.symbol)}"><span><b>${esc(x.symbol)}</b>${x.y?' <i class="an-y">yours</i>':""}</span><span class="dim">${esc(x.date||"")}${x.hour?` · ${x.hour==="bmo"?"before open":x.hour==="amc"?"after close":esc(x.hour)}`:""}</span></div>`).join(""):'<p class="an-note">No major earnings in the next two weeks.</p>'; }
+  $("anClaudeBtn").onclick=anClaude;
+}
+async function anClaude(){
+  if(VIEW) return; if(!hasKey()) return toast("Claude isn't switched on yet.");
+  if(clNeed(()=>anClaude())) return;
+  const out=$("anClaudeOut"); out.innerHTML='<p class="an-note"><span class="spin"></span>Claude is analyzing the market…</p>';
+  const d=anData(), sc=anScores(d);
+  const ctx=["FREE ANALYSIS SHOWN ON THE PAGE:",$("anBrief").innerText,"Scorecard: "+sc.out.map(x=>`${x.k} ${x.v}/100 (${x.t})`).join("; "),
+    "Sectors today: "+d.sec.map(x=>`${x.n} ${pct(x.q.changePct)}`).join(", "),"Top stories: "+d.list.slice(0,10).map(i=>i.title).join(" | ")].join("\n");
+  try{ const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Write a sharp market analysis for today in 4 short sections: 1) What happened and why, 2) What's really driving it (connect the headlines to the moves), 3) Risks to watch this week, 4) What it could mean for my holdings. Be specific, under 300 words, plain English. Do not create or change portfolios.",watchlist:S.wl,holdings:S.port,context:ctx})});
+    out.innerHTML=`<div class="an-cl">${esc(j.answer).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/\n/g,"<br>")}</div><p class="an-note">Claude · ${new Date().toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not advice</p>`; refreshUsage(); }
+  catch(e){ out.innerHTML=`<p class="an-note">Couldn't get Claude's analysis: ${esc(e.message)}</p>`; }
+}
+$("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return; const o=e.target.closest("[data-nyopen]"); if(o) openQuote(o.dataset.nyopen); });
 </script>
 </body>
 </html>
