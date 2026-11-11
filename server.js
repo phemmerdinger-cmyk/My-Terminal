@@ -1732,6 +1732,105 @@ function apRestore(doc) {
 }
 setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60e3); }, process.env.AP_TEST ? 3000 : 60_000);
 
+// ---------------------------------------------------------------- SEC EDGAR fundamentals (free, no key)
+// Annual figures from companies' own 10-K filings via the SEC's XBRL "company facts" API.
+// SEC fair-access rules: at most 10 requests/second and a User-Agent naming a contact
+// (set SEC_USER_AGENT in Render, e.g. "Market Desk research your@email"). We stay far below
+// the limit: one SEC request at a time, results cached for 12 hours.
+const SEC_UA = process.env.SEC_USER_AGENT || "Market Desk personal research project (github.com/phemmerdinger-cmyk/My-Terminal)";
+let secChain = Promise.resolve();
+function secGet(url) {
+  const run = secChain.then(async () => {
+    const r = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
+    await new Promise((ok) => setTimeout(ok, 250)); // ≤ 4 requests/second
+    if (!r.ok) throw new Error(`SEC returned ${r.status}`);
+    return r.json();
+  });
+  secChain = run.catch(() => {});
+  return run;
+}
+const secTickers = () => cached("sec:tickers", 24 * 3600e3, async () => {
+  const j = await secGet("https://www.sec.gov/files/company_tickers.json");
+  const m = {}; for (const k in j) m[String(j[k].ticker).toUpperCase()] = { cik: j[k].cik_str, name: j[k].title };
+  return m;
+});
+// tag fallbacks, in order of preference (companies switch tags over the years, so this is chosen per year)
+const SEC_TAGS = {
+  revenue: ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet", "SalesRevenueGoodsNet", "RevenuesNetOfInterestExpense"],
+  cogs: ["CostOfRevenue", "CostOfGoodsAndServicesSold", "CostOfGoodsSold", "CostOfGoodsAndServiceExcludingDepreciationDepletionAndAmortization"],
+  grossProfit: ["GrossProfit"],
+  operatingIncome: ["OperatingIncomeLoss"],
+  pretaxIncome: ["IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments", "IncomeLossFromContinuingOperationsBeforeIncomeTaxesDomestic"],
+  incomeTax: ["IncomeTaxExpenseBenefit"],
+  netIncome: ["NetIncomeLoss", "ProfitLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"],
+  eps: ["EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted", "EarningsPerShareBasic"],
+  interestExpense: ["InterestExpense", "InterestExpenseNonoperating", "InterestExpenseDebt"],
+  da: ["DepreciationDepletionAndAmortization", "DepreciationAmortizationAndAccretionNet", "DepreciationAndAmortization", "Depreciation"],
+  capex: ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets", "PaymentsForCapitalImprovements"],
+  cfo: ["NetCashProvidedByUsedInOperatingActivities", "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations"],
+  cff: ["NetCashProvidedByUsedInFinancingActivities", "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations"],
+  cash: ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "Cash"],
+  currentAssets: ["AssetsCurrent"],
+  currentLiabilities: ["LiabilitiesCurrent"],
+  inventory: ["InventoryNet"],
+  totalAssets: ["Assets"],
+  equity: ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
+  ltDebt: ["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"],
+  ltDebtCurrent: ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "DebtCurrent"],
+  ltDebtTotal: ["LongTermDebt"],
+  shortDebt: ["ShortTermBorrowings", "CommercialPaper"],
+  dilutedShares: ["WeightedAverageNumberOfDilutedSharesOutstanding"],
+};
+const FLOW = new Set(["revenue", "cogs", "grossProfit", "operatingIncome", "pretaxIncome", "incomeTax", "netIncome", "eps", "interestExpense", "da", "capex", "cfo", "cff", "dilutedShares"]);
+function secSeries(facts, tag, flow) {
+  const f = facts["us-gaap"] && facts["us-gaap"][tag]; if (!f) return null;
+  const unitKey = Object.keys(f.units).find((u) => u === "USD" || u === "USD/shares" || u === "shares") || Object.keys(f.units)[0];
+  const byEnd = {};
+  for (const x of f.units[unitKey]) {
+    if (!/^(10-K|10-K\/A|20-F|20-F\/A|40-F)$/.test(x.form || "")) continue;
+    if (flow) { if (!x.start) continue; const d = (Date.parse(x.end) - Date.parse(x.start)) / 864e5; if (d < 340 || d > 380) continue; } // full fiscal years only
+    else if (x.start) continue;
+    const prev = byEnd[x.end]; if (!prev || (x.filed || "") > (prev.filed || "")) byEnd[x.end] = x; // latest filing wins (restatements)
+  }
+  return { unit: unitKey, byEnd };
+}
+async function secFundamentals(sym) {
+  sym = String(sym || "").toUpperCase().replace("-", ".");
+  if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol");
+  return cached("sec:f:" + sym, 12 * 3600e3, async () => {
+    const map = await secTickers(); const hit = map[sym] || map[sym.replace(".", "-")];
+    if (!hit) return { symbol: sym, available: false, reason: "Not an SEC filer (the SEC only has U.S.-listed companies that file 10-Ks; ETFs and many foreign companies aren't covered)." };
+    const j = await secGet(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(hit.cik).padStart(10, "0")}.json`);
+    const facts = j.facts || {};
+    // fiscal-year ends come from revenue/net income/assets filings
+    const S = {}; for (const k in SEC_TAGS) S[k] = SEC_TAGS[k].map((t) => [t, secSeries(facts, t, FLOW.has(k))]).filter(([, s]) => s && Object.keys(s.byEnd).length);
+    const ends = new Set(); for (const k of ["revenue", "netIncome", "totalAssets"]) for (const [, s] of S[k]) for (const e of Object.keys(s.byEnd)) ends.add(e);
+    // group ends that are within a few days of each other (52/53-week years)
+    const sorted = [...ends].sort().reverse(), years = [];
+    for (const e of sorted) if (!years.some((y) => Math.abs(Date.parse(y) - Date.parse(e)) < 20 * 864e5)) years.push(e);
+    const pick = (k, end) => {
+      for (const [tag, s] of S[k]) for (const e in s.byEnd) if (Math.abs(Date.parse(e) - Date.parse(end)) < 20 * 864e5) return { v: s.byEnd[e].val, tag, unit: s.unit, filed: s.byEnd[e].filed, form: s.byEnd[e].form };
+      return null;
+    };
+    const rows = years.slice(0, 6).map((end) => {
+      const r = { end }; const src = {};
+      for (const k in SEC_TAGS) { const p = pick(k, end); if (p) { r[k] = p.v; src[k] = p.tag; r._unit = r._unit || (p.unit.startsWith("USD") ? "USD" : p.unit); r._filed = p.filed; r._form = p.form; } }
+      if (r.grossProfit == null && r.revenue != null && r.cogs != null) { r.grossProfit = r.revenue - r.cogs; src.grossProfit = "computed: revenue − cost of revenue"; }
+      const debtParts = r.ltDebtTotal != null ? [r.ltDebtTotal, r.shortDebt] : [r.ltDebt, r.ltDebtCurrent, r.shortDebt];
+      if (debtParts.some((x) => x != null)) { r.totalDebt = debtParts.reduce((a, b) => a + (b || 0), 0); src.totalDebt = "computed: long-term + current debt + short-term borrowings"; }
+      if (r.cfo != null && r.capex != null) { r.fcf = r.cfo - r.capex; src.fcf = "computed: operating cash flow − capital expenditures"; }
+      r._src = src; return r;
+    }).filter((r) => r.revenue != null || r.netIncome != null);
+    const sh = facts.dei && facts.dei.EntityCommonStockSharesOutstanding;
+    let shares = null;
+    if (sh) { const list = Object.values(sh.units)[0].slice().sort((a, b) => (a.end > b.end ? 1 : -1)); const last = list[list.length - 1]; if (last) shares = { v: last.val, asOf: last.end, src: "dei:EntityCommonStockSharesOutstanding (cover page of latest filing)" }; }
+    // dual-class companies report each class separately on the cover; fall back to diluted weighted shares if that looks too small
+    const dil = rows[0] && rows[0].dilutedShares;
+    if (dil && (!shares || shares.v < dil * 0.5)) shares = { v: dil, asOf: rows[0].end, src: "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding (latest 10-K)" };
+    return { symbol: sym, available: true, name: j.entityName || hit.name, cik: hit.cik, currency: (rows[0] && rows[0]._unit) || "USD", years: rows.reverse(), shares, source: "SEC EDGAR XBRL company facts (10-K / 20-F annual filings)", fetched: Date.now() };
+  });
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -1781,6 +1880,10 @@ async function handle(req, res) {
       if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
       if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
+      if (u.pathname === "/api/pub/sec") {
+        try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
+        catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
+      }
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
         if (!apLoaded) await apLoad();

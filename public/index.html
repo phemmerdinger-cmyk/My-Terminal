@@ -39,6 +39,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
 <script src="/tickers.js"></script>
+<script src="/fin.js"></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
@@ -451,6 +452,71 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .scr-detail .pcard{border-color:var(--claude)}
 .ai-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:4px}
 .ai-sub{font-size:13px;color:var(--muted);margin-top:4px}
+/* fundamentals + DCF */
+.fx-head{margin-bottom:14px}
+.fx-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#4da3ff}
+.fx h1{margin:6px 0 4px;font-size:clamp(22px,3vw,30px);letter-spacing:-.02em}
+.fx-sub{margin:0;max-width:820px;color:var(--muted);font-size:14px;line-height:1.55}
+.fx-bar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.fx-bar .field{flex:1 1 160px;max-width:240px;text-transform:uppercase}
+.fx-empty{padding:30px;color:var(--muted);text-align:center;border:1px dashed var(--line2);border-radius:12px}
+.fx-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.fx-card h3{margin:0 0 10px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fx-card h3 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:400;font-size:12px}
+.fx-co{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.fx-co b{font-size:20px}.fx-co small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.fx-co a{color:var(--muted);font-size:12px}
+.fx-wrap{overflow-x:auto}
+.fx-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px}
+.fx-tbl th{position:static;cursor:default;text-align:right;padding:7px 10px;background:var(--panel2);font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.fx-tbl th:first-child,.fx-tbl td:first-child{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
+.fx-tbl th:first-child{background:var(--panel2)}
+.fx-tbl td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);white-space:nowrap}
+.fx-tbl td:first-child{font-family:var(--sans);color:var(--text)}
+.fx-tbl td small{display:block;font-size:10.5px;color:var(--dim)}
+.fx-tbl tr.sub td:first-child{padding-left:22px;color:var(--muted)}
+.fx-tbl .na{color:var(--dim)}
+.fx-charts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+@media (max-width:860px){.fx-charts{grid-template-columns:1fr}}
+.fx-ch{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.fx-ch span{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fx-ch>b{display:block;font-family:var(--mono);font-size:18px;font-weight:500;margin:2px 0 6px}
+.fx-ch svg{width:100%;height:90px;display:block}
+.fx-note{font-size:12px;color:var(--muted);line-height:1.5;margin:8px 0 0}
+.fx-badge{display:inline-block;font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:5px;border:1px solid var(--line2);color:var(--muted);vertical-align:1px;white-space:nowrap}
+.fx-badge.sec{color:#4da3ff;border-color:color-mix(in srgb,#4da3ff 40%,var(--line))}
+.fx-badge.calc{color:#9b8cff;border-color:color-mix(in srgb,#9b8cff 40%,var(--line))}
+.fx-badge.mkt{color:#21c37a;border-color:color-mix(in srgb,#21c37a 40%,var(--line))}
+.fx-badge.est{color:#f5a524;border-color:color-mix(in srgb,#f5a524 40%,var(--line))}
+.fx-badge.user{color:#ff6fae;border-color:color-mix(in srgb,#ff6fae 45%,var(--line))}
+.dcf-grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;align-items:start}
+@media (max-width:980px){.dcf-grid{grid-template-columns:1fr}}
+.dcf-grid>*,.fx-charts>*{min-width:0}
+.dcf-in{display:flex;flex-direction:column;gap:2px}
+.dcf-in h4{margin:12px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dcf-in h4:first-child{margin-top:0}
+.dcf-row{display:grid;grid-template-columns:1fr 104px;gap:8px;align-items:center;padding:4px 0;font-size:13px}
+.dcf-row label{display:flex;flex-direction:column;gap:2px}
+.dcf-row label .fx-badge{align-self:flex-start}
+.dcf-row input{width:100%;padding:6px 8px;border-radius:7px;border:1px solid var(--line2);background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;text-align:right}
+.dcf-row input.edited{border-color:#ff6fae}
+.dcf-scn{display:flex;gap:6px;margin-bottom:12px}
+.dcf-scn button{flex:1;padding:8px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);color:var(--muted);font-weight:600;cursor:pointer}
+.dcf-scn button.on[data-scn="bull"]{color:#111;background:#21c37a;border-color:#21c37a}
+.dcf-scn button.on[data-scn="base"]{color:#111;background:#4da3ff;border-color:#4da3ff}
+.dcf-scn button.on[data-scn="bear"]{color:#111;background:#ff6b6b;border-color:#ff6b6b}
+.dcf-hero{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+@media (max-width:640px){.dcf-hero{grid-template-columns:1fr 1fr}}
+.dcf-hero div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.dcf-hero span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.dcf-hero b{display:block;font-family:var(--mono);font-size:24px;font-weight:500;margin-top:4px}
+.dcf-hero small{font-size:12px;color:var(--muted)}
+.dcf-sens td.base{outline:2px solid var(--text);outline-offset:-2px}
+.dcf-sens td.hi{background:color-mix(in srgb,var(--up) 16%,transparent)}
+.dcf-sens td.lo{background:color-mix(in srgb,var(--down) 16%,transparent)}
+.fx-formula{font-size:13px;color:var(--muted);line-height:1.7}
+.fx-formula code{font-family:var(--mono);color:var(--text);font-size:12px;background:var(--panel2);padding:1px 6px;border-radius:5px}
+.fx-warn{background:color-mix(in srgb,#f5a524 10%,var(--panel));border:1px solid color-mix(in srgb,#f5a524 40%,var(--line));border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px}
 /* AI vs S&P (Autopilot) */
 .aitrade .ap-head{margin-bottom:16px}
 .ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff9f43}
@@ -1330,6 +1396,18 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
 
     <!-- PORTFOLIO -->
+    <section id="tab-fin" class="pad fx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">🏛 COMPANY FUNDAMENTALS</div><h1>Financial statements</h1>
+        <p class="fx-sub">Up to six years of annual figures straight from each company's 10-K filings with the SEC, plus the ratios analysts use. Add a second ticker to compare side by side.</p></div></div>
+      <form class="fx-bar" id="finForm"><input class="field" id="finSym" placeholder="Ticker, e.g. AAPL" maxlength="10" autocomplete="off"><input class="field" id="finCmp" placeholder="Compare with (optional)" maxlength="10" autocomplete="off"><button class="btn">Load</button></form>
+      <div id="finOut"><div class="fx-empty">Enter a ticker to load its filings.</div></div>
+    </section>
+    <section id="tab-dcf" class="pad fx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">🧮 VALUATION</div><h1>Discounted cash flow (DCF)</h1>
+        <p class="fx-sub">Estimates what a company is worth from the cash it could generate over the next five years plus a terminal value, discounted at its cost of capital. Every input is labeled with where it came from — change any of them and the value updates instantly.</p></div></div>
+      <form class="fx-bar" id="dcfForm"><input class="field" id="dcfSym" placeholder="Ticker, e.g. MSFT" maxlength="10" autocomplete="off"><button class="btn">Build model</button></form>
+      <div id="dcfOut"><div class="fx-empty">Enter a ticker to build a model from its latest 10-K.</div></div>
+    </section>
     <section id="tab-portfolio" class="pad pfx" hidden>
       <div class="pf-bar">
         <div class="dd" id="pfDD"><button class="dd-btn pf-btn" type="button" data-dd="pfDD" title="Right-click to rename or delete"><span id="pfName"></span> <span class="car">▾</span></button><div class="dd-menu" id="pfMenu"></div></div>
@@ -1603,11 +1681,11 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","research","portfolio","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","research","fin","dcf","portfolio","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
-  ["research",[["research","Stock research"]]],
+  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
   ["portfolio",[["portfolio","My portfolio"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"]]],
 ];
@@ -1733,6 +1811,7 @@ function setTab(t){
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
   if(t==="aitrade"){ apLoadView(); }
+  if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -2432,6 +2511,175 @@ function aiStats(){
   const g=S.db.map(grade), done=g.filter(x=>x.final), right=done.filter(x=>x.status==="correct").length, track=g.filter(x=>x.status==="on").length, live=g.filter(x=>!x.final&&x.move!=null).length;
   const u=S.usage?` · Claude used today: <b>${S.usage.used}</b> of <b>${S.usage.limit}</b>`:"";
   $("aiStats").innerHTML=`<b>${S.db.length}</b> predictions saved · <b>${done.length?Math.round(right/done.length*100)+"%":"—"}</b> accuracy after 2 weeks (${done.length} graded) · <b>${live?Math.round(track/live*100)+"%":"—"}</b> of open calls on track${u}`;
+}
+
+/* ---------- Financial statements (SEC EDGAR) + DCF valuation ---------- */
+const fxM=(n,unit)=>{ if(n==null||!isFinite(n)) return '<span class="na">—</span>'; const a=Math.abs(n),s=n<0?"−":""; const c=unit&&unit!=="USD"?unit+" ":"$";
+  return a>=1e12?`${s}${c}${(a/1e12).toFixed(2)}T`:a>=1e9?`${s}${c}${(a/1e9).toFixed(2)}B`:a>=1e6?`${s}${c}${(a/1e6).toFixed(1)}M`:a>=1e3?`${s}${c}${(a/1e3).toFixed(1)}K`:`${s}${c}${a.toFixed(2)}`; };
+const fxP=(x,d=1)=>x==null||!isFinite(x)?'<span class="na">—</span>':(x*100).toFixed(d)+"%";
+const fxX=(x,d=2)=>x==null||!isFinite(x)?'<span class="na">—</span>':x.toFixed(d)+"×";
+const fxFY=r=>{const d=new Date(r.end+"T12:00:00Z");return {y:"FY"+d.getUTCFullYear(),m:d.toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"})};};
+const FX={cache:{}};
+async function fxSec(sym){ sym=sym.toUpperCase().trim(); if(FX.cache[sym]) return FX.cache[sym]; const j=await api("/api/pub/sec?symbol="+encodeURIComponent(sym)); if(j.available) FX.cache[sym]=j; return j; }
+function fxBars(vals,labels){
+  const v=vals.map(x=>x==null?0:x), mx=Math.max(...v.map(Math.abs),1), W=300,H=90,n=v.length,bw=W/n*0.62, hasNeg=v.some(x=>x<0), base=hasNeg?H/2:H-12;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${v.map((x,i)=>{const h=Math.abs(x)/mx*(hasNeg?H/2-12:H-16),xx=i*W/n+(W/n-bw)/2,y=x>=0?base-h:base;return `<rect x="${xx.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,h).toFixed(1)}" rx="2" fill="${x>=0?"#4da3ff":"#ff6b6b"}" opacity="${i===n-1?1:.55}"><title>${labels[i]}: ${x}</title></rect>`}).join("")}<line x1="0" x2="${W}" y1="${base}" y2="${base}" stroke="var(--line2)"/></svg>`;
+}
+function finTable(title,rows,ys,cell){
+  return `<div class="fx-card"><h3>${title}</h3><div class="fx-wrap"><table class="fx-tbl"><thead><tr><th>${ys.length} fiscal years</th>${ys.map(r=>{const f=fxFY(r);return `<th>${f.y}<br><span style="font-weight:400">${f.m}</span></th>`}).join("")}</tr></thead><tbody>
+  ${rows.map(([k,label,kind])=>`<tr class="${kind==="sub"?"sub":""}"><td>${label}</td>${ys.map((r,i)=>`<td title="${esc((r._src&&r._src[k])||"")}">${cell(k,r,i)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+}
+function finRender(j){
+  const ys=j.years, u=j.currency, R=ys.map((y,i)=>FIN.ratios(y,ys[i-1])), last=ys[ys.length-1];
+  const money=(k,r)=>k==="eps"?(r.eps==null?'<span class="na">—</span>':(r.eps<0?"−$":"$")+Math.abs(r.eps).toFixed(2)):fxM(r[k],u);
+  const ch=(k,label)=>{const vals=ys.map(y=>y[k]), g=FIN.cagr(vals[0],vals[vals.length-1],ys.length-1);return `<div class="fx-ch"><span>${label}</span><b>${fxM(last[k],u)}</b>${fxBars(vals,ys.map(y=>fxFY(y).y))}<div class="fx-note">${g!=null?`${ys.length-1}-year growth rate: <b>${fxP(g)}</b> a year`:"&nbsp;"}</div></div>`;};
+  const rat=(k)=>(r,i)=>{const v=R[i][k];return /Ratio|debtTo/.test(k)?fxX(v):fxP(v);};
+  return `<div class="fx-co"><div><b>${esc(j.name)}</b> <span class="fx-badge sec">SEC 10-K</span><small>${esc(j.symbol)} · CIK ${j.cik} · figures in ${esc(u)} · fiscal years as each company defines them</small></div><a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${j.cik}&type=10-K" target="_blank" rel="noopener">See the original filings on sec.gov ↗</a></div>
+  <div class="fx-charts">${ch("revenue","Revenue")}${ch("netIncome","Net income")}${ch("fcf","Free cash flow")}</div>
+  ${finTable("Income statement",[["revenue","Revenue"],["cogs","Cost of revenue","sub"],["grossProfit","Gross profit"],["operatingIncome","Operating income"],["netIncome","Net income"],["eps","Diluted EPS"]],ys,money)}
+  ${finTable("Balance sheet",[["cash","Cash & equivalents"],["currentAssets","Current assets"],["currentLiabilities","Current liabilities"],["totalDebt","Total debt"],["totalAssets","Total assets"],["equity","Shareholders' equity"]],ys,money)}
+  ${finTable("Cash flow statement",[["cfo","Operating cash flow"],["capex","Capital expenditures"],["fcf","Free cash flow"],["cff","Financing cash flow"],["da","Depreciation & amortization","sub"]],ys,money)}
+  <div class="fx-card"><h3>Ratios <em>calculated from the figures above</em></h3><div class="fx-wrap"><table class="fx-tbl"><thead><tr><th>Ratio</th>${ys.map(r=>`<th>${fxFY(r).y}</th>`).join("")}</tr></thead><tbody>
+  ${[["revenueGrowth","Revenue growth"],["grossMargin","Gross margin"],["operatingMargin","Operating margin"],["netMargin","Net profit margin"],["roe","Return on equity"],["roa","Return on assets"],["roic","Return on invested capital"],["currentRatio","Current ratio"],["quickRatio","Quick ratio"],["debtToEquity","Debt-to-equity"]].map(([k,l])=>`<tr><td>${l}</td>${ys.map((r,i)=>`<td>${rat(k)(r,i)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+  <p class="fx-note">ROE and ROA use average equity/assets across the year. ROIC = operating income × (1 − tax rate) ÷ (equity + debt − cash). Quick ratio = (current assets − inventory) ÷ current liabilities. “—” means the company didn't report that line under a standard XBRL tag, so it isn't guessed. Hover any number to see the exact SEC tag it came from.</p></div>`;
+}
+function finCompare(a,b){
+  const pick=j=>{const ys=j.years,l=ys[ys.length-1],r=FIN.ratios(l,ys[ys.length-2]);return {l,r,g3:FIN.cagr(ys[Math.max(0,ys.length-4)].revenue,l.revenue,Math.min(3,ys.length-1))};};
+  const A=pick(a),B=pick(b);
+  const rows=[["Fiscal year",x=>fxFY(x.l).m],["Revenue",x=>fxM(x.l.revenue)],["Revenue growth (last year)",x=>fxP(x.r.revenueGrowth)],["Revenue growth (3-yr a year)",x=>fxP(x.g3)],["Gross margin",x=>fxP(x.r.grossMargin)],["Operating margin",x=>fxP(x.r.operatingMargin)],["Net margin",x=>fxP(x.r.netMargin)],["Free cash flow",x=>fxM(x.l.fcf)],["FCF margin",x=>fxP(x.r.fcfMargin)],["Return on equity",x=>fxP(x.r.roe)],["ROIC",x=>fxP(x.r.roic)],["Current ratio",x=>fxX(x.r.currentRatio)],["Debt-to-equity",x=>fxX(x.r.debtToEquity)]];
+  return `<div class="fx-card"><h3>Side by side <em>latest fiscal year of each company</em></h3><div class="fx-wrap"><table class="fx-tbl"><thead><tr><th>Metric</th><th>${esc(a.symbol)}</th><th>${esc(b.symbol)}</th></tr></thead><tbody>${rows.map(([l,f])=>`<tr><td>${l}</td><td>${f(A)}</td><td>${f(B)}</td></tr>`).join("")}</tbody></table></div><p class="fx-note">Fiscal years can end in different months, so the two columns may cover slightly different periods.</p></div>`;
+}
+async function finLoad(){
+  const s=$("finSym").value.trim().toUpperCase(), c=$("finCmp").value.trim().toUpperCase(); if(!s) return;
+  $("finOut").innerHTML=`<div class="fx-empty"><span class="spin"></span> Reading ${esc(s)}${c?" and "+esc(c):""}'s 10-K filings from the SEC…</div>`;
+  try{
+    const [a,b]=await Promise.all([fxSec(s),c?fxSec(c):null]);
+    const bad=[a,b].filter(x=>x&&!x.available);
+    if(!a.available){ $("finOut").innerHTML=`<div class="fx-empty">${esc(s)}: ${esc(a.reason)}</div>`; return; }
+    $("finOut").innerHTML=(b&&b.available?finCompare(a,b):"")+(bad.length?`<div class="fx-warn">${bad.map(x=>esc(x.symbol)+": "+esc(x.reason)).join("<br>")}</div>`:"")+finRender(a)+(b&&b.available?`<h2 style="margin:24px 0 10px;font-size:18px">${esc(b.symbol)}</h2>`+finRender(b):"");
+  }catch(e){ $("finOut").innerHTML=`<div class="fx-empty">${esc(e.message)}</div>`; }
+}
+$("finForm").onsubmit=e=>{e.preventDefault(); finLoad();};
+
+/* DCF: inputs are kept in display units (%, $ millions, millions of shares) */
+const DCF={scn:"base",edited:new Set()};
+const DCF_FIELDS=[
+  ["Company (latest 10-K)",[["revenue","Revenue, latest year ($M)"],["shares","Shares outstanding (M)"],["debt","Total debt ($M)"],["cash","Cash ($M)"],["price","Share price ($)"]]],
+  ["Forecast",[["g1","Revenue growth, year 1 (%)"],["g2","Year 2 (%)"],["g3","Year 3 (%)"],["g4","Year 4 (%)"],["g5","Year 5 (%)"],["margin","Operating margin (%)"],["tax","Tax rate (%)"],["da","D&A, % of revenue"],["capex","CapEx, % of revenue"],["nwc","Working capital, % of revenue growth"]]],
+  ["Cost of capital",[["rf","Risk-free rate: 10-yr Treasury (%)"],["beta","Beta vs S&P 500"],["erp","Equity risk premium (%)"],["kd","Pre-tax cost of debt (%)"],["tg","Terminal growth (%)"]]],
+];
+const BADGE={sec:["sec","SEC 10-K"],calc:["calc","computed"],mkt:["mkt","market data"],est:["est","assumption"],user:["user","you entered"]};
+function dcfDefaults(j,mkt){
+  const ys=j.years, l=ys[ys.length-1], n=ys.length, M=1e6, src={}, v={};
+  const avg=(f,k=3)=>{const a=ys.slice(-k).map(f).filter(x=>x!=null&&isFinite(x));return a.length?FIN.mean(a):null;};
+  v.revenue=l.revenue/M; src.revenue="sec";
+  v.shares=j.shares?j.shares.v/M:null; src.shares=j.shares?"sec":"est";
+  v.debt=(l.totalDebt||0)/M; src.debt=l.totalDebt!=null?"calc":"est"; v.cash=(l.cash||0)/M; src.cash=l.cash!=null?"sec":"est";
+  v.price=mkt.price; src.price=mkt.price?"mkt":"est";
+  const g=FIN.cagr(ys[Math.max(0,n-4)].revenue,l.revenue,Math.min(3,n-1)); DCF.g0=g!=null?Math.max(-0.05,Math.min(0.2,g)):0.04; DCF.g0src=g!=null?"calc":"est";
+  const m=avg(y=>y.revenue?y.operatingIncome/y.revenue:null); DCF.m0=m!=null?m:0.15; DCF.m0src=m!=null?"calc":"est";
+  const t=avg(y=>y.pretaxIncome>0&&y.incomeTax!=null?y.incomeTax/y.pretaxIncome:null); v.tax=(t!=null&&t>=0&&t<=0.35?t:0.21)*100; src.tax=t!=null&&t>=0&&t<=0.35?"calc":"est";
+  const da=avg(y=>y.da!=null&&y.revenue?y.da/y.revenue:null); v.da=(da!=null?da:0.04)*100; src.da=da!=null?"calc":"est";
+  const cx=avg(y=>y.capex!=null&&y.revenue?y.capex/y.revenue:null); v.capex=(cx!=null?cx:0.05)*100; src.capex=cx!=null?"calc":"est";
+  const nwcOf=y=>y.currentAssets!=null&&y.currentLiabilities!=null?(y.currentAssets-(y.cash||0))-(y.currentLiabilities-(y.ltDebtCurrent||0)):null;
+  const p=ys[n-2], dn=p&&nwcOf(l)!=null&&nwcOf(p)!=null&&l.revenue!==p.revenue?(nwcOf(l)-nwcOf(p))/(l.revenue-p.revenue):null;
+  v.nwc=(dn!=null&&Math.abs(dn)<=0.4?dn:0.05)*100; src.nwc=dn!=null&&Math.abs(dn)<=0.4?"calc":"est";
+  v.rf=mkt.rf!=null?mkt.rf:4.25; src.rf=mkt.rf!=null?"mkt":"est";
+  v.beta=mkt.beta!=null?+mkt.beta.toFixed(2):1; src.beta=mkt.beta!=null?"mkt":"est";
+  v.erp=5; src.erp="est";
+  const kd=l.interestExpense&&l.totalDebt?l.interestExpense/l.totalDebt:null; v.kd=(kd!=null&&kd>=0.02&&kd<=0.12?kd:(v.rf/100+0.015))*100; src.kd=kd!=null&&kd>=0.02&&kd<=0.12?"calc":"est";
+  v.tg=2.5; src.tg="est";
+  return {v,src};
+}
+function dcfScenario(){
+  const off={bull:[0.03,0.02],base:[0,0],bear:[-0.03,-0.02]}[DCF.scn], g0=DCF.g0+off[0], gT=(DCF.v.tg/100), mid=(g0+gT)/2;
+  for(let t=1;t<=5;t++){ const k="g"+t; if(DCF.edited.has(k)) continue; DCF.v[k]=+((g0+(mid-g0)*(t-1)/4)*100).toFixed(2); DCF.src[k]=DCF.scn==="base"?DCF.g0src:"est"; }
+  if(!DCF.edited.has("margin")){ DCF.v.margin=+((DCF.m0+off[1])*100).toFixed(2); DCF.src.margin=DCF.scn==="base"?DCF.m0src:"est"; }
+}
+function dcfInputs(v){
+  const P=x=>x/100;
+  return {revenue:v.revenue*1e6,growth:[1,2,3,4,5].map(t=>P(v["g"+t])),operatingMargin:P(v.margin),taxRate:P(v.tax),daPct:P(v.da),capexPct:P(v.capex),nwcPct:P(v.nwc),terminalGrowth:P(v.tg),debt:v.debt*1e6,cash:v.cash*1e6,shares:v.shares*1e6,price:v.price};
+}
+function dcfCalc(){
+  const v=DCF.v, a=dcfInputs(v), mcap=v.price&&v.shares?v.price*v.shares*1e6:0;
+  const w=FIN.wacc({riskFree:v.rf/100,beta:v.beta,erp:v.erp/100,costOfDebt:v.kd/100,taxRate:v.tax/100,equityValue:mcap,debtValue:v.debt*1e6});
+  return {a,w,r:FIN.dcf({...a,wacc:w.wacc})};
+}
+function dcfRenderOut(){
+  const {a,w,r}=dcfCalc(), $m2=n=>fxM(n);
+  if(r.error){ $("dcfRes").innerHTML=`<div class="fx-warn">${esc(r.error)}</div>`; return; }
+  const ws=[-0.02,-0.01,0,0.01,0.02].map(d=>w.wacc+d), gs=[0.015,0.02,0.025,0.03,0.035];
+  const sens=FIN.sensitivity(a,ws,gs);
+  $("dcfRes").innerHTML=`
+  <div class="dcf-hero"><div><span>Intrinsic value / share</span><b>${r.perShare!=null?"$"+r.perShare.toFixed(2):"—"}</b><small>${DCF.scn} case</small></div>
+  <div><span>Current price</span><b>${a.price?"$"+a.price.toFixed(2):"—"}</b><small>live quote</small></div>
+  <div><span>Implied ${r.upside>=0?"upside":"downside"}</span><b class="${cls(r.upside)}">${r.upside!=null?pct(r.upside*100):"—"}</b><small>vs. today's price</small></div></div>
+  <div class="fx-card"><h3>Five-year forecast <em>unlevered free cash flow (UFCF)</em></h3><div class="fx-wrap"><table class="fx-tbl"><thead><tr><th></th>${r.rows.map(x=>`<th>Year ${x.t}</th>`).join("")}</tr></thead><tbody>
+  ${[["revenue","Revenue"],["growth","Growth",1],["ebit","EBIT (operating income)"],["nopat","NOPAT = EBIT × (1 − tax)"],["da","+ D&A"],["capex","− CapEx"],["dNwc","− Change in working capital"],["ufcf","= Unlevered free cash flow"],["discountFactor","Discount factor",2],["pv","Present value"]].map(([k,l,f])=>`<tr><td>${l}</td>${r.rows.map(x=>`<td>${f===1?fxP(x[k]):f===2?x[k].toFixed(3):$m2(x[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
+  <div class="fx-card"><h3>From cash flows to value per share</h3><div class="fx-wrap"><table class="fx-tbl" style="min-width:0"><tbody>
+  <tr><td>Sum of present values (years 1–5)</td><td>${$m2(r.sumPv)}</td></tr>
+  <tr><td>Terminal value in year 5 = UFCF₅ × (1 + g) ÷ (WACC − g)</td><td>${$m2(r.terminalValue)}</td></tr>
+  <tr><td>Present value of terminal value</td><td>${$m2(r.pvTerminal)} <small>${(r.terminalShare*100).toFixed(0)}% of enterprise value</small></td></tr>
+  <tr><td><b>Enterprise value</b></td><td><b>${$m2(r.enterpriseValue)}</b></td></tr>
+  <tr><td>− Total debt</td><td>${$m2(a.debt)}</td></tr><tr><td>+ Cash</td><td>${$m2(a.cash)}</td></tr>
+  <tr><td><b>Equity value</b></td><td><b>${$m2(r.equityValue)}</b></td></tr>
+  <tr><td>÷ Shares outstanding</td><td>${(a.shares/1e6).toFixed(1)}M</td></tr>
+  <tr><td><b>Intrinsic value per share</b></td><td><b>${r.perShare!=null?"$"+r.perShare.toFixed(2):"—"}</b></td></tr></tbody></table></div></div>
+  <div class="fx-card"><h3>WACC <em>${fxP(w.wacc,2)}</em></h3><p class="fx-formula">Cost of equity (CAPM) = risk-free ${fxP(DCF.v.rf/100,2)} + beta ${DCF.v.beta} × equity risk premium ${fxP(DCF.v.erp/100,1)} = <b>${fxP(w.costOfEquity,2)}</b><br>
+  After-tax cost of debt = ${fxP(DCF.v.kd/100,2)} × (1 − ${fxP(DCF.v.tax/100,1)}) = <b>${fxP(w.afterTaxCostOfDebt,2)}</b><br>
+  Weights (market values): equity ${fxP(w.weightEquity,0)}, debt ${fxP(w.weightDebt,0)} → <code>WACC = E/V × Ke + D/V × Kd × (1 − t)</code></p></div>
+  <div class="fx-card"><h3>Sensitivity <em>value per share as WACC and terminal growth change</em></h3><div class="fx-wrap"><table class="fx-tbl dcf-sens" style="min-width:460px"><thead><tr><th>Terminal growth ↓ · WACC →</th>${ws.map(x=>`<th>${fxP(x,1)}</th>`).join("")}</tr></thead><tbody>
+  ${sens.map((row,i)=>`<tr><td>${fxP(gs[i],1)}</td>${row.map((x,j)=>`<td class="${i===2&&j===2?"base":""} ${x!=null&&a.price?(x>a.price?"hi":"lo"):""}">${x!=null?"$"+x.toFixed(2):"—"}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+  <p class="fx-note">Green cells are above today's price, red below; the outlined cell is the current model. Valuations are very sensitive to these two inputs — that's normal, and why analysts show this table.</p></div>`;
+}
+function dcfRender(j){
+  const row=([k,l])=>`<div class="dcf-row"><label for="dcf_${k}">${l} <span class="fx-badge ${BADGE[DCF.edited.has(k)?"user":DCF.src[k]||"est"][0]}">${BADGE[DCF.edited.has(k)?"user":DCF.src[k]||"est"][1]}</span></label><input id="dcf_${k}" data-k="${k}" type="number" step="any" inputmode="decimal" value="${DCF.v[k]==null?"":+(+DCF.v[k]).toFixed(k==="beta"?2:2)}" class="${DCF.edited.has(k)?"edited":""}"></div>`;
+  const warn=[]; const l=j.years[j.years.length-1];
+  if(l.capex==null||l.da==null) warn.push("Capital spending or depreciation isn't reported under a standard tag, so those inputs are assumptions.");
+  if(l.operatingIncome==null) warn.push("No operating income line (common for banks and insurers). A DCF of free cash flow isn't a good fit for financial companies.");
+  if(!j.shares) warn.push("Shares outstanding weren't found — enter them to get a per-share value.");
+  $("dcfOut").innerHTML=`<div class="fx-co"><div><b>${esc(j.name)}</b><small>${esc(j.symbol)} · built from the ${fxFY(l).y} 10-K (fiscal year ending ${fxFY(l).m}) · <span class="fx-badge sec">SEC 10-K</span> reported <span class="fx-badge calc">computed</span> from filings <span class="fx-badge mkt">market data</span> live <span class="fx-badge est">assumption</span> default estimate <span class="fx-badge user">you entered</span></small></div><button class="btn ghost" id="dcfReset" type="button">Reset to defaults</button></div>
+  ${warn.length?`<div class="fx-warn">${warn.map(esc).join("<br>")}</div>`:""}
+  <div class="dcf-grid"><div class="fx-card"><div class="dcf-scn">${["bull","base","bear"].map(s=>`<button type="button" data-scn="${s}" class="${DCF.scn===s?"on":""}">${s[0].toUpperCase()+s.slice(1)} case</button>`).join("")}</div>
+  <p class="fx-note" style="margin:-4px 0 10px">Base = the company's own 3-year revenue growth rate (capped at −5% to 20%) fading toward the terminal rate, and its 3-year average operating margin. Bull/bear add/subtract 3 points of growth and 2 points of margin.</p>
+  <div class="dcf-in" id="dcfIn">${DCF_FIELDS.map(([h,f])=>`<h4>${h}</h4>`+f.map(row).join("")).join("")}</div></div>
+  <div id="dcfRes"></div></div>
+  <details class="fx-card"><summary style="cursor:pointer;font-weight:600">How this model works</summary><p class="fx-formula">
+  1. Revenue grows each year by the growth rates on the left. <code>EBIT = revenue × operating margin</code><br>
+  2. <code>NOPAT = EBIT × (1 − tax rate)</code> — operating profit after tax, before any interest.<br>
+  3. <code>UFCF = NOPAT + D&amp;A − CapEx − ΔNWC</code>, where ΔNWC = working-capital % × the increase in revenue.<br>
+  4. Each year's UFCF is discounted: <code>PV = UFCF ÷ (1 + WACC)^t</code>.<br>
+  5. After year 5 the business is assumed to grow forever at the terminal rate: <code>TV = UFCF₅ × (1 + g) ÷ (WACC − g)</code>, discounted back 5 years.<br>
+  6. <code>Enterprise value = Σ PV + PV(TV)</code>; <code>Equity value = EV − debt + cash</code>; divide by shares for value per share.<br>
+  Simplifications: year-end discounting, no stock-based compensation adjustment, debt at book value, minority interests and leases not modeled. This is an educational model, not investment advice.</p></details>`;
+  dcfRenderOut();
+  $("dcfIn").oninput=e=>{const k=e.target.dataset.k; if(!k) return; const x=parseFloat(e.target.value); if(!isFinite(x)) return; DCF.v[k]=x; DCF.edited.add(k); e.target.classList.add("edited"); const b=e.target.parentElement.querySelector(".fx-badge"); b.className="fx-badge user"; b.textContent="you entered"; if(k==="tg"){ dcfScenario(); [1,2,3,4,5].forEach(t=>{const el=$("dcf_g"+t); if(el&&!DCF.edited.has("g"+t)) el.value=DCF.v["g"+t];}); } dcfRenderOut(); };
+  $("dcfOut").querySelector(".dcf-scn").onclick=e=>{const b=e.target.closest("[data-scn]"); if(!b) return; DCF.scn=b.dataset.scn; ["g1","g2","g3","g4","g5","margin"].forEach(k=>DCF.edited.delete(k)); dcfScenario(); dcfRender(j); };
+  $("dcfReset").onclick=()=>{ DCF.edited.clear(); Object.assign(DCF,dcfDefaults(j,DCF.mkt)); dcfScenario(); dcfRender(j); };
+}
+async function dcfMarket(sym){
+  const out={};
+  const [q,hA,hM]=await Promise.allSettled([api("/api/quotes?symbols="+encodeURIComponent(sym+",^TNX")),api(`/api/history?symbol=${encodeURIComponent(sym)}&range=2y&interval=1wk`),api(`/api/history?symbol=%5EGSPC&range=2y&interval=1wk`)]);
+  if(q.status==="fulfilled"){ const a=q.value.quotes[sym], t=q.value.quotes["^TNX"]; if(a&&!a.error) out.price=a.price; if(t&&!t.error&&t.price){ const y=t.price>20?t.price/10:t.price; if(y>0&&y<15) out.rf=y; } }
+  if(hA.status==="fulfilled"&&hM.status==="fulfilled"){ const m=new Map(hM.value.candles.map(c=>[c.time,c.close])); const pairs=hA.value.candles.filter(c=>m.has(c.time)).map(c=>[c.close,m.get(c.time)]);
+    if(pairs.length>40){ const b=FIN.beta(FIN.returns(pairs.map(p=>p[0])),FIN.returns(pairs.map(p=>p[1]))); if(b!=null&&isFinite(b)) out.beta=Math.max(0.2,Math.min(3,b)); } }
+  return out;
+}
+async function dcfLoad(){
+  const s=$("dcfSym").value.trim().toUpperCase(); if(!s) return;
+  $("dcfOut").innerHTML=`<div class="fx-empty"><span class="spin"></span> Reading ${esc(s)}'s latest 10-K, price, 10-year Treasury yield and 2 years of weekly prices for beta…</div>`;
+  try{
+    const [j,mkt]=await Promise.all([fxSec(s),dcfMarket(s)]);
+    if(!j.available){ $("dcfOut").innerHTML=`<div class="fx-empty">${esc(s)}: ${esc(j.reason)}</div>`; return; }
+    if(!j.years.length||j.years[j.years.length-1].revenue==null){ $("dcfOut").innerHTML=`<div class="fx-empty">${esc(s)} doesn't report revenue under a standard tag, so a DCF can't be built automatically.</div>`; return; }
+    DCF.edited.clear(); DCF.scn="base"; DCF.mkt=mkt; Object.assign(DCF,dcfDefaults(j,mkt)); dcfScenario(); dcfRender(j);
+  }catch(e){ $("dcfOut").innerHTML=`<div class="fx-empty">${esc(e.message)}</div>`; }
+}
+$("dcfForm").onsubmit=e=>{e.preventDefault(); dcfLoad();};
+function fxOpen(t){
+  const def=(S.sel&&!/^\^|-USD$|=F$/.test(S.sel)?S.sel:"AAPL");
+  if(t==="fin"&&!$("finSym").value){ $("finSym").value=def; finLoad(); }
+  if(t==="dcf"&&!$("dcfSym").value){ $("dcfSym").value=def; dcfLoad(); }
 }
 
 /* ---------- Autopilot: free rules-based paper trading (no Claude API) ---------- */
