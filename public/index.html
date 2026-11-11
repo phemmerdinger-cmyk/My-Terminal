@@ -666,6 +666,13 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-hood>summary::-webkit-details-marker{display:none}.ap-hood>summary::before{content:"▸";color:var(--muted)}.ap-hood[open]>summary::before{content:"▾"}
 .ap-hood>summary small{color:var(--muted);font-weight:400}
 .ap-hood[open]>summary{margin-bottom:14px}.ap-hood>.bt-card,.ap-hood>.ap-two{margin-bottom:14px}
+.bot-sw{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 14px}
+.bot-sw button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--text)}
+.bot-sw button span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.bot-sw button b{font-family:var(--mono);font-size:20px;font-weight:500}
+.bot-sw button small{font-size:11.5px;color:var(--muted)}
+.bot-sw button.on{border-color:#ff9f43;box-shadow:0 0 0 1px #ff9f43 inset;background:color-mix(in srgb,#ff9f43 6%,var(--panel))}
+.bot-sw button.on span{color:#ff9f43}
 .ap-mini{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 @media (max-width:760px){.ap-mini{grid-template-columns:repeat(3,1fr)}}
 .ap-mini div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
@@ -1600,7 +1607,8 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1>
-        <p class="ap-lede">I gave a trading bot <b>$10,000</b> of paper money and pitted it against simply buying the S&amp;P 500 with the same $10,000. It plays aggressively — <b>80% risk</b> — trading all day on live prices, reads the news and earnings overnight, and acts at the opening bell — with no human input. Can it beat the market, or how fast does it go bust? Every bust starts a new $10,000 test run.</p></div></div>
+        <p class="ap-lede">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> goes long and short within the day using limit orders, liquidity sweeps and news gaps, and is flat by the close. Every bust starts a new test run.</p></div></div>
+      <div class="bot-sw" id="apSwitch"></div>
       <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
     </section>
 
@@ -3205,7 +3213,7 @@ function apH2H(d){
   return {a:st(ra,ai),s:st(rs,sp),beta:ra.length>=10?FIN.beta(ra,rs):null,corr:ra.length>=5?FIN.correlation(ra,rs):null,days:ra.length,ra,rs,lab:daily.map(p=>new Date(p.d+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"}))};
 }
 function apDrivers(d){
-  const m={}; for(const t of d.trades) if(t.side==="SELL"&&t.pnl!=null){ m[t.sym]=m[t.sym]||{r:0,u:0}; m[t.sym].r+=t.pnl; }
+  const m={}; for(const t of d.trades) if(t.pnl!=null){ m[t.sym]=m[t.sym]||{r:0,u:0}; m[t.sym].r+=t.pnl; }
   for(const p of d.positions){ m[p.sym]=m[p.sym]||{r:0,u:0}; m[p.sym].u+=p.pnl; }
   return Object.entries(m).map(([s,x])=>({s,r:x.r,u:x.u,t:x.r+x.u})).sort((a,b)=>Math.abs(b.t)-Math.abs(a.t)).slice(0,12);
 }
@@ -3216,16 +3224,16 @@ function apPerf(d){
   const views=[["ret","Return %"],["val","Value $"],["gap","Gap $"],["dd","Drawdown"]], ranges=[["today","Today"],["5d","5D"],["1m","1M"],["3m","3M"],["all","All"]];
   const seg=(k,list,cur)=>`<div class="apseg" data-seg="${k}">${list.map(([v,l])=>`<button type="button" data-v="${v}" class="${v===cur?"on":""}">${l}</button>`).join("")}</div>`;
   const ok=R.ai.length>=2&&R.sp.some(x=>x!=null);
-  const best=d.trades.filter(t=>t.side==="SELL"&&t.pnl!=null).sort((x,y)=>y.pnl-x.pnl);
+  const best=d.trades.filter(t=>t.pnl!=null).sort((x,y)=>y.pnl-x.pnl);
   const row=(l,f,x,y,better)=>{const w=x==null||y==null?"":better(x,y)?"ai":"sp";return `<tr class="${w}"><td>${l}</td><td>${x==null?"—":f(x)}</td><td>${y==null?"—":f(y)}</td><td>${w==="ai"?'<span class="ap-tag own">AI</span>':w==="sp"?'<span class="ap-tag">S&amp;P</span>':""}</td></tr>`;};
   const P=x=>pct(x*100), hi=(x,y)=>x>y, low=(x,y)=>x<y, dn=(x,y)=>x>y;
   return `
-  <div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>same $10,000 · AI bot vs. S&amp;P 500</em></h4><div class="ap-ctl">${seg("view",views,APV.view)}${seg("range",ranges,APV.range)}</div></div>
+  <div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>same $${d.startValue.toLocaleString()} · AI vs. S&amp;P 500</em></h4><div class="ap-ctl">${seg("view",views,APV.view)}${seg("range",ranges,APV.range)}</div></div>
     ${R.fell?`<p class="ap-note" style="margin:6px 0 0">Showing today's 5-minute data until there are two full trading days.</p>`:""}
     ${ok?`<div id="apMainWrap">${apMainChart(d,R)}</div>`:`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet — try “Today” or come back after a few trading days.</div>`}
   </div>
   <div class="ap-two">
-    <div class="bt-card"><h4>Returns side by side <em>same $10,000, same days</em></h4>${apReturnBars(d)}</div>
+    <div class="bt-card"><h4>Returns side by side <em>same $${d.startValue.toLocaleString()}, same days</em></h4>${apReturnBars(d)}</div>
     <div class="bt-card"><h4>Head to head <em>${H?`${H.days} trading day${H.days===1?"":"s"} of daily closes`:"needs 2 trading days"}</em></h4>${H?`<div class="ap-wrap"><table class="ap-tbl ap-h2h"><thead><tr><th></th><th>🤖 AI bot</th><th>📈 S&amp;P 500</th><th>Edge</th></tr></thead><tbody>
       ${row("Total return",P,H.a.ret,H.s.ret,hi)}${row("Volatility (annualized)",P,H.a.vol,H.s.vol,low)}${row("Sharpe ratio",x=>x.toFixed(2),H.a.sharpe,H.s.sharpe,hi)}${row("Max drawdown",P,H.a.mdd,H.s.mdd,dn)}${row("Best day",P,H.a.best,H.s.best,hi)}${row("Worst day",P,H.a.worst,H.s.worst,dn)}${row("Up days",x=>Math.round(x*100)+"%",H.a.up,H.s.up,hi)}
       </tbody></table></div><p class="ap-note" style="margin:8px 0 0">Beta vs. S&amp;P: <b>${H.beta!=null?H.beta.toFixed(2):"needs 10 days"}</b> · correlation: <b>${H.corr!=null?H.corr.toFixed(2):"needs 5 days"}</b>. Short histories swing a lot — these firm up over weeks.</p>`:`<div class="ap-note">The head-to-head table fills in after the bot's first two trading days.</div>`}</div>
@@ -3359,25 +3367,81 @@ function apRender(d){
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
   apWirePerf(d);
 }
+/* ---------- two bots: switcher + day-trader page ---------- */
+const BOTS={sel:"swing",d:{}};
+try{ BOTS.sel=localStorage.getItem("md_bot")||"swing"; }catch{}
+function botRet(d){ if(!d) return null; return d.value/d.startValue-1; }
+function botSwitch(){
+  const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
+  const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
+    return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`${sw?$m(sw.value):"$10,000"} · holds for days`,sw)+card("day","⚡","Day trader",`${dy?$m(dy.value):"$30,000"} · longs &amp; shorts, flat by close`,dy);
+}
+function dtRender(d){
+  const ret=d.value/d.startValue-1, spxV=d.spx0&&d.spxNow?d.startValue*d.spxNow/d.spx0:d.startValue, spxRet=spxV/d.startValue-1, lead=d.value-spxV;
+  const started=d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side)), a=d.analytics||{}, day=d.day||{};
+  const ago=t=>new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  const today=d.trades.filter(t=>t.pnl!=null&&day.d&&new Date(t.t).toISOString().slice(0,10)>=day.d.slice(0,10));
+  const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?' <span class="ap-tag own">live</span>':""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">🔒 PDT lock</b>':"ended"}</td></tr>`; };
+  const dirTag=x=>`<span class="sd ${x==="long"?"BUY":"SELL"}">${x==="long"?"LONG":"SHORT"}</span>`;
+  $("apBox").innerHTML=`
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>
+  <div class="ap-vs">
+    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>⚡ Day trader</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret*100)}</small></div>
+    <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
+    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
+  </div>
+  <div class="ap-mini">${[["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",day.halted?"loss limit hit — done for today":`${day.trades||0} of ${d.rules.maxTrades} trades used`],
+    ["Avg. trade",a.avgR!=null?(a.avgR>=0?"+":"")+a.avgR.toFixed(2)+"R":"—","R = multiples of the risk taken"],
+    ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
+    ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
+    ["Open now",`${d.positions.length} pos · ${d.orders.length} orders`,`max ${d.rules.maxPos} at a time`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>
+  ${d.positions.length||d.orders.length?`<div class="bt-card"><h4>Live book <em>open positions and working limit orders</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Entry / limit</th><th>Stop</th><th>Target</th><th>Now</th><th>P&amp;L</th><th>Setup</th></tr></thead><tbody>
+    ${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b></td><td>${dirTag(p.dir)}</td><td>${p.shares}</td><td>${$m(p.entry)}</td><td>${$m(p.stop)}${p.be?' <small style="color:var(--muted)">BE</small>':""}</td><td>${$m(p.target)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${(p.pnl>=0?"+":"−")+"$"+Math.abs(p.pnl).toFixed(0)} <small>${p.R>=0?"+":""}${p.R.toFixed(2)}R</small></td><td class="n">${esc(p.setup)}</td></tr>`).join("")}
+    ${d.orders.map(o=>`<tr style="opacity:.75"><td class="n"><b>${esc(o.sym)}</b></td><td>${dirTag(o.dir)} <small>limit</small></td><td>${o.shares}</td><td>${$m(o.price)}</td><td>${$m(o.stop)}</td><td>2R</td><td>—</td><td><small>expires ${new Date(o.expires*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</small></td><td class="n">${esc(o.setup)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+  ${apPerf(d)}
+  ${(a.bySetup||[]).length?`<div class="bt-card"><h4>By setup <em>which plays are working</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Setup</th><th>Trades</th><th>Win rate</th><th>P&amp;L</th></tr></thead><tbody>${a.bySetup.map(x=>`<tr><td class="n">${esc(x.setup)}</td><td>${x.n}</td><td>${Math.round(x.win*100)}%</td><td class="${cls(x.pnl)}">${(x.pnl>=0?"+":"−")+"$"+Math.abs(x.pnl).toFixed(0)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+  <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· trade log, orders and the rules</small></summary>
+  <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
+    ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts scanning at 9:35 AM ET.</div>`}</div>
+  <div class="bt-card"><h4>How the day trader works <em>paper money only · rules designed by Claude, run by the server</em></h4><ul class="ap-rules">
+    <li><b>Liquidity sweeps:</b> stops pile up just beyond obvious levels — yesterday's high and low, the pre-market high and low, and the first 15 minutes' range. When price spikes through one of those on 1.5× normal volume and the next close snaps back, the stops have been "swept". The bot fades it: a <b>short</b> after a sweep of a high, a <b>long</b> after a sweep of a low.</li>
+    <li><b>News / earnings gaps:</b> a stock that gaps ±3% at the open on a catalyst the site found (earnings beat or miss, strong headlines) and then breaks its first-5-minute range in the same direction — gap and go.</li>
+    <li><b>Limit orders only:</b> entries are limit orders at the swept level or breakout level. If price doesn't come back within 10 minutes, the order expires unfilled.</li>
+    <li><b>Brackets:</b> every position has a stop just past the sweep wick (or the 5-minute range) and a profit target at 2× the risk (2R). At +1R the stop moves to breakeven.</li>
+    <li><b>Risk:</b> each trade risks 2% of the account. Max 3 positions, 12 trades a day, 4× intraday buying power (2× in one stock). A −6% day stops trading for the day. Everything is closed by 3:55 PM.</li>
+    <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}, plus the day's catalyst stocks.</li>
+    <li><b>Starts with $30,000</b> to clear the $25,000 pattern-day-trader minimum. Falling below $25,000 would lock a real account out of day trading, so it counts as a bust and a new $30,000 run starts.</li>
+    <li>Simulated on free 1-minute bars: a limit fills only if a later bar trades through it; if a stop and target fall in the same bar, the stop is assumed to hit first. No order-book data, so liquidity is read from price and volume. 0.02% slippage on exits, 0.01% borrow fee on shorts. Not financial advice.</li>
+  </ul></div></details>
+  <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${d.runs.length} PDT lock${d.runs.length===1?"":"s"} so far`:"no busts yet — falling under $25,000 starts a new $30,000 run"}</em></h4>
+  <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
+  apWirePerf(d);
+}
+async function apBackup(kind,d){
+  if(window.__VISITOR) return false;
+  const key=kind==="day"?"dtBackup1":"apBackup2", ep=kind==="day"?"/api/daytrader/restore":"/api/autopilot/restore";
+  let bk=null; try{ bk=JSON.parse(localStorage.getItem(key)||"null"); }catch{}
+  const size=x=>(x.trades||[]).length+((x.runs||[]).length*1e4);
+  if(bk&&size(bk)>size(d)){ const r=await api(ep,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(bk)}).catch(()=>null); if(r&&r.ok){ toast("🤖 Trading history restored from this browser's backup."); return true; } }
+  if(!bk||size(d)>=size(bk)){
+    const raw=kind==="day"?{v:1,run:d.run,runs:d.runs,start:d.start,cash:d.cash,positions:d.rawPositions,orders:d.orders,trades:d.trades,equity:d.equity,intraday:d.intraday,spx0:d.spx0,firstTrade:d.firstTrade,day:d.day,lastBar:d.lastBar,updated:d.updated}
+      :{v:2,run:d.run,runs:d.runs,spx0:d.spx0,firstTrade:d.firstTrade,start:d.start,cash:d.cash,positions:Object.fromEntries(d.positions.map(p=>[p.sym,{shares:p.shares,cost:p.cost,at:p.at,peak:Math.max(p.peak||p.cost,p.price),name:p.name,sleeve:p.sleeve}])),trades:d.trades.map(({since,...t})=>t),equity:d.equity,intraday:d.intraday,recent:d.recent,lastRebalance:d.lastRebalance,lastScan:d.lastScan,updated:d.updated};
+    try{ localStorage.setItem(key,JSON.stringify(raw)); }catch{}
+  }
+  return false;
+}
 async function apLoadView(){
   if(!$("apBox")) return;
-  try{
-    const d=await api("/api/autopilot");
-    if(!window.__VISITOR){
-      let bk=null; try{ bk=JSON.parse(localStorage.getItem("apBackup2")||"null"); }catch{}
-      const size=x=>(x.trades||[]).length+((x.runs||[]).length*1e4);
-      if(bk&&size(bk)>size(d)){
-        const r=await api("/api/autopilot/restore",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(bk)}).catch(()=>null);
-        if(r&&r.ok){ toast("🤖 Trading history restored from this browser's backup."); return apLoadView(); }
-      }
-      if(!bk||size(d)>=size(bk)){
-        const raw={v:2,run:d.run,runs:d.runs,spx0:d.spx0,firstTrade:d.firstTrade,start:d.start,cash:d.cash,positions:Object.fromEntries(d.positions.map(p=>[p.sym,{shares:p.shares,cost:p.cost,at:p.at,peak:Math.max(p.peak||p.cost,p.price),name:p.name}])),trades:d.trades.map(({since,...t})=>t),equity:d.equity,intraday:d.intraday,recent:d.recent,lastRebalance:d.lastRebalance,lastScan:d.lastScan,updated:d.updated};
-        try{ localStorage.setItem("apBackup2",JSON.stringify(raw)); }catch{}
-      }
-    }
-    apRender(d);
-  }catch(e){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load the experiment (${esc(e.message)}). <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; }
+  const [sw,dy]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader")]);
+  if(sw.status==="fulfilled"){ BOTS.d.swing=sw.value; if(await apBackup("swing",sw.value)) return apLoadView(); }
+  if(dy.status==="fulfilled"){ BOTS.d.day=dy.value; if(await apBackup("day",dy.value)) return apLoadView(); }
+  botSwitch();
+  const d=BOTS.d[BOTS.sel];
+  if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
+  if(BOTS.sel==="day") dtRender(d); else apRender(d);
 }
+$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else apRender(d); } else apLoadView(); };
 setInterval(()=>{ if(S.tab==="aitrade") apLoadView(); },60_000);
 function aiShow(k){
   S.aiPane=k; document.querySelectorAll("#aiNav [data-ai]").forEach(b=>b.classList.toggle("on",b.dataset.ai===k));
