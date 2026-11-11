@@ -2222,14 +2222,16 @@ function secSection(text, startRe, endRe, minLen = 800) {
 function riskHeadlines(risk) {
   const paras = risk.replace(/^Item\s*1A\.?\s*Risk\s*Factors/i, "").split("\n").map((x) => x.trim()).filter((x) => x.length > 40);
   const intro = paras.find((x) => x.length > 120) || "";
-  const heads = paras.filter((x) => x !== intro && x.length >= 50 && x.length <= 300 && /[.:]$/.test(x) && (x.match(/\.\s/g) || []).length === 0 && !/^(The following|This section|You should|Investing in|In addition|Risks? (Related|Relating) to)/i.test(x));
+  const heads = paras.filter((x) => x !== intro && x.length >= 50 && x.length <= 300 && /[.:]$/.test(x) && (x.match(/\.\s/g) || []).length === 0 && !/^(The following|This section|You should|Investing in|In addition|Risks? (Related|Relating) to)/i.test(x)
+    // closing sentences of a risk's body text, not headlines
+    && !/^(Any of the foregoing|Any of these|All of the foregoing|Each of (the foregoing|these)|The foregoing|These (risks|factors|events|matters|and other)|Such (risks|events|matters)|As a result|Accordingly|Consequently|In such (event|case)|If any of (the foregoing|these)|There can be no assurance|Additionally|Further(more)?|Moreover)\b/i.test(x));
   return { intro, heads: [...new Set(heads)] };
 }
 const secSubs = (cik) => cached("sec:subs:" + cik, 3600e3, () => secGet(`https://data.sec.gov/submissions/CIK${String(cik).padStart(10, "0")}.json`));
 const secCik = async (sym) => { sym = String(sym || "").toUpperCase().replace("-", "."); if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol"); const m = await secTickers(), h = m[sym] || m[sym.replace(".", "-")]; return h ? { sym, cik: h.cik, name: h.name } : null; };
 const edgarUrl = (cik, acc, doc) => `https://www.sec.gov/Archives/edgar/data/${cik}/${acc.replace(/-/g, "")}/${doc}`;
 // risk headlines of one 10-K document, cached for a day (shared by the crawler and the year-over-year risk comparison)
-const tenKRisks = (url) => cached("sec:rh:" + url, 24 * 3600e3, async () => riskHeadlines(secSection(htmlToText(await secText(url)), /Item\s*1A\.?\s*\n?\s*Risk\s*Factors/gi, /Item\s*1B\.?|Item\s*1C\.?|Item\s*2\.?\s*\n?\s*Properties/gi)));
+const tenKRisks = (url) => cached("sec:rh2:" + url, 24 * 3600e3, async () => riskHeadlines(secSection(htmlToText(await secText(url)), /Item\s*1A\.?\s*\n?\s*Risk\s*Factors/gi, /Item\s*1B\.?|Item\s*1C\.?|Item\s*2\.?\s*\n?\s*Properties/gi)));
 async function filingDoc(sym) {
   sym = String(sym || "").toUpperCase().replace("-", ".");
   if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol");
@@ -2252,7 +2254,7 @@ async function filingDoc(sym) {
         // risk-factor headlines: one-sentence paragraphs (bold titles in the filing) between 50 and 300 characters
         const riskP = paras(risk.replace(/^Item\s*1A\.?\s*Risk\s*Factors/i, ""));
         const intro0 = riskP.find((x) => x.length > 120) || "";
-        const rh = riskHeadlines(risk); cached("sec:rh:" + url, 24 * 3600e3, async () => rh).catch(() => {});
+        const rh = riskHeadlines(risk); cached("sec:rh2:" + url, 24 * 3600e3, async () => rh).catch(() => {});
         const heads = rh.heads.slice(0, 10);
         const intro = intro0;
         const sents = mdna.replace(/\n/g, " ").split(/(?<=[.!?])\s+(?=[A-Z“"])/).map((x) => x.trim());
@@ -2350,9 +2352,11 @@ async function earningsRelease(symIn) {
 const RK_STOP = new Set("the a an and or of to in on for with our we us its it is are be may could can by as from that this which have has other such any including or not will would than these".split(" "));
 const rkWords = (t) => new Set(t.toLowerCase().replace(/[’']/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !RK_STOP.has(w)));
 const rkSim = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.max(1, a.size + b.size - n); };
+// containment: how much of the shorter headline appears in the longer one (catches shortened or extended rewrites)
+const rkCont = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.max(1, Math.min(a.size, b.size)); };
 async function riskDiff(symIn) {
   const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
-  return cached("sec:rd:" + id.sym, 24 * 3600e3, async () => {
+  return cached("sec:rd2:" + id.sym, 24 * 3600e3, async () => {
     const r = (await secSubs(id.cik)).filings.recent, ks = [];
     for (let i = 0; i < r.form.length && ks.length < 2; i++) if (r.form[i] === "10-K") ks.push(i);
     if (ks.length < 2) return { symbol: id.sym, available: false, name: id.name, reason: "Needs two 10-K filings to compare." };
@@ -2361,8 +2365,8 @@ async function riskDiff(symIn) {
     const bw = B.heads.map((h) => ({ h, w: rkWords(h), used: false })), heads = [];
     for (const h of A.heads) {
       const w = rkWords(h); let best = null, bs = 0;
-      for (const b of bw) { const s = rkSim(w, b.w); if (s > bs) { bs = s; best = b; } }
-      if (best && bs >= 0.55) { best.used = true; heads.push({ text: h, status: bs >= 0.86 ? "same" : "reworded", before: bs >= 0.86 ? null : best.h, sim: +bs.toFixed(2) }); }
+      for (const b of bw) { if (b.used) continue; const s = Math.max(rkSim(w, b.w), rkCont(w, b.w) >= 0.8 ? 0.6 : 0); if (s > bs) { bs = s; best = b; } }
+      if (best && bs >= 0.5) { best.used = true; const j = rkSim(w, best.w); heads.push({ text: h, status: j >= 0.86 ? "same" : "reworded", before: j >= 0.86 ? null : best.h, sim: +j.toFixed(2) }); }
       else heads.push({ text: h, status: "new", sim: +bs.toFixed(2) });
     }
     const removed = bw.filter((b) => !b.used).map((b) => b.h);
