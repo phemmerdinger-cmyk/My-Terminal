@@ -517,6 +517,41 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .fx-formula{font-size:13px;color:var(--muted);line-height:1.7}
 .fx-formula code{font-family:var(--mono);color:var(--text);font-size:12px;background:var(--panel2);padding:1px 6px;border-radius:5px}
 .fx-warn{background:color-mix(in srgb,#f5a524 10%,var(--panel));border:1px solid color-mix(in srgb,#f5a524 40%,var(--line));border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:14px}
+/* backtester + risk */
+.bt-grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:14px;align-items:start}
+@media (max-width:980px){.bt-grid{grid-template-columns:1fr}}
+.bt-grid>*{min-width:0}
+.bt-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.bt-presets button{font-size:12px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:var(--panel2);color:var(--muted);cursor:pointer}
+.bt-presets button:hover{color:var(--text)}
+.bt-row{display:grid;grid-template-columns:1fr 84px 30px;gap:6px;margin-bottom:6px}
+.bt-row input{padding:7px 9px;border-radius:7px;border:1px solid var(--line2);background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;min-width:0}
+.bt-row input[data-f="sym"]{text-transform:uppercase}
+.bt-row button{border:1px solid var(--line2);background:var(--panel2);color:var(--muted);border-radius:7px;cursor:pointer}
+.bt-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bt-opts label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.bt-opts .field{width:100%;min-width:0}
+.bt-opts .bt-chk{grid-column:1/-1;flex-direction:row;align-items:center;gap:8px;font-size:13px;color:var(--text)}
+.bt-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.bt-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+@media (max-width:760px){.bt-kpis{grid-template-columns:1fr 1fr}}
+.bt-kpis div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.bt-kpis span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bt-kpis b{display:block;font-family:var(--mono);font-size:19px;font-weight:500;margin-top:3px}
+.bt-kpis small{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
+.bt-chart svg{width:100%;display:block}
+.bt-leg{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.bt-leg i{display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.rk-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.rk-two>*{min-width:0}
+@media (max-width:860px){.rk-two{grid-template-columns:1fr}}
+.rk-heat td{text-align:center!important;font-size:12px}
+.rk-bar{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;min-width:80px}
+.rk-bar i{display:block;height:100%;background:#4da3ff}
+.rk-scn{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.rk-scn div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.rk-scn span{display:block;font-size:12px;color:var(--muted)}
+.rk-scn b{display:block;font-family:var(--mono);font-size:18px;margin:3px 0}
+.rk-scn small{font-size:11px;color:var(--dim)}
 /* AI vs S&P (Autopilot) */
 .aitrade .ap-head{margin-bottom:16px}
 .ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff9f43}
@@ -1462,6 +1497,33 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- PREDICTIONS -->
     <!-- WALL STREET: live market floor (S&P 500) -->
+    <section id="tab-backtest" class="pad fx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">⏪ BACKTESTING</div><h1>Portfolio backtester</h1>
+        <p class="fx-sub">See how a mix of stocks and ETFs would have done in the past — growth, risk and drawdowns — compared with the S&amp;P 500. Hypothetical results from historical prices, not actual investment performance.</p></div></div>
+      <div class="bt-grid">
+        <div class="fx-card"><h3>Portfolio <em id="btWsum"></em></h3>
+          <div class="bt-presets" id="btPresets"></div>
+          <div id="btRows"></div>
+          <button class="btn ghost" type="button" id="btAdd" style="margin:6px 0 12px">+ Add holding</button>
+          <div class="bt-opts">
+            <label>Start<input type="date" id="btFrom" class="field"></label>
+            <label>End<input type="date" id="btTo" class="field"></label>
+            <label>Starting amount ($)<input type="number" id="btInit" class="field" value="10000" min="100" step="100"></label>
+            <label>Rebalance<select id="btReb" class="field"><option value="none">Never (buy &amp; hold)</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual" selected>Yearly</option></select></label>
+            <label>Risk-free rate for Sharpe (%)<input type="number" id="btRf" class="field" value="2" step="0.25"></label>
+            <label class="bt-chk"><input type="checkbox" id="btDiv" checked> Reinvest dividends (total return)</label>
+          </div>
+          <div class="bt-act"><button class="btn" type="button" id="btRun">Run backtest</button><button class="btn ghost" type="button" id="btSave">Save setup</button><select class="field" id="btLoad" style="max-width:180px"><option value="">Saved setups…</option></select></div>
+        </div>
+        <div id="btOut"><div class="fx-empty">Pick holdings and dates, then run the backtest.</div></div>
+      </div>
+    </section>
+    <section id="tab-risk" class="pad fx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">🛡 RISK</div><h1>Risk &amp; stress testing</h1>
+        <p class="fx-sub">How concentrated a portfolio is, how its holdings move together, how much it could lose on a bad day, and what past crises or hypothetical shocks would do to it. Estimates, not guarantees.</p></div></div>
+      <div class="fx-bar"><select class="field" id="rkSrc" style="max-width:320px"></select><button class="btn" type="button" id="rkRun">Analyze</button></div>
+      <div id="rkOut"><div class="fx-empty">Choose a portfolio and press Analyze.</div></div>
+    </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1>
         <p class="ap-lede">I gave a trading bot <b>$10,000</b> of paper money and pitted it against simply buying the S&amp;P 500 with the same $10,000. It plays aggressively — <b>80% risk</b> — trading all day on live prices, reads the news and earnings overnight, and acts at the opening bell — with no human input. Can it beat the market, or how fast does it go bust? Every bust starts a new $10,000 test run.</p></div></div>
@@ -1681,12 +1743,12 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","research","fin","dcf","portfolio","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","research","fin","dcf","portfolio","backtest","risk","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
   ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
-  ["portfolio",[["portfolio","My portfolio"]]],
+  ["portfolio",[["portfolio","My portfolio"],["backtest","Backtest"],["risk","Risk & stress"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
@@ -1812,6 +1874,8 @@ function setTab(t){
   if(t==="analysis"){ anOpen(); }
   if(t==="aitrade"){ apLoadView(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
+  if(t==="backtest"){ btInit(); }
+  if(t==="risk"){ rkInit(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
@@ -2582,8 +2646,9 @@ function dcfDefaults(j,mkt){
   const da=avg(y=>y.da!=null&&y.revenue?y.da/y.revenue:null); v.da=(da!=null?da:0.04)*100; src.da=da!=null?"calc":"est";
   const cx=avg(y=>y.capex!=null&&y.revenue?y.capex/y.revenue:null); v.capex=(cx!=null?cx:0.05)*100; src.capex=cx!=null?"calc":"est";
   const nwcOf=y=>y.currentAssets!=null&&y.currentLiabilities!=null?(y.currentAssets-(y.cash||0))-(y.currentLiabilities-(y.ltDebtCurrent||0)):null;
-  const p=ys[n-2], dn=p&&nwcOf(l)!=null&&nwcOf(p)!=null&&l.revenue!==p.revenue?(nwcOf(l)-nwcOf(p))/(l.revenue-p.revenue):null;
-  v.nwc=(dn!=null&&Math.abs(dn)<=0.4?dn:0.05)*100; src.nwc=dn!=null&&Math.abs(dn)<=0.4?"calc":"est";
+  // change in working capital per $1 of revenue growth, measured over up to 3 years to smooth out one-off swings
+  const p=ys[Math.max(0,n-4)], dn=p&&p!==l&&nwcOf(l)!=null&&nwcOf(p)!=null&&l.revenue-p.revenue>0?(nwcOf(l)-nwcOf(p))/(l.revenue-p.revenue):null, nOk=dn!=null&&Math.abs(dn)<=0.25;
+  v.nwc=(nOk?dn:0.05)*100; src.nwc=nOk?"calc":"est";
   v.rf=mkt.rf!=null?mkt.rf:4.25; src.rf=mkt.rf!=null?"mkt":"est";
   v.beta=mkt.beta!=null?+mkt.beta.toFixed(2):1; src.beta=mkt.beta!=null?"mkt":"est";
   v.erp=5; src.erp="est";
@@ -2681,6 +2746,176 @@ function fxOpen(t){
   if(t==="fin"&&!$("finSym").value){ $("finSym").value=def; finLoad(); }
   if(t==="dcf"&&!$("dcfSym").value){ $("dcfSym").value=def; dcfLoad(); }
 }
+
+/* ---------- Backtester + Risk & stress testing (all math in public/fin.js, runs in the browser) ---------- */
+const HC={};
+async function hist(sym,from,to,iv){ const k=[sym,from,to,iv].join("|"); if(!HC[k]) HC[k]=api(`/api/pub/hist?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}&interval=${iv}`).catch(e=>{delete HC[k];throw e;}); return HC[k]; }
+const isoDay=d=>new Date(d).toISOString().slice(0,10);
+const BT_PRESETS=[["Classic 60/40",[["SPY",60],["AGG",40]]],["Big Tech",[["AAPL",1],["MSFT",1],["NVDA",1],["AMZN",1],["GOOGL",1],["META",1]].map(([s])=>[s,16.67])],["All-weather",[["VTI",30],["TLT",40],["IEF",15],["GLD",7.5],["DBC",7.5]]],["Dividend ETFs",[["SCHD",50],["VYM",50]]]];
+const BT={rows:[["SPY",60],["AGG",40]]};
+function pfWeights(pf){ const hs=(pf||[]).filter(h=>h.shares>0); const val=h=>{const q=S.quotes[h.symbol];return h.shares*(q&&!q.error&&q.price?q.price:(h.cost||0));}; const tot=hs.reduce((a,h)=>a+val(h),0)||1; return hs.map(h=>[h.symbol,+(val(h)/tot*100).toFixed(2)]); }
+function btRowsUI(){
+  $("btRows").innerHTML=BT.rows.map(([s,w],i)=>`<div class="bt-row"><input data-i="${i}" data-f="sym" value="${esc(s)}" placeholder="Ticker" maxlength="10" aria-label="Ticker"><input data-i="${i}" data-f="w" type="number" step="any" value="${w}" aria-label="Weight %"><button type="button" data-del="${i}" aria-label="Remove">✕</button></div>`).join("");
+  const t=BT.rows.reduce((a,r)=>a+(+r[1]||0),0); $("btWsum").innerHTML=`weights add to ${t.toFixed(1)}%${Math.abs(t-100)>0.5?" · scaled to 100% when run":""}`;
+}
+function btPresetsUI(){
+  const own=!VIEW&&S.port&&S.port.length?[["My portfolio",pfWeights(S.port)]]:[];
+  $("btPresets").innerHTML=[...own,...BT_PRESETS].map(([n],i)=>`<button type="button" data-pre="${i}">${esc(n)}</button>`).join("");
+  $("btPresets").onclick=e=>{const b=e.target.closest("[data-pre]"); if(!b) return; BT.rows=[...own,...BT_PRESETS][+b.dataset.pre][1].map(r=>[...r]); btRowsUI();};
+}
+function btSavedUI(){ let l=[]; try{l=JSON.parse(localStorage.getItem("md_bt_setups")||"[]");}catch{} $("btLoad").innerHTML=`<option value="">Saved setups (${l.length})…</option>`+l.map((x,i)=>`<option value="${i}">${esc(x.name)}</option>`).join(""); return l; }
+function svgLines(dates,series,{h=240,pct=false,fills=false}={}){
+  const all=series.flatMap(s=>s.v.filter(x=>x!=null)), lo=Math.min(...all), hi=Math.max(...all), pad=(hi-lo||1)*0.08, y0=pct?Math.min(lo,0)-pad:lo-pad, y1=pct?Math.max(hi,0)+pad*0.3:hi+pad;
+  const W=800,n=dates.length, X=i=>i/(n-1)*W, Y=v=>h-(v-y0)/(y1-y0)*h;
+  const path=s=>s.v.map((v,i)=>v==null?"":`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+  const yr=[...new Set(dates.map(t=>new Date(t*1000).getUTCFullYear()))], step=Math.ceil(yr.length/8);
+  const ticks=yr.filter((_,i)=>i%step===0).map(y=>{const i=dates.findIndex(t=>new Date(t*1000).getUTCFullYear()===y);return `<text x="${X(i)+3}" y="${h-4}" font-size="11" fill="var(--dim)">${y}</text><line x1="${X(i)}" x2="${X(i)}" y1="0" y2="${h}" stroke="var(--line)" vector-effect="non-scaling-stroke"/>`;}).join("");
+  const lab=v=>pct?(v*100).toFixed(0)+"%":"$"+(Math.abs(v)>=1e6?(v/1e6).toFixed(1)+"M":Math.abs(v)>=1e3?(v/1e3).toFixed(0)+"K":v.toFixed(0));
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="height:${h}px">${ticks}${pct?`<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line2)" vector-effect="non-scaling-stroke"/>`:""}
+  ${series.map(s=>fills?`<polygon points="0,${Y(0)} ${path(s)} ${W},${Y(0)}" fill="${s.c}" opacity=".25"/><polyline points="${path(s)}" fill="none" stroke="${s.c}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`:`<polyline points="${path(s)}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke"/>`).join("")}
+  <text x="4" y="13" font-size="11" fill="var(--dim)">${lab(y1)}</text><text x="4" y="${h-18}" font-size="11" fill="var(--dim)">${lab(y0)}</text><line class="bt-x" x1="-10" x2="-10" y1="0" y2="${h}" stroke="var(--muted)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function btHover(box,dates,lines,fmtv){
+  const svg=box.querySelector("svg"), x=svg.querySelector(".bt-x"), out=box.querySelector(".bt-read");
+  const move=e=>{const r=svg.getBoundingClientRect(),cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left,i=Math.max(0,Math.min(dates.length-1,Math.round(cx/r.width*(dates.length-1))));
+    x.setAttribute("x1",i/(dates.length-1)*800); x.setAttribute("x2",i/(dates.length-1)*800);
+    out.innerHTML=`<b>${new Date(dates[i]*1000).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"})}</b> · `+lines.map(l=>`<span style="color:${l.c}">${l.n}: ${l.v[i]==null?"—":fmtv(l.v[i])}</span>`).join(" · ");};
+  svg.addEventListener("mousemove",move); svg.addEventListener("touchmove",move,{passive:true});
+}
+async function btRun(){
+  const rows=BT.rows.map(([s,w])=>[String(s||"").trim().toUpperCase(),+w]).filter(([s,w])=>s&&w>0);
+  if(!rows.length) return toast("Add at least one holding with a weight.");
+  if(rows.length>12) return toast("Up to 12 holdings at a time.");
+  const from=$("btFrom").value, to=$("btTo").value, init=Math.max(100,+$("btInit").value||10000), reb=$("btReb").value, rf=(+$("btRf").value||0)/100, useAdj=$("btDiv").checked;
+  if(!from||!to||from>=to) return toast("Pick a start date before the end date.");
+  const yrs=(Date.parse(to)-Date.parse(from))/31557600000, iv=yrs>8?"1wk":"1d";
+  $("btOut").innerHTML=`<div class="fx-empty"><span class="spin"></span> Loading ${rows.length+1} price histories (${iv==="1wk"?"weekly":"daily"})…</div>`;
+  const syms=[...rows.map(r=>r[0]),"SPY"];
+  const res=await Promise.allSettled(syms.map(s=>hist(s,from,to,iv)));
+  const bad=syms.filter((s,i)=>res[i].status!=="fulfilled"||!res[i].value.t.length);
+  if(bad.length) return $("btOut").innerHTML=`<div class="fx-warn">No price history for ${bad.map(esc).join(", ")} in that period. Check the ticker or move the start date.</div>`;
+  const H=Object.fromEntries(syms.map((s,i)=>[s,res[i].value])), noAdj=[];
+  const ser=s=>{const h=H[s],a=useAdj&&h.adj; if(useAdj&&!h.adj) noAdj.push(s); const key=t=>{const d=Math.floor(t/86400);return iv==="1wk"?Math.floor((d+3)/7)*7*86400:d*86400;}; // same calendar day/week → same key, whatever time of day the source stamped
+    const m=new Map(); h.t.forEach((t,i)=>{const v=a?h.adj[i]:h.close[i]; if(v!=null) m.set(key(t),v);}); return [...m].sort((x,y)=>x[0]-y[0]).map(([t,close])=>({t,close}));};
+  const series=Object.fromEntries(rows.map(r=>[r[0],ser(r[0])])), w=Object.fromEntries(rows.map(r=>[r[0],(w0=>w0)(r[1])]));
+  const firsts=rows.map(r=>[r[0],series[r[0]][0].t]), late=firsts.filter(([,t])=>t>Date.parse(from)/1000+20*86400);
+  const r=FIN.backtest({series,weights:w,initial:init,rebalance:reb,benchmark:ser("SPY")});
+  if(r.error) return $("btOut").innerHTML=`<div class="fx-warn">${esc(r.error)}</div>`;
+  const st=FIN.stats(r.dates,r.values,r.bench,rf), b=st.benchmark||{};
+  const ddP=FIN.drawdownSeries(r.values), ddB=r.bench?FIN.drawdownSeries(r.bench):null;
+  const dfmt=i=>new Date(r.dates[i]*1000).toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"});
+  BT.last={rows,from,to,init,reb,useAdj};
+  $("btOut").innerHTML=`
+  ${late.length?`<div class="fx-warn">The backtest starts on ${dfmt(0)} because ${late.map(([s])=>esc(s)).join(", ")} ${late.length>1?"don't":"doesn't"} have prices before then. A backtest can only hold what existed at the time.</div>`:""}
+  <div class="bt-kpis">
+    <div><span>Ending value</span><b>$${Math.round(r.values.at(-1)).toLocaleString()}</b><small>from $${init.toLocaleString()} · S&amp;P $${r.bench?Math.round(r.bench.at(-1)).toLocaleString():"—"}</small></div>
+    <div><span>Annual return (CAGR)</span><b class="${cls(st.cagr)}">${fxP(st.cagr)}</b><small>S&amp;P ${fxP(b.cagr)} · total ${fxP(st.totalReturn,0)}</small></div>
+    <div><span>Volatility</span><b>${fxP(st.volatility)}</b><small>S&amp;P ${fxP(b.volatility)} a year</small></div>
+    <div><span>Sharpe ratio</span><b>${st.cagr!=null&&st.volatility?((st.cagr-rf)/st.volatility).toFixed(2):"—"}</b><small>S&amp;P ${b.cagr!=null&&b.volatility?((b.cagr-rf)/b.volatility).toFixed(2):"—"} · rf ${fxP(rf)}</small></div>
+    <div><span>Max drawdown</span><b class="down">${fxP(st.maxDrawdown)}</b><small>${dfmt(st.from)} → ${dfmt(st.to)}</small></div>
+    <div><span>Beta / correlation</span><b>${st.beta!=null?st.beta.toFixed(2):"—"}</b><small>correlation ${st.correlation!=null?st.correlation.toFixed(2):"—"}</small></div>
+    <div><span>Alpha (Jensen's)</span><b class="${cls(st.alpha)}">${fxP(st.alpha)}</b><small>a year vs. its beta-adjusted S&amp;P</small></div>
+    <div><span>Best / worst month</span><b><span class="up">${st.bestMonth?fxP(st.bestMonth.ret):"—"}</span> / <span class="down">${st.worstMonth?fxP(st.worstMonth.ret):"—"}</span></b><small>${st.bestMonth?st.bestMonth.month:""} · ${st.worstMonth?st.worstMonth.month:""}</small></div>
+  </div>
+  <div class="fx-card bt-chart" id="btEq"><h3>Growth of $${init.toLocaleString()} <em class="bt-read">hover the chart for values</em></h3>${svgLines(r.dates,[{v:r.bench||[],c:"#8a93a3",w:1.6},{v:r.values,c:"#4da3ff",w:2.4}])}
+  <div class="bt-leg"><span><i style="background:#4da3ff"></i>Your portfolio</span><span><i style="background:#8a93a3"></i>S&amp;P 500 (SPY ETF${useAdj?", dividends reinvested":", price only"})</span></div></div>
+  <div class="fx-card bt-chart" id="btDd"><h3>Drawdown <em class="bt-read">how far below its previous peak</em></h3>${svgLines(r.dates,[...(ddB?[{v:ddB,c:"#8a93a3"}]:[]),{v:ddP,c:"#ff6b6b"}],{h:150,pct:true,fills:true})}</div>
+  <div class="fx-card"><h3>Year by year</h3><div class="fx-wrap"><table class="fx-tbl" style="min-width:360px"><thead><tr><th>Year</th><th>Portfolio</th><th>S&amp;P 500</th><th>Difference</th></tr></thead><tbody>
+  ${st.annual.map(a=>{const bi=r.bench?FIN.stats(r.dates,r.bench,null).annual.find(x=>x.year===a.year):null;return `<tr><td>${a.year}${a.partial?" <small>partial</small>":""}</td><td class="${cls(a.ret)}">${fxP(a.ret)}</td><td class="${cls(bi&&bi.ret)}">${bi?fxP(bi.ret):"—"}</td><td class="${cls(bi&&a.ret-bi.ret)}">${bi?fxP(a.ret-bi.ret):"—"}</td></tr>`}).join("")}</tbody></table></div></div>
+  <div class="fx-card"><h3>Method &amp; limitations</h3><p class="fx-formula">${useAdj?"Prices are Yahoo's dividend- and split-adjusted closes, so dividends are treated as reinvested (total return).":"Prices are plain closes: dividends are ignored (price return)."}${noAdj.length?` No adjusted prices for ${noAdj.map(esc).join(", ")}, so plain closes were used for them.`:""} Each day's value uses only that day's closing prices (no look-ahead). Weights are ${reb==="none"?"set once at the start and then drift":"reset at the start of each "+({monthly:"month",quarterly:"quarter",annual:"year"}[reb])}. ${iv==="1wk"?"Weekly prices are used for periods over 8 years. ":""}CAGR = (end ÷ start)^(1/years) − 1; volatility = standard deviation of period returns × √(periods per year); Sharpe = (CAGR − risk-free) ÷ volatility; beta and alpha (CAPM) are measured against SPY.<br><b>Limitations:</b> survivorship bias — you can only test companies that still trade today; no taxes, trading costs or cash drag; free Yahoo data can have gaps. Hypothetical results, not actual investment performance.</p></div>`;
+  btHover($("btEq"),r.dates,[{n:"Portfolio",v:r.values,c:"#4da3ff"},...(r.bench?[{n:"S&P 500",v:r.bench,c:"#8a93a3"}]:[])],v=>"$"+Math.round(v).toLocaleString());
+  btHover($("btDd"),r.dates,[{n:"Portfolio",v:ddP,c:"#ff6b6b"},...(ddB?[{n:"S&P 500",v:ddB,c:"#8a93a3"}]:[])],v=>(v*100).toFixed(1)+"%");
+}
+function btInit(){
+  if(BT.ready) return; BT.ready=true;
+  const today=new Date(); $("btTo").value=isoDay(today); const f=new Date(today); f.setFullYear(f.getFullYear()-5); $("btFrom").value=isoDay(f);
+  btPresetsUI(); btRowsUI(); btSavedUI();
+  $("btRows").oninput=e=>{const i=e.target.dataset.i; if(i==null) return; BT.rows[i][e.target.dataset.f==="sym"?0:1]=e.target.dataset.f==="sym"?e.target.value:e.target.value; btRowsUI(); const el=$("btRows").querySelector(`[data-i="${i}"][data-f="${e.target.dataset.f}"]`); if(el){el.focus(); const v=el.value; el.value=""; el.value=v;}};
+  $("btRows").onclick=e=>{const d=e.target.closest("[data-del]"); if(d){BT.rows.splice(+d.dataset.del,1); btRowsUI();}};
+  $("btAdd").onclick=()=>{ if(BT.rows.length<12){BT.rows.push(["",10]); btRowsUI();} };
+  $("btRun").onclick=btRun;
+  $("btSave").onclick=()=>{ const name=prompt("Name this setup:", BT.rows.map(r=>r[0]).filter(Boolean).slice(0,3).join("/")); if(!name) return; const l=btSavedUI(); l.unshift({name:name.slice(0,40),rows:BT.rows,from:$("btFrom").value,to:$("btTo").value,init:$("btInit").value,reb:$("btReb").value,div:$("btDiv").checked}); try{localStorage.setItem("md_bt_setups",JSON.stringify(l.slice(0,20)));}catch{} btSavedUI(); toast("Saved in this browser."); };
+  $("btLoad").onchange=()=>{ const l=btSavedUI(), x=l[+$("btLoad").value]; if(!x) return; BT.rows=x.rows.map(r=>[...r]); $("btFrom").value=x.from; $("btTo").value=x.to; $("btInit").value=x.init; $("btReb").value=x.reb; $("btDiv").checked=x.div; btRowsUI(); btRun(); };
+}
+
+/* ----- risk & stress ----- */
+const ETF_SECTOR={SPY:"Broad market",VOO:"Broad market",IVV:"Broad market",VTI:"Broad market",ITOT:"Broad market",QQQ:"Broad market",DIA:"Broad market",IWM:"Broad market",SCHD:"Broad market",VYM:"Broad market",VT:"Broad market",VXUS:"International",EFA:"International",VEA:"International",VWO:"International",EEM:"International",BND:"Bonds",AGG:"Bonds",TLT:"Bonds",IEF:"Bonds",SHY:"Bonds",LQD:"Bonds",HYG:"Bonds",TIP:"Bonds",BIL:"Bonds",GLD:"Commodities",IAU:"Commodities",SLV:"Commodities",DBC:"Commodities",USO:"Commodities",XLK:"Information Technology",XLF:"Financials",XLV:"Health Care",XLE:"Energy",XLY:"Consumer Discretionary",XLP:"Consumer Staples",XLI:"Industrials",XLU:"Utilities",XLB:"Materials",XLRE:"Real Estate",XLC:"Communication Services",VNQ:"Real Estate"};
+let SPSECT=null;
+async function sectorOf(sym){ if(ETF_SECTOR[sym]) return ETF_SECTOR[sym]; if(/-USD$/.test(sym)) return "Crypto"; if(!SPSECT){ try{ const j=await fetch("/sp500.json").then(r=>r.json()); SPSECT=Object.fromEntries((j.rows||[]).map(r=>[r[0].replace(".","-"),r[2]])); }catch{ SPSECT={}; } } return SPSECT[sym]||"Other / not in S&P 500"; }
+const CRISES=[["2008 financial crisis","2007-10-09","2009-03-09"],["2020 COVID crash","2020-02-19","2020-03-23"],["2022 rate shock","2022-01-03","2022-10-12"]];
+function rkSources(){
+  const list=[]; (S.pfs||[]).forEach(p=>{ if(p.holdings&&p.holdings.length) list.push([`pf:${p.id}`,`${VIEW?"Sample":"My"} portfolio: ${p.name}`]); });
+  if(BT.rows.some(r=>r[0])) list.push(["bt","Backtester holdings"]);
+  $("rkSrc").innerHTML=list.map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join("")||`<option value="">No portfolio yet — add holdings in Portfolio or the Backtester</option>`;
+}
+function alignRets(H,syms){
+  const maps=syms.map(s=>new Map(H[s].t.map((t,i)=>[Math.floor(t/86400),(H[s].adj||H[s].close)[i]])));
+  const days=[...maps[0].keys()].filter(d=>maps.every(m=>m.has(d))).sort((a,b)=>a-b);
+  const px=syms.map((s,k)=>days.map(d=>maps[k].get(d)));
+  return {days,rets:px.map(FIN.returns),px};
+}
+async function rkRun(){
+  const src=$("rkSrc").value; if(!src) return;
+  let w=[]; if(src==="bt") w=BT.rows.filter(r=>r[0]&&+r[1]>0).map(r=>[String(r[0]).toUpperCase(),+r[1]]); else { const pf=S.pfs.find(p=>"pf:"+p.id===src); if(pf){ const need=pf.holdings.map(h=>h.symbol).filter(s=>!S.quotes[s]); if(need.length){ try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(need.join(","))); Object.assign(S.quotes,j.quotes);}catch{} } w=pfWeights(pf.holdings); } }
+  w=w.slice(0,15); const tot=w.reduce((a,x)=>a+x[1],0); if(!tot) return; w=w.map(([s,x])=>[s,x/tot]);
+  const val=src==="bt"?(+$("btInit").value||10000):(S.pfs.find(p=>"pf:"+p.id===src)||{holdings:[]}).holdings.reduce((a,h)=>{const q=S.quotes[h.symbol];return a+h.shares*(q&&q.price||h.cost||0);},0);
+  $("rkOut").innerHTML=`<div class="fx-empty"><span class="spin"></span> Loading 3 years of prices and three crisis periods for ${w.length} holdings…</div>`;
+  const to=isoDay(Date.now()), from=isoDay(Date.now()-3*365.25*864e5), syms=w.map(x=>x[0]);
+  const all=[...syms,"SPY","^TNX"], res=await Promise.allSettled(all.map(s=>hist(s,from,to,"1d")));
+  const H={}; all.forEach((s,i)=>{ if(res[i].status==="fulfilled"&&res[i].value.t.length>60) H[s]=res[i].value; });
+  const missing=syms.filter(s=>!H[s]); if(!H.SPY) return $("rkOut").innerHTML=`<div class="fx-warn">Couldn't load S&amp;P 500 prices right now. Try again in a minute.</div>`;
+  const ok=w.filter(([s])=>H[s]), wsum=ok.reduce((a,x)=>a+x[1],0), W=ok.map(([s,x])=>[s,x/wsum]), S2=W.map(x=>x[0]);
+  const {days,rets}=alignRets(H,[...S2,"SPY"]), spy=rets[rets.length-1];
+  const port=spy.map((_,d)=>W.reduce((a,[,x],k)=>a+x*rets[k][d],0));
+  const idx=[1]; port.forEach(r=>idx.push(idx.at(-1)*(1+r)));
+  const vol=FIN.stdev(port)*Math.sqrt(252), mdd=FIN.maxDrawdown(idx).maxDrawdown, v95=FIN.varEs(port,0.95), v99=FIN.varEs(port,0.99), pb=FIN.beta(port,spy);
+  const betas=Object.fromEntries(S2.map((s,k)=>[s,FIN.beta(rets[k],spy)]));
+  // rates: weekly returns vs weekly change in the 10-year yield (percentage points)
+  let rate=null;
+  if(H["^TNX"]){ const tn=new Map(H["^TNX"].t.map((t,i)=>[Math.floor(t/86400),H["^TNX"].close[i]])); const wk=[]; days.forEach((d,i)=>{ if(i%5===0&&tn.has(d)) wk.push(i); });
+    if(wk.length>40){ const dy=wk.slice(1).map((i,k)=>tn.get(days[i])-tn.get(days[wk[k]])); const pr=wk.map(i=>idx[i]); const pw=FIN.returns(pr); rate=FIN.beta(pw,dy); } }
+  const sect={}; for(const [s,x] of W){ const k=await sectorOf(s); sect[k]=(sect[k]||0)+x; }
+  const sects=Object.entries(sect).sort((a,b)=>b[1]-a[1]), hhi=W.reduce((a,[,x])=>a+x*x,0);
+  const corr=S2.map((_,i)=>S2.map((_,j)=>FIN.correlation(rets[i],rets[j])));
+  const shock=m=>W.reduce((a,[s,x])=>a+x*(betas[s]??1)*m,0);
+  $("rkOut").innerHTML=`
+  ${missing.length?`<div class="fx-warn">No price history for ${missing.map(esc).join(", ")}, so ${missing.length>1?"they're":"it's"} left out and the other weights are scaled up.</div>`:""}
+  <div class="bt-kpis">
+    <div><span>Volatility (3-yr)</span><b>${fxP(vol)}</b><small>a year · S&amp;P ${fxP(FIN.stdev(spy)*Math.sqrt(252))}</small></div>
+    <div><span>Beta vs S&amp;P 500</span><b>${pb!=null?pb.toFixed(2):"—"}</b><small>moves ${pb!=null?pb.toFixed(2):"?"}% per 1% market move</small></div>
+    <div><span>Max drawdown (3-yr)</span><b class="down">${fxP(mdd)}</b><small>worst peak-to-trough fall</small></div>
+    <div><span>Effective holdings</span><b>${(1/hhi).toFixed(1)}</b><small>of ${W.length} · largest ${fxP(Math.max(...W.map(x=>x[1])),0)}</small></div>
+    <div><span>1-day VaR (95%)</span><b class="down">${fxP(v95.var,2)}</b><small>${val?"≈ $"+Math.round(v95.var*val).toLocaleString():""} on 1 day in 20</small></div>
+    <div><span>Expected shortfall (95%)</span><b class="down">${fxP(v95.es,2)}</b><small>average loss on those worst days</small></div>
+    <div><span>1-day VaR (99%)</span><b class="down">${fxP(v99.var,2)}</b><small>${val?"≈ $"+Math.round(v99.var*val).toLocaleString():""} on 1 day in 100</small></div>
+    <div><span>Rate sensitivity</span><b class="${cls(rate)}">${rate!=null?fxP(rate/100*1,1):"—"}</b><small>per +1 point in the 10-yr yield (est.)</small></div>
+  </div>
+  <div class="rk-two">
+    <div class="fx-card"><h3>Position concentration</h3><table class="fx-tbl" style="min-width:0">${W.slice().sort((a,b)=>b[1]-a[1]).map(([s,x])=>`<tr><td>${esc(s)} <small>β ${betas[s]!=null?betas[s].toFixed(2):"—"}</small></td><td style="width:55%"><div class="rk-bar"><i style="width:${(x*100).toFixed(1)}%"></i></div></td><td>${fxP(x)}</td></tr>`).join("")}</table></div>
+    <div class="fx-card"><h3>Sector concentration</h3><table class="fx-tbl" style="min-width:0">${sects.map(([k,x])=>`<tr><td>${esc(k)}</td><td style="width:45%"><div class="rk-bar"><i style="width:${(x*100).toFixed(1)}%;background:#9b8cff"></i></div></td><td>${fxP(x)}</td></tr>`).join("")}</table></div>
+  </div>
+  <div class="fx-card"><h3>Correlation matrix <em>daily returns, 3 years · 1 = move together, 0 = unrelated, −1 = opposite</em></h3><div class="fx-wrap"><table class="fx-tbl rk-heat" style="min-width:${80+S2.length*58}px"><thead><tr><th></th>${S2.map(s=>`<th style="text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
+  ${S2.map((s,i)=>`<tr><td>${esc(s)}</td>${corr[i].map(c=>`<td style="background:${c==null?"transparent":c>=0?`rgba(255,107,107,${(c*0.55).toFixed(2)})`:`rgba(77,163,255,${(-c*0.55).toFixed(2)})`}">${c==null?"—":c.toFixed(2)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
+  <div class="fx-card"><h3>Hypothetical shocks <em>simple estimates: each holding moves its beta × the shock</em></h3><div class="rk-scn">
+    ${[-0.1,-0.2,-0.3].map(m=>{const x=shock(m);return `<div><span>S&amp;P 500 falls ${Math.abs(m*100)}%</span><b class="down">${fxP(x)}</b><small>${val?"≈ −$"+Math.round(-x*val).toLocaleString():""}</small></div>`}).join("")}
+    <div><span>10-yr yield rises 1 point</span><b class="${cls(rate)}">${rate!=null?fxP(rate/100):"—"}</b><small>estimated from the portfolio's last 3 years vs. yield changes</small></div>
+    <div><span>Sector selloff: <select id="rkSect" class="field" style="padding:2px 4px;font-size:12px">${sects.map(([k])=>`<option>${esc(k)}</option>`).join("")}</select> −20%</span><b class="down" id="rkSectOut">${fxP(-0.2*(sects[0]?sects[0][1]:0))}</b><small>only the holdings in that sector fall</small></div>
+  </div></div>
+  <div class="fx-card"><h3>Historical crises <em>what these holdings actually did then</em></h3><div id="rkHist"><span class="spin"></span> Loading crisis periods…</div></div>
+  <div class="fx-card"><h3>Method</h3><p class="fx-formula">Weights are by current market value${src==="bt"?" (backtester weights)":""}, held constant (rebalanced daily) for the 3-year statistics. VaR and expected shortfall are historical: the 5th/1st-percentile daily return over 3 years and the average beyond it. Hypothetical shocks are linear and ignore that correlations rise in a crisis; historical replays use real prices where they exist. None of these are predictions or guarantees.</p></div>`;
+  $("rkSect").onchange=e=>{ $("rkSectOut").innerHTML=fxP(-0.2*(sect[e.target.value]||0)); };
+  // crisis replays
+  const rows=[];
+  for(const [name,a,b] of CRISES){
+    const spyH=await hist("SPY",a,b,"1d").catch(()=>null); const ret=h=>{const p=h&&(h.adj||h.close); return p&&p.length>3?p.at(-1)/p[0]-1:null;}; const sr=ret(spyH);
+    const per=[]; for(const [s,x] of W){ const h=await hist(s,a,b,"1d").catch(()=>null); const first=h&&h.t.length?h.t[0]:null; const real=h&&first&&first<=Date.parse(a)/1000+5*86400?ret(h):null; per.push([s,x,real!=null?real:(betas[s]!=null&&sr!=null?betas[s]*sr:null),real==null]); }
+    const tot=per.reduce((acc,[,x,r])=>acc+(r==null?0:x*r),0), est=per.filter(p=>p[3]).map(p=>p[0]);
+    rows.push(`<tr><td>${name}<small>${a} → ${b}</small></td><td class="${cls(tot)}">${fxP(tot)}</td><td class="${cls(sr)}">${fxP(sr)}</td><td style="white-space:normal;font-family:var(--sans);font-size:12px;text-align:left">${est.length?`Estimated with beta × S&amp;P for ${est.map(esc).join(", ")} (didn't trade then)`:"All holdings traded then — real prices"}</td></tr>`);
+  }
+  if($("rkHist")) $("rkHist").innerHTML=`<div class="fx-wrap"><table class="fx-tbl"><thead><tr><th>Period</th><th>Portfolio</th><th>S&amp;P 500</th><th style="text-align:left">Data</th></tr></thead><tbody>${rows.join("")}</tbody></table></div><p class="fx-note">Peak-to-trough windows of the S&amp;P 500, using dividend-adjusted prices.</p>`;
+}
+function rkInit(){ rkSources(); if(!RK.wired){ RK.wired=true; $("rkRun").onclick=rkRun; } }
+const RK={};
 
 /* ---------- Autopilot: free rules-based paper trading (no Claude API) ---------- */
 const $m=n=>n==null||isNaN(n)?"—":(n<0?"−$":"$")+fmt(Math.abs(n));

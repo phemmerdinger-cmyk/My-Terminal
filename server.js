@@ -1831,6 +1831,32 @@ async function secFundamentals(sym) {
   });
 }
 
+// ---------------------------------------------------------------- long price history for backtests and stress tests
+// Daily or weekly closes plus Yahoo's dividend-and-split adjusted closes ("adj") between two dates.
+// Cached for 6 hours; the backtester and risk tools run their math in the browser.
+async function longHistory(sym, from, to, interval) {
+  const p1 = Math.floor(Date.parse(from + "T00:00:00Z") / 1000), p2 = Math.floor(Date.parse(to + "T23:59:59Z") / 1000);
+  if (!isFinite(p1) || !isFinite(p2) || p2 <= p1) throw new Error("bad dates");
+  const iv = interval === "1wk" ? "1wk" : interval === "1mo" ? "1mo" : "1d";
+  return cached(`lh:${sym}:${p1}:${p2}:${iv}`, 6 * 3600e3, async () => {
+    let j = null, err;
+    for (const [i, host] of ["query1", "query2"].entries()) {
+      try {
+        if (i) await new Promise((ok) => setTimeout(ok, 700));
+        j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=${iv}&events=div%2Csplit`, "application/json"));
+        if (j.chart && j.chart.result && j.chart.result[0]) break;
+      } catch (e) { err = e; j = null; }
+    }
+    const r = j && j.chart && j.chart.result && j.chart.result[0];
+    if (!r || !r.timestamp) throw err || new Error((j && j.chart && j.chart.error && j.chart.error.description) || "no history");
+    const q = r.indicators.quote[0], adj = (r.indicators.adjclose && r.indicators.adjclose[0] && r.indicators.adjclose[0].adjclose) || null;
+    const t = [], c = [], a = [];
+    r.timestamp.forEach((ts, i) => { if (q.close[i] == null) return; t.push(ts); c.push(+q.close[i].toFixed(4)); a.push(adj && adj[i] != null ? +adj[i].toFixed(4) : null); });
+    const divs = r.events && r.events.dividends ? Object.keys(r.events.dividends).length : 0;
+    return { symbol: r.meta.symbol, name: r.meta.shortName || r.meta.longName || r.meta.symbol, currency: r.meta.currency, interval: iv, first: (r.meta.firstTradeDate || t[0]) || null, t, close: c, adj: a.some((x) => x != null) ? a : null, dividends: divs, source: "Yahoo Finance chart data" };
+  });
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -1880,6 +1906,13 @@ async function handle(req, res) {
       if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
       if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
+      if (u.pathname === "/api/pub/hist") {
+        const [s] = parseList(u.searchParams.get("symbol"), 1); const d = /^\d{4}-\d{2}-\d{2}$/;
+        const from = String(u.searchParams.get("from") || ""), to = String(u.searchParams.get("to") || new Date().toISOString().slice(0, 10));
+        if (!s || !d.test(from) || !d.test(to)) return send(res, 400, { error: "symbol, from and to (YYYY-MM-DD) are required" });
+        try { return send(res, 200, await longHistory(s, from, to, u.searchParams.get("interval"))); }
+        catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
+      }
       if (u.pathname === "/api/pub/sec") {
         try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
