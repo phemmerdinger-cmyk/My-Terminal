@@ -6,9 +6,10 @@
 /* View-only mode: visitors can look around but can't use Claude, sync, or edit portfolios/watchlist.
    The owner opens the site once with ?owner and enters the Claude password to unlock this device
    (?viewer switches a device back to view-only). */
-(function(){var o=false;try{var q=location.search;if(/[?&]viewer\b/.test(q))localStorage.removeItem("ownerMode");o=localStorage.getItem("ownerMode")==="1";}catch(e){}
-/* ?visitor always shows the public view-only site, even on an unlocked device, and never touches this device's saved data */
-if(/[?&]visitor\b/.test(location.search)){o=false;window.__VISITOR=true;}
+(function(){var o=false,demo=/^\/demo\b/.test(location.pathname);
+/* The server only sends the real site to a signed-in owner; /demo is the public recruiter view and never touches this device's saved data */
+try{var q=location.search;if(/[?&]viewer\b/.test(q))localStorage.removeItem("ownerMode");else if(!demo)localStorage.setItem("ownerMode","1");o=!demo&&localStorage.getItem("ownerMode")==="1";}catch(e){o=!demo;}
+if(demo||/[?&]visitor\b/.test(location.search)){o=false;window.__VISITOR=true;}
 if(!o)document.documentElement.classList.add("viewonly");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -28,7 +29,7 @@ if(!o)document.documentElement.classList.add("viewonly");})();
 <link rel="manifest" id="appManifest" href="/manifest.json">
 <link rel="apple-touch-icon" id="touchIcon" href="/apple-touch-icon.png">
 <script>/* tab + home-screen icon: pink on your unlocked (owner) devices, orange for visitors */
-(function(){try{var q=location.search,own=!/[?&](visitor|viewer)\b/.test(q)&&localStorage.getItem("ownerMode")==="1";if(!own)return;
+(function(){try{var q=location.search,own=!/^\/demo\b/.test(location.pathname)&&!/[?&](visitor|viewer)\b/.test(q)&&localStorage.getItem("ownerMode")==="1";if(!own)return;
 document.getElementById("favIcon").href="/favicon-owner.svg?v=3";
 document.getElementById("touchIcon").href="/apple-touch-icon-owner.png";document.getElementById("appManifest").href="/manifest-owner.json";
 document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
@@ -520,6 +521,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .modal-box .row{display:flex;gap:8px}
 .sync-ok{color:var(--up)} .sync-warn{color:#eab308}
 #syncBtn.on{color:var(--up);border-color:rgba(33,195,122,.5)}
+a.iconbtn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 /* MARKETS top: mood + earnings */
 .mk-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:18px;margin-bottom:24px}
 .mood-card,.earn-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
@@ -1182,6 +1184,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <div class="live stale" id="live" title="Connecting…"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
     <button class="iconbtn" id="installBtn" hidden title="Install Market Desk as an app">⤓ Install app</button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
+    <a class="iconbtn no-vo" id="logoutBtn" href="/logout" title="Sign out of your private site">⎋ <span class="tlong">Sign out</span></a>
     <button class="iconbtn" id="notifBtn" title="Desktop alerts for headlines on your stocks">🔔 Alerts</button>
   </div>
 </header>
@@ -1650,7 +1653,7 @@ function clNeed(run){ if(CL.pass) return false; CL.pending=run; clOpen(); toast(
 try{ localStorage.removeItem("claudePass"); }catch{}
 const api = (p,opt={})=>{
   if(/^\/api\/(predict|ask|autopilot\/restore)/.test(p)&&CL.pass) opt={...opt,headers:{...(opt.headers||{}),"x-claude-pass":CL.pass}};
-  return fetch(p,opt).then(async r=>{const c=+r.headers.get("x-api-cost")||0; if(c>0&&typeof apiSpent==="function") apiSpent(c,p);const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error||r.status);e.code=j.code||j.error;if(e.code==="locked"&&typeof clLocked==="function") clLocked(j.error);throw e;}return j;});
+  return fetch(p,opt).then(async r=>{const c=+r.headers.get("x-api-cost")||0; if(c>0&&typeof apiSpent==="function") apiSpent(c,p);const j=await r.json().catch(()=>({}));if(r.status===401&&j.code==="private"&&!window.__VISITOR){location.href="/login";}if(!r.ok){const e=new Error(j.error||r.status);e.code=j.code||j.error;if(e.code==="locked"&&typeof clLocked==="function") clLocked(j.error);throw e;}return j;});
 };
 
 /* ---------- clock & market status ---------- */
@@ -2454,7 +2457,7 @@ function apRender(d){
     <li><b>Busting:</b> if the account falls below $1,000 (a 90% loss) the run ends, is saved below as a test run, and a new run starts with a fresh $10,000.</li>
     <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. The S&amp;P 500 side is the same $10,000 put into the index on the run's first day.</li>
   </ul>
-  <p class="ap-note" style="margin:10px 0 0">${d.durable?"Saved in permanent storage.":"The server forgets its copy when the site updates; your owner browser keeps a backup and puts it back automatically."}</p></div>
+  <p class="ap-note" style="margin:10px 0 0">${d.durable?"Saved in permanent storage.":"The server forgets its copy when the site updates; your signed-in browser keeps a backup and puts it back automatically."}</p></div>
   <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${busts} bust${busts===1?"":"s"} so far`:"no busts yet — every bust starts a new $10,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
 }
@@ -2465,10 +2468,10 @@ async function apLoadView(){
     if(!window.__VISITOR){
       let bk=null; try{ bk=JSON.parse(localStorage.getItem("apBackup2")||"null"); }catch{}
       const size=x=>(x.trades||[]).length+((x.runs||[]).length*1e4);
-      if(bk&&size(bk)>size(d)&&CL.pass){
+      if(bk&&size(bk)>size(d)){
         const r=await api("/api/autopilot/restore",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(bk)}).catch(()=>null);
         if(r&&r.ok){ toast("🤖 Trading history restored from this browser's backup."); return apLoadView(); }
-      } else if(bk&&size(bk)>size(d)&&!CL.pass){ toast("🤖 The server lost the bot's history in an update — unlock Claude once and it restores from this browser."); }
+      }
       if(!bk||size(d)>=size(bk)){
         const raw={v:2,run:d.run,runs:d.runs,spx0:d.spx0,firstTrade:d.firstTrade,start:d.start,cash:d.cash,positions:Object.fromEntries(d.positions.map(p=>[p.sym,{shares:p.shares,cost:p.cost,at:p.at,peak:Math.max(p.peak||p.cost,p.price),name:p.name}])),trades:d.trades,equity:d.equity,intraday:d.intraday,recent:d.recent,lastRebalance:d.lastRebalance,lastScan:d.lastScan,updated:d.updated};
         try{ localStorage.setItem("apBackup2",JSON.stringify(raw)); }catch{}
@@ -3197,12 +3200,12 @@ function syncUI(){
   const on=!!S.sync.code; $("syncBtn").classList.toggle("on",on&&S.sync.status==="ok"); $("syncLbl").textContent=on?(S.sync.status==="err"?"Sync error":"Synced"):"Sync";
   if($("syncModal").hidden) return;
   if(!on){
-    const sug=Math.random().toString(36).slice(2,6).toUpperCase()+"-"+Math.random().toString(36).slice(2,6).toUpperCase()+"-"+Math.random().toString(36).slice(2,6).toUpperCase();
+    const sug=(()=>{const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",v=crypto.getRandomValues(new Uint8Array(20));return [...v].map((x,i)=>A[x%A.length]+(i%5===4&&i<19?"-":"")).join("");})();
     $("syncBody").innerHTML=`<p>Make up a private <b>sync code</b> and enter the <b>same code</b> on your computer and your phone. Your portfolios, watchlist, price alerts and prediction database will then stay the same everywhere.</p>
       <p>Treat it like a password: anyone with your code can see and change this data.</p>
       <form class="row" id="syncForm"><input class="field" id="syncCode" value="${sug}" maxlength="80" style="flex:1;font-family:var(--mono)"><button class="btn">Turn on sync</button></form>
       <p style="margin-top:10px;font-size:12px">Already set up on another device? Replace the code above with the one you used there.</p>`;
-    $("syncForm").onsubmit=async e=>{ e.preventDefault(); const c=$("syncCode").value.trim(); if(c.length<6) return toast("Use at least 6 characters.");
+    $("syncForm").onsubmit=async e=>{ e.preventDefault(); const c=$("syncCode").value.trim(); if(c.length<12) return toast("Use at least 12 characters so nobody can guess it.");
       try{ localStorage.setItem("preSyncBackup",JSON.stringify(syncDoc())); }catch{}
       S.sync.code=c; store.set("syncCode",c); S.sync.updated=0; $("syncBody").innerHTML='<p><span class="spin"></span>Connecting…</p>';
       try{ const j=await api("/api/sync?code="+encodeURIComponent(c)); S.sync.durable=j.durable;

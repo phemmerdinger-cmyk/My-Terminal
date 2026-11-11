@@ -644,7 +644,7 @@ async function sp500Snapshot() {
 // Only a one-way scrypt hash of the password lives in this code. To change the password, set
 // CLAUDE_PASSWORD in Render's Environment settings (it takes priority over the hash below).
 const nodeCrypto = require("crypto");
-const PASS_HASH = process.env.CLAUDE_PASSWORD_HASH || "1cec6559abba0f21217c3da332525de6:3b6fa7c7c1f84925bd3996c9e92a95e84b870569b46891d817182942fd43b65e";
+const PASS_HASH = process.env.CLAUDE_PASSWORD_HASH || "c0ac999253905a7b3be1af512276821d:4d4a88f54ad298c56217184506034a7a802b03db15033fb68f1d3cf61a8ec18d";
 const goodPass = new Set(); // sha256 of passwords already verified (skips the slow check next time)
 const badTries = new Map(); // ip -> [times] of wrong passwords
 function passOk(pw) {
@@ -663,6 +663,66 @@ function passOk(pw) {
   if (ok) goodPass.add(tag);
   return ok;
 }
+
+// ---------------------------------------------------------------- private site login
+// The real site needs the owner's site password; everyone else only gets the public demo (/demo).
+// Login turns the password into a session key with scrypt (slow on purpose) and stores it in an
+// HttpOnly cookie; each request is checked by hashing that cookie and comparing with SITE_CHECK.
+// Only that one-way check value is in this (public) code, never the password or the key.
+// SITE_PASSWORD in Render's settings replaces the built-in password.
+const SITE_SALT = "md-site-v1:cb944adbcd40a4ff562c03f47f9498b7";
+let SITE_CHECK = "bf2a3c78b6d18ed0605022ddd41ce1168c86dd92efe4fb4cca2ce9b36b734887";
+const siteKey = (pw) => nodeCrypto.scryptSync(pw, SITE_SALT, 32, { N: 32768, r: 8, p: 1, maxmem: 96 * 1024 * 1024 }).toString("hex");
+if (process.env.SITE_PASSWORD) SITE_CHECK = nodeCrypto.createHash("sha256").update(Buffer.from(siteKey(process.env.SITE_PASSWORD), "hex")).digest("hex");
+const keyOk = (hex) => /^[0-9a-f]{64}$/.test(hex || "") && nodeCrypto.timingSafeEqual(nodeCrypto.createHash("sha256").update(Buffer.from(hex, "hex")).digest(), Buffer.from(SITE_CHECK, "hex"));
+const cookieOf = (req, name) => { const m = String(req.headers.cookie || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)")); return m ? decodeURIComponent(m[1]) : ""; };
+const isOwner = (req) => keyOk(cookieOf(req, "md_owner"));
+const loginTries = new Map();
+function siteLogin(req, pw) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const now = Date.now(), tries = (loginTries.get(ip) || []).filter((t) => now - t < 15 * 60e3);
+  if (tries.length >= 8) return { status: 429, error: "Too many wrong passwords. Try again in 15 minutes." };
+  if (typeof pw !== "string" || !pw || pw.length > 200) return { status: 400, error: "Enter your password." };
+  const key = siteKey(pw);
+  if (keyOk(key)) return { status: 200, key };
+  tries.push(now); loginTries.set(ip, tries); if (loginTries.size > 5000) loginTries.clear();
+  return { status: 401, error: "Wrong password." };
+}
+const LOGIN_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Market Desk · Sign in</title><meta name="robots" content="noindex"><link rel="icon" type="image/svg+xml" href="/favicon-owner.svg?v=3"><link rel="apple-touch-icon" href="/apple-touch-icon-owner.png">
+<meta name="theme-color" content="#0b0d10"><style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0d10;color:#e8ecf1;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;padding:16px}
+form{width:min(380px,100%);background:#12151a;border:1px solid #232932;border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;gap:14px}
+.b{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.14em;font-size:13px}.b i{width:22px;height:22px;background:url(/favicon-owner.svg?v=3) center/contain no-repeat}.b span{color:#ff6fae}
+h1{margin:4px 0 0;font-size:22px;letter-spacing:-.01em}p{margin:0;color:#8b95a3;font-size:13px}
+input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #2d3540;background:#0b0d10;color:#e8ecf1;font-size:16px}input:focus{outline:2px solid #ff6fae;border-color:transparent}
+button{padding:12px;border:0;border-radius:10px;background:#ff6fae;color:#1a0b12;font-weight:700;font-size:15px;cursor:pointer}button:disabled{opacity:.6}
+.e{color:#ff6b6b;font-size:13px;min-height:18px}a{color:#8b95a3;font-size:13px;text-align:center}
+</style></head><body><form id="f"><div class="b"><i></i>MARKET <span>DESK</span></div><h1>Owner sign-in</h1><p>This is Peter's private site. Recruiters and visitors: the public demo is open to everyone.</p>
+<input type="text" name="username" value="owner" autocomplete="username" hidden><input id="p" type="password" placeholder="Password" autocomplete="current-password" autofocus required>
+<div class="e" id="e"></div><button id="b">Sign in</button><a href="/demo">Open the public demo →</a></form>
+<script>document.getElementById("f").onsubmit=async function(ev){ev.preventDefault();var b=document.getElementById("b"),e=document.getElementById("e");b.disabled=true;e.textContent="";
+try{var r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:document.getElementById("p").value})});var j=await r.json().catch(function(){return{}});
+if(!r.ok)throw new Error(j.error||"Wrong password.");try{localStorage.setItem("ownerMode","1")}catch(x){}var n=new URLSearchParams(location.search).get("next")||"/";location.replace(/^\\/(?!\\/)/.test(n)?n:"/");}
+catch(x){e.textContent=x.message;b.disabled=false;document.getElementById("p").select();}};</script></body></html>`;
+// API routes anyone may use (the demo needs public market data); everything else is owner-only
+const PUBLIC_API = new Set(["/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
+const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || (u.pathname === "/api/autopilot" && req.method === "GET") || u.pathname.startsWith("/api/pub/");
+// ---------------------------------------------------------------- abuse protection
+// Per-visitor request budget for the API (keeps outbound traffic low so the free plan is never suspended)
+const RL = new Map();
+function rateLimited(req, owner) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const now = Date.now(), max = owner ? 600 : 180;
+  let b = RL.get(ip); if (!b || now - b.t > 60e3) { b = { t: now, n: 0 }; RL.set(ip, b); }
+  b.n++; if (RL.size > 20000) RL.clear();
+  return b.n > max;
+}
+const SEC_HEADERS = {
+  "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin", "X-Frame-Options": "DENY",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()", "Strict-Transport-Security": "max-age=15552000",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+};
 // Returns null if allowed, or [status, body] to send back
 function claudeGate(req, pw) {
   const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
@@ -679,13 +739,13 @@ function claudeGate(req, pw) {
 // Credit protection: the site is public, so every real call to Claude counts toward a daily cap
 // (CLAUDE_DAILY_LIMIT, default 60 ≈ $1/day worst case) and each visitor gets at most 20 Claude
 // requests per hour. Cached predictions (reused for 30 minutes) are free and don't count.
-const DAILY_LIMIT = Math.max(0, parseInt(process.env.CLAUDE_DAILY_LIMIT || "60", 10) || 0);
+const DAILY_LIMIT = Math.max(0, parseInt(process.env.CLAUDE_DAILY_LIMIT || "0", 10) || 0);
 const usage = { day: "", count: 0 };
 const etDay = () => new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
 function claudeUsed() { if (usage.day !== etDay()) { usage.day = etDay(); usage.count = 0; } return usage.count; }
 function spendOne() {
   if (claudeUsed() >= DAILY_LIMIT) {
-    const e = new Error(`Daily Claude limit reached (${DAILY_LIMIT} requests). It resets at midnight Eastern, or raise CLAUDE_DAILY_LIMIT in Render.`);
+    const e = new Error(DAILY_LIMIT ? `Daily Claude limit reached (${DAILY_LIMIT} requests). It resets at midnight Eastern, or raise CLAUDE_DAILY_LIMIT in Render.` : "Claude is turned off so the site costs $0. To turn it on, set CLAUDE_DAILY_LIMIT (for example 20) in Render's Environment settings.");
     e.code = "daily_limit"; throw e;
   }
   usage.count++;
@@ -1679,10 +1739,18 @@ function parseList(v, max) {
   return [...new Set(String(v || "").toUpperCase().split(",").map((s) => s.trim()).filter((s) => TICKER_RE.test(s)))].slice(0, max);
 }
 
-function send(res, code, body, type = "application/json") {
+const zlib = require("zlib");
+const STATIC_GZ = new Map(); // file -> {mtime, raw, gz, etag}
+function send(res, code, body, type = "application/json", extra = {}) {
   const st = costCtx.getStore();
-  res.writeHead(code, { "Content-Type": type, "Cache-Control": "no-store", ...(st && st.cost > 0 ? { "X-Api-Cost": st.cost.toFixed(6) } : {}) });
-  res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
+  let buf = typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body);
+  const h = { ...SEC_HEADERS, "Content-Type": type, "Cache-Control": "no-store", ...(st && st.cost > 0 ? { "X-Api-Cost": st.cost.toFixed(6) } : {}), ...extra };
+  const ae = String((res.req && res.req.headers["accept-encoding"]) || "");
+  if (!h["Content-Encoding"] && /json|text|javascript|svg|xml/.test(type) && buf.length > 1024 && /\bgzip\b/.test(ae)) {
+    buf = zlib.gzipSync(buf, { level: 6 }); h["Content-Encoding"] = "gzip"; h.Vary = "Accept-Encoding";
+  }
+  res.writeHead(code, h);
+  res.end(buf);
 }
 
 process.on("unhandledRejection", (e) => console.error("unhandled:", e && e.message));
@@ -1694,6 +1762,17 @@ http
 async function handle(req, res) {
     const u = new URL(req.url, "http://x");
     try {
+      if (u.pathname.startsWith("/api/")) {
+        const owner = isOwner(req);
+        if (u.pathname !== "/api/stream" && u.pathname !== "/api/health" && rateLimited(req, owner)) return send(res, 429, { error: "Too many requests — slow down for a minute." }, "application/json", { "Retry-After": "60" });
+        if (!owner && !isPublicApi(u, req)) return send(res, 401, { error: "This part of Market Desk is private.", code: "private" });
+        if (u.pathname === "/api/login" && req.method === "POST") {
+          let pw = ""; try { pw = (await readBody(req)).password; } catch {}
+          const r = siteLogin(req, pw);
+          if (r.status !== 200) return send(res, r.status, { error: r.error });
+          return send(res, 200, { ok: true }, "application/json", { "Set-Cookie": `md_owner=${r.key}; Path=/; Max-Age=${180 * 86400}; HttpOnly; Secure; SameSite=Lax` });
+        }
+      }
       if (u.pathname === "/api/news") {
         const r = String(u.searchParams.get("range") || "");
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
@@ -1703,8 +1782,7 @@ async function handle(req, res) {
       if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
-      if (u.pathname === "/api/autopilot/restore" && req.method === "POST") {
-        { const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g); }
+      if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
         if (!apLoaded) await apLoad();
         let doc = null; try { doc = await readBody(req); } catch {}
         return send(res, 200, apRestore(doc));
@@ -1779,11 +1857,38 @@ async function handle(req, res) {
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
-      let file = path.normalize(path.join(PUBLIC, u.pathname === "/" || u.pathname === "/ai-vs-sp500" ? "index.html" : u.pathname));
-      if (!file.startsWith(PUBLIC)) return send(res, 403, "Forbidden", "text/plain");
-      fs.readFile(file, (err, data) => {
-        if (err) return send(res, 404, "Not found", "text/plain");
-        send(res, 200, data, MIME[path.extname(file)] || "application/octet-stream");
+      // pages: the real site is owner-only; /demo is the public recruiter view
+      const owner = isOwner(req);
+      const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
+      if (u.pathname === "/login") return owner ? go("/") : send(res, 200, LOGIN_HTML, "text/html; charset=utf-8");
+      if (u.pathname === "/logout") return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
+      let page = null;
+      if (u.pathname === "/demo" || u.pathname === "/demo/") page = "index.html";
+      else if (u.pathname === "/" || u.pathname === "/index.html" || u.pathname === "/ai-vs-sp500") {
+        if (u.searchParams.has("visitor")) return go("/demo");
+        if (!owner) return go(u.pathname === "/ai-vs-sp500" ? "/demo#aitrade" : "/login");
+        page = "index.html";
+      }
+      const file = path.normalize(path.join(PUBLIC, page || u.pathname));
+      if (!file.startsWith(PUBLIC + path.sep) || (!page && file === path.join(PUBLIC, "index.html"))) return send(res, 404, "Not found", "text/plain");
+      fs.stat(file, (err, stt) => {
+        if (err || !stt.isFile()) return send(res, 404, "Not found", "text/plain");
+        const type = MIME[path.extname(file)] || "application/octet-stream";
+        let c = STATIC_GZ.get(file);
+        const done = () => {
+          const html = /html/.test(type);
+          const hdr = { ETag: c.etag, "Cache-Control": html ? "no-cache" : "public, max-age=86400" };
+          if (req.headers["if-none-match"] === c.etag) return send(res, 304, "", type, hdr);
+          const gz = /\bgzip\b/.test(String(req.headers["accept-encoding"] || "")) && c.gz;
+          send(res, 200, gz || c.raw, type, gz ? { ...hdr, "Content-Encoding": "gzip", Vary: "Accept-Encoding" } : hdr);
+        };
+        if (c && c.mtime === stt.mtimeMs) return done();
+        fs.readFile(file, (e2, data) => {
+          if (e2) return send(res, 404, "Not found", "text/plain");
+          const comp = /json|text|javascript|svg|xml|manifest|icon/.test(type) && data.length > 1024;
+          c = { mtime: stt.mtimeMs, raw: data, gz: comp ? zlib.gzipSync(data, { level: 9 }) : null, etag: '"' + nodeCrypto.createHash("sha1").update(data).digest("hex").slice(0, 16) + '"' };
+          STATIC_GZ.set(file, c); done();
+        });
       });
     } catch (e) {
       send(res, 500, { error: String(e.message || e) });

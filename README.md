@@ -64,10 +64,14 @@ Railway, Fly.io or any VPS also work (there's a `Dockerfile`). Free tiers may sl
 
 > **Note:** if you set `ANTHROPIC_API_KEY` on a public server, anyone with the link can run predictions on your key. Keep the URL private. Each prediction is cached for 30 minutes to limit cost.
 
-## View-only for visitors
-Anyone who opens the link sees the site in **view-only** mode: they can browse news, markets, research, the heatmap and a sample portfolio with its risk analysis, but the Claude tab, Ask Claude, the Claude switch, Sync, and all portfolio/watchlist editing are hidden and turned off. Claude requests are also blocked on the server without the password.
+## Private site + public demo
+The real site is private: opening `…onrender.com/` shows a sign-in page, and only the site password unlocks it (the browser then stays signed in for 180 days; **Sign out** in the header ends it). Every private API (sync, Claude, the bot's restore) is blocked on the server without that sign-in.
 
-To use the full site on your own device, open it once as `…onrender.com/?owner` and enter the Claude password. That device stays unlocked. Open `?viewer` to switch a device back to view-only.
+Recruiters and visitors use the public demo at `…onrender.com/demo`: live market data, news, the heatmap, the AI vs. S&P experiment and a sample portfolio, with none of the owner's data and no Claude. Old `?visitor` links redirect there.
+
+Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment settings to replace the built-in passwords. Claude is **off by default** so the site costs $0; set `CLAUDE_DAILY_LIMIT` (for example 20) to turn it on.
+
+Run the checks with `npm test`.
 
 ## Settings
 - `PORT`: default 3000
