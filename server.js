@@ -1445,9 +1445,29 @@ const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 async function apMarketOpen() {
   const t = etParts();
   if (process.env.AP_TEST) return { open: process.env.AP_TEST !== "closed", t: { ...t, wd: "Tue", min: process.env.AP_TEST === "closed" ? 20 * 60 : 11 * 60 } };
-  if (t.wd === "Sat" || t.wd === "Sun" || t.min < 9 * 60 + 30 || t.min >= 16 * 60) return { open: false, t };
-  try { const q = await quote("SPY"); return { open: Date.now() - q.marketTime < 20 * 60e3, t, spy: q }; } catch { return { open: false, t }; }
+  const BOT = BOTDIAG.market;
+  if (t.wd === "Sat" || t.wd === "Sun" || t.min < 9 * 60 + 30 || t.min >= 16 * 60) { Object.assign(BOT, { at: Date.now(), open: false, why: "outside 9:30 AM–4 PM ET on a weekday" }); return { open: false, t }; }
+  if (NYSE_HOLIDAYS.has(t.day)) { Object.assign(BOT, { at: Date.now(), open: false, why: "NYSE holiday" }); return { open: false, t }; }
+  if (NYSE_EARLY.has(t.day) && t.min >= 13 * 60) { Object.assign(BOT, { at: Date.now(), open: false, why: "early close (1 PM)" }); return { open: false, t }; }
+  try {
+    const q = await quote("SPY"), fresh = Date.now() - q.marketTime < 20 * 60e3;
+    // a quote older than 20 minutes in the middle of a session means trading is halted or the day is a holiday we don't know about
+    const open = fresh || t.min < 9 * 60 + 50;
+    Object.assign(BOT, { at: Date.now(), open, why: open ? "open (live SPY quote)" : "SPY quote hasn't updated for 20+ minutes", quoteError: null });
+    return { open, t, spy: q };
+  } catch (e) {
+    // price feed hiccup: trust the exchange calendar instead of sitting out the whole day
+    Object.assign(BOT, { at: Date.now(), open: true, why: "open (by the exchange calendar; SPY quote unavailable)", quoteError: String(e.message || e) });
+    return { open: true, t };
+  }
 }
+// NYSE full-day holidays and 1 PM early closes, 2026–2027 (nyse.com/markets/hours-calendars)
+const NYSE_HOLIDAYS = new Set(["2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
+  "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24"]);
+const NYSE_EARLY = new Set(["2026-11-27", "2026-12-24", "2027-11-26"]);
+// What each bot last did and why — shown on the page so "why no trades?" has an answer
+const BOTDIAG = { market: {}, swing: { errors: [] }, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
+const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
 const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
@@ -1496,7 +1516,7 @@ function apMatcher(sym, name) {
 // stories (trending), Smart Money (Fed, SEC, Treasury, newsletters), and each candidate's own Yahoo feed.
 async function apNewsPool(syms) {
   const pool = [];
-  const add = (title, time, src, w = 1) => { if (title) pool.push({ title, time: time || Date.now(), src, w }); };
+  const add = (title, time, src, w = 1) => { if (title) pool.push({ title, time: time || Date.now(), src, w, dated: !!time }); };
   try { (await getNews([], "24h")).items.forEach((i) => add(i.title, i.time, i.source)); } catch {}
   try { (await getTrending()).items.forEach((i) => add(i.title, Date.now() - 3 * 3600e3, "trending", 1.5)); } catch {}
   let macro = 0, swan = null;
@@ -1504,7 +1524,7 @@ async function apNewsPool(syms) {
   for (const s of syms) {
     try { const r = await loadSource("yahoo", SOURCES.yahoo.ticker(s), s); r.items.forEach((i) => pool.push({ title: i.title, time: i.time || Date.now(), src: "yahoo", w: 1, sym: s })); } catch {}
   }
-  for (const p of pool) if (!swan && Date.now() - p.time < 24 * 3600e3 && AP_SWAN.some((re) => re.test(p.title))) swan = p.title;
+  for (const p of pool) if (!swan && p.dated && p.src !== "smart" && p.src !== "trending" && Date.now() - p.time < 24 * 3600e3 && AP_SWAN.some((re) => re.test(p.title))) swan = p.title;
   const seen = new Set();
   return { pool: pool.filter((p) => { const k = p.title.toLowerCase().slice(0, 90); if (seen.has(k)) return false; seen.add(k); return true; }), macro: clamp(macro, -3, 3), swan };
 }
@@ -1590,7 +1610,9 @@ async function apScore(live) {
   let spx = null; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((c) => c.close); spx = { px: (q["^GSPC"] && q["^GSPC"].price) || cl[cl.length - 1], m200: sma(cl, 200), day: q["^GSPC"] && q["^GSPC"].changePct }; } catch {}
   const vix = q["^VIX"] && !q["^VIX"].error ? q["^VIX"] : null;
   const riskOff = !!(spx && spx.m200 && spx.px < spx.m200);
-  const stress = (vix && (vix.price >= 35 || vix.changePct >= 25)) ? `VIX fear index at ${vix.price.toFixed(1)}` : spx && spx.day <= -3 ? `S&P 500 down ${spx.day.toFixed(1)}% today` : news.swan ? `Black-swan headline: “${news.swan.slice(0, 110)}”` : null;
+  // defense mode needs the market to agree: a scary headline alone (often opinion pieces) isn't enough
+  const marketShaky = (vix && vix.price >= 25) || (spx && spx.day != null && spx.day <= -1.5);
+  const stress = (vix && (vix.price >= 35 || vix.changePct >= 25)) ? `VIX fear index at ${vix.price.toFixed(1)}` : spx && spx.day <= -3 ? `S&P 500 down ${spx.day.toFixed(1)}% today` : news.swan && marketShaky ? `Black-swan headline with the market under stress: “${news.swan.slice(0, 110)}”` : null;
   return { list: out, riskOff, stress, macro: news.macro, vix: vix && vix.price, spyDay };
 }
 // Turns scores into trades on `st` (the real account, or a copy when planning overnight).
@@ -1681,6 +1703,8 @@ async function apTick() {
       }
       return;
     }
+    BOTDIAG.swing.lastOpenTick = now;
+    if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = AP.firstTrade || now; } catch (e) { diagErr("swing", e); } }
     let syms = Object.keys(AP.positions), q = syms.length ? (await getQuotes(syms)).quotes : {};
     // stops every minute
     for (const s of syms) {
@@ -1694,8 +1718,10 @@ async function apTick() {
     if (opening || now - apLastScore >= 10 * 60e3) {
       apLastScore = now;
       const sc = await apScore(true); apSig = apSignals(sc);
+      BOTDIAG.swing.lastScan = { t: now, candidates: sc.list.length, stress: sc.stress, riskOff: sc.riskOff, buysBefore: AP.trades.length };
       if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = now; } catch {} }
       apDecide(AP, sc, opening);
+      BOTDIAG.swing.lastScan.tradesMade = AP.trades.length - BOTDIAG.swing.lastScan.buysBefore;
       AP.lastRebalance = m.t.day; AP.lastScan = apSig; AP.plan = null;
     }
     syms = Object.keys(AP.positions); q = syms.length ? (await getQuotes(syms)).quotes : {};
@@ -1712,7 +1738,7 @@ async function apTick() {
       Object.assign(AP, { run: AP.run + 1, start: now, cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], recent: {}, spx0: null, firstTrade: null, lastRebalance: "" });
     }
     await apSave();
-  } catch (e) { console.error("autopilot", e.message); } finally { apBusy = false; }
+  } catch (e) { console.error("autopilot", e.message); diagErr("swing", e); } finally { apBusy = false; BOTDIAG.swing.lastTick = Date.now(); }
 }
 async function apView() {
   if (!apLoaded) await apLoad();
@@ -1740,7 +1766,7 @@ async function apView() {
     profitFactor: gl > 0 ? gw / gl : wins.length ? null : null, grossWins: gw, grossLosses: gl, maxDrawdown: mdd, tradingDays: eqv.length,
     sharpe: dr.length >= 20 && sd ? (mean / sd) * Math.sqrt(252) : null, turnover: avgEq ? traded / avgEq : null, traded,
     costs: AP.trades.reduce((a, t) => a + (t.cost != null ? t.cost : t.amount * AP_SLIP), 0), totalReturn: ret, benchmarkReturn: spxRet, excessReturn: spxRet != null ? ret - spxRet : null };
-  return { ...AP, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
+  return { ...AP, diag: { market: BOTDIAG.market, ...BOTDIAG.swing }, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
 }
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
@@ -1846,11 +1872,11 @@ async function dtTick() {
     const t = m.t; if (!m.open && !(t.min >= 9 * 60 + 28 && t.min < 9 * 60 + 30 && t.wd !== "Sat" && t.wd !== "Sun")) return;
     if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, halted: false, used: {} };
     const cats = dtCatalysts(), syms = [...new Set([...DT_UNIVERSE, ...Object.keys(cats).slice(0, 5), ...Object.keys(DT.positions), ...DT.orders.map((o) => o.sym)])];
-    dtTickN++;
+    dtTickN++; BOTDIAG.day.scans++; BOTDIAG.day.lastOpenTick = Date.now();
     const batch = syms.filter((s, i) => DT.positions[s] || DT.orders.some((o) => o.sym === s) || i % 2 === dtTickN % 2); // each symbol about every 2 minutes; open trades every minute
     const now = Date.now() / 1000;
     for (const sym of batch) {
-      let bars; try { bars = await dtBars(sym); } catch { continue; }
+      let bars; try { bars = await dtBars(sym); BOTDIAG.day.barsOk++; } catch (e) { BOTDIAG.day.barsFail++; diagErr("day", `${sym}: ${e.message || e}`); continue; }
       const done = bars.filter((b) => b.t <= now - 60), seen = DT.lastBar[sym] || 0;
       for (const b of done) if (b.t > seen && b.m >= DTC.OPEN) dtBar(sym, b);
       if (done.length) DT.lastBar[sym] = done[done.length - 1].t;
@@ -1862,6 +1888,7 @@ async function dtTick() {
       const lv = DTC.levels(prev, done).filter((L) => !DT.day.used[sym + ":" + L.k]);
       const sw = DTC.sweep(done, lv);
       if (sw) {
+        BOTDIAG.day.signals++; BOTDIAG.day.lastSignal = { t: Date.now(), sym, setup: "sweep " + sw.level.k };
         DT.day.used[sym + ":" + sw.level.k] = 1;
         const why = `${sym} swept the ${sw.level.name} ($${sw.level.p.toFixed(2)}) to $${sw.wick.toFixed(2)} on ${sw.volX.toFixed(1)}× normal volume, then closed back ${sw.dir === "short" ? "below" : "above"} it — stops were taken, fading the move`;
         dtPlace(sym, sw, "Liquidity sweep", why, Math.min(0.95, 0.5 + (sw.volX - 1.5) * 0.1), last.t); continue;
@@ -1878,9 +1905,10 @@ async function dtTick() {
     if (t.min >= 15 * 60 + 55 && !process.env.AP_TEST) { DT.orders = []; for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "End of day — day traders go home flat (3:55 PM)"); }
     // equity points (5-minute intraday + one per day) vs. the S&P 500
     let spx = null; try { spx = (await quote("^GSPC")).price; } catch {}
-    if (DT.firstTrade && !DT.spx0 && spx) DT.spx0 = spx;
+    if (!DT.spx0 && spx) DT.spx0 = spx; // the S&P side starts with the bot's first trading minute
+    if (!DT.started) DT.started = Date.now();
     const v = +dtEquity().toFixed(2), nowMs = Date.now();
-    if (DT.firstTrade) {
+    if (DT.started) {
       if (!DT.intraday.length || DT.intraday[0].d !== t.day) DT.intraday = [];
       if (!DT.intraday.length || nowMs - DT.intraday[DT.intraday.length - 1].t >= 5 * 60e3) DT.intraday.push({ d: t.day, t: nowMs, v, spx });
       const pt = { d: t.day, v, spx }; if (DT.equity.length && DT.equity[DT.equity.length - 1].d === t.day) DT.equity[DT.equity.length - 1] = pt; else DT.equity.push(pt);
@@ -1893,7 +1921,7 @@ async function dtTick() {
       DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs };
     }
     await dtSave();
-  } catch (e) { console.error("daytrader", e.message); } finally { dtBusy = false; }
+  } catch (e) { console.error("daytrader", e.message); diagErr("day", e); } finally { dtBusy = false; BOTDIAG.day.lastTick = Date.now(); }
 }
 function botStats(trades, equity, start, value, spx0, spxNow) {
   const closed = trades.filter((t) => t.pnl != null), wins = closed.filter((t) => t.pnl > 0), losses = closed.filter((t) => t.pnl <= 0);
@@ -1920,7 +1948,7 @@ async function dtView() {
   const value = dtEquity(), t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun"), open = wk && t.min >= 570 && t.min < 960, spxNow = q["^GSPC"] && q["^GSPC"].price;
   const vals = [DT_START, ...DT.equity.map((p) => p.v), value];
   const current = { run: DT.run, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +value.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spxNow ? +((spxNow / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false };
-  return { ...DT, kind: "day", rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow), universe: DT_UNIVERSE, durable: !!(UP_URL && UP_TOKEN),
+  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow), universe: DT_UNIVERSE, durable: !!(UP_URL && UP_TOKEN),
     status: open ? (DT.day && DT.day.halted ? "Daily loss limit hit — done for today" : "Trading live — scanning 1-minute bars for sweeps and gaps") : "Market closed — flat overnight, back at the opening bell",
     rules: { risk: DT_RISK, maxPos: DT_MAXPOS, maxTrades: DT_MAXTRADES, dayStop: DT_DAYSTOP } };
 }

@@ -666,6 +666,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-hood>summary::-webkit-details-marker{display:none}.ap-hood>summary::before{content:"▸";color:var(--muted)}.ap-hood[open]>summary::before{content:"▾"}
 .ap-hood>summary small{color:var(--muted);font-weight:400}
 .ap-hood[open]>summary{margin-bottom:14px}.ap-hood>.bt-card,.ap-hood>.ap-two{margin-bottom:14px}
+.ap-health{font-size:12px;color:var(--muted);margin:-4px 0 4px;line-height:1.5}
 .bot-sw{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 14px}
 .bot-sw button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--text)}
 .bot-sw button span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -3337,7 +3338,7 @@ function apRender(d){
   const busts=(d.runs||[]).filter(r=>r.busted).length;
   const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?" <span class=\"ap-tag own\">live</span>":""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">💀 Busted</b>':"ended"}</td></tr>`; };
   $("apBox").innerHTML=`
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Test run #${d.run}</b> · <span class="ap-tag risk">80% risk</span> ${(()=>{const r=d.positions.filter(p=>p.sleeve!=="safe").reduce((a,p)=>a+p.value,0),f=d.positions.filter(p=>p.sleeve==="safe").reduce((a,p)=>a+p.value,0);return d.value?`${Math.round(r/d.value*100)}% high-risk · ${Math.round(f/d.value*100)}% safe · ${Math.round(d.cash/d.value*100)}% cash · `:""})()}${esc(d.status)}${sig?` · last scan ${ago(sig.t)}`:""}</div>
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Test run #${d.run}</b> · <span class="ap-tag risk">80% risk</span> ${(()=>{const r=d.positions.filter(p=>p.sleeve!=="safe").reduce((a,p)=>a+p.value,0),f=d.positions.filter(p=>p.sleeve==="safe").reduce((a,p)=>a+p.value,0);return d.value?`${Math.round(r/d.value*100)}% high-risk · ${Math.round(f/d.value*100)}% safe · ${Math.round(d.cash/d.value*100)}% cash · `:""})()}${esc(d.status)}${sig?` · last scan ${ago(sig.t)}`:""}</div>${botHealth(d,"swing")}
   ${sig&&sig.stress?`<div class="ap-warn">🛡 Defense mode: ${esc(sig.stress)} — the bot cuts to 50% invested and makes no new buys.</div>`:""}
   <div class="ap-vs">
     <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>🤖 AI bot</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret)}</small></div>
@@ -3379,6 +3380,16 @@ function apRender(d){
 /* ---------- two bots: switcher + day-trader page ---------- */
 const BOTS={sel:"swing",d:{}};
 try{ BOTS.sel=localStorage.getItem("md_bot")||"swing"; }catch{}
+function botHealth(d,kind){
+  const g=d.diag; if(!g) return "";
+  const tm=t=>t?new Date(t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):"—", m=g.market||{}, bits=[];
+  bits.push(`Last check ${tm(g.lastTick)}`);
+  if(m.at) bits.push(`market: ${esc(m.why||"")}`);
+  if(kind==="swing"&&g.lastScan){ const L=g.lastScan; bits.push(`last scan ${tm(L.t)}: ${L.candidates} stocks scored, ${L.tradesMade??0} trade${L.tradesMade===1?"":"s"}${L.stress?` · defense mode (${esc(L.stress)})`:""}${L.riskOff?" · S&P under its 200-day average":""}`); }
+  if(kind==="day") bits.push(`1-minute bars ${g.barsOk||0} ok / ${g.barsFail||0} failed · setups found ${g.signals||0}${g.lastSignal?` (last: ${esc(g.lastSignal.sym)} ${esc(g.lastSignal.setup)} at ${tm(g.lastSignal.t)})`:""}`);
+  if(g.errors&&g.errors.length) bits.push(`<span class="down">last error ${tm(g.errors[0].t)}: ${esc(g.errors[0].e)}</span>`);
+  return `<div class="ap-health">🩺 ${bits.join(" · ")}</div>`;
+}
 function botRet(d){ if(!d) return null; return d.value/d.startValue-1; }
 function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
@@ -3394,7 +3405,7 @@ function dtRender(d){
   const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?' <span class="ap-tag own">live</span>':""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">🔒 PDT lock</b>':"ended"}</td></tr>`; };
   const dirTag=x=>`<span class="sd ${x==="long"?"BUY":"SELL"}">${x==="long"?"LONG":"SHORT"}</span>`;
   $("apBox").innerHTML=`
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>${botHealth(d,"day")}
   <div class="ap-vs">
     <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>⚡ Day trader</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret*100)}</small></div>
     <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
