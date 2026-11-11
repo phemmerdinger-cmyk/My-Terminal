@@ -1906,7 +1906,7 @@ const weekly = (rows) => { const wk = new Map(); for (const r of rows) wk.set(Ma
 const yoy = (rows) => { const by = new Map(rows); return rows.map(([d, v]) => { const p = by.get(String(+d.slice(0, 4) - 1) + d.slice(4)); return p ? [d, +((v / p - 1) * 100).toFixed(2)] : null; }).filter(Boolean); };
 async function fredCsv(m) {
   const start = m.daily ? new Date(Date.now() - 31 * 365.25 * 864e5).toISOString().slice(0, 10) : "1960-01-01";
-  const csv = await getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${m.id}&cosd=${start}`, "text/csv", 15000);
+  const csv = await getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${m.id}&cosd=${start}`, "text/csv", 8000);
   let rows = csv.trim().split(/\r?\n/).slice(1).map((l) => l.split(",")).filter((r) => r[1] && r[1] !== "." && isFinite(+r[1])).map((r) => [r[0], +r[1]]);
   if (!rows.length) throw new Error("empty series");
   return rows;
@@ -1964,10 +1964,12 @@ async function macroFallback(id, have) {
   if (id === "USREC") return { rows: nberMonthly(), src: "NBER business-cycle dates" };
   throw new Error("no free fallback for this series");
 }
+let fredDownUntil = 0; // after one FRED failure, go straight to the agency sources for an hour
 async function macroSeries(m, have) {
   return cached("macro:s:" + m.id, 6 * 3600e3, async () => {
     let rows = null, src = m.src, note = null;
-    try { rows = await fredCsv(m); } catch (e) { note = `FRED unavailable (${e.message}); used the original agency instead`; }
+    if (Date.now() > fredDownUntil) { try { rows = await fredCsv(m); } catch (e) { fredDownUntil = Date.now() + 3600e3; note = `FRED unavailable (${e.message}); used the original agency instead`; } }
+    else note = "FRED unreachable from the server recently; used the original agency instead";
     if (!rows) { const f = await macroFallback(m.id, have); rows = f.rows; src = f.src; }
     if (m.yoy) rows = yoy(rows);
     if (m.daily) rows = weekly(rows);
@@ -1976,7 +1978,7 @@ async function macroSeries(m, have) {
 }
 async function macroData() {
   const hit = cache.get("macro:all");
-  if (hit && hit.data && Date.now() - hit.at < (hit.data.complete ? 30 * 60e3 : 3 * 60e3)) return hit.data;
+  if (hit && hit.data && Date.now() - hit.at < (hit.data.complete ? 30 * 60e3 : 20 * 60e3)) return hit.data;
   return cached("macro:all", 0, async () => {
     const have = {}, res = [];
     for (let i = 0; i < MACRO.length; i += 3) { // a few at a time, to be gentle with the sources
