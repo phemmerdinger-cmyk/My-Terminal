@@ -639,7 +639,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-tr .sd.SELL,.ap-tbl .sd.SELL{background:color-mix(in srgb,var(--down) 18%,transparent);color:var(--down)}
 .ap-tr p{margin:2px 0 0;color:var(--muted);font-size:12px}
 .ap-tr time{color:var(--muted);font-size:11px;white-space:nowrap}
-.ap-tl .ap-tbl td{vertical-align:top}.ap-tl .ap-tbl{min-width:900px}.ap-why{white-space:normal!important;max-width:340px;font-size:12.5px;line-height:1.4}.ap-why small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+.ap-tl .ap-tbl td{vertical-align:top}.ap-tl .ap-tbl{min-width:900px}.ap-why{white-space:normal!important;max-width:340px;text-align:left!important;font-size:12.5px;line-height:1.4}.ap-why small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
 /* AI vs S&P performance */
 .ap-perf-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .ap-ctl{display:flex;gap:8px;flex-wrap:wrap}
@@ -3245,9 +3245,9 @@ function apPerf(d){
        ["Profit factor",a.profitFactor!=null?a.profitFactor.toFixed(2):"—","gross wins ÷ gross losses",a.profitFactor!=null?(a.profitFactor>=1?"up":"down"):""],
        ["Average win / loss",`${a.avgWinPct!=null?pct(a.avgWinPct*100):"—"} / ${a.avgLossPct!=null?pct(a.avgLossPct*100):"—"}`,`${a.avgWin!=null?$m(a.avgWin):"—"} / ${a.avgLoss!=null?$m(a.avgLoss):"—"} per trade`,""],
        ["Best trade",best[0]?pct(best[0].pnlPct*100):"—",best[0]?`${esc(best[0].sym)} · ${$m(best[0].pnl)}`:"no closed trades yet","up"],
-       ["Worst trade",best.length?pct(best.at(-1).pnlPct*100):"—",best.length?`${esc(best.at(-1).sym)} · ${$m(best.at(-1).pnl)}`:"no closed trades yet","down"],
+       ["Worst trade",best.length>1?pct(best.at(-1).pnlPct*100):"—",best.length>1?`${esc(best.at(-1).sym)} · ${$m(best.at(-1).pnl)}`:"needs 2+ closed trades","down"],
        ["Turnover",a.turnover!=null?a.turnover.toFixed(1)+"×":"—",`${$m(a.traded||0)} traded`,""],
-       ["Simulated costs",$m(a.costs||0),"0.05% slippage per trade",""]].map(([l,v,s,c])=>`<div class="ap-k"><span>${l}</span><b class="${c}">${v}</b><small>${s}</small></div>`).join("")}
+       ["Simulated costs",$m(a.costs||0),"slippage and fees on every fill",""]].map(([l,v,s,c])=>`<div class="ap-k"><span>${l}</span><b class="${c}">${v}</b><small>${s}</small></div>`).join("")}
   </div></div>
   ${drv.length?`<div class="bt-card"><h4>What's driving the results <em>profit &amp; loss by stock · realized + open</em></h4>${apDriverBars(drv)}</div>`:""}`;
 }
