@@ -72,3 +72,31 @@ test("gap and go: a ≥4% gap needs no catalyst, but never trades against one", 
   assert.equal(D.gapGo(b, 102, 0), null, "a 2.5% gap still needs a catalyst");
   assert.equal(D.gapGo(b, 102, 1).dir, "long");
 });
+test("scalper: EMA and average range", () => {
+  assert.equal(D.ema([1, 1, 1], 9), 1);
+  assert.ok(D.ema([1, 2, 3, 4], 3) > 3);
+  const b = Array.from({ length: 20 }, (_, i) => bar(D.OPEN + i, 100, 100.5, 99.5, 100));
+  assert.equal(+D.atr(b).toFixed(4), 1);
+});
+test("scalper: uptrend pullback to the 9-EMA closing green → long, with stop and target one range away", () => {
+  const b = Array.from({ length: 30 }, (_, i) => bar(D.OPEN + i, 100 + i * 0.1, 100.15 + i * 0.1, 99.95 + i * 0.1, 100.1 + i * 0.1));
+  const e9 = D.ema(b.map((x) => x.c), 9);
+  b.push(bar(D.OPEN + 30, e9 + 0.02, e9 + 0.12, e9 - 0.01, e9 + 0.1));
+  const s = D.scalpSignal(b);
+  assert.equal(s.dir, "long"); assert.equal(s.kind, "pullback");
+  assert.ok(s.stop < s.entry && s.target > s.entry);
+  assert.ok(Math.abs((s.target - s.entry) / (s.entry - s.stop) - 1.2) < 0.01);
+});
+test("scalper: a quiet flat tape gives no trade", () => {
+  assert.equal(D.scalpSignal(session(40)), null);
+});
+test("scalper: exits — stop, target, OHLC path rule when both are hit, then a 5-minute time stop", () => {
+  const p = () => ({ dir: "short", entry: 100, stop: 100.2, target: 99.76, shares: 10 });
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.9, 100.1)).why, "Stop hit");
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 99.8)).why, "Stop hit", "red bar: high came first");
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 100.1)).why, "Target hit", "green bar: low came first");
+  assert.equal(D.scalpManage(p(), bar(0, 100.4, 100.5, 99.7, 99.8)).px, 100.4, "gap through the stop fills at the open");
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.1, 99.7, 99.8)).px, 99.76);
+  const q = p(); for (let i = 0; i < 4; i++) assert.equal(D.scalpManage(q, bar(0, 100, 100.1, 99.9, 100)), null);
+  assert.match(D.scalpManage(q, bar(0, 100, 100.1, 99.9, 99.95)).why, /Time stop/);
+});

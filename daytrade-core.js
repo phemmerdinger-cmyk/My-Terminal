@@ -88,4 +88,48 @@ function manage(p, b, slip = 0.0002) {
 }
 const pnlOf = (p, exit) => (p.dir === "long" ? exit - p.entry : p.entry - exit) * p.shares;
 
-module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf };
+// ---------------------------------------------------------------- scalper
+// Exponential moving average of the last value, and the average 1-minute true range.
+function ema(vals, n) { if (!vals.length) return null; const k = 2 / (n + 1); let e = vals[0]; for (let i = 1; i < vals.length; i++) e = vals[i] * k + e * (1 - k); return e; }
+function atr(bars, n = 14) {
+  const tr = bars.slice(1).map((b, i) => Math.max(b.h - b.l, Math.abs(b.h - bars[i].c), Math.abs(b.l - bars[i].c))).slice(-n);
+  return tr.length ? tr.reduce((a, b) => a + b, 0) / tr.length : null;
+}
+// One scalp idea per stock per minute, or null. Three quick patterns, all judged on the bar that just closed:
+//   pullback — trend up (9-EMA over 20-EMA, price over VWAP), the bar dipped to the 9-EMA and closed green → long (mirror for short)
+//   burst    — a bar of 1.3×+ the normal range on 1.3×+ volume closing in its top/bottom quarter → ride it
+//   stretch  — price 2.5+ average ranges away from VWAP with a reversal bar → fade it back toward VWAP
+// Entry is a limit at the close (valid one minute), stop and target one average range away.
+function scalpSignal(bars, { stopX = 1, targetX = 1.2 } = {}) {
+  const reg = bars.filter((b) => b.m >= OPEN); if (reg.length < 15) return null;
+  const b = reg[reg.length - 1], cl = reg.map((x) => x.c), e9 = ema(cl, 9), e20 = ema(cl, 20), vw = vwap(reg), a = atr(reg, 14), v = avgVol(reg, 20);
+  if (!a || !vw || !(b.c > 0)) return null;
+  const rng = b.h - b.l, pos = rng > 0 ? (b.c - b.l) / rng : 0.5, volX = v ? b.v / v : 1, green = b.c > b.o, red = b.c < b.o;
+  let idea = null;
+  if (e9 > e20 && b.c > vw && b.l <= e9 * 1.0003 && green) idea = { dir: "long", kind: "pullback", score: 1 + Math.min(1, volX / 3), why: "uptrend pullback to the 9-EMA, closed green" };
+  else if (e9 < e20 && b.c < vw && b.h >= e9 * 0.9997 && red) idea = { dir: "short", kind: "pullback", score: 1 + Math.min(1, volX / 3), why: "downtrend pop to the 9-EMA, closed red" };
+  else if (rng >= 1.3 * a && volX >= 1.3 && pos >= 0.75) idea = { dir: "long", kind: "burst", score: 1.2 + Math.min(1, volX / 4), why: `range burst on ${volX.toFixed(1)}× volume, closed near the high` };
+  else if (rng >= 1.3 * a && volX >= 1.3 && pos <= 0.25) idea = { dir: "short", kind: "burst", score: 1.2 + Math.min(1, volX / 4), why: `range burst on ${volX.toFixed(1)}× volume, closed near the low` };
+  else if ((b.c - vw) / a >= 2.5 && red) idea = { dir: "short", kind: "stretch", score: 0.8 + Math.min(1, (b.c - vw) / a / 5), why: "stretched far above VWAP, reversal bar" };
+  else if ((vw - b.c) / a >= 2.5 && green) idea = { dir: "long", kind: "stretch", score: 0.8 + Math.min(1, (vw - b.c) / a / 5), why: "stretched far below VWAP, reversal bar" };
+  if (!idea) return null;
+  const d = Math.max(a * stopX, b.c * 0.0005); // never tighter than 0.05% of price
+  const t = Math.max(a * targetX, b.c * 0.0006);
+  return { ...idea, entry: b.c, stop: idea.dir === "long" ? b.c - d : b.c + d, target: idea.dir === "long" ? b.c + t : b.c - t, atr: a, at: b.t };
+}
+// Exits for a scalp on one bar, then a 5-minute time stop at the close. When the stop and the target are both inside
+// one bar, the usual OHLC path rule decides which came first: a green bar went open → low → high → close,
+// a red bar open → high → low → close. A gap through either level fills at the open.
+function scalpManage(p, b, maxBars = 5) {
+  p.bars = (p.bars || 0) + 1;
+  const long = p.dir === "long";
+  const hitS = long ? b.l <= p.stop : b.h >= p.stop, hitT = long ? b.h >= p.target : b.l <= p.target;
+  const stop = { px: long ? Math.min(p.stop, b.o) : Math.max(p.stop, b.o), why: "Stop hit" }, tgt = { px: long ? Math.max(p.target, b.o) : Math.min(p.target, b.o), why: "Target hit" };
+  if (hitS && hitT) { const gapS = long ? b.o <= p.stop : b.o >= p.stop, gapT = long ? b.o >= p.target : b.o <= p.target; if (gapS) return stop; if (gapT) return tgt; const lowFirst = b.c >= b.o; return (long ? lowFirst : !lowFirst) ? stop : tgt; }
+  if (hitS) return stop;
+  if (hitT) return tgt;
+  if (p.bars >= maxBars) return { px: b.c, why: `Time stop — out after ${maxBars} minutes` };
+  return null;
+}
+
+module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, scalpManage };

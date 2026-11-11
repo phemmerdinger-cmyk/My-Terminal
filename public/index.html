@@ -1664,7 +1664,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <aside class="ap-hold" id="apNote"></aside>
       </div>
       <div class="apx" id="apMore"></div>
-      <p class="ap-lede ap-about">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> goes long and short within the day using limit orders, liquidity sweeps and news gaps, and is flat by the close. Every bust starts a new test run.</p>
+      <p class="ap-lede ap-about">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> is a scalper — about 1,000 quick long and short trades a day, each lasting a few minutes, flat by the close. Every bust starts a new test run.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3466,7 +3466,7 @@ function botNotepad(){
         <div class="hd-m"><small>put in</small>${$m(r.inv)}</div>
         <div class="hd-r"><b>${$m(r.val)}</b><small class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
         <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
-      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades — it only trades when a sweep or gap sets up."}</div>`}${orders}</div>`;
+      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now — it scalps from 9:45 AM to 3:50 PM ET."}</div>`}${orders}</div>`;
   };
   const order=BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing]]:[["swing",BOTS.d.swing],["day",BOTS.d.day]];
   const n=(BOTS.d.swing?BOTS.d.swing.positions.length:0)+(BOTS.d.day?BOTS.d.day.positions.length:0);
@@ -3477,7 +3477,7 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`${sw?$m(sw.value):"$10,000"} · holds for days`,sw)+card("day","⚡","Day trader",`${dy?$m(dy.value):"$30,000"} · longs &amp; shorts, flat by close`,dy);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`${sw?$m(sw.value):"$10,000"} · holds for days`,sw)+card("day","⚡","Day trader",`${dy?$m(dy.value):"$30,000"} · scalper, ~1,000 trades a day`,dy);
 }
 function dtRender(d){
   const ret=d.value/d.startValue-1, spxV=d.spx0&&d.spxNow?d.startValue*d.spxNow/d.spx0:d.startValue, spxRet=spxV/d.startValue-1, lead=d.value-spxV;
@@ -3492,31 +3492,35 @@ function dtRender(d){
     <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">scalper · 0.1% risk / trade</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
   ${apPerf(d)}
-  <div class="ap-mini">${[["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",day.halted?"loss limit hit — done for today":`${day.trades||0} of ${d.rules.maxTrades} trades used`],
-    ["Avg. trade",a.avgR!=null?(a.avgR>=0?"+":"")+a.avgR.toFixed(2)+"R":"—","R = multiples of the risk taken"],
+  <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),day.halted?"loss limit hit — done for today":`aiming for ~1,000 · ${(a.closed||0).toLocaleString()} all-time`],
+    ["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",a.winRate!=null?`${Math.round(a.winRate*100)}% of trades win`:"no closed trades yet"],
+    ["Avg. trade",a.avgR!=null?(a.avgR>=0?"+":"")+a.avgR.toFixed(2)+"R":"—",a.avgHold!=null?`held ${a.avgHold.toFixed(1)} min on average`:"R = multiples of the risk taken"],
+    ["Costs paid",a.costs!=null?"$"+Math.round(a.costs).toLocaleString():"—","spread, slippage & borrow fees"],
     ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
     ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
     ["Open now",`${d.positions.length} pos · ${d.orders.length} orders`,`max ${d.rules.maxPos} at a time`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
   $("apMore").innerHTML=`
   ${d.positions.length||d.orders.length?`<div class="bt-card"><h4>Live book <em>open positions and working limit orders</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Entry / limit</th><th>Stop</th><th>Target</th><th>Now</th><th>P&amp;L</th><th>Setup</th></tr></thead><tbody>
     ${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b></td><td>${dirTag(p.dir)}</td><td>${p.shares}</td><td>${$m(p.entry)}</td><td>${$m(p.stop)}${p.be?' <small style="color:var(--muted)">BE</small>':""}</td><td>${$m(p.target)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${(p.pnl>=0?"+":"−")+"$"+Math.abs(p.pnl).toFixed(0)} <small>${p.R>=0?"+":""}${p.R.toFixed(2)}R</small></td><td class="n">${esc(p.setup)}</td></tr>`).join("")}
-    ${d.orders.map(o=>`<tr style="opacity:.75"><td class="n"><b>${esc(o.sym)}</b></td><td>${dirTag(o.dir)} <small>limit</small></td><td>${o.shares}</td><td>${$m(o.price)}</td><td>${$m(o.stop)}</td><td>2R</td><td>—</td><td><small>expires ${new Date(o.expires*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</small></td><td class="n">${esc(o.setup)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+    ${d.orders.map(o=>`<tr style="opacity:.75"><td class="n"><b>${esc(o.sym)}</b></td><td>${dirTag(o.dir)} <small>limit</small></td><td>${o.shares}</td><td>${$m(o.price)}</td><td>${$m(o.stop)}</td><td>${$m(o.target)}</td><td>—</td><td><small>expires ${new Date(o.expires*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</small></td><td class="n">${esc(o.setup)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   ${(a.bySetup||[]).length?`<div class="bt-card"><h4>By setup <em>which plays are working</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Setup</th><th>Trades</th><th>Win rate</th><th>P&amp;L</th></tr></thead><tbody>${a.bySetup.map(x=>`<tr><td class="n">${esc(x.setup)}</td><td>${x.n}</td><td>${Math.round(x.win*100)}%</td><td class="${cls(x.pnl)}">${(x.pnl>=0?"+":"−")+"$"+Math.abs(x.pnl).toFixed(0)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· trade log, orders and the rules</small></summary>
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
-    ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts scanning at 9:35 AM ET.</div>`}</div>
+    ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts scalping at 9:45 AM ET.</div>`}</div>
   <div class="bt-card"><h4>How the day trader works <em>paper money only · rules designed by Claude, run by the server</em></h4><ul class="ap-rules">
-    <li><b>Liquidity sweeps:</b> stops pile up just beyond obvious levels — yesterday's high and low, the pre-market high and low, the first 15 minutes' range, the high and low of the day so far, and the last 30 minutes' swing high and low. When price spikes through one of those on 1.25× normal volume and closes back within 5 minutes, the stops have been "swept". The bot fades it: a <b>short</b> after a sweep of a high, a <b>long</b> after a sweep of a low.</li>
-    <li><b>News / earnings gaps:</b> a stock that gaps ±2% at the open on a catalyst the site found (earnings beat or miss, strong headlines) — or ±4% with no known catalyst — and then breaks its first-5-minute range in the same direction within the first two hours — gap and go.</li>
-    <li><b>Limit orders only:</b> entries are limit orders at the swept level or breakout level. If price doesn't come back within 10 minutes, the order expires unfilled.</li>
-    <li><b>Brackets:</b> every position has a stop just past the sweep wick (or the 5-minute range) and a profit target at 2× the risk (2R). At +1R the stop moves to breakeven.</li>
-    <li><b>Risk:</b> each trade risks 2% of the account. Max 4 positions (including working orders), 20 trades a day, 4× intraday buying power (2× in one stock). A −6% day stops trading for the day. Everything is closed by 3:55 PM.</li>
-    <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}, plus the day's catalyst stocks.</li>
+    <li><b>Scalping:</b> the goal is about 1,000 small, fast trades a day. Every minute it checks all ${(d.universe||[]).length} stocks on the bar that just closed and looks for three quick patterns:
+      <b>trend pullback</b> (the trend is up and price dips to its 9-minute average, then turns green — buy; mirror image to short),
+      <b>momentum burst</b> (an unusually big bar on heavy volume that closes near its high or low — ride it), and
+      <b>VWAP snap-back</b> (price stretched far from the day's average price, then a reversal bar — fade it back).</li>
+    <li><b>Long and short, limit orders only:</b> each entry is a limit order at the last price, good for one minute. If the next minute doesn't trade through it, it's dropped.</li>
+    <li><b>In and out fast:</b> stop one typical 1-minute range away, target 1.2 ranges away, and if neither hits it gets out after 5 minutes regardless.</li>
+    <li><b>Risk:</b> at most 0.1% of the account at risk and 10% of it in any one trade, up to 10 trades open at once, best signals first. A −6% day stops trading for the day. Everything is closed by 3:55 PM.</li>
+    <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}.</li>
     <li><b>Starts with $30,000</b> to clear the $25,000 pattern-day-trader minimum. Falling below $25,000 would lock a real account out of day trading, so it counts as a bust and a new $30,000 run starts.</li>
-    <li>Simulated on free 1-minute bars: a limit fills only if a later bar trades through it; if a stop and target fall in the same bar, the stop is assumed to hit first. No order-book data, so liquidity is read from price and volume. 0.02% slippage on exits, 0.01% borrow fee on shorts. Not financial advice.</li>
+    <li>Simulated on free 1-minute bars: a limit fills only if the next bar trades through it; if a stop and target fall in the same bar, a green bar is assumed to have hit its low first and a red bar its high. Every trade pays 0.005% of its size going in and again coming out (spread and slippage), plus 0.01% to borrow shares for a short — at 1,000 trades a day these costs add up fast, which is the hardest part of real scalping. The trade log keeps the latest 600 events; the totals count every trade. Not financial advice.</li>
   </ul></div></details>
   <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${d.runs.length} PDT lock${d.runs.length===1?"":"s"} so far`:"no busts yet — falling under $25,000 starts a new $30,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;

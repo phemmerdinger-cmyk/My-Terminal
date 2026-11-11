@@ -1790,10 +1790,14 @@ setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60
 // Data: free 1-minute Yahoo bars (every symbol every minute); all rules live in daytrade-core.js.
 const DTC = require("./daytrade-core.js");
 const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY = "pft:daytrader:v1";
-const DT_START = 30_000, DT_PDT = 25_000, DT_RISK = 0.02, DT_MAXPOS = 4, DT_MAXTRADES = 20, DT_DAYSTOP = 0.06, DT_FEE_SHORT = 0.0001;
+// Scalper: ~1,000 quick trades a day. Up to 0.1% of the account at risk per trade and at most 10% of it in any one
+// trade, up to 10 trades open at once. Every trade pays 0.005% of its size on the way in and on the way out
+// (half the bid-ask spread plus slippage on big, liquid stocks); shorts pay 0.01% more to borrow.
+const DT_START = 30_000, DT_PDT = 25_000, DT_RISK = 0.001, DT_MAXPOS = 10, DT_MAXTRADES = 1500, DT_DAYSTOP = 0.06, DT_FEE_SHORT = 0.0001, DT_COST = 0.00005, DT_HOLD = 5;
 const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA", "UBER",
   "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB"];
-const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, updated: Date.now() });
+const dtTally = () => ({ n: 0, wins: 0, gw: 0, gl: 0, longs: 0, shorts: 0, longPnl: 0, shortPnl: 0, costs: 0, traded: 0, Rsum: 0, held: 0, kinds: {} });
+const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), updated: Date.now() });
 let DT = dtFresh(), dtLoaded = false, dtBusy = false, dtTickN = 0;
 const dtPx = {}, dtSeq = { n: 0 };
 async function dtLoad() {
@@ -1823,46 +1827,44 @@ async function dtPrev(sym, today) {
     return rows[rows.length - 1] || null;
   });
 }
-// catalysts the swing bot already found (earnings beats/misses, strong news) — feed the gap setup
-function dtCatalysts() {
-  const m = {}, sig = AP && AP.lastScan; if (!sig) return m;
-  for (const x of sig.earnings || []) if (x.earn && (x.earn.kind === "beat" || x.earn.kind === "miss")) m[x.sym] = { s: x.earn.kind === "beat" ? 1 : -1, why: `earnings ${x.earn.kind === "beat" ? "beat" : "miss"} (${Math.round(x.earn.surprise * 100)}%)` };
-  for (const x of sig.news || []) if (!m[x.sym] && Math.abs(x.news) >= 1.5) m[x.sym] = { s: Math.sign(x.news), why: `${x.news > 0 ? "good" : "bad"} news: “${(x.headline || "").slice(0, 80)}”` };
-  return m;
-}
 const dtEquity = () => DT.cash + Object.entries(DT.positions).reduce((a, [s, p]) => a + (p.dir === "long" ? 1 : -1) * p.shares * (dtPx[s] || p.entry), 0);
-function dtLog(x) { DT.trades.unshift({ id: ++dtSeq.n + "-" + Date.now(), t: x.t || Date.now(), ...x, after: +dtEquity().toFixed(2) }); DT.trades = DT.trades.slice(0, 2000); }
+function dtLog(x) { DT.trades.unshift({ id: ++dtSeq.n + "-" + Date.now(), t: x.t || Date.now(), ...x, after: +dtEquity().toFixed(2) }); DT.trades = DT.trades.slice(0, 600); }
 function dtExit(sym, px, why, t) {
   const p = DT.positions[sym]; if (!p) return;
-  const pnl = DTC.pnlOf(p, px), R = pnl / (Math.abs(p.entry - p.stop0) * p.shares);
-  DT.cash += (p.dir === "long" ? 1 : -1) * p.shares * px; delete DT.positions[sym]; dtPx[sym] = px;
-  DT.day.pnl += pnl;
-  dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(4), R: +R.toFixed(2), held: Math.round(((t ? t * 1000 : Date.now()) - p.at) / 60000), cost: +(p.shares * px * 0.0002).toFixed(2), entry: p.entry, dir: p.dir });
+  const cost = p.shares * px * DT_COST, gross = DTC.pnlOf(p, px), pnl = gross - cost - (p.cost0 || 0), R = pnl / (Math.abs(p.entry - p.stop0) * p.shares);
+  DT.cash += (p.dir === "long" ? 1 : -1) * p.shares * px - cost; delete DT.positions[sym]; dtPx[sym] = px;
+  DT.day.pnl += pnl; DT.day.closed = (DT.day.closed || 0) + 1;
+  const T = DT.tally || (DT.tally = dtTally()), held = Math.max(1, Math.round(((t ? t * 1000 : Date.now()) - p.at) / 60000));
+  T.n++; if (pnl > 0) { T.wins++; T.gw += pnl; } else T.gl -= pnl; T.costs += cost + (p.cost0 || 0); T.traded += p.shares * (px + p.entry); T.Rsum += R; T.held += held;
+  if (p.dir === "long") { T.longs++; T.longPnl += pnl; } else { T.shorts++; T.shortPnl += pnl; }
+  const k = (T.kinds[p.kind || "other"] = T.kinds[p.kind || "other"] || { n: 0, wins: 0, pnl: 0 }); k.n++; if (pnl > 0) k.wins++; k.pnl += pnl;
+  dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(5), R: +R.toFixed(2), held, cost: +(cost + (p.cost0 || 0)).toFixed(2), entry: p.entry, dir: p.dir });
 }
 function dtBar(sym, b) {
   dtPx[sym] = b.c;
-  // working limit orders (placed on an earlier bar) can fill on this one
+  // a working limit order (placed at the last close) can fill on the next bar only; otherwise it is dropped
   for (const o of DT.orders.filter((x) => x.sym === sym && x.placed < b.t)) {
-    if (b.t > o.expires) { DT.orders = DT.orders.filter((x) => x !== o); dtLog({ t: b.t * 1000, side: "CANCEL", sym, shares: o.shares, price: o.price, amount: 0, setup: o.setup, why: "Limit order expired unfilled — price never came back to the level" }); continue; }
-    const px = DTC.fillOrder(o, b); if (px == null) continue;
     DT.orders = DT.orders.filter((x) => x !== o);
-    if ((o.dir === "long" && px <= o.stop) || (o.dir === "short" && px >= o.stop)) { dtLog({ t: b.t * 1000, side: "CANCEL", sym, shares: o.shares, price: o.price, amount: 0, setup: o.setup, why: "Price gapped through the stop before the order could fill — skipped" }); continue; }
-    const risk = Math.abs(px - o.stop), target = o.dir === "long" ? px + 2 * risk : px - 2 * risk;
-    DT.positions[sym] = { dir: o.dir, shares: o.shares, entry: px, stop: o.stop, stop0: o.stop, target, setup: o.setup, at: b.t * 1000, why: o.why };
-    const fee = o.dir === "short" ? o.shares * px * DT_FEE_SHORT : 0;
-    DT.cash += (o.dir === "long" ? -1 : 1) * o.shares * px - fee; DT.day.trades++;
+    if (b.t > o.expires) continue;
+    const px = DTC.fillOrder(o, b); if (px == null) continue;
+    if ((o.dir === "long" && px <= o.stop) || (o.dir === "short" && px >= o.stop)) continue;
+    const cost0 = o.shares * px * (DT_COST + (o.dir === "short" ? DT_FEE_SHORT : 0));
+    DT.positions[sym] = { dir: o.dir, shares: o.shares, entry: px, stop: o.stop, stop0: o.stop, target: o.target, setup: o.setup, kind: o.kind, at: b.t * 1000, why: o.why, cost0, bars: 0 };
+    DT.cash += (o.dir === "long" ? -1 : 1) * o.shares * px - cost0; DT.day.trades++;
     if (!DT.firstTrade) DT.firstTrade = Date.now();
-    dtLog({ t: b.t * 1000, side: o.dir === "long" ? "BUY" : "SHORT", sym, shares: o.shares, price: +px.toFixed(2), amount: +(o.shares * px).toFixed(2), setup: o.setup, why: o.why, stop: +o.stop.toFixed(2), target: +target.toFixed(2), score: o.conf, cost: +fee.toFixed(2), dir: o.dir });
+    dtLog({ t: b.t * 1000, side: o.dir === "long" ? "BUY" : "SHORT", sym, shares: o.shares, price: +px.toFixed(2), amount: +(o.shares * px).toFixed(2), setup: o.setup, why: o.why, stop: +o.stop.toFixed(2), target: +o.target.toFixed(2), score: o.conf, cost: +cost0.toFixed(2), dir: o.dir });
+    // the stop or target can be hit on the same bar the order filled — judge it on the rest of that bar
+    const p = DT.positions[sym], ex = DTC.scalpManage(p, { ...b, o: px }, DT_HOLD + 1); if (ex && !/Time/.test(ex.why)) { dtExit(sym, ex.px, ex.why, b.t); return; }
+    p.bars = 0; return;
   }
   const p = DT.positions[sym]; if (!p) return;
-  const ex = DTC.manage(p, b); if (ex) dtExit(sym, ex.px, ex.why, b.t);
+  const ex = DTC.scalpManage(p, b, DT_HOLD); if (ex) dtExit(sym, ex.px, ex.why, b.t);
 }
-function dtPlace(sym, idea, setup, why, conf, lastT) {
-  const eq = dtEquity(), gross = Object.entries(DT.positions).reduce((a, [s, p]) => a + p.shares * (dtPx[s] || p.entry), 0);
-  const per = Math.abs(idea.entry - idea.stop) / idea.entry; if (per < 0.001 || per > 0.03) return false; // stop too tight to survive noise, or too wide for a day trade
-  const shares = DTC.size(eq, idea.entry, idea.stop, DT_RISK, Math.min(2 * eq, 4 * eq - gross)); if (shares < 1) return false; // day-trading buying power: 4× equity, max 2× in one stock
-  DT.orders.push({ sym, dir: idea.dir, price: +idea.entry.toFixed(2), stop: +idea.stop.toFixed(2), shares, setup, why, conf, placed: lastT, expires: lastT + 10 * 60 });
-  dtLog({ t: lastT * 1000, side: "ORDER", sym, shares, price: +idea.entry.toFixed(2), amount: +(shares * idea.entry).toFixed(2), setup, why: `${idea.dir === "long" ? "Buy" : "Short"} limit @ $${idea.entry.toFixed(2)}, stop $${idea.stop.toFixed(2)}, target 2R — ${why}`, dir: idea.dir, score: conf });
+const DT_KIND = { pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back" };
+function dtPlace(sym, idea) {
+  const eq = dtEquity(), gross = Object.entries(DT.positions).reduce((a, [s, p]) => a + p.shares * (dtPx[s] || p.entry), 0) + DT.orders.reduce((a, o) => a + o.shares * o.price, 0);
+  const shares = DTC.size(eq, idea.entry, idea.stop, DT_RISK, Math.min(eq / DT_MAXPOS, 4 * eq - gross)); if (shares < 1) return false; // at most 10% of the account per trade
+  DT.orders.push({ sym, dir: idea.dir, price: +idea.entry.toFixed(2), stop: idea.stop, target: idea.target, shares, setup: DT_KIND[idea.kind], kind: idea.kind, why: `${sym}: ${idea.why}`, conf: +Math.min(0.99, idea.score / 2.2).toFixed(2), placed: idea.at, expires: idea.at + 60 });
   return true;
 }
 async function dtTick() {
@@ -1871,34 +1873,27 @@ async function dtTick() {
     if (!dtLoaded) await dtLoad();
     const m = process.env.AP_TEST ? { open: true, t: { ...etParts(), wd: "Tue", min: 11 * 60 } } : await apMarketOpen();
     const t = m.t; if (!m.open && !(t.min >= 9 * 60 + 28 && t.min < 9 * 60 + 30 && t.wd !== "Sat" && t.wd !== "Sun")) return;
-    if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, halted: false, used: {} };
-    const cats = dtCatalysts(), syms = [...new Set([...DT_UNIVERSE, ...Object.keys(cats).slice(0, 5), ...Object.keys(DT.positions), ...DT.orders.map((o) => o.sym)])];
+    if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, closed: 0, halted: false };
+    if (!DT.tally) DT.tally = dtTally();
+    const syms = [...new Set([...DT_UNIVERSE, ...Object.keys(DT.positions), ...DT.orders.map((o) => o.sym)])];
     dtTickN++; BOTDIAG.day.scans++; BOTDIAG.day.lastOpenTick = Date.now();
-    const batch = syms; // every symbol every minute
-    const now = Date.now() / 1000;
-    for (const sym of batch) {
-      let bars; try { bars = await dtBars(sym); BOTDIAG.day.barsOk++; } catch (e) { BOTDIAG.day.barsFail++; diagErr("day", `${sym}: ${e.message || e}`); continue; }
+    const now = Date.now() / 1000, ideas = [];
+    const one = async (sym) => { try { const b = await dtBars(sym); BOTDIAG.day.barsOk++; return [sym, b]; } catch (e) { BOTDIAG.day.barsFail++; diagErr("day", `${sym}: ${e.message || e}`); return [sym, null]; } };
+    const all = []; for (let i = 0; i < syms.length; i += 6) all.push(...(await Promise.all(syms.slice(i, i + 6).map(one)))); // 6 at a time — gentle on the free data source
+    for (const [sym, bars] of all) {
+      if (!bars) continue;
       const done = bars.filter((b) => b.t <= now - 60), seen = DT.lastBar[sym] || 0;
       for (const b of done) if (b.t > seen && b.m >= DTC.OPEN) dtBar(sym, b);
       if (done.length) DT.lastBar[sym] = done[done.length - 1].t;
-      const last = done[done.length - 1]; if (!last) continue;
-      // look for a new setup
-      if (DT.day.halted || t.min < DTC.OPEN + 5 || t.min >= 15 * 60 + 30 || DT.day.trades >= DT_MAXTRADES) continue;
-      if (DT.positions[sym] || DT.orders.some((o) => o.sym === sym) || Object.keys(DT.positions).length + DT.orders.length >= DT_MAXPOS) continue;
-      let prev = null; try { prev = await dtPrev(sym, t.day); } catch {}
-      const lk = (L) => sym + ":" + L.k + ":" + L.p.toFixed(2), lv = DTC.levels(prev, done).filter((L) => !DT.day.used[lk(L)]);
-      const sw = DTC.sweep(done, lv);
-      if (sw) {
-        BOTDIAG.day.signals++; BOTDIAG.day.lastSignal = { t: Date.now(), sym, setup: "sweep " + sw.level.k };
-        DT.day.used[lk(sw.level)] = 1;
-        const why = `${sym} swept the ${sw.level.name} ($${sw.level.p.toFixed(2)}) to $${sw.wick.toFixed(2)} on ${sw.volX.toFixed(1)}× normal volume, then closed back ${sw.dir === "short" ? "below" : "above"} it — stops were taken, fading the move`;
-        dtPlace(sym, sw, "Liquidity sweep", why, Math.min(0.95, 0.5 + (sw.volX - 1.25) * 0.1), last.t); continue;
-      }
-      const c = cats[sym];
-      if (prev && !DT.day.used[sym + ":GAP"]) {
-        const g = DTC.gapGo(done, prev.c, c ? c.s : 0);
-        if (g) { DT.day.used[sym + ":GAP"] = 1; dtPlace(sym, g, "News/earnings gap", `${sym} gapped ${g.gap >= 0 ? "up" : "down"} ${(Math.abs(g.gap) * 100).toFixed(1)}% on ${c ? c.why : "no single headline — a gap that size is news in itself"}, then broke its first-5-minute ${g.dir === "long" ? "high" : "low"} — limit at the breakout level`, 0.6, last.t); }
-      }
+      if (DT.day.halted || t.min < DTC.OPEN + 15 || t.min >= 15 * 60 + 50 || DT.day.trades >= DT_MAXTRADES || DT.positions[sym]) continue;
+      const last = done[done.length - 1]; if (!last || now - last.t > 3 * 60) continue; // stale data — skip
+      const idea = DTC.scalpSignal(done); if (idea) ideas.push({ sym, ...idea });
+    }
+    BOTDIAG.day.signals += ideas.length; if (ideas.length) BOTDIAG.day.lastSignal = { t: Date.now(), n: ideas.length };
+    DT.orders = DT.orders.filter((o) => !ideas.some((x) => x.sym === o.sym)); // refresh: newest idea per stock replaces an unfilled one
+    for (const idea of ideas.sort((a, b) => b.score - a.score)) {
+      if (Object.keys(DT.positions).length + DT.orders.length >= DT_MAXPOS || DT.day.trades + DT.orders.length >= DT_MAXTRADES) break;
+      dtPlace(idea.sym, idea);
     }
     // daily loss limit and end of day
     const eq = dtEquity();
@@ -1918,7 +1913,7 @@ async function dtTick() {
     if (DT.firstTrade && v < DT_PDT) {
       DT.orders = []; for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "Account fell below $25,000 — a real account would be locked out of day trading");
       const vals = [DT_START, ...DT.equity.map((p) => p.v)];
-      DT.runs.unshift({ run: DT.run, start: DT.firstTrade || DT.start, end: nowMs, startValue: DT_START, endValue: +dtEquity().toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals, dtEquity()).toFixed(2), trades: DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spx ? +((spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: true, reason: "PDT lock (< $25,000)" });
+      DT.runs.unshift({ run: DT.run, start: DT.firstTrade || DT.start, end: nowMs, startValue: DT_START, endValue: +dtEquity().toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals, dtEquity()).toFixed(2), trades: DT.tally ? DT.tally.n : DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spx ? +((spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: true, reason: "PDT lock (< $25,000)" });
       DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs };
     }
     await dtSave();
@@ -1948,10 +1943,13 @@ async function dtView() {
   const positions = syms.map((s) => { const p = DT.positions[s], price = dtPx[s] || p.entry, pnl = DTC.pnlOf(p, price); return { sym: s, dir: p.dir, shares: p.shares, entry: p.entry, stop: p.stop, target: p.target, price, pnl, value: p.shares * price, R: pnl / (Math.abs(p.entry - p.stop0) * p.shares), setup: p.setup, at: p.at, why: p.why, be: !!p.be }; });
   const value = dtEquity(), t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun"), open = wk && t.min >= 570 && t.min < 960, spxNow = q["^GSPC"] && q["^GSPC"].price;
   const vals = [DT_START, ...DT.equity.map((p) => p.v), value];
-  const current = { run: DT.run, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +value.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spxNow ? +((spxNow / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false };
-  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow), universe: DT_UNIVERSE, durable: !!(UP_URL && UP_TOKEN),
-    status: open ? (DT.day && DT.day.halted ? "Daily loss limit hit — done for today" : "Trading live — scanning 1-minute bars for sweeps and gaps") : "Market closed — flat overnight, back at the opening bell",
-    rules: { risk: DT_RISK, maxPos: DT_MAXPOS, maxTrades: DT_MAXTRADES, dayStop: DT_DAYSTOP } };
+  const current = { run: DT.run, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +value.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n : 0, days: DT.equity.length, spxRet: DT.spx0 && spxNow ? +((spxNow / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false };
+  const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
+  Object.assign(st, { trades: T.n * 2, closed: T.n, winRate: T.n ? T.wins / T.n : null, avgWin: T.wins ? T.gw / T.wins : null, avgLoss: T.n - T.wins ? -T.gl / (T.n - T.wins) : null, profitFactor: T.gl > 0 ? T.gw / T.gl : null, grossWins: T.gw, grossLosses: T.gl, costs: T.costs, traded: T.traded, avgR: T.n ? T.Rsum / T.n : null, avgHold: T.n ? T.held / T.n : null, longs: T.longs, shorts: T.shorts, longPnl: T.longPnl, shortPnl: T.shortPnl,
+    bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })) });
+  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, durable: !!(UP_URL && UP_TOKEN),
+    status: open ? (DT.day && DT.day.halted ? "Daily loss limit hit — done for today" : "Scalping live — every stock checked every minute, trades last 1–5 minutes") : "Market closed — flat overnight, back at the opening bell",
+    rules: { risk: DT_RISK, maxPos: DT_MAXPOS, maxTrades: DT_MAXTRADES, dayStop: DT_DAYSTOP, cost: DT_COST, hold: DT_HOLD } };
 }
 function dtRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
