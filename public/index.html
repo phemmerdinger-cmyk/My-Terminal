@@ -2815,7 +2815,7 @@ async function btRun(){
     <div><span>Max drawdown</span><b class="down">${fxP(st.maxDrawdown)}</b><small>${dfmt(st.from)} → ${dfmt(st.to)}</small></div>
     <div><span>Beta / correlation</span><b>${st.beta!=null?st.beta.toFixed(2):"—"}</b><small>correlation ${st.correlation!=null?st.correlation.toFixed(2):"—"}</small></div>
     <div><span>Alpha (Jensen's)</span><b class="${cls(st.alpha)}">${fxP(st.alpha)}</b><small>a year vs. its beta-adjusted S&amp;P</small></div>
-    <div><span>Best / worst month</span><b><span class="up">${st.bestMonth?fxP(st.bestMonth.ret):"—"}</span> / <span class="down">${st.worstMonth?fxP(st.worstMonth.ret):"—"}</span></b><small>${st.bestMonth?st.bestMonth.month:""} · ${st.worstMonth?st.worstMonth.month:""}</small></div>
+    <div><span>Best / worst month</span><b style="font-size:16px;white-space:nowrap"><span class="up">${st.bestMonth?fxP(st.bestMonth.ret):"—"}</span> / <span class="down">${st.worstMonth?fxP(st.worstMonth.ret):"—"}</span></b><small>${st.bestMonth?st.bestMonth.month:""} · ${st.worstMonth?st.worstMonth.month:""}</small></div>
   </div>
   <div class="fx-card bt-chart" id="btEq"><h3>Growth of $${init.toLocaleString()} <em class="bt-read">hover the chart for values</em></h3>${svgLines(r.dates,[{v:r.bench||[],c:"#8a93a3",w:1.6},{v:r.values,c:"#4da3ff",w:2.4}])}
   <div class="bt-leg"><span><i style="background:#4da3ff"></i>Your portfolio</span><span><i style="background:#8a93a3"></i>S&amp;P 500 (SPY ETF${useAdj?", dividends reinvested":", price only"})</span></div></div>
