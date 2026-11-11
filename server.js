@@ -1863,20 +1863,70 @@ function dtExit(sym, px, why, t) {
   const k = (T.kinds[p.kind || "other"] = T.kinds[p.kind || "other"] || { n: 0, wins: 0, pnl: 0 }); k.n++; if (pnl > 0) k.wins++; k.pnl += pnl;
   dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(5), R: +R.toFixed(2), held, cost: +(cost + (p.cost0 || 0)).toFixed(2), entry: p.entry, dir: p.dir });
 }
-const DT_KIND = { pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum" };
-// Direction for the next minute: one of the scalper patterns if it shows up, otherwise follow the bar that just closed
-// (or, on a flat bar, the 9- vs 20-minute trend).
-function dtDecide(bars) {
-  const sig = DTC.scalpSignal(bars); if (sig) return sig;
+const DT_KIND = { pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum", "research-long": "News & research (bullish)", "research-short": "News & research (bearish)" };
+// ---- research for the day trader: the same inputs the swing bot uses, refreshed every 10 minutes ----
+// For each stock: news headlines (the five outlets, trending, Smart Money, its own Yahoo feed), earnings (beat or miss
+// in the last few days, or reporting today/tomorrow), analyst ratings, its 50- and 200-day trend and how it's doing
+// today against the S&P 500; plus the whole market's mood (S&P today, VIX fear index, S&P vs its 200-day average).
+// Becomes a lean from −1 (bearish) to +1 (bullish) with the reasons attached.
+let DTR = { t: 0, by: {}, market: null }, dtrBusy = false;
+async function dtResearch() {
+  if (dtrBusy) return; dtrBusy = true;
+  try {
+    const t = etParts(), cal = await apEarnings();
+    const q = (await getQuotes([...DT_UNIVERSE, "SPY", "^VIX", "^GSPC"])).quotes, spyDay = (q.SPY && q.SPY.changePct) || 0;
+    const vix = q["^VIX"] && !q["^VIX"].error ? q["^VIX"].price : null;
+    let below200 = false; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((c) => c.close); below200 = cl[cl.length - 1] < sma(cl, 200); } catch {}
+    const mk = clamp(spyDay / 1.5, -1, 1) * 0.6 + (vix != null ? (vix >= 30 ? -0.4 : vix >= 22 ? -0.2 : vix <= 14 ? 0.1 : 0) : 0) + (below200 ? -0.15 : 0.05);
+    const market = { lean: clamp(mk, -1, 1), spyDay, vix, below200 };
+    const own = [...DT_UNIVERSE.filter((s) => !/^(SPY|QQQ|IWM|DIA)$/.test(s)).slice(0, 24), ...Object.keys(DT.positions).slice(0, 8)];
+    const news = await apNewsPool([...new Set(own)]);
+    const by = {};
+    for (const sym of DT_UNIVERSE) {
+      let base = apBase.get(sym); if (!base || base.day !== t.day) { try { base = await apBaseFor(sym, t.day); await new Promise((r) => setTimeout(r, 120)); } catch { base = null; } }
+      const qq = q[sym], px = qq && !qq.error && qq.price ? qq.price : base && base.last, day = qq && !qq.error ? qq.changePct || 0 : 0;
+      const n = base ? apNewsFor(sym, base.re, news.pool) : { score: 0, top: [] };
+      const earn = apEarnFor(sym, cal, t.day);
+      const r = BB.ratings[sym.replace("-", ".")], adj = r && r.n >= BB_MIN_N ? bbAdj(r) : null;
+      const trend = base && px ? (px > base.m50 ? 0.5 : -0.5) + (px > base.m200 ? 0.5 : -0.5) : 0;
+      const parts = [], add = (w, v, label) => { if (v) parts.push({ w, v, label }); };
+      add(0.35, clamp(n.score / 2.5, -1, 1), n.top[0] ? `${n.score > 0 ? "good" : "bad"} news: “${n.top[0].slice(0, 80)}”` : null);
+      if (earn && (earn.kind === "beat" || earn.kind === "miss")) add(0.3, earn.kind === "beat" ? 1 : -1, `earnings ${earn.kind} by ${Math.abs(earn.surprise * 100).toFixed(0)}%`);
+      add(0.1, adj != null ? clamp(adj / 1.5, -1, 1) : 0, adj != null ? `analysts ${adj >= 1 ? "strongly positive" : adj >= 0.4 ? "positive" : adj <= -0.2 ? "negative" : "mixed"}` : null);
+      add(0.1, trend, base ? (trend > 0 ? "above its 50- & 200-day averages" : trend < 0 ? "below its 50- & 200-day averages" : "mixed long-term trend") : null);
+      add(0.15, clamp((day - spyDay) / 3, -1, 1), Math.abs(day - spyDay) >= 1 ? `${day - spyDay >= 0 ? "beating" : "lagging"} the S&P today (${day >= 0 ? "+" : ""}${day.toFixed(1)}%)` : null);
+      const lean = clamp(parts.reduce((a, x) => a + x.w * x.v, 0) + 0.2 * market.lean, -1, 1);
+      const reasons = parts.filter((x) => x.label && Math.abs(x.w * x.v) >= 0.03).sort((a, b) => Math.abs(b.w * b.v) - Math.abs(a.w * a.v)).map((x) => x.label);
+      by[sym] = { lean: +lean.toFixed(3), reasons: reasons.slice(0, 3), news: +n.score.toFixed(2), headline: n.top[0] || null, earn, adj: adj == null ? null : +adj.toFixed(2), trend, day: +day.toFixed(2), soon: !!(earn && earn.kind === "soon") };
+    }
+    DTR = { t: Date.now(), by, market };
+    BOTDIAG.day.research = { t: DTR.t, n: Object.keys(by).length };
+  } catch (e) { diagErr("day", "research: " + (e.message || e)); } finally { dtrBusy = false; }
+}
+// Direction for the next minute = the 1-minute chart signal combined with the research lean.
+//   chart: one of the scalper patterns (strength 1) or simply the direction of the minute that just closed (0.4)
+//   research: lean −1…+1 counts 1.2× — strong news or an earnings beat/miss overrules a single minute's wiggle
+// Size grows with agreement: chart and research pointing the same way → up to 1.33× a normal slice; disagreeing or
+// reporting earnings today/tomorrow (a coin flip) → as little as half.
+function dtDecide(bars, sym) {
   const reg = bars.filter((x) => x.m >= DTC.OPEN), b = reg[reg.length - 1]; if (!b || reg.length < 3) return null;
   const a = DTC.atr(reg, 14) || b.c * 0.001, cl = reg.map((x) => x.c);
-  const dir = b.c > b.o ? "long" : b.c < b.o ? "short" : (DTC.ema(cl, 9) >= DTC.ema(cl, 20) ? "long" : "short");
+  const sig = DTC.scalpSignal(bars);
+  const mDir = sig ? (sig.dir === "long" ? 1 : -1) : b.c > b.o ? 1 : b.c < b.o ? -1 : (DTC.ema(cl, 9) >= DTC.ema(cl, 20) ? 1 : -1);
+  const chart = (sig ? 1 : 0.4) * mDir, info = DTR.by[sym], lean = info ? info.lean : 0, total = chart + 1.2 * lean;
+  const dir = total > 0 ? "long" : total < 0 ? "short" : mDir > 0 ? "long" : "short", sgn = dir === "long" ? 1 : -1;
+  const agree = Math.sign(chart) === Math.sign(lean) || Math.abs(lean) < 0.05;
+  const sizeX = clamp((0.6 + Math.abs(total) * 0.6) * (agree ? 1 : 0.75) * (info && info.soon ? 0.5 : 1), 0.5, 1.33);
+  const chartWhy = sig ? sig.why : `last minute closed ${b.c > b.o ? "up" : b.c < b.o ? "down" : "flat"}`;
+  const resWhy = info && info.reasons.length ? info.reasons.join("; ") : "no strong news, earnings or trend signal";
+  const ruled = Math.sign(total) !== mDir ? " — research overruled the chart" : "";
+  const kind = Math.abs(1.2 * lean) > Math.abs(chart) ? (lean > 0 ? "research-long" : "research-short") : sig ? sig.kind : "momentum";
   const d = Math.max(a, b.c * 0.0005), t = Math.max(a * 1.2, b.c * 0.0006);
-  return { dir, kind: "momentum", score: 0.5, why: `last minute closed ${b.c > b.o ? "up" : b.c < b.o ? "down" : "flat"} — riding it for one minute`, entry: b.c, stop: dir === "long" ? b.c - d : b.c + d, target: dir === "long" ? b.c + t : b.c - t, at: b.t };
+  return { dir, kind, sizeX, score: Math.abs(total), why: `${chartWhy} · research ${lean >= 0 ? "+" : ""}${lean.toFixed(2)}: ${resWhy}${ruled}`, entry: b.c, stop: b.c - sgn * d, target: b.c + sgn * t, at: b.t };
 }
 function dtOpen(sym, idea, b, nSyms) {
   const eq = dtEquity(); if (eq <= 0) return;
-  const px = idea.entry, shares = DTC.size(eq, px, idea.stop, 1, (4 * eq) / nSyms); if (shares < 1) return; // equal slice of 4× buying power
+  const px = idea.entry, shares = DTC.size(eq, px, idea.stop, 1, ((3 * eq) / nSyms) * (idea.sizeX || 1)); if (shares < 1) return; // a slice of buying power: 3×/N, up to 1.33× that when chart and research agree (max 4×)
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   DT.positions[sym] = { dir: idea.dir, shares, entry: px, stop: idea.stop, stop0: idea.stop, target: idea.target, setup: DT_KIND[idea.kind], kind: idea.kind, at: b.t * 1000 + 60e3, why: `${sym}: ${idea.why}`, cost0, bars: 0 };
   DT.cash += (idea.dir === "long" ? -1 : 1) * shares * px - cost0; DT.day.trades++;
@@ -1890,7 +1940,7 @@ function dtBar(sym, b, bars, nSyms, canOpen) {
   const p = DT.positions[sym];
   if (p) { const ex = DTC.scalpManage(p, b, DT_HOLD); if (ex) dtExit(sym, ex.px, ex.why === "Stop hit" || ex.why === "Target hit" ? ex.why : "Closed after one minute", b.t + 60); }
   if (!canOpen) return;
-  const idea = dtDecide(bars); if (idea) dtOpen(sym, idea, b, nSyms);
+  const idea = dtDecide(bars, sym); if (idea) dtOpen(sym, idea, b, nSyms);
 }
 async function dtTick() {
   if (dtBusy) return; dtBusy = true;
@@ -1900,6 +1950,7 @@ async function dtTick() {
     const t = m.t;
     if (!m.open && Object.keys(DT.positions).length && DT.day) { for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "Market closed — flat at the close"); await dtSave(); }
     if (!m.open && !(t.min >= 9 * 60 + 28 && t.min < 9 * 60 + 30 && t.wd !== "Sat" && t.wd !== "Sun")) return;
+    if (Date.now() - DTR.t > 10 * 60e3) { const r = dtResearch(); if (!DTR.t) await r; }
     if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, closed: 0, halted: false };
     if (!DT.tally) DT.tally = dtTally();
     const uni = Date.now() < dtThrottleUntil ? DT_UNIVERSE.slice(0, 50) : DT_UNIVERSE;
@@ -1974,7 +2025,7 @@ async function dtView() {
   const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
   Object.assign(st, { trades: T.n * 2, closed: T.n, winRate: T.n ? T.wins / T.n : null, avgWin: T.wins ? T.gw / T.wins : null, avgLoss: T.n - T.wins ? -T.gl / (T.n - T.wins) : null, profitFactor: T.gl > 0 ? T.gw / T.gl : null, grossWins: T.gw, grossLosses: T.gl, costs: T.costs, traded: T.traded, avgR: T.n ? T.Rsum / T.n : null, avgHold: T.n ? T.held / T.n : null, longs: T.longs, shorts: T.shorts, longPnl: T.longPnl, shortPnl: T.shortPnl,
     bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })) });
-  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, durable: !!(UP_URL && UP_TOKEN),
+  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons })) }, durable: !!(UP_URL && UP_TOKEN),
     status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute` : "Market closed — flat overnight, back at the opening bell",
     rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388 } };
 }
