@@ -679,8 +679,8 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .lv-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:lvPulse 1.6s infinite}
 .lv.off .lv-dot{background:var(--dim);animation:none}
 @keyframes lvPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
-.lv-key{margin-left:auto;display:flex;align-items:center;gap:6px}.lv-key i{display:inline-block;width:12px;height:3px;border-radius:2px}.lv-key i.ai{background:#ff9f43}.lv-key i.sp{background:#8b93a7;margin-left:6px}
-#apLiveSvg{display:block;width:100%;height:70px;margin-top:4px}
+.lv-key{margin-left:auto;display:flex;align-items:center;gap:6px}.lv-key i{display:inline-block;width:12px;height:3px;border-radius:2px}.lv-key i.ai{background:#ff9f43}.lv-key i.dy{background:#4da3ff;margin-left:6px}.lv-key i.sp{background:#a7afbd;margin-left:6px}
+#apLiveSvg{display:block;width:100%;height:90px;margin-top:4px}
 .ap-side b,.hd-r b,.hd-gh span,.hd-sum b,.bot-sw b,.bot-sw small{font-variant-numeric:tabular-nums}
 .lv-up{animation:lvUp .9s ease-out}.lv-dn{animation:lvDn .9s ease-out}
 @keyframes lvUp{0%{color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,.5)}100%{}}
@@ -1671,7 +1671,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
-      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div><div class="lv" id="apLive"><div class="lv-h"><span class="lv-dot"></span><b>Live</b><small id="apLiveNote">connecting…</small><span class="lv-key"><i class="ai"></i>AI <i class="sp"></i>S&amp;P 500 · same money</span></div><svg id="apLiveSvg" viewBox="0 0 800 90" preserveAspectRatio="none"></svg></div></div>
+      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div><div class="lv" id="apLive"><div class="lv-h"><span class="lv-dot"></span><b>Live</b><small id="apLiveNote">connecting…</small><span class="lv-key"><i class="ai"></i>Swing <i class="dy"></i>Day trader <i class="sp"></i>S&amp;P 500 · return since start</span></div><svg id="apLiveSvg" viewBox="0 0 800 90" preserveAspectRatio="none"></svg></div></div>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
         <aside class="ap-hold" id="apNote"></aside>
@@ -3257,8 +3257,8 @@ function apSvgChart(id,labels,series,{h=260,zero=false,fmt=v=>v,fills=false}={})
   // evenly spaced time labels, always including the first and last — few enough that they never overlap
   const K=Math.min(n,(window.innerWidth||1000)<700?3:5), idx=[...new Set(Array.from({length:K},(_,j)=>K<2?0:Math.round(j*(n-1)/(K-1))))];
   const ticks=idx.map(i=>`<span style="left:${(X(i)/W*100).toFixed(2)}%">${esc(labels[i])}</span>`).join("");
-  const body=series.map(s=>{const p=pl(s); if(!p) return ""; if(s.area){ const first=p.split(" ")[0].split(",")[0], last=p.split(" ").at(-1).split(",")[0], base=zero?Y(0):h;
-    return `<defs><clipPath id="${id}u"><rect x="0" y="0" width="${W}" height="${base}"/></clipPath><clipPath id="${id}d"><rect x="0" y="${base}" width="${W}" height="${h-base}"/></clipPath></defs><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.up||s.c}" opacity=".25" clip-path="url(#${id}u)"/><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.down||s.c}" opacity=".25" clip-path="url(#${id}d)"/><polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke"/>`; }
+  const body=series.map((s,k)=>{const p=pl(s); if(!p) return ""; if(s.area){ const first=p.split(" ")[0].split(",")[0], last=p.split(" ").at(-1).split(",")[0], base=zero?Y(0):h, ao=s.ao||.25, cu=`${id}u${k}`, cd=`${id}d${k}`;
+    return `<defs><clipPath id="${cu}"><rect x="0" y="0" width="${W}" height="${Math.max(0,base)}"/></clipPath><clipPath id="${cd}"><rect x="0" y="${base}" width="${W}" height="${Math.max(0,h-base)}"/></clipPath></defs><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.up||s.c}" opacity="${ao}" clip-path="url(#${cu})"/><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.down||s.c}" opacity="${ao}" clip-path="url(#${cd})"/><polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke" ${s.dash?'stroke-dasharray="5 4"':""}/>`; }
     return `<polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke" ${s.dash?'stroke-dasharray="5 4"':""}/>`;}).join("");
   return `<div class="apc" id="${id}"><div class="apc-read"><b>${esc(labels.at(-1))}</b>${series.map(s=>`<span><i style="background:${s.c}"></i>${s.n} <b>${s.v.at(-1)==null?"—":fmt(s.v.at(-1))}</b></span>`).join("")}</div>
   <div class="apc-plot" style="height:${h}px"><svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none">${grid}${z}${body}<line class="apc-x" x1="-9" x2="-9" y1="0" y2="${h}" stroke="var(--muted)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
@@ -3329,11 +3329,39 @@ function apPerf(d){
   </div></div>
   ${drv.length?`<div class="bt-card"><h4>What's driving the results <em>profit &amp; loss by stock · realized + open</em></h4>${apDriverBars(drv)}</div>`:""}`;
 }
+/* ---------- both bots and the S&P 500 on one chart: return since each run started, green above 0 / red below ---------- */
+const BOTH_C={swing:"#ff9f43",day:"#4da3ff",spx:"#a7afbd"};
+function apBothData(range){
+  const sw=BOTS.d.swing, dy=BOTS.d.day; if(!sw&&!dy) return null;
+  const ref=[sw,dy].find(b=>b&&b.spx0), spx0=ref&&ref.spx0;
+  const pts=(b,k)=>!b?[]:range==="today"?(b.intraday||[]).map(p=>({t:p.t,v:p.v,spx:p.spx})):(b.equity||[]).map(p=>({t:Date.parse(p.d+"T21:00:00Z"),v:p.v,spx:p.spx}));
+  const A=pts(sw), B=pts(dy), key=t=>range==="today"?Math.round(t/300e3)*300e3:t, T=[...new Set([...A,...B].map(p=>key(p.t)))].sort((a,b)=>a-b);
+  if(T.length<2) return null;
+  const walk=(arr,start)=>{ const m=new Map(arr.map(p=>[key(p.t),p])); let last=null; return T.map(t=>{ const p=m.get(t); if(p) last=p; return last?last.v/start-1:null; }); };
+  const spxAt=(()=>{ const m=new Map([...A,...B].filter(p=>p.spx).map(p=>[key(p.t),p.spx])); let last=null; return T.map(t=>{ if(m.has(t)) last=m.get(t); return last&&spx0?last/spx0-1:null; }); })();
+  const lab=T.map(t=>range==="today"?new Date(t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"}):new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"America/New_York"}));
+  const series=[{n:"S&P 500",c:BOTH_C.spx,v:spxAt,w:2,dash:true}];
+  if(sw) series.push({n:"🤖 Swing bot",c:BOTH_C.swing,v:walk(A,sw.startValue),w:2.6,area:true,up:"#21c37a",down:"#ff6b6b",ao:.14});
+  if(dy) series.push({n:"⚡ Day trader",c:BOTH_C.day,v:walk(B,dy.startValue),w:2.6,area:true,up:"#21c37a",down:"#ff6b6b",ao:.14});
+  return {lab,series};
+}
+function apBoth(){
+  APV.both=APV.both||"today"; const D=apBothData(APV.both), pc=x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%";
+  const seg=`<div class="apseg" data-seg="both">${[["today","Today"],["all","All days"]].map(([v,l])=>`<button type="button" data-v="${v}" class="${v===APV.both?"on":""}">${l}</button>`).join("")}</div>`;
+  const chart=D&&D.series.some(s=>s.v.filter(x=>x!=null).length>=2)?apSvgChart("apBothC",D.lab,D.series,{zero:true,fmt:pc,h:260}).replace('<div class="apc" id="apBothC">','<div class="apc" id="apBothC" data-zero="1">'):`<div class="ap-empty" style="padding:30px 10px">${APV.both==="today"?"Fills in once both bots have traded for a few minutes today.":"Needs a couple of trading days — try “Today”."}</div>`;
+  APV.bothD=D&&{...D,fmt:pc};
+  return `<div class="bt-card ap-perf" id="apBothCard"><div class="ap-perf-h"><h4 style="margin:0">Both bots vs. the S&amp;P 500 <em>return since each run started · green above zero, red below</em></h4><div class="ap-ctl">${seg}</div></div><div id="apBothWrap">${chart}</div></div>`;
+}
+function apWireBoth(){
+  const card=$("apBothCard"); if(!card) return;
+  card.querySelector(".apseg").onclick=e=>{const b=e.target.closest("[data-v]"); if(!b) return; APV.both=b.dataset.v; card.outerHTML=apBoth(); apWireBoth(); };
+  if($("apBothC")&&APV.bothD) apWireChart("apBothC",APV.bothD.lab,APV.bothD.series,APV.bothD.fmt);
+}
 function apMainChart(d,R){
   const v=APV.view, ai=R.ai, sp=R.sp, a0=ai[0], s0=sp.find(x=>x!=null);
   const usd=x=>(x<0?"−$":"$")+Math.abs(x).toLocaleString(undefined,{maximumFractionDigits:0}), pc=x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%";
   let series,opt;
-  if(v==="ret") { series=[{n:"S&P 500",c:"#8a93a3",v:sp.map(x=>x==null?null:x/s0-1)},{n:"AI bot",c:"#ff9f43",v:ai.map(x=>x/a0-1),w:2.6}]; opt={zero:true,fmt:pc}; }
+  if(v==="ret") { series=[{n:"S&P 500",c:"#8a93a3",v:sp.map(x=>x==null?null:x/s0-1)},{n:"AI bot",c:"#ff9f43",v:ai.map(x=>x/a0-1),w:2.6,area:true,up:"#21c37a",down:"#ff6b6b",ao:.18}]; opt={zero:true,fmt:pc}; }
   else if(v==="val"){ series=[{n:"S&P 500",c:"#8a93a3",v:sp},{n:"AI bot",c:"#ff9f43",v:ai,w:2.6}]; opt={fmt:usd}; }
   else if(v==="gap"){ series=[{n:"AI minus S&P",c:"var(--text)",v:ai.map((x,i)=>sp[i]==null?null:x-sp[i]),area:true,up:"#21c37a",down:"#ff6b6b"}]; opt={zero:true,fmt:x=>(x>=0?"+":"")+usd(x)}; }
   else { const ddf=arr=>{let pk=-Infinity;return arr.map(x=>{if(x==null)return null;pk=Math.max(pk,x);return x/pk-1;});}; series=[{n:"S&P 500",c:"#8a93a3",v:ddf(sp)},{n:"AI bot",c:"#ff6b6b",v:ddf(ai),area:true,up:"#ff6b6b",down:"#ff6b6b"}]; opt={zero:true,fmt:pc}; }
@@ -3361,8 +3389,8 @@ function apDriverBars(drv){
   return drv.map(x=>`<div class="ap-drv" title="realized ${$m(x.r)} · open ${$m(x.u)}"><span><b>${esc(x.s)}</b></span><div class="ap-bar"><i class="${x.t>=0?"pos":"neg"}" style="width:${(Math.abs(x.t)/mx*50).toFixed(1)}%;background:${x.t>=0?"#21c37a":"#ff6b6b"}"></i><b class="${cls(x.t)}">${x.t>=0?"+":"−"}$${Math.abs(x.t).toFixed(0)}</b></div></div>`).join("")+`<p class="ap-note" style="margin:8px 0 0">Realized = closed trades; open = gain or loss on what it holds now. Hover a bar for the split.</p>`;
 }
 function apWirePerf(d){
-  const box=$("apBox"); if(!box) return;
-  box.querySelectorAll(".apseg").forEach(g=>g.onclick=e=>{const b=e.target.closest("[data-v]"); if(!b) return; APV[g.dataset.seg]=b.dataset.v; g.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+  const box=$("apBox"); if(!box) return; apWireBoth();
+  box.querySelectorAll('.apseg:not([data-seg="both"])').forEach(g=>g.onclick=e=>{const b=e.target.closest("[data-v]"); if(!b) return; APV[g.dataset.seg]=b.dataset.v; g.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
     if(g.dataset.seg==="range"||g.dataset.seg==="view"){ const R=apRangeSeries(d,APV.range), w=$("apMainWrap"); if(w){ w.innerHTML=R.ai.length>=2?apMainChart(d,R):`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet.</div>`; if(APV.cur&&R.ai.length>=2) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt); } } });
   if($("apMain")&&APV.cur) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt);
   if($("apPre")&&APV.pre) apWireChart("apPre",APV.pre.labels,APV.pre.series,APV.pre.fmt);
@@ -3415,6 +3443,7 @@ function apRender(d){
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet)}</small></div>
   </div>${liveLine}`;
   $("apBox").innerHTML=`
+  ${apBoth()}
   ${apPerf(d)}
   <div class="ap-mini">${[["Days running",days,d.firstTrade?"since "+new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"not started"],["Peak",$m(peak),"low "+$m(low)],["Worst drop",dd.toFixed(1)+"%","from a peak"],["To bust",$m(Math.max(0,d.value-d.bustAt)),"busts under "+$m(d.bustAt)],["Invested",(d.value?Math.round(inv/d.value*100):0)+"%",d.positions.length+" stocks"]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
   $("apMore").innerHTML=`
@@ -3512,6 +3541,7 @@ function dtRender(d){
   </div>
   <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">max speed · no daily stop</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
+  ${apBoth()}
   ${apPerf(d)}
   <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),`ceiling ~${(d.rules.ceiling||0).toLocaleString()} a day · ${(a.closed||0).toLocaleString()} all-time`],
     ["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",a.winRate!=null?`${Math.round(a.winRate*100)}% of trades win`:"no closed trades yet"],
@@ -3620,14 +3650,23 @@ function liveApply(flash){
 }
 function liveChart(){
   const svg=$("apLiveSvg"), note=$("apLiveNote"), L=LIVE.d; if(!svg||!L) return;
-  const h=LIVE.hist[BOTS.sel]||[], ago=Math.max(0,Math.round((Date.now()-(L.pricesAt||L.t))/1000));
+  const hs=LIVE.hist.swing||[], hd=LIVE.hist.day||[], h=hs.length>=hd.length?hs:hd, ago=Math.max(0,Math.round((Date.now()-(L.pricesAt||L.t))/1000));
   note.textContent=!L.open?"market closed — showing the last prices":`prices ${ago<3?"just now":ago+"s ago"} · ${h.length>1?(()=>{const sec=Math.round((h.at(-1).t-h[0].t)/1000);return sec<60?`${sec}s since you opened the page`:`${Math.round(sec/60)} min since you opened the page`;})():"building…"}`;
   $("apLive").classList.toggle("off",!L.open);
   if(h.length<2){ svg.innerHTML=""; return; }
-  const vals=h.flatMap(p=>[p.v,p.s]).filter(v=>v!=null); let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*0.15,hi*0.0002); lo-=pad; hi+=pad;
-  const X=i=>i/(h.length-1)*800, Y=v=>84-(v-lo)/(hi-lo)*78;
-  const line=(k,c)=>{ const pts=h.map((p,i)=>p[k]==null?null:`${X(i).toFixed(1)},${Y(p[k]).toFixed(1)}`).filter(Boolean).join(" "); return pts?`<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`:""; };
-  svg.innerHTML=line("s","#8b93a7")+line("v","#ff9f43");
+  const sw=BOTS.d.swing, dy=BOTS.d.day;
+  const S=[["s",hs,sw?sw.startValue:10000,"#a7afbd",true],["v",hs,sw?sw.startValue:10000,"#ff9f43",false],["v",hd,dy?dy.startValue:30000,"#4da3ff",false]]
+    .map(([k,arr,start,c,dash])=>({c,dash,v:arr.map(p=>p[k]==null?null:p[k]/start-1)})).filter(x=>x.v.filter(v=>v!=null).length>=2);
+  const vals=S.flatMap(x=>x.v).filter(v=>v!=null); if(!vals.length){ svg.innerHTML=""; return; }
+  let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*0.15,0.0002); lo-=pad; hi+=pad;
+  const H=90, Y=v=>H-4-(v-lo)/(hi-lo)*(H-8), z=Math.max(0,Math.min(H,Y(0)));
+  const body=S.map((x,k)=>{ const n=x.v.length, X=i=>i/(n-1)*800, pts=x.v.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean); if(pts.length<2) return "";
+    const line=pts.map(p=>`${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    if(x.dash) return `<polyline points="${line}" fill="none" stroke="${x.c}" stroke-width="1.6" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
+    const poly=`${pts[0][0].toFixed(1)},${z} ${line} ${pts.at(-1)[0].toFixed(1)},${z}`;
+    return `<defs><clipPath id="lvU${k}"><rect x="0" y="0" width="800" height="${z}"/></clipPath><clipPath id="lvD${k}"><rect x="0" y="${z}" width="800" height="${H-z}"/></clipPath></defs><polygon points="${poly}" fill="#21c37a" opacity=".14" clip-path="url(#lvU${k})"/><polygon points="${poly}" fill="#ff6b6b" opacity=".14" clip-path="url(#lvD${k})"/><polyline points="${line}" fill="none" stroke="${x.c}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`; }).join("");
+  svg.setAttribute("viewBox",`0 0 800 ${H}`);
+  svg.innerHTML=(z>0&&z<H?`<line x1="0" x2="800" y1="${z}" y2="${z}" stroke="var(--line2)" stroke-dasharray="3 4" vector-effect="non-scaling-stroke"/>`:"")+body;
 }
 liveSchedule(1500);
 function aiShow(k){
