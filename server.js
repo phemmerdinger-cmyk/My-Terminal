@@ -1470,7 +1470,7 @@ const BOTDIAG = { market: {}, swing: { errors: [] }, day: { errors: [], scans: 0
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
-const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
+const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Failed the 10-K health/.test(why) ? "Health rule" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
 function apTrade(st, side, sym, shares, price, why, name, sleeve) {
   const px = side === "BUY" ? price * (1 + AP_SLIP) : price * (1 - AP_SLIP), amt = shares * px;
   const p = st.positions[sym]; let pnl = null, pnlPct = null;
@@ -1568,6 +1568,28 @@ async function apBaseFor(sym, day) {
   apBase.set(sym, out); if (apBase.size > 400) apBase.delete(apBase.keys().next().value);
   return out;
 }
+// ---- health grades for the swing bot: the crawler's scorecard (FIN.health) on each candidate's last two 10-Ks.
+// A background job grades names a few seconds apart through the SEC queue; grades last a day. Until a stock has
+// a grade it's simply scored without one.
+const FINS = require("./public/fin.js");
+const AP_HEALTH = new Map(); let apHealthBusy = false;
+async function apHealthJob(syms) {
+  if (apHealthBusy) return; apHealthBusy = true;
+  try {
+    for (const sym of syms) {
+      const h = AP_HEALTH.get(sym); if (h && Date.now() - h.t < 24 * 3600e3) continue;
+      try {
+        const f = await secFundamentals(sym), Y = f.available ? f.years.slice(-2) : [];
+        if (Y.length < 2) { AP_HEALTH.set(sym, { t: Date.now(), grade: null }); continue; }
+        const H = FINS.health(Y[1], Y[0]);
+        AP_HEALTH.set(sym, { t: Date.now(), grade: H.grade, score: H.score, failed: H.failed, flags: H.flags.map((c) => c.label), fy: String(Y[1].end).slice(0, 4) });
+        BOTDIAG.swing.graded = [...AP_HEALTH.values()].filter((v) => v.grade).length;
+      } catch { AP_HEALTH.set(sym, { t: Date.now() - 23 * 3600e3, grade: null }); } // retry in an hour
+      await new Promise((ok) => setTimeout(ok, 1500));
+    }
+  } finally { apHealthBusy = false; }
+}
+const AP_GRADE_ADJ = { A: 0.04, B: 0.02, C: 0, D: -0.06, F: -0.15 };
 // Scores every candidate. Returns the ranked list plus market-level signals.
 async function apScore(live) {
   const t = etParts(), ranked = bbRank().all;
@@ -1601,9 +1623,11 @@ async function apScore(live) {
   const ra = pr("adj"), rm = pr("mom");
   for (const x of out) {
     const e = x.earn, eAdj = !e ? 0 : e.kind === "beat" ? Math.min(0.2, 0.08 + e.surprise) : e.kind === "miss" ? -0.35 : 0;
-    x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj;
+    const hg = AP_HEALTH.get(x.sym); x.health = hg && hg.grade ? { grade: hg.grade, flags: hg.flags, fy: hg.fy } : null;
+    x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj + (x.health ? AP_GRADE_ADJ[x.health.grade] || 0 : 0);
   }
   out.sort((a, b) => b.score - a.score); out.forEach((x, i) => { x.rank = i + 1; apPx[x.sym] = x.px; apScoreOf[x.sym] = x.score; });
+  apHealthJob(out.map((x) => x.sym)).catch(() => {}); // grade anything new in the background
   // 80% risk: the more volatile 60% of names feed the risk sleeve (8 slots), the calmest 40% the safe sleeve (2 slots)
   const vols = out.map((x) => x.vol).sort((a, b) => a - b), cut = vols[Math.floor(vols.length * 0.4)] || 0;
   let rr = 0, sr = 0; for (const x of out) { x.sleeve = x.vol > cut ? "risk" : "safe"; x.srank = x.sleeve === "risk" ? ++rr : ++sr; }
@@ -1644,6 +1668,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     const x = by[sym]; if (!x) continue; const risk = slv(sym) === "risk";
     if (x.earn && x.earn.kind === "miss") apTrade(st, "SELL", sym, p.shares, x.px, `${opening ? "At the opening bell: " : ""}${fmtE(x.earn)} — sold before it can fall further`);
     else if (x.news <= -2.5) apTrade(st, "SELL", sym, p.shares, x.px, `Bad news: “${(x.headlines[0] || "").slice(0, 120)}”`);
+    else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
     else if (x.rank > (risk ? 25 : 35) && !cool(sym)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the live rankings`);
   }
@@ -1656,13 +1681,14 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
   }
   if (sc.stress) return;
-  const ok = (x, sl) => x.sleeve === sl && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const ok = (x, sl) => x.sleeve === sl && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
     if (x.earn && x.earn.kind === "beat") bits.push(`${opening ? "reported overnight: " : ""}${fmtE(x.earn)}`);
     if (x.news >= 1 && x.headlines[0]) bits.push(`good news: “${x.headlines[0].slice(0, 90)}”`);
     if (x.adj != null) bits.push(`analysts ${x.adj >= 1 ? "strongly positive" : x.adj >= 0.5 ? "positive" : "mixed"}`);
+    if (x.health) bits.push(`10-K health grade ${x.health.grade}`);
     bits.push(`${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months`);
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
     return `Ranked #${x.rank}: ` + bits.join(", ");
@@ -1694,7 +1720,7 @@ function apSummary(end, busted, spxNow) {
     trades: AP.trades.length, days: AP.equity.length, spxRet: AP.spx0 && spxNow ? +((spxNow / AP.spx0 - 1) * 100).toFixed(2) : null, busted };
 }
 function apSignals(sc) {
-  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym] });
+  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null });
   return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
@@ -2302,8 +2328,9 @@ async function insiderScan(symIn) {
 const TONE_UP = /\b(record|records|grew|grow(s|ing)?|growth|increase[ds]?|rose|strong(er|est)?|exceed(ed|s)?|beat|raised|raising|accelerat\w*|momentum|all-time|robust|expan(d|ded|ding|sion)|outperform\w*|double-digit|best-ever|surpass\w*|exceptional|healthy)\b/i;
 const TONE_DN = /\b(headwinds?|uncertain(ty|ties)?|challeng\w*|softness|soft(er)?|cautious(ly)?|declin\w*|decreas\w*|lower|weak(er|ness)?|pressures?|volatil\w*|tariffs?|macro(economic)?|slow(er|ing|down)?|lumpy|visibility|impairment|restructuring|disruption|constrain\w*|shortfall|down \d)/i;
 const TONE_GUIDE = /\b(expects?|expected|outlook|guidance|anticipates?|forecast|projects?|projected|plans? to|targets?)\b/i;
+const relPeriod = (t) => (t.match(/\b(first|second|third|fourth) (fiscal )?quarter( of fiscal \d{4}| of \d{4}| \d{4})?|\b(fiscal|full[- ]year|calendar) (year )?\d{4}|\bfull[- ]year\b|\bQ[1-4]( F?Y?\d{2,4})?\b/i) || [""])[0];
 function releaseGuidance(sent, lastPer) {
-  const out = [], per = (sent.match(/\b(first|second|third|fourth) (fiscal )?quarter( of fiscal \d{4}| of \d{4}| \d{4})?|\b(fiscal|full[- ]year|calendar) (year )?\d{4}|\bfull[- ]year\b|\bQ[1-4]( F?Y?\d{2,4})?\b/i) || [""])[0];
+  const out = [], per = relPeriod(sent);
   const add = (metric, m, unit) => m && out.push({ metric, value: m[1].replace(/,/g, "") + (unit || (m[2] ? " " + m[2].toLowerCase() : "")), range: m[3] ? m[3].trim() : null, period: per || lastPer || null });
   add("Revenue", sent.match(/\b(?:revenue|net sales|total sales|sales)\b[^.;]{0,70}?\$\s?([\d.,]+)\s?(billion|million)?(\s*(?:(?:,?\s*plus or minus\s*[\d.]+\s?(?:%|percent))|±|to \$?[\d.,]+\s?(?:billion|million)?))?/i));
   add("Gross margin", sent.match(/\bgross margins?\b[^.;]{0,60}?([\d.]+)\s?(?:%|percent)()(\s*(?:(?:,?\s*plus or minus\s*[\d.]+\s?(?:%|percent))|±|to [\d.]+\s?(?:%|percent)))?/i), "%");
@@ -2316,7 +2343,7 @@ function releaseGuidance(sent, lastPer) {
 }
 async function earningsRelease(symIn) {
   const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
-  return cached("sec:er2:" + id.sym, 6 * 3600e3, async () => {
+  return cached("sec:er3:" + id.sym, 6 * 3600e3, async () => {
     const r = (await secSubs(id.cik)).filings.recent;
     const i = r.form.findIndex((f, k) => (f === "8-K" || f === "6-K") && /2\.02/.test(r.items ? r.items[k] || "" : ""));
     if (i < 0) return { symbol: id.sym, available: false, name: id.name, reason: "No earnings press release (8-K, Item 2.02) found in the company's recent filings." };
@@ -2340,6 +2367,7 @@ async function earningsRelease(symIn) {
       const sents = p.split(/(?<=[.!?”])\s+(?=[A-Z“"])/).filter((x) => x.length > 25).map((t) => {
         const g = TONE_GUIDE.test(t) && /(\$|%|percent|billion|million|quarter|fiscal|year)/i.test(t), up = TONE_UP.test(t), dn = TONE_DN.test(t);
         const tone = g ? "guide" : dn && !up ? "bear" : up && !dn ? "bull" : up && dn ? "mixed" : null, hedge = dn ? (t.match(TONE_DN) || [""])[0].toLowerCase() : null;
+        if (TONE_GUIDE.test(t) && relPeriod(t)) lastPer = relPeriod(t);
         if (g) for (const x of releaseGuidance(t, lastPer)) { guide.push({ ...x, text: t.slice(0, 300) }); if (x.period) lastPer = x.period; }
         return { text: t.slice(0, 420), tone, hedge };
       });
@@ -2373,6 +2401,22 @@ async function riskDiff(symIn) {
     return { symbol: id.sym, available: A.heads.length > 0, name: id.name, cik: id.cik, current: { ...cur, count: A.heads.length }, prior: { ...prev, count: B.heads.length }, intro: A.intro.slice(0, 500), heads, removed,
       reason: A.heads.length ? null : "Couldn't find risk-factor headlines in this 10-K.", source: "Item 1A of the two most recent 10-K filings on SEC EDGAR" };
   });
+}
+
+// ---- filing alerts: each company's latest 10-K, 10-Q, earnings release (8-K Item 2.02) and insider filing (Form 4)
+async function latestFilings(symbols) {
+  const out = {};
+  for (const raw of symbols.slice(0, 40)) {
+    try {
+      const id = await secCik(raw); if (!id) continue;
+      const r = (await secSubs(id.cik)).filings.recent, first = (test) => { for (let i = 0; i < r.form.length; i++) if (test(i)) return i; return -1; };
+      const pick = (i, extra) => (i < 0 ? null : { date: r.filingDate[i], form: r.form[i], period: r.reportDate[i] || null, url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]), acc: r.accessionNumber[i], ...extra });
+      const k = first((i) => r.form[i] === "10-K" || r.form[i] === "20-F"), q = first((i) => r.form[i] === "10-Q"), er = first((i) => (r.form[i] === "8-K" || r.form[i] === "6-K") && /2\.02/.test((r.items && r.items[i]) || "")), f4 = first((i) => r.form[i] === "4");
+      const since = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+      out[raw] = { name: id.name, k: pick(k), q: pick(q), er: pick(er), f4: pick(f4, { n30: r.form.filter((f, i) => f === "4" && r.filingDate[i] >= since).length }) };
+    } catch { /* skip one */ }
+  }
+  return { updated: Date.now(), filings: out };
 }
 
 // Fast path: if the full filing (numbers + text) is ready, send it; otherwise send the numbers now (usually cached or
@@ -2589,6 +2633,10 @@ async function handle(req, res) {
         catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
       }
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
+      if (u.pathname === "/api/pub/filings") {
+        const syms = [...new Set(String(u.searchParams.get("symbols") || "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(x)))];
+        try { return send(res, 200, await latestFilings(syms)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
       if (u.pathname === "/api/pub/insiders" || u.pathname === "/api/pub/release" || u.pathname === "/api/pub/riskdiff") {
         const fn = { "/api/pub/insiders": insiderScan, "/api/pub/release": earningsRelease, "/api/pub/riskdiff": riskDiff }[u.pathname];
         try { return send(res, 200, await fn(u.searchParams.get("symbol"))); }

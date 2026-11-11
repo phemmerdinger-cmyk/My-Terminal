@@ -135,6 +135,18 @@ main{min-width:0}
 .cr[data-layout="nums"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="nums"] .cr-docwrap{display:none}
 .cr[data-layout="nums"] .cr-side{max-height:none}
 .cr-main{min-width:0;display:flex;flex-direction:column;gap:8px}
+.fa-box{border:1px solid rgba(245,158,11,.55);border-radius:4px;background:linear-gradient(180deg,rgba(245,158,11,.08),transparent 70%),var(--cr-p);padding:10px 12px;margin:0 0 12px;font-family:var(--cr-m)}
+.fa-box[hidden]{display:none}
+.fa-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}.fa-h b{font-size:13px;color:var(--text)}.fa-h small{color:var(--muted);font-size:11.5px}
+.fa-all{margin-left:auto;font:11px var(--cr-m);color:var(--muted);background:none;border:1px solid var(--cr-l);border-radius:3px;padding:4px 8px;cursor:pointer}.fa-all:hover{color:var(--text)}
+.fa-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px}
+.fa-it{display:flex;align-items:center;gap:10px;text-align:left;background:var(--cr-bg);border:1px solid var(--cr-l);border-radius:4px;padding:8px 10px;cursor:pointer;color:var(--text);font:12px var(--cr-m);min-width:0}
+.fa-it:hover{border-color:#f59e0b}.fa-it>span:nth-child(2){flex:1;min-width:0}.fa-it small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fa-it em{font-style:normal;font-size:10px;color:#f59e0b;margin-left:4px}.fa-it i{font-style:normal;color:#f59e0b;font-size:11px;white-space:nowrap}.fa-ic{font-size:18px}
+.fa-note{position:fixed;right:18px;bottom:18px;z-index:70;max-width:340px;background:var(--panel);border:1px solid #f59e0b;border-radius:6px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:6px;animation:crSumIn .3s ease-out}
+.fa-note b{font-size:13.5px}.fa-note small{color:var(--muted);font-size:12px}.fa-note div{display:flex;gap:8px;margin-top:4px}
+@media (max-width:700px){.fa-note{left:12px;right:12px;bottom:84px;max-width:none}}
+body.fa-has [data-tab="filings"]::after,body.fa-has [data-group="research"]::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:6px;vertical-align:middle;box-shadow:0 0 8px rgba(245,158,11,.8)}
 .cr-modes{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--cr-l);border-radius:4px;overflow:hidden;background:var(--cr-p);margin:0 0 10px;width:max-content;max-width:100%}
 .cr-modes button{font:600 12px/1 var(--cr-m);color:var(--muted);background:none;border:0;border-right:1px solid var(--cr-l);padding:10px 14px;cursor:pointer;white-space:nowrap}
 .cr-modes button:last-child{border-right:0}.cr-modes button:hover{color:var(--text)}
@@ -1749,6 +1761,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <section id="tab-filings" class="pad fx crx" hidden>
       <div class="fx-head"><div><div class="fx-kick" id="crKick">🕷 10-K CRAWLER</div><h1>Filing crawler</h1>
         <p class="fx-sub">A bot reads a company's SEC filings — its 10-K financials, latest earnings release, risk factors or insider trades — and lasers every key fact into the panel on the right. Everything comes from the real filings on SEC EDGAR.</p></div></div>
+      <div class="fa-box" id="crAlerts" hidden></div>
       <div class="cr-modes" id="crModes" role="tablist" aria-label="What the crawler reads"><button type="button" data-m="fin">📊 10-K financials</button><button type="button" data-m="release">🎙️ Earnings release</button><button type="button" data-m="risk">⚠️ Risk &amp; forensics</button><button type="button" data-m="insiders">💼 Insider trades</button></div>
       <form class="fx-bar cr-bar" id="crForm"><input class="field" id="crSym" placeholder="Type a ticker — e.g. AAPL" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
         <span class="cr-chips" id="crChips"><button type="button" data-sym="AAPL">AAPL</button><button type="button" data-sym="NVDA">NVDA</button><button type="button" data-sym="MSFT">MSFT</button><button type="button" data-sym="TSLA">TSLA</button><button type="button" data-sym="AMZN">AMZN</button><button type="button" data-sym="JPM">JPM</button></span>
@@ -3633,11 +3646,12 @@ function apRender(d){
   <div class="bt-card"><h4>Holdings <em>${d.positions.length} of 10 slots</em></h4>${d.positions.length?`<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Value</th><th>Bought at</th><th>Now</th><th>Gain</th><th>Today</th><th>Stop</th></tr></thead><tbody>${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b> <span class="ap-tag ${p.sleeve==="safe"?"safe":"risk"}">${p.sleeve==="safe"?"safe":"risk"}</span><small>${esc(p.name||"")}</small></td><td>${$m(p.value)}</td><td>${$m(p.cost)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${pct(p.pnlPct)}</td><td class="${cls(p.dayPct)}">${pct(p.dayPct)}</td><td>${$m(p.stop)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No positions yet — it buys at the next opening bell.</div>`}</div>
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} trades · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>When</th><th>Action</th><th>Stock</th><th>Price</th><th>Size</th><th>Why</th><th>Signal</th><th>Account after</th><th>Since then</th></tr></thead><tbody>${d.trades.slice(0,150).map(t=>`<tr><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${t.side}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${$m(t.price)}</td><td>${$m(t.amount)}<small style="display:block;color:var(--muted)">${(+t.shares).toFixed(2)} sh</small></td><td class="n ap-why">${esc(t.why)}${t.rule?`<small>${esc(t.rule)}</small>`:""}</td><td>${t.score!=null?Math.round(t.score*100):"—"}</td><td>${t.after!=null?$m(t.after):"—"}</td><td class="${t.since==null?"":t.side==="BUY"?cls(t.since):cls(-t.since)}" title="${t.side==="BUY"?"Price change since this buy":"Price change since this sale (green = selling was right)"}">${t.since!=null?pct(t.since*100):"—"}</td></tr>`).join("")}</tbody></table></div>
   <p class="ap-note" style="margin:8px 0 0">Every signal here is <b>deterministic</b>: “Signal” is the rules-based ranking score (0–100) at the time of the trade, not an AI-generated recommendation. Prices include 0.05% simulated slippage. “Since then” compares the trade price with the latest price; for a sale, green means the stock fell after it was sold.</p>`:`<div class="ap-note">Nothing yet — the bot makes its first trades when the market opens (weekdays 9:30 AM–4 PM ET).</div>`}</div>
-  ${sig?`<div class="bt-card"><h4>Live rankings <em>${ago(sig.t)}${sig.riskOff?" · ⚠ S&amp;P below its 200-day average: 20% cash":""}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>#</th><th>Stock</th><th>Score</th><th>News</th><th>3-mo</th><th>Today</th><th>Analysts</th><th>Trend</th></tr></thead><tbody>${sig.top.map((x,i)=>`<tr><td>${i+1}</td><td class="n"><b>${esc(x.sym)}</b> <span class="ap-tag ${x.sleeve==="safe"?"safe":"risk"}">${x.sleeve||"risk"}</span>${x.held?' <span class="ap-tag own">held</span>':""}<small>${esc(x.name||"")}</small></td><td>${Math.round(x.score*100)}</td><td class="${cls(x.news)}">${x.news>0?"+":""}${x.news.toFixed(1)}</td><td class="${cls(x.mom)}">${pct(x.mom*100)}</td><td class="${cls(x.day)}">${pct(x.day)}</td><td>${x.adj==null?"—":x.adj.toFixed(2)}</td><td>${x.trend===1?"▲▲":x.trend?"▲":"▼"}</td></tr>`).join("")}</tbody></table></div></div>`:""}
+  ${sig?`<div class="bt-card"><h4>Live rankings <em>${ago(sig.t)}${sig.riskOff?" · ⚠ S&amp;P below its 200-day average: 20% cash":""}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>#</th><th>Stock</th><th>Score</th><th>News</th><th>3-mo</th><th>Today</th><th>Analysts</th><th>Trend</th><th title="10-K health grade from the filing crawler's scorecard">Health</th></tr></thead><tbody>${sig.top.map((x,i)=>`<tr><td>${i+1}</td><td class="n"><b>${esc(x.sym)}</b> <span class="ap-tag ${x.sleeve==="safe"?"safe":"risk"}">${x.sleeve||"risk"}</span>${x.held?' <span class="ap-tag own">held</span>':""}<small>${esc(x.name||"")}</small></td><td>${Math.round(x.score*100)}</td><td class="${cls(x.news)}">${x.news>0?"+":""}${x.news.toFixed(1)}</td><td class="${cls(x.mom)}">${pct(x.mom*100)}</td><td class="${cls(x.day)}">${pct(x.day)}</td><td>${x.adj==null?"—":x.adj.toFixed(2)}</td><td>${x.trend===1?"▲▲":x.trend?"▲":"▼"}</td><td>${x.grade?`<b class="${/[AB]/.test(x.grade)?"up":/[DF]/.test(x.grade)?"down":""}">${x.grade}</b>`:"—"}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   <div class="bt-card"><h4>How the AI trades <em>paper money only · not financial advice</em></h4>
   <ul class="ap-rules">
     <li><b>Who decides?</b> Claude (Anthropic's AI) wrote these rules; the server follows them on its own, 24/7, so no person picks the trades and it costs nothing to run.</li>
     <li><b>All day, every trading day:</b> stops are checked every minute and about 70 stocks are re-scored every 10 minutes.</li>
+    <li><b>10-K health grade:</b> every candidate is graded A–F with the filing crawler's scorecard (up to 15 checks on its last two 10-Ks: cash backing profit, margins, debt, dilution, and more). A and B add a little to a stock's score, D takes some off, and an F is never bought — and is sold if the bot holds it.</li>
     <li><b>Uses the whole site:</b> analyst ratings from the Best Buys scan (30%), 3-month momentum (20%), trend vs 50/200-day averages (20%), <b>news</b> from all five outlets, trending top stories, Smart Money and each stock's own headlines (20%), and today's strength vs the S&amp;P (10%).</li>
     <li><b>Earnings:</b> a company that beats estimates gets a boost (even if it reported at night — it buys at the opening bell); a miss is sold right away; it won't open a new position the day before a report.</li>
     <li><b>Overnight:</b> it keeps reading news and the earnings calendar and builds an opening-bell plan, carried out at 9:30 AM.</li>
@@ -3663,6 +3677,7 @@ function botHealth(d,kind){
   bits.push(`Last check ${tm(g.lastTick)}`);
   if(m.at) bits.push(`market: ${esc(m.why||"")}`);
   if(kind==="swing"&&g.lastScan){ const L=g.lastScan; bits.push(`last scan ${tm(L.t)}: ${L.candidates} stocks scored, ${L.tradesMade??0} trade${L.tradesMade===1?"":"s"}${L.stress?` · defense mode (${esc(L.stress)})`:""}${L.riskOff?" · S&P under its 200-day average":""}`); }
+  if(kind==="swing"&&g.graded) bits.push(`${g.graded} stocks graded by the 10-K health scorecard`);
   if(kind==="day") bits.push(`1-minute bars ${g.barsOk||0} ok / ${g.barsFail||0} failed · setups found ${g.signals||0}${g.lastSignal?` (last: ${esc(g.lastSignal.sym)} ${esc(g.lastSignal.setup)} at ${tm(g.lastSignal.t)})`:""}`);
   if(g.errors&&g.errors.length) bits.push(`<span class="down">last error ${tm(g.errors[0].t)}: ${esc(g.errors[0].e)}</span>`);
   return `<div class="ap-health">🩺 ${bits.join(" · ")}</div>`;
@@ -5578,6 +5593,43 @@ function crInsCsv(){ const rows=CR.insRows||[], qv=v=>'"'+String(v??"").replace(
   const lines=[["Date","Insider","Role","Code","Meaning","Shares","Acquired/Disposed","Price","Value (USD)","Owned after","Direct/Indirect","10b5-1 plan","Filing"].map(qv).join(",")];
   for(const r of rows) lines.push([r.date,r.owner,r.role,r.code,CR_CODE[r.code]||"",r.shares,r.ad,r.price,r.value,r.after,r.direct?"D":"I",r.plan10b51?"yes":"no",r.url].map(qv).join(","));
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([lines.join("\r\n")],{type:"text/csv"})); a.download=`${CR.d.symbol}-insiders.csv`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
+/* ---------- filing alerts: new 10-K / 10-Q / earnings release / Form 4 for your watchlist and holdings ---------- */
+const FA={d:null,seen:{},items:[],toasted:false};
+try{ FA.seen=JSON.parse(localStorage.getItem("md_fseen")||"{}")||{}; }catch{}
+const FA_KINDS=[["er","Earnings release","release","🎙️"],["k","10-K annual report","fin","📊"],["q","10-Q quarterly report",null,"📄"],["f4","Insider trade (Form 4)","insiders","💼"]];
+async function faCheck(){
+  const syms=[...new Set([...(S.wl||[]),...(S.port||[]).map(h=>h.symbol)])].filter(x=>/^[A-Z][A-Z.\-]{0,6}$/.test(x)&&!/-USD$/.test(x)).slice(0,30);
+  if(!syms.length) return;
+  try{ const j=await api("/api/pub/filings?symbols="+encodeURIComponent(syms.join(","))); FA.d=j.filings||{}; }catch{ return; }
+  const week=new Date(Date.now()-7*864e5).toISOString().slice(0,10), items=[];
+  for(const [sym,x] of Object.entries(FA.d)) for(const [k,label,mode,icon] of FA_KINDS){ const f=x[k]; if(!f) continue; const seen=FA.seen[sym+":"+k];
+    if(seen?f.acc!==seen:f.date>=week) items.push({sym,name:x.name,k,label,mode,icon,f,n30:k==="f4"?x.f4.n30:0}); }
+  items.sort((a,b)=>b.f.date.localeCompare(a.f.date)); FA.items=items; faRender();
+  if(items.length&&!FA.toasted){ FA.toasted=true; faNotice(); }
+  // read the newest ones ahead of time so they open instantly
+  for(const it of items.filter(i=>i.mode).slice(0,4)) api({fin:"/api/pub/filing?fast=1&symbol=",release:"/api/pub/release?symbol=",insiders:"/api/pub/insiders?symbol="}[it.mode]+encodeURIComponent(it.sym)).catch(()=>{});
+}
+function faSave(){ try{localStorage.setItem("md_fseen",JSON.stringify(FA.seen))}catch{} }
+function faMark(it){ FA.seen[it.sym+":"+it.k]=it.f.acc; faSave(); FA.items=FA.items.filter(x=>x!==it); faRender(); }
+function faOpen(it){ faMark(it); const n=$("faNote"); if(n) n.remove(); if(!it.mode){ window.open(it.f.url,"_blank","noopener"); return; }
+  CR.mode=it.mode; try{localStorage.setItem("md_crm",it.mode)}catch{} crModeBar(); CR.sym=""; crOpenSym(it.sym); }
+const faWhen=d=>{ const n=Math.round((Date.now()-Date.parse(d+"T12:00:00Z"))/864e5); return n<=0?"today":n===1?"yesterday":n+" days ago"; };
+function faRender(){
+  const el=$("crAlerts"), it=FA.items; document.body.classList.toggle("fa-has",it.length>0); if(!el) return;
+  if(!it.length){ el.hidden=true; el.innerHTML=""; return; }
+  el.hidden=false;
+  el.innerHTML=`<div class="fa-h"><b>📬 New filings from your watchlist</b><small>${it.length} new · checked ${FA.d?"just now":""}</small><button type="button" class="fa-all" id="faAll">Mark all read</button></div>
+    <div class="fa-list">${it.slice(0,12).map((x,i)=>`<button type="button" class="fa-it" data-i="${i}"><span class="fa-ic">${x.icon}</span><span><b>${esc(x.sym)}</b> ${esc(x.label)}${x.k==="f4"&&x.n30>1?` <em>${x.n30} in 30 days</em>`:""}<small>${esc(x.name)} · filed ${faWhen(x.f.date)}</small></span><i>${x.mode?"Crawl it →":"SEC ↗"}</i></button>`).join("")}</div>`;
+  el.querySelectorAll(".fa-it").forEach(b=>b.onclick=()=>faOpen(it[+b.dataset.i]));
+  $("faAll").onclick=()=>{ for(const x of it) FA.seen[x.sym+":"+x.k]=x.f.acc; faSave(); FA.items=[]; faRender(); };
+}
+function faNotice(){
+  if(S.tab==="filings"||$("faNote")) return; const it=FA.items, n=document.createElement("div"); n.id="faNote"; n.className="fa-note";
+  n.innerHTML=`<b>📬 ${it.length} new filing${it.length===1?"":"s"} from your watchlist</b><small>${it.slice(0,3).map(x=>esc(x.sym+" "+x.label.replace(/ \(.*\)$/,""))).join(" · ")}${it.length>3?" …":""}</small><div><button type="button" class="btn" id="faGo">Open in the crawler</button><button type="button" class="btn ghost" id="faX">Later</button></div>`;
+  document.body.appendChild(n); const close=()=>n.remove(); $("faX").onclick=close; $("faGo").onclick=()=>{ close(); setTab("filings"); $("crAlerts").scrollIntoView({block:"start"}); };
+  setTimeout(close,15000);
+}
+setTimeout(faCheck,8000); setInterval(()=>{ if(!document.hidden) faCheck(); },30*60e3);
 $("crModes").onclick=e=>{ const b=e.target.closest("[data-m]"); if(b) crSetMode(b.dataset.m); };
 crModeBar();
 
