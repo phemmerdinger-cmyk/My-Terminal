@@ -640,6 +640,50 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-tr p{margin:2px 0 0;color:var(--muted);font-size:12px}
 .ap-tr time{color:var(--muted);font-size:11px;white-space:nowrap}
 .ap-tl .ap-tbl td{vertical-align:top}.ap-tl .ap-tbl{min-width:900px}.ap-why{white-space:normal!important;max-width:340px;font-size:12.5px;line-height:1.4}.ap-why small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+/* AI vs S&P performance */
+.ap-perf-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.ap-ctl{display:flex;gap:8px;flex-wrap:wrap}
+.apseg{display:inline-flex;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:2px}
+.apseg button{border:0;background:none;color:var(--muted);font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;cursor:pointer}
+.apseg button.on{background:var(--bg);color:var(--text);box-shadow:0 0 0 1px var(--line2)}
+.apseg[data-seg="view"] button.on{color:#ff9f43}
+.apc-read{display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--muted);min-height:22px;margin-bottom:6px}
+.apc-read span{display:inline-flex;align-items:center;gap:5px}.apc-read i{width:10px;height:3px;border-radius:2px;display:inline-block}
+.apc-read b{color:var(--text);font-family:var(--mono);font-weight:500}
+.apc-plot{position:relative;cursor:crosshair;touch-action:pan-y}
+.apc-plot svg{width:100%;height:100%;display:block;overflow:hidden}
+.apc-y{position:absolute;left:4px;top:2px;bottom:2px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.apc-dot{position:absolute;width:9px;height:9px;border-radius:50%;margin:-4.5px 0 0 -4.5px;box-shadow:0 0 0 2px var(--panel);pointer-events:none;display:none}
+.apc-t{position:relative;height:16px;font-size:10.5px;color:var(--dim);margin-top:4px}
+.apc-t span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.apc-t span:first-child{transform:none}.apc-t span:last-child{transform:translateX(-100%)}
+.ap-h2h{min-width:0;width:100%}@media (max-width:520px){.ap-h2h td,.ap-h2h th{padding:6px 5px;font-size:12px}}.ap-h2h td:not(:first-child),.ap-h2h th:not(:first-child){text-align:right}
+.ap-h2h tr.ai td:nth-child(2){color:#ff9f43;font-weight:600}.ap-h2h tr.sp td:nth-child(3){color:var(--text);font-weight:600}
+.apd g rect:not(.hit){opacity:.75}.apd g.on rect:not(.hit){opacity:1}.apd g.on .hit{fill:var(--panel2)}.apd .hit{pointer-events:none}
+.apd svg{cursor:pointer}
+.ap-drv{display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:center;padding:4px 0;font-size:13px}
+.ap-hood{margin-top:4px}.ap-hood>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-weight:600;font-size:14px}
+.ap-hood>summary::-webkit-details-marker{display:none}.ap-hood>summary::before{content:"▸";color:var(--muted)}.ap-hood[open]>summary::before{content:"▾"}
+.ap-hood>summary small{color:var(--muted);font-weight:400}
+.ap-hood[open]>summary{margin-bottom:14px}.ap-hood>.bt-card,.ap-hood>.ap-two{margin-bottom:14px}
+.ap-mini{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media (max-width:760px){.ap-mini{grid-template-columns:repeat(3,1fr)}}
+.ap-mini div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+.ap-mini span{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.ap-mini b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;margin-top:2px}
+.ap-mini small{font-size:11px;color:var(--dim)}
+.ap-gapnow{font-family:var(--mono);font-size:20px;margin:-2px 0 6px}
+.ap-cmp{display:grid;grid-template-columns:96px 1fr 104px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ap-cmp:last-of-type{border-bottom:0}
+.ap-cmp>span{color:var(--muted)}
+.ap-cmp em{font-style:normal;font-family:var(--mono);font-size:12px;text-align:right}
+.ap-bar{position:relative;height:18px;display:flex;align-items:center;margin:2px 0}
+.ap-bar::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line2)}
+.ap-bar i{position:absolute;height:12px;border-radius:3px;top:3px}
+.ap-bar i.pos{left:50%}.ap-bar i.neg{right:50%}
+.ap-bar b{position:relative;font-family:var(--mono);font-size:11.5px;font-weight:500;margin-left:auto;padding-left:6px;background:var(--panel)}
+.ap-bar .na{margin-left:auto;color:var(--dim);font-size:12px}
+@media (max-width:520px){.ap-cmp{grid-template-columns:70px 1fr 84px;gap:6px}}
 .ap-rules{font-size:13px;color:var(--muted);line-height:1.55;margin:0;padding-left:18px}
 .ap-rules b{color:var(--text);font-weight:500}
 .ap-note{font-size:12px;color:var(--muted)}
@@ -3080,6 +3124,167 @@ function apChart(eq,startV,spx0,intra){
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(startV)}" y2="${Y(startV)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>${line(b,"#8a93a3",2)}${line(a,"#ff9f43",2.5)}</svg>
   <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot ${$m(a[a.length-1])}</span>${b[b.length-1]!=null?`<span><i style="background:#8a93a3"></i>S&amp;P 500 ${$m(b[b.length-1])}</span>`:""}<span>dashed line = the $10,000 start · ${label?"today, ":""}${esc(tl(pts[0]))} → ${esc(tl(pts[pts.length-1]))}</span></div>`;
 }
+/* (superseded by apPerf) side-by-side difference: who's ahead over time, and returns compared period by period */
+function apSeries(d){
+  let pts=(d.equity||[]).filter(p=>p&&p.v), intra=false;
+  if(pts.length<2&&(d.intraday||[]).length>=2){ pts=d.intraday; intra=true; }
+  const s0=d.spx0||pts.find(p=>p.spx)?.spx;
+  return {pts,intra,ai:pts.map(p=>p.v),sp:pts.map(p=>s0&&p.spx?d.startValue*p.spx/s0:null)};
+}
+function apDiffCharts(d){
+  const {pts,intra,ai,sp}=apSeries(d);
+  if(!d.trades.length||pts.length<2||sp.every(x=>x==null)) return `<div class="bt-card"><h4>AI vs. S&amp;P — the gap <em>who's ahead, and by how much</em></h4><div class="ap-empty" style="padding:30px 10px">These charts appear once the bot has traded for a little while — the gap is tracked every 5 minutes during the day and once a day after that.</div></div>`;
+  const gap=ai.map((v,i)=>sp[i]==null?null:v-sp[i]), g=gap.filter(x=>x!=null), lo=Math.min(0,...g), hi=Math.max(0,...g), pad=(hi-lo||1)*0.12, y0=lo-pad, y1=hi+pad;
+  const W=800,H=170,n=pts.length, X=i=>i/(n-1)*W, Y=v=>H-(v-y0)/(y1-y0)*H, z=Y(0);
+  const line=gap.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean);
+  const area=`${line[0][0].toFixed(1)},${z} ${line.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")} ${line.at(-1)[0].toFixed(1)},${z}`;
+  const last=g.at(-1), lab=t=>intra?new Date(t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):t;
+  const gapSvg=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block"><defs><clipPath id="apUp"><rect x="0" y="0" width="${W}" height="${z}"/></clipPath><clipPath id="apDn"><rect x="0" y="${z}" width="${W}" height="${H-z}"/></clipPath></defs>
+    <polygon points="${area}" fill="#21c37a" opacity=".28" clip-path="url(#apUp)"/><polygon points="${area}" fill="#ff6b6b" opacity=".28" clip-path="url(#apDn)"/>
+    <line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+    <polyline points="${line.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="var(--text)" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <text x="4" y="12" font-size="11" fill="var(--dim)">${hi>0?"+$"+Math.round(hi).toLocaleString():""}</text><text x="4" y="${H-4}" font-size="11" fill="var(--dim)">${lo<0?"−$"+Math.round(-lo).toLocaleString():""}</text></svg>`;
+  // returns compared over several windows
+  const at=k=>{ const i=Math.max(0,n-1-k); return [ai[i],sp[i]]; };
+  const win=[]; const r=(a,b)=>a&&b?b/a-1:null;
+  if(d.intraday&&d.intraday.length>=2){ const t=d.intraday, s0=t[0].spx, s1=t.at(-1).spx; win.push(["Today",r(t[0].v,t.at(-1).v),s0&&s1?s1/s0-1:null]); }
+  if(!intra&&n>5){ const [a,b]=at(5); win.push(["Last 5 days",r(a,ai.at(-1)),r(b,sp.at(-1))]); }
+  if(!intra&&n>21){ const [a,b]=at(21); win.push(["Last month",r(a,ai.at(-1)),r(b,sp.at(-1))]); }
+  win.push(["Since the start",d.value/d.startValue-1,d.spx0&&d.spxNow?d.spxNow/d.spx0-1:r(sp.find(x=>x!=null),sp.at(-1))]);
+  const mx=Math.max(0.005,...win.flatMap(w=>[Math.abs(w[1]||0),Math.abs(w[2]||0)]));
+  const bar=(v,c)=>v==null?`<div class="ap-bar"><span class="na">—</span></div>`:`<div class="ap-bar"><i class="${v>=0?"pos":"neg"}" style="width:${(Math.abs(v)/mx*50).toFixed(1)}%;background:${c}"></i><b class="${cls(v)}">${pct(v*100)}</b></div>`;
+  const rows=win.map(([l,a,b])=>`<div class="ap-cmp"><span>${l}</span><div>${bar(a,"#ff9f43")}${bar(b,"#8a93a3")}</div><em class="${a!=null&&b!=null?cls(a-b):""}">${a!=null&&b!=null?(a>=b?"AI +":"S&P +")+Math.abs((a-b)*100).toFixed(2)+" pts":"—"}</em></div>`).join("");
+  return `<div class="ap-two">
+    <div class="bt-card"><h4>The gap <em>AI minus S&amp;P, in dollars</em></h4><div class="ap-gapnow ${cls(last)}">${last>=0?"AI ahead by ":"S&amp;P ahead by "}${$m(Math.abs(last))}</div>${gapSvg}
+      <div class="ap-leg"><span><i style="background:#21c37a"></i>AI ahead</span><span><i style="background:#ff6b6b"></i>S&amp;P ahead</span><span>${esc(lab(intra?pts[0].t:pts[0].d))} → ${esc(lab(intra?pts.at(-1).t:pts.at(-1).d))}</span></div></div>
+    <div class="bt-card"><h4>Returns side by side <em>same $10,000, same days</em></h4>${rows}
+      <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot</span><span><i style="background:#8a93a3"></i>S&amp;P 500</span></div></div>
+  </div>`;
+}
+/* ---------- AI vs S&P: performance comparison (interactive) ---------- */
+const APV={view:"ret",range:"all"};
+function apRangeSeries(d,range){
+  const s0=d.spx0||(d.equity||[]).find(p=>p.spx)?.spx||(d.intraday||[]).find(p=>p.spx)?.spx, sv=x=>s0&&x?d.startValue*x/s0:null;
+  const daily=(d.equity||[]).filter(p=>p&&p.v), intra=(d.intraday||[]).filter(p=>p&&p.v);
+  let pts,kind="daily";
+  if(range==="today"||daily.length<2){ pts=intra; kind="intra"; }
+  else { const n={"5d":6,"1m":22,"3m":64,"all":1e9}[range]; pts=daily.slice(-n); }
+  return {kind,lab:pts.map(p=>kind==="intra"?new Date(p.t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):new Date(p.d+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"})),ai:pts.map(p=>p.v),sp:pts.map(p=>sv(p.spx)),fell:range!=="today"&&kind==="intra"};
+}
+function apSvgChart(id,labels,series,{h=260,zero=false,fmt=v=>v,fills=false}={}){
+  const all=series.flatMap(s=>s.v.filter(x=>x!=null)); if(all.length<2) return "";
+  let lo=Math.min(...all),hi=Math.max(...all); if(zero){lo=Math.min(lo,0);hi=Math.max(hi,0);} const pad=(hi-lo||Math.abs(hi)*0.01||1)*0.12; lo-=pad; hi+=pad;
+  const W=800,n=labels.length,X=i=>n<2?0:i/(n-1)*W,Y=v=>h-(v-lo)/(hi-lo)*h;
+  const pl=s=>s.v.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
+  const grid=[0.25,0.5,0.75].map(f=>`<line x1="0" x2="${W}" y1="${h*f}" y2="${h*f}" stroke="var(--line)" vector-effect="non-scaling-stroke"/>`).join("");
+  const z=zero?`<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`:"";
+  const step=Math.max(1,Math.ceil(n/6)), ticks=labels.map((l,i)=>i%step===0||i===n-1?`<span style="left:${(X(i)/W*100).toFixed(2)}%">${esc(l)}</span>`:"").join("");
+  const body=series.map(s=>{const p=pl(s); if(!p) return ""; if(s.area){ const first=p.split(" ")[0].split(",")[0], last=p.split(" ").at(-1).split(",")[0], base=zero?Y(0):h;
+    return `<defs><clipPath id="${id}u"><rect x="0" y="0" width="${W}" height="${base}"/></clipPath><clipPath id="${id}d"><rect x="0" y="${base}" width="${W}" height="${h-base}"/></clipPath></defs><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.up||s.c}" opacity=".25" clip-path="url(#${id}u)"/><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.down||s.c}" opacity=".25" clip-path="url(#${id}d)"/><polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke"/>`; }
+    return `<polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke" ${s.dash?'stroke-dasharray="5 4"':""}/>`;}).join("");
+  return `<div class="apc" id="${id}"><div class="apc-read"><b>${esc(labels.at(-1))}</b>${series.map(s=>`<span><i style="background:${s.c}"></i>${s.n} <b>${s.v.at(-1)==null?"—":fmt(s.v.at(-1))}</b></span>`).join("")}</div>
+  <div class="apc-plot" style="height:${h}px"><svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none">${grid}${z}${body}<line class="apc-x" x1="-9" x2="-9" y1="0" y2="${h}" stroke="var(--muted)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/></svg>
+  <div class="apc-y"><span>${fmt(hi)}</span><span>${fmt(lo)}</span></div>${series.map((s,k)=>`<i class="apc-dot" data-k="${k}" style="background:${s.c}"></i>`).join("")}</div><div class="apc-t">${ticks}</div></div>`;
+}
+function apWireChart(id,labels,series,fmt){
+  const box=$(id); if(!box) return; const plot=box.querySelector(".apc-plot"), svg=plot.querySelector("svg"), x=svg.querySelector(".apc-x"), read=box.querySelector(".apc-read"), dots=[...plot.querySelectorAll(".apc-dot")];
+  const all=series.flatMap(s=>s.v.filter(v=>v!=null)); let lo=Math.min(...all),hi=Math.max(...all); if(box.dataset.zero){lo=Math.min(lo,0);hi=Math.max(hi,0);} const pad=(hi-lo||Math.abs(hi)*0.01||1)*0.12; lo-=pad; hi+=pad;
+  const n=labels.length, show=i=>{ const fx=n<2?0:i/(n-1); x.setAttribute("x1",fx*800); x.setAttribute("x2",fx*800);
+    read.innerHTML=`<b>${esc(labels[i])}</b>`+series.map(s=>`<span><i style="background:${s.c}"></i>${s.n} <b>${s.v[i]==null?"—":fmt(s.v[i])}</b></span>`).join("");
+    dots.forEach((dt,k)=>{const v=series[k].v[i]; if(v==null){dt.style.display="none";return;} dt.style.display="block"; dt.style.left=(fx*100)+"%"; dt.style.top=((1-(v-lo)/(hi-lo))*100)+"%";}); };
+  const move=e=>{const r=plot.getBoundingClientRect(),cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left; show(Math.max(0,Math.min(n-1,Math.round(cx/r.width*(n-1)))));};
+  plot.addEventListener("mousemove",move); plot.addEventListener("touchmove",move,{passive:true}); plot.addEventListener("touchstart",move,{passive:true});
+  plot.addEventListener("mouseleave",()=>show(n-1)); show(n-1);
+}
+function apH2H(d){
+  const daily=(d.equity||[]).filter(p=>p&&p.v), s0=d.spx0||daily.find(p=>p.spx)?.spx;
+  const ai=[d.startValue,...daily.map(p=>p.v)], sp=[d.startValue,...daily.map(p=>s0&&p.spx?d.startValue*p.spx/s0:null)];
+  if(sp.some(x=>x==null)||ai.length<3) return null;
+  const ra=FIN.returns(ai), rs=FIN.returns(sp), m=a=>FIN.mean(a), sd=a=>FIN.stdev(a);
+  const st=(r,v)=>({ret:v.at(-1)/v[0]-1,vol:r.length>1?sd(r)*Math.sqrt(252):null,sharpe:r.length>4&&sd(r)?m(r)/sd(r)*Math.sqrt(252):null,mdd:FIN.maxDrawdown(v).maxDrawdown,best:Math.max(...r),worst:Math.min(...r),up:r.filter(x=>x>0).length/r.length});
+  return {a:st(ra,ai),s:st(rs,sp),beta:ra.length>=10?FIN.beta(ra,rs):null,corr:ra.length>=5?FIN.correlation(ra,rs):null,days:ra.length,ra,rs,lab:daily.map(p=>new Date(p.d+"T12:00:00Z").toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"}))};
+}
+function apDrivers(d){
+  const m={}; for(const t of d.trades) if(t.side==="SELL"&&t.pnl!=null){ m[t.sym]=m[t.sym]||{r:0,u:0}; m[t.sym].r+=t.pnl; }
+  for(const p of d.positions){ m[p.sym]=m[p.sym]||{r:0,u:0}; m[p.sym].u+=p.pnl; }
+  return Object.entries(m).map(([s,x])=>({s,r:x.r,u:x.u,t:x.r+x.u})).sort((a,b)=>Math.abs(b.t)-Math.abs(a.t)).slice(0,12);
+}
+function apPerf(d){
+  const started=d.trades.length>0;
+  if(!started) return `<div class="bt-card"><h4>Performance <em>AI vs. S&amp;P 500</em></h4><div class="ap-empty" style="padding:36px 10px">The comparison charts start the moment the bot makes its first trades at the opening bell (weekdays 9:30 AM ET). Until then there's nothing to compare yet.</div></div>`;
+  const R=apRangeSeries(d,APV.range), H=apH2H(d), a=d.analytics||{}, drv=apDrivers(d);
+  const views=[["ret","Return %"],["val","Value $"],["gap","Gap $"],["dd","Drawdown"]], ranges=[["today","Today"],["5d","5D"],["1m","1M"],["3m","3M"],["all","All"]];
+  const seg=(k,list,cur)=>`<div class="apseg" data-seg="${k}">${list.map(([v,l])=>`<button type="button" data-v="${v}" class="${v===cur?"on":""}">${l}</button>`).join("")}</div>`;
+  const ok=R.ai.length>=2&&R.sp.some(x=>x!=null);
+  const best=d.trades.filter(t=>t.side==="SELL"&&t.pnl!=null).sort((x,y)=>y.pnl-x.pnl);
+  const row=(l,f,x,y,better)=>{const w=x==null||y==null?"":better(x,y)?"ai":"sp";return `<tr class="${w}"><td>${l}</td><td>${x==null?"—":f(x)}</td><td>${y==null?"—":f(y)}</td><td>${w==="ai"?'<span class="ap-tag own">AI</span>':w==="sp"?'<span class="ap-tag">S&amp;P</span>':""}</td></tr>`;};
+  const P=x=>pct(x*100), hi=(x,y)=>x>y, low=(x,y)=>x<y, dn=(x,y)=>x>y;
+  return `
+  <div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>same $10,000 · AI bot vs. S&amp;P 500</em></h4><div class="ap-ctl">${seg("view",views,APV.view)}${seg("range",ranges,APV.range)}</div></div>
+    ${R.fell?`<p class="ap-note" style="margin:6px 0 0">Showing today's 5-minute data until there are two full trading days.</p>`:""}
+    ${ok?`<div id="apMainWrap">${apMainChart(d,R)}</div>`:`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet — try “Today” or come back after a few trading days.</div>`}
+  </div>
+  <div class="ap-two">
+    <div class="bt-card"><h4>Returns side by side <em>same $10,000, same days</em></h4>${apReturnBars(d)}</div>
+    <div class="bt-card"><h4>Head to head <em>${H?`${H.days} trading day${H.days===1?"":"s"} of daily closes`:"needs 2 trading days"}</em></h4>${H?`<div class="ap-wrap"><table class="ap-tbl ap-h2h"><thead><tr><th></th><th>🤖 AI bot</th><th>📈 S&amp;P 500</th><th>Edge</th></tr></thead><tbody>
+      ${row("Total return",P,H.a.ret,H.s.ret,hi)}${row("Volatility (annualized)",P,H.a.vol,H.s.vol,low)}${row("Sharpe ratio",x=>x.toFixed(2),H.a.sharpe,H.s.sharpe,hi)}${row("Max drawdown",P,H.a.mdd,H.s.mdd,dn)}${row("Best day",P,H.a.best,H.s.best,hi)}${row("Worst day",P,H.a.worst,H.s.worst,dn)}${row("Up days",x=>Math.round(x*100)+"%",H.a.up,H.s.up,hi)}
+      </tbody></table></div><p class="ap-note" style="margin:8px 0 0">Beta vs. S&amp;P: <b>${H.beta!=null?H.beta.toFixed(2):"needs 10 days"}</b> · correlation: <b>${H.corr!=null?H.corr.toFixed(2):"needs 5 days"}</b>. Short histories swing a lot — these firm up over weeks.</p>`:`<div class="ap-note">The head-to-head table fills in after the bot's first two trading days.</div>`}</div>
+  </div>
+  ${H&&H.ra.length>=2?`<div class="bt-card"><h4>Day by day <em>daily return of each — hover a day</em></h4>${apDayBars(H)}</div>`:""}
+  <div class="bt-card"><h4>The AI's results <em>run #${d.run} · hypothetical paper trading${(a.closed||0)<20?` · <span class="ap-tag">${a.closed||0} closed trades — early days</span>`:""}</em></h4><div class="ap-top">
+    ${[["Excess return vs S&amp;P",a.excessReturn!=null?pct(a.excessReturn*100):"—","AI return minus S&amp;P return",cls(a.excessReturn)],
+       ["Win rate",a.winRate!=null?Math.round(a.winRate*100)+"%":"—",`${a.closed||0} closed trades`,""],
+       ["Profit factor",a.profitFactor!=null?a.profitFactor.toFixed(2):"—","gross wins ÷ gross losses",a.profitFactor!=null?(a.profitFactor>=1?"up":"down"):""],
+       ["Average win / loss",`${a.avgWinPct!=null?pct(a.avgWinPct*100):"—"} / ${a.avgLossPct!=null?pct(a.avgLossPct*100):"—"}`,`${a.avgWin!=null?$m(a.avgWin):"—"} / ${a.avgLoss!=null?$m(a.avgLoss):"—"} per trade`,""],
+       ["Best trade",best[0]?pct(best[0].pnlPct*100):"—",best[0]?`${esc(best[0].sym)} · ${$m(best[0].pnl)}`:"no closed trades yet","up"],
+       ["Worst trade",best.length?pct(best.at(-1).pnlPct*100):"—",best.length?`${esc(best.at(-1).sym)} · ${$m(best.at(-1).pnl)}`:"no closed trades yet","down"],
+       ["Turnover",a.turnover!=null?a.turnover.toFixed(1)+"×":"—",`${$m(a.traded||0)} traded`,""],
+       ["Simulated costs",$m(a.costs||0),"0.05% slippage per trade",""]].map(([l,v,s,c])=>`<div class="ap-k"><span>${l}</span><b class="${c}">${v}</b><small>${s}</small></div>`).join("")}
+  </div></div>
+  ${drv.length?`<div class="bt-card"><h4>What's driving the results <em>profit &amp; loss by stock · realized + open</em></h4>${apDriverBars(drv)}</div>`:""}`;
+}
+function apMainChart(d,R){
+  const v=APV.view, ai=R.ai, sp=R.sp, a0=ai[0], s0=sp.find(x=>x!=null);
+  const usd=x=>(x<0?"−$":"$")+Math.abs(x).toLocaleString(undefined,{maximumFractionDigits:0}), pc=x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%";
+  let series,opt;
+  if(v==="ret") { series=[{n:"S&P 500",c:"#8a93a3",v:sp.map(x=>x==null?null:x/s0-1)},{n:"AI bot",c:"#ff9f43",v:ai.map(x=>x/a0-1),w:2.6}]; opt={zero:true,fmt:pc}; }
+  else if(v==="val"){ series=[{n:"S&P 500",c:"#8a93a3",v:sp},{n:"AI bot",c:"#ff9f43",v:ai,w:2.6}]; opt={fmt:usd}; }
+  else if(v==="gap"){ series=[{n:"AI minus S&P",c:"var(--text)",v:ai.map((x,i)=>sp[i]==null?null:x-sp[i]),area:true,up:"#21c37a",down:"#ff6b6b"}]; opt={zero:true,fmt:x=>(x>=0?"+":"")+usd(x)}; }
+  else { const ddf=arr=>{let pk=-Infinity;return arr.map(x=>{if(x==null)return null;pk=Math.max(pk,x);return x/pk-1;});}; series=[{n:"S&P 500",c:"#8a93a3",v:ddf(sp)},{n:"AI bot",c:"#ff6b6b",v:ddf(ai),area:true,up:"#ff6b6b",down:"#ff6b6b"}]; opt={zero:true,fmt:pc}; }
+  APV.cur={labels:R.lab,series,fmt:opt.fmt};
+  return apSvgChart("apMain",R.lab,series,{...opt,h:280}).replace('<div class="apc" id="apMain">',`<div class="apc" id="apMain" ${opt.zero?'data-zero="1"':""}>`);
+}
+function apReturnBars(d){
+  const r=(a,b)=>a&&b?b/a-1:null, daily=(d.equity||[]).filter(p=>p&&p.v), s0=d.spx0, sv=x=>s0&&x?d.startValue*x/s0:null, n=daily.length, win=[];
+  if((d.intraday||[]).length>=2){ const t=d.intraday; win.push(["Today",r(t[0].v,t.at(-1).v),t[0].spx&&t.at(-1).spx?t.at(-1).spx/t[0].spx-1:null]); }
+  if(n>5) win.push(["5 days",r(daily.at(-6).v,daily.at(-1).v),r(sv(daily.at(-6).spx),sv(daily.at(-1).spx))]);
+  if(n>21) win.push(["1 month",r(daily.at(-22).v,daily.at(-1).v),r(sv(daily.at(-22).spx),sv(daily.at(-1).spx))]);
+  win.push(["Since start",d.value/d.startValue-1,d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null]);
+  const mx=Math.max(0.005,...win.flatMap(w=>[Math.abs(w[1]||0),Math.abs(w[2]||0)]));
+  const bar=(v,c)=>v==null?`<div class="ap-bar"><span class="na">—</span></div>`:`<div class="ap-bar"><i class="${v>=0?"pos":"neg"}" style="width:${(Math.abs(v)/mx*50).toFixed(1)}%;background:${c}"></i><b class="${cls(v)}">${pct(v*100)}</b></div>`;
+  return win.map(([l,a,b])=>`<div class="ap-cmp"><span>${l}</span><div>${bar(a,"#ff9f43")}${bar(b,"#8a93a3")}</div><em class="${a!=null&&b!=null?cls(a-b):""}">${a!=null&&b!=null?(a>=b?"AI +":"S&P +")+Math.abs((a-b)*100).toFixed(2)+" pts":"—"}</em></div>`).join("")+`<div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot</span><span><i style="background:#8a93a3"></i>S&amp;P 500</span></div>`;
+}
+function apDayBars(H){
+  const n=H.ra.length, mx=Math.max(0.002,...H.ra.map(Math.abs),...H.rs.map(Math.abs)), W=800,h=180, gw=W/n, bw=Math.min(18,gw*0.38), Y=v=>h/2-v/mx*(h/2-8);
+  const bars=H.ra.map((a,i)=>{const s=H.rs[i],x=i*gw+gw/2;return `<g data-i="${i}"><rect x="${(x-bw-1).toFixed(1)}" y="${Math.min(Y(a),h/2).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,Math.abs(Y(a)-h/2)).toFixed(1)}" fill="#ff9f43" rx="1.5"/><rect x="${(x+1).toFixed(1)}" y="${Math.min(Y(s),h/2).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,Math.abs(Y(s)-h/2)).toFixed(1)}" fill="#8a93a3" rx="1.5"/><rect class="hit" x="${(i*gw).toFixed(1)}" y="0" width="${gw.toFixed(1)}" height="${h}" fill="transparent"/></g>`;}).join("");
+  const won=H.ra.filter((a,i)=>a>H.rs[i]).length;
+  return `<div class="apd" id="apDays"><div class="apc-read" id="apDaysRead">Hover a day · AI beat the S&amp;P on <b>${won} of ${n}</b> days</div><svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block"><line x1="0" x2="${W}" y1="${h/2}" y2="${h/2}" stroke="var(--line2)" vector-effect="non-scaling-stroke"/>${bars}</svg></div>`;
+}
+function apDriverBars(drv){
+  const mx=Math.max(1,...drv.map(x=>Math.abs(x.t)));
+  return drv.map(x=>`<div class="ap-drv" title="realized ${$m(x.r)} · open ${$m(x.u)}"><span><b>${esc(x.s)}</b></span><div class="ap-bar"><i class="${x.t>=0?"pos":"neg"}" style="width:${(Math.abs(x.t)/mx*50).toFixed(1)}%;background:${x.t>=0?"#21c37a":"#ff6b6b"}"></i><b class="${cls(x.t)}">${x.t>=0?"+":"−"}$${Math.abs(x.t).toFixed(0)}</b></div></div>`).join("")+`<p class="ap-note" style="margin:8px 0 0">Realized = closed trades; open = gain or loss on what it holds now. Hover a bar for the split.</p>`;
+}
+function apWirePerf(d){
+  const box=$("apBox"); if(!box) return;
+  box.querySelectorAll(".apseg").forEach(g=>g.onclick=e=>{const b=e.target.closest("[data-v]"); if(!b) return; APV[g.dataset.seg]=b.dataset.v; g.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+    if(g.dataset.seg==="range"||g.dataset.seg==="view"){ const R=apRangeSeries(d,APV.range), w=$("apMainWrap"); if(w){ w.innerHTML=R.ai.length>=2?apMainChart(d,R):`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet.</div>`; if(APV.cur&&R.ai.length>=2) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt); } } });
+  if($("apMain")&&APV.cur) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt);
+  const dd=$("apDays"); if(dd){ const H=apH2H(d), svg=dd.querySelector("svg"), n=H.ra.length;
+    const show=e=>{ const r=svg.getBoundingClientRect(), cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left, i=Math.max(0,Math.min(n-1,Math.floor(cx/r.width*n)));
+      $("apDaysRead").innerHTML=`<b>${esc(H.lab[i])}</b> <span><i style="background:#ff9f43"></i>AI <b class="${cls(H.ra[i])}">${pct(H.ra[i]*100)}</b></span> <span><i style="background:#8a93a3"></i>S&amp;P <b class="${cls(H.rs[i])}">${pct(H.rs[i]*100)}</b></span> <span>${H.ra[i]>H.rs[i]?"AI won the day":"S&amp;P won the day"}</span>`;
+      dd.querySelectorAll("g[data-i]").forEach(g=>g.classList.toggle("on",+g.dataset.i===i)); };
+    svg.addEventListener("mousemove",show); svg.addEventListener("touchstart",show,{passive:true}); svg.addEventListener("touchmove",show,{passive:true}); }
+}
 function apSigRow(x,kind){
   const e=x.earn, et=e?(e.kind==="beat"?`<span class="ap-tag up">Beat ${pct(e.surprise*100)}</span>`:e.kind==="miss"?`<span class="ap-tag down">Missed ${pct(e.surprise*100)}</span>`:e.kind==="soon"?`<span class="ap-tag">Reports ${esc(e.date)}${e.hour==="amc"?" after close":e.hour==="bmo"?" before open":""}</span>`:`<span class="ap-tag">In line</span>`):"";
   return `<div class="ap-sig"><div><b>${esc(x.sym)}</b>${x.held?` <span class="ap-tag own">held</span>`:""} ${et}${kind==="news"?` <span class="ap-tag ${x.news>0?"up":"down"}">news ${x.news>0?"+":""}${x.news.toFixed(1)}</span>`:""}<small>${esc(x.headline||x.name||"")}</small></div><span class="ap-rk">#${x.rank}</span></div>`;
@@ -3122,20 +3327,15 @@ function apRender(d){
     <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet)}</small></div>
   </div>
-  <div class="ap-top">
-    <div class="ap-k"><span>Days running</span><b>${days}</b><small>${d.firstTrade?`since ${new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`:"not started yet"}</small></div>
-    <div class="ap-k"><span>Peak / low</span><b>${$m(peak)}</b><small>lowest ${$m(low)}</small></div>
-    <div class="ap-k"><span>Distance to bust</span><b class="${d.value-d.bustAt<3000?"down":""}">${$m(Math.max(0,d.value-d.bustAt))}</b><small>busts below ${$m(d.bustAt)} · worst drop ${dd.toFixed(1)}%</small></div>
-    <div class="ap-k"><span>Trades</span><b>${d.trades.length}</b><small>${sells.length?`${wins} of ${sells.length} sells were winners`:"no sells yet"} · ${d.value?Math.round(inv/d.value*100):0}% invested</small></div>
-  </div>
-  <div class="bt-card"><h4>The race <em>${d.marketOpen?"live":"updates when the market reopens"}</em></h4><div class="ap-chart">${apChart(d.equity,d.startValue,d.spx0,d.intraday)}</div></div>
+  <div class="ap-mini">${[["Days running",days,d.firstTrade?"since "+new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"not started"],["Peak",$m(peak),"low "+$m(low)],["Worst drop",dd.toFixed(1)+"%","from a peak"],["To bust",$m(Math.max(0,d.value-d.bustAt)),"busts under "+$m(d.bustAt)],["Invested",(d.value?Math.round(inv/d.value*100):0)+"%",d.positions.length+" stocks"]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>
+  ${apPerf(d)}
+  <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· holdings, trade log, signals, rankings &amp; rules</small></summary>
   ${plan&&!d.marketOpen?`<div class="bt-card"><h4>🔔 Opening-bell plan <em>built overnight from news &amp; earnings · updated ${ago(plan.t)}</em></h4>${plan.orders.length?`<div class="ap-log">${plan.orders.map(o=>`<div class="ap-tr"><span class="sd ${o.side}">${o.side}</span><div><b>${esc(o.sym)}</b> · about ${$m(o.amount)}<p>${esc(o.why)}</p></div><time>at 9:30 AM</time></div>`).join("")}</div>`:`<div class="ap-note">No changes planned — if overnight news or earnings change that, this list updates before the bell.</div>`}</div>`:""}
   <div class="ap-two">
     <div class="bt-card"><h4>📰 News moving the bot <em>${sig?`market tone ${sig.macro>0?"+":""}${(sig.macro||0).toFixed(1)}`:""}</em></h4>${sig&&sig.news&&sig.news.length?sig.news.map(x=>apSigRow(x,"news")).join(""):`<div class="ap-note">No strong headlines about its stocks right now.</div>`}</div>
     <div class="bt-card"><h4>📅 Earnings watch <em>beats get bought, misses get sold, no buys right before a report</em></h4>${sig&&sig.earnings&&sig.earnings.length?sig.earnings.map(x=>apSigRow(x,"earn")).join(""):`<div class="ap-note">None of its stocks report in the next two days.</div>`}</div>
   </div>
   <div class="bt-card"><h4>Holdings <em>${d.positions.length} of 10 slots</em></h4>${d.positions.length?`<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Value</th><th>Bought at</th><th>Now</th><th>Gain</th><th>Today</th><th>Stop</th></tr></thead><tbody>${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b> <span class="ap-tag ${p.sleeve==="safe"?"safe":"risk"}">${p.sleeve==="safe"?"safe":"risk"}</span><small>${esc(p.name||"")}</small></td><td>${$m(p.value)}</td><td>${$m(p.cost)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${pct(p.pnlPct)}</td><td class="${cls(p.dayPct)}">${pct(p.dayPct)}</td><td>${$m(p.stop)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No positions yet — it buys at the next opening bell.</div>`}</div>
-  ${apAnalytics(d)}
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} trades · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>When</th><th>Action</th><th>Stock</th><th>Price</th><th>Size</th><th>Why</th><th>Signal</th><th>Account after</th><th>Since then</th></tr></thead><tbody>${d.trades.slice(0,150).map(t=>`<tr><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${t.side}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${$m(t.price)}</td><td>${$m(t.amount)}<small style="display:block;color:var(--muted)">${(+t.shares).toFixed(2)} sh</small></td><td class="n ap-why">${esc(t.why)}${t.rule?`<small>${esc(t.rule)}</small>`:""}</td><td>${t.score!=null?Math.round(t.score*100):"—"}</td><td>${t.after!=null?$m(t.after):"—"}</td><td class="${t.since==null?"":t.side==="BUY"?cls(t.since):cls(-t.since)}" title="${t.side==="BUY"?"Price change since this buy":"Price change since this sale (green = selling was right)"}">${t.since!=null?pct(t.since*100):"—"}</td></tr>`).join("")}</tbody></table></div>
   <p class="ap-note" style="margin:8px 0 0">Every signal here is <b>deterministic</b>: “Signal” is the rules-based ranking score (0–100) at the time of the trade, not an AI-generated recommendation. Prices include 0.05% simulated slippage. “Since then” compares the trade price with the latest price; for a sale, green means the stock fell after it was sold.</p>`:`<div class="ap-note">Nothing yet — the bot makes its first trades when the market opens (weekdays 9:30 AM–4 PM ET).</div>`}</div>
   ${sig?`<div class="bt-card"><h4>Live rankings <em>${ago(sig.t)}${sig.riskOff?" · ⚠ S&amp;P below its 200-day average: 20% cash":""}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>#</th><th>Stock</th><th>Score</th><th>News</th><th>3-mo</th><th>Today</th><th>Analysts</th><th>Trend</th></tr></thead><tbody>${sig.top.map((x,i)=>`<tr><td>${i+1}</td><td class="n"><b>${esc(x.sym)}</b> <span class="ap-tag ${x.sleeve==="safe"?"safe":"risk"}">${x.sleeve||"risk"}</span>${x.held?' <span class="ap-tag own">held</span>':""}<small>${esc(x.name||"")}</small></td><td>${Math.round(x.score*100)}</td><td class="${cls(x.news)}">${x.news>0?"+":""}${x.news.toFixed(1)}</td><td class="${cls(x.mom)}">${pct(x.mom*100)}</td><td class="${cls(x.day)}">${pct(x.day)}</td><td>${x.adj==null?"—":x.adj.toFixed(2)}</td><td>${x.trend===1?"▲▲":x.trend?"▲":"▼"}</td></tr>`).join("")}</tbody></table></div></div>`:""}
@@ -3154,8 +3354,10 @@ function apRender(d){
     <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. The S&amp;P 500 side is the same $10,000 put into the index on the run's first day.</li>
   </ul>
   <p class="ap-note" style="margin:10px 0 0">${d.durable?"Saved in permanent storage.":"The server forgets its copy when the site updates; your signed-in browser keeps a backup and puts it back automatically."}</p></div>
+  </details>
   <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${busts} bust${busts===1?"":"s"} so far`:"no busts yet — every bust starts a new $10,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
+  apWirePerf(d);
 }
 async function apLoadView(){
   if(!$("apBox")) return;
