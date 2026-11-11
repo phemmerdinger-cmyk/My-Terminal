@@ -1615,8 +1615,23 @@ async function apScore(live) {
   const stress = (vix && (vix.price >= 35 || vix.changePct >= 25)) ? `VIX fear index at ${vix.price.toFixed(1)}` : spx && spx.day <= -3 ? `S&P 500 down ${spx.day.toFixed(1)}% today` : news.swan && marketShaky ? `Black-swan headline with the market under stress: “${news.swan.slice(0, 110)}”` : null;
   return { list: out, riskOff, stress, macro: news.macro, vix: vix && vix.price, spyDay };
 }
+// Trading pace: about 2 trades a day, ~14 a week. A "swap" (sell the weakest holding, buy a better-ranked stock) is
+// 2 trades. One swap is allowed per day while fewer than 2 trades have happened today; a second only if the week is
+// behind pace. Never more than 4 trades in a day or 14 in 7 days from swaps, and swaps are at least 90 minutes apart.
+// Safety sells (stop-loss, bad news, earnings miss, broken trend) are never held back by the pace.
+function apPace(trades, t, now = Date.now()) {
+  const fills = trades.filter((x) => x.side === "BUY" || x.side === "SELL");
+  const today = fills.filter((x) => etParts(new Date(x.t)).day === t.day).length, week = fills.filter((x) => now - x.t < 7 * 864e5).length;
+  const lastSwap = fills.find((x) => /^Swapped out/.test(x.why || ""));
+  const idx = ["Mon", "Tue", "Wed", "Thu", "Fri"].indexOf(t.wd) + 1, daysLeft = idx > 0 ? 5 - idx : 0;
+  let swaps = 0;
+  if (today >= 4 || week >= 14 || (lastSwap && now - lastSwap.t < 90 * 60e3)) swaps = 0;
+  else if (today < 2) swaps = 1;
+  else if (week < 14 - 2 * daysLeft) swaps = 1; // behind for the week — catch up
+  return { swaps, gap: 0.02, today, week };
+}
 // Turns scores into trades on `st` (the real account, or a copy when planning overnight).
-function apDecide(st, sc, opening) {
+function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   const by = Object.fromEntries(sc.list.map((x) => [x.sym, x])), now = Date.now();
   const cool = (s) => st.recent && st.recent[s] && now - st.recent[s] < AP_HOLD_MIN;
   const val = () => st.cash + Object.entries(st.positions).reduce((s, [k, p]) => s + p.shares * (by[k] ? by[k].px : p.cost), 0);
@@ -1654,14 +1669,13 @@ function apDecide(st, sc, opening) {
   };
   for (const sl of ["risk", "safe"]) {
     // 3) swaps inside the sleeve: a much stronger name replaces the weakest holding (held at least an hour)
-    let swaps = 0;
     for (const x of sc.list) {
-      if (swaps >= 2 || held(sl).length < SLOTS[sl]) break;
+      if (pace.swaps <= 0 || held(sl).length < SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
       const weakest = held(sl).filter((s) => by[s] && !cool(s)).sort((a, b) => by[a].score - by[b].score)[0];
-      if (!weakest || x.score < by[weakest].score + 0.1) break;
-      apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores much higher (#${by[weakest].rank} vs #${x.rank})`);
-      swaps++;
+      if (!weakest || x.score < by[weakest].score + pace.gap) break;
+      apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores higher (#${by[weakest].rank} vs #${x.rank})`);
+      pace.swaps--;
     }
     // 4) buys into empty slots
     for (const x of sc.list) {
@@ -1697,7 +1711,7 @@ async function apTick() {
         apLastPlan = now;
         const sc = await apScore(false); apSig = apSignals(sc);
         const copy = JSON.parse(JSON.stringify({ cash: AP.cash, positions: AP.positions, trades: [], recent: AP.recent }));
-        apDecide(copy, sc, true);
+        apDecide(copy, sc, true, apPace(AP.trades, m.t));
         AP.plan = { t: now, orders: copy.trades.reverse().map((x) => ({ side: x.side, sym: x.sym, amount: x.amount, why: x.why.replace(/ \([+−]\$\d+\)$/, "") })) };
         AP.lastScan = apSig; await apSave();
       }
@@ -1720,7 +1734,8 @@ async function apTick() {
       const sc = await apScore(true); apSig = apSignals(sc);
       BOTDIAG.swing.lastScan = { t: now, candidates: sc.list.length, stress: sc.stress, riskOff: sc.riskOff, buysBefore: AP.trades.length };
       if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = now; } catch {} }
-      apDecide(AP, sc, opening);
+      const pace = apPace(AP.trades, m.t); BOTDIAG.swing.pace = { today: pace.today, week: pace.week };
+      apDecide(AP, sc, opening, pace);
       BOTDIAG.swing.lastScan.tradesMade = AP.trades.length - BOTDIAG.swing.lastScan.buysBefore;
       AP.lastRebalance = m.t.day; AP.lastScan = apSig; AP.plan = null;
     }
