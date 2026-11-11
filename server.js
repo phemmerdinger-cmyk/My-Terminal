@@ -2218,6 +2218,18 @@ function secSection(text, startRe, endRe, minLen = 800) {
   for (const m of text.matchAll(startRe)) { const i = m.index + m[0].length, rest = text.slice(i), e = rest.search(endRe), len = e < 0 ? rest.length : e; if (len >= minLen) return text.slice(m.index, i + Math.min(len, 400000)); }
   return "";
 }
+// every risk-factor headline in an Item 1A section (bold one-sentence titles), in order
+function riskHeadlines(risk) {
+  const paras = risk.replace(/^Item\s*1A\.?\s*Risk\s*Factors/i, "").split("\n").map((x) => x.trim()).filter((x) => x.length > 40);
+  const intro = paras.find((x) => x.length > 120) || "";
+  const heads = paras.filter((x) => x !== intro && x.length >= 50 && x.length <= 300 && /[.:]$/.test(x) && (x.match(/\.\s/g) || []).length === 0 && !/^(The following|This section|You should|Investing in|In addition|Risks? (Related|Relating) to)/i.test(x));
+  return { intro, heads: [...new Set(heads)] };
+}
+const secSubs = (cik) => cached("sec:subs:" + cik, 3600e3, () => secGet(`https://data.sec.gov/submissions/CIK${String(cik).padStart(10, "0")}.json`));
+const secCik = async (sym) => { sym = String(sym || "").toUpperCase().replace("-", "."); if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol"); const m = await secTickers(), h = m[sym] || m[sym.replace(".", "-")]; return h ? { sym, cik: h.cik, name: h.name } : null; };
+const edgarUrl = (cik, acc, doc) => `https://www.sec.gov/Archives/edgar/data/${cik}/${acc.replace(/-/g, "")}/${doc}`;
+// risk headlines of one 10-K document, cached for a day (shared by the crawler and the year-over-year risk comparison)
+const tenKRisks = (url) => cached("sec:rh:" + url, 24 * 3600e3, async () => riskHeadlines(secSection(htmlToText(await secText(url)), /Item\s*1A\.?\s*\n?\s*Risk\s*Factors/gi, /Item\s*1B\.?|Item\s*1C\.?|Item\s*2\.?\s*\n?\s*Properties/gi)));
 async function filingDoc(sym) {
   sym = String(sym || "").toUpperCase().replace("-", ".");
   if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol");
@@ -2225,7 +2237,7 @@ async function filingDoc(sym) {
     const f = await secFundamentals(sym); if (!f.available) return { ...f, text: null };
     const out = { ...f, filing: null, text: null };
     try {
-      const sub = await secGet(`https://data.sec.gov/submissions/CIK${String(f.cik).padStart(10, "0")}.json`), r = sub.filings && sub.filings.recent;
+      const sub = await secSubs(f.cik), r = sub.filings && sub.filings.recent;
       const i = r ? r.form.findIndex((x) => x === "10-K" || x === "20-F" || x === "40-F") : -1;
       if (i >= 0) {
         const acc = r.accessionNumber[i], url = `https://www.sec.gov/Archives/edgar/data/${f.cik}/${acc.replace(/-/g, "")}/${r.primaryDocument[i]}`;
@@ -2240,7 +2252,8 @@ async function filingDoc(sym) {
         // risk-factor headlines: one-sentence paragraphs (bold titles in the filing) between 50 and 300 characters
         const riskP = paras(risk.replace(/^Item\s*1A\.?\s*Risk\s*Factors/i, ""));
         const intro0 = riskP.find((x) => x.length > 120) || "";
-        const heads = riskP.filter((x) => x !== intro0 && x.length >= 50 && x.length <= 300 && /[.:]$/.test(x) && (x.match(/\.\s/g) || []).length === 0 && !/^(The following|This section|You should|Investing in|In addition|Risks? (Related|Relating) to)/i.test(x)).slice(0, 10);
+        const rh = riskHeadlines(risk); cached("sec:rh:" + url, 24 * 3600e3, async () => rh).catch(() => {});
+        const heads = rh.heads.slice(0, 10);
         const intro = intro0;
         const sents = mdna.replace(/\n/g, " ").split(/(?<=[.!?])\s+(?=[A-Z“"])/).map((x) => x.trim());
         const guide = sents.filter((x) => x.length >= 70 && x.length <= 320 && /\b(expects?|anticipates?|outlook|plans? to|intends? to|believes?[^.]{0,80}\bwill\b|will continue to|guidance|forecast)\b/i.test(x) && !/forward-looking statements|Private Securities Litigation|Part I, Item 1A/i.test(x)).slice(0, 6).map((x) => clip(x, 320));
@@ -2249,6 +2262,105 @@ async function filingDoc(sym) {
       }
     } catch (e) { out.textError = String(e.message || e); }
     return out;
+  });
+}
+
+// ---------------------------------------------------------------- document intelligence: three more crawler modes
+// 1) Insider scanner — the company's Form 4 filings from the last 12 months (who traded, buy or sell, size, price,
+//    10b5-1 plan or not). Form 4 XML is structured, so this is exact. Up to 30 filings, cached 6 hours.
+// value of a Form 4 field: <tag><value>x</value>…</tag> (footnote references can sit beside the value) or <tag>x</tag>
+const xv = (x, tag) => { const m = x.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i")); if (!m) return null; const v = m[1].match(/<value>\s*([^<]*?)\s*<\/value>/i); return (v ? v[1] : m[1].replace(/<[^>]+>/g, "")).trim(); };
+async function insiderScan(symIn) {
+  const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
+  return cached("sec:ins:" + id.sym, 6 * 3600e3, async () => {
+    const r = (await secSubs(id.cik)).filings.recent, since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10), picks = [];
+    for (let i = 0; i < r.form.length && picks.length < 30; i++) if ((r.form[i] === "4" || r.form[i] === "4/A") && r.filingDate[i] >= since) picks.push(i);
+    const filings = [];
+    for (const i of picks) {
+      const url = edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i].replace(/^xsl[^/]+\//, ""));
+      try {
+        const x = await secText(url, 2e6);
+        const owner = (x.match(/<reportingOwner>[\s\S]*?<\/reportingOwner>/i) || [""])[0], foot = {};
+        for (const m of x.matchAll(/<footnote id="(F\d+)">([\s\S]*?)<\/footnote>/gi)) foot[m[1]] = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        const role = [xv(owner, "isDirector") === "1" || xv(owner, "isDirector") === "true" ? "Director" : null, xv(owner, "officerTitle"), xv(owner, "isTenPercentOwner") === "1" || xv(owner, "isTenPercentOwner") === "true" ? "10% owner" : null].filter(Boolean);
+        const plan = /<aff10b5One>\s*(1|true)\s*<\/aff10b5One>/i.test(x);
+        const tx = [...x.matchAll(/<nonDerivativeTransaction>([\s\S]*?)<\/nonDerivativeTransaction>/gi)].map((m) => {
+          const t = m[1], code = xv(t, "transactionCode"), sh = +xv(t, "transactionShares") || 0, px = +xv(t, "transactionPricePerShare") || 0;
+          const fids = [...t.matchAll(/footnoteId id="(F\d+)"/gi)].map((f) => f[1]), notes = fids.map((f) => foot[f] || "").join(" ");
+          return { date: xv(t, "transactionDate"), code, ad: xv(t, "transactionAcquiredDisposedCode"), shares: sh, price: px, value: +(sh * px).toFixed(2), after: +xv(t, "sharesOwnedFollowingTransaction") || null, direct: xv(t, "directOrIndirectOwnership") !== "I", security: xv(t, "securityTitle"), plan10b51: plan || /10b5-1/i.test(notes) };
+        }).filter((t) => t.code && t.shares > 0);
+        filings.push({ filed: r.filingDate[i], accession: r.accessionNumber[i], url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]), owner: (xv(owner, "rptOwnerName") || "").replace(/\s+/g, " "), role: role.join(", ") || "Other", officer: /chief|ceo|cfo|coo|president|officer|chair|evp|svp|vice president|general counsel|treasurer|controller/i.test(role.join(" ")), tx });
+      } catch (e) { /* skip one unreadable filing */ }
+    }
+    return { symbol: id.sym, available: true, name: id.name, cik: id.cik, since, filings, source: "SEC EDGAR Form 4 filings (last 12 months, up to 30 most recent)" };
+  });
+}
+// 2) Earnings release auditor — the latest 8-K under Item 2.02 (results) and its press-release exhibit (EX-99.1):
+//    every sentence tagged bullish, cautious/hedging or guidance, guidance figures pulled out, management quotes found.
+const TONE_UP = /\b(record|records|grew|grow(s|ing)?|growth|increase[ds]?|rose|strong(er|est)?|exceed(ed|s)?|beat|raised|raising|accelerat\w*|momentum|all-time|robust|expan(d|ded|ding|sion)|outperform\w*|double-digit|best-ever|surpass\w*|exceptional|healthy)\b/i;
+const TONE_DN = /\b(headwinds?|uncertain(ty|ties)?|challeng\w*|softness|soft(er)?|cautious(ly)?|declin\w*|decreas\w*|lower|weak(er|ness)?|pressures?|volatil\w*|tariffs?|macro(economic)?|slow(er|ing|down)?|lumpy|visibility|impairment|restructuring|disruption|constrain\w*|shortfall|down \d)/i;
+const TONE_GUIDE = /\b(expects?|expected|outlook|guidance|anticipates?|forecast|projects?|projected|plans? to|targets?)\b/i;
+function releaseGuidance(sent, lastPer) {
+  const out = [], per = (sent.match(/\b(first|second|third|fourth) (fiscal )?quarter( of fiscal \d{4}| of \d{4}| \d{4})?|\b(fiscal|full[- ]year|calendar) (year )?\d{4}|\bfull[- ]year\b|\bQ[1-4]( F?Y?\d{2,4})?\b/i) || [""])[0];
+  const add = (metric, m, unit) => m && out.push({ metric, value: m[1].replace(/,/g, "") + (unit || (m[2] ? " " + m[2].toLowerCase() : "")), range: m[3] ? m[3].trim() : null, period: per || lastPer || null });
+  add("Revenue", sent.match(/\b(?:revenue|net sales|total sales|sales)\b[^.;]{0,70}?\$\s?([\d.,]+)\s?(billion|million)?(\s*(?:(?:,?\s*plus or minus\s*[\d.]+\s?(?:%|percent))|±|to \$?[\d.,]+\s?(?:billion|million)?))?/i));
+  add("Gross margin", sent.match(/\bgross margins?\b[^.;]{0,60}?([\d.]+)\s?(?:%|percent)()(\s*(?:(?:,?\s*plus or minus\s*[\d.]+\s?(?:%|percent))|±|to [\d.]+\s?(?:%|percent)))?/i), "%");
+  add("Operating margin", sent.match(/\boperating margins?\b[^.;]{0,60}?([\d.]+)\s?(?:%|percent)()(\s*(?:to [\d.]+\s?(?:%|percent)))?/i), "%");
+  add("Operating expenses", sent.match(/\boperating expenses\b[^.;]{0,60}?\$\s?([\d.,]+)\s?(billion|million)?(\s*(?:to \$?[\d.,]+\s?(?:billion|million)?))?/i));
+  add("EPS", sent.match(/\b(?:earnings per (?:diluted )?share|EPS)\b[^.;]{0,60}?\$\s?([\d.]+)()(\s*(?:to \$?[\d.]+))?/i), " $/share");
+  add("Capital expenditures", sent.match(/\b(?:capital expenditures|capex)\b[^.;]{0,60}?\$\s?([\d.,]+)\s?(billion|million)?(\s*(?:to \$?[\d.,]+\s?(?:billion|million)?))?/i));
+  add("Tax rate", sent.match(/\btax rate\b[^.;]{0,60}?([\d.]+)\s?(?:%|percent)()(\s*(?:(?:,?\s*plus or minus\s*[\d.]+\s?(?:%|percent))|±|to [\d.]+\s?(?:%|percent)))?/i), "%");
+  return out;
+}
+async function earningsRelease(symIn) {
+  const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
+  return cached("sec:er:" + id.sym, 6 * 3600e3, async () => {
+    const r = (await secSubs(id.cik)).filings.recent;
+    const i = r.form.findIndex((f, k) => (f === "8-K" || f === "6-K") && /2\.02/.test(r.items ? r.items[k] || "" : ""));
+    if (i < 0) return { symbol: id.sym, available: false, name: id.name, reason: "No earnings press release (8-K, Item 2.02) found in the company's recent filings." };
+    const acc = r.accessionNumber[i], dir = `https://www.sec.gov/Archives/edgar/data/${id.cik}/${acc.replace(/-/g, "")}/`;
+    const idx = await secGet(dir + "index.json"), files = ((idx.directory && idx.directory.item) || []).map((x) => x.name).filter((n) => /\.html?$/i.test(n));
+    const ex = files.find((n) => /ex-?99[-_.]?0?1\b|ex99[-_]?1|exhibit-?99[-_.]?1|ex991|_991\b|991\./i.test(n)) || files.find((n) => /99/.test(n) && n !== r.primaryDocument[i]) || r.primaryDocument[i];
+    const url = dir + ex, text = htmlToText(await secText(url, 6e6));
+    // narrative paragraphs only (financial tables come out as rows of numbers)
+    const paras = text.split("\n").map((x) => x.trim()).filter((x) => x.length > 60 && (x.match(/\d/g) || []).length / x.length < 0.18 && !/^(This press release contains|Forward-Looking Statements|Safe Harbor|About [A-Z])/i.test(x)).slice(0, 45);
+    const out = [], guide = []; let lastPer = null, title = (text.split("\n").find((x) => x.length > 20 && x.length < 200 && !/^exhibit/i.test(x)) || "").slice(0, 200);
+    for (const p of paras) {
+      const said = p.match(/[”"]\s*,?\s*(?:said|says)\s+([A-Z][\w.'’ -]{2,40}?),\s*([^.,”"]{3,80})/) || p.match(/(?:said|says)\s+([A-Z][\w.'’ -]{2,40}?),\s*([^.,”"]{3,80})/);
+      const speaker = said ? (/chief executive|ceo|president/i.test(said[2]) ? "CEO" : /chief financial|cfo/i.test(said[2]) ? "CFO" : said[2].trim().slice(0, 40)) + " — " + said[1].trim() : /\boutlook|guidance|expects?\b/i.test(p) ? "Outlook" : "Release";
+      const sents = p.split(/(?<=[.!?”])\s+(?=[A-Z“"])/).filter((x) => x.length > 25).map((t) => {
+        const g = TONE_GUIDE.test(t) && /(\$|%|percent|billion|million|quarter|fiscal|year)/i.test(t), up = TONE_UP.test(t), dn = TONE_DN.test(t);
+        const tone = g ? "guide" : dn && !up ? "bear" : up && !dn ? "bull" : up && dn ? "mixed" : null, hedge = dn ? (t.match(TONE_DN) || [""])[0].toLowerCase() : null;
+        if (g) for (const x of releaseGuidance(t, lastPer)) { guide.push({ ...x, text: t.slice(0, 300) }); if (x.period) lastPer = x.period; }
+        return { text: t.slice(0, 420), tone, hedge };
+      });
+      if (sents.length) out.push({ speaker, sents });
+    }
+    return { symbol: id.sym, available: true, name: id.name, cik: id.cik, title, filing: { form: r.form[i], filed: r.filingDate[i], period: r.reportDate[i] || null, accession: acc, url, items: r.items[i] }, paragraphs: out, guidance: guide.slice(0, 12), source: "SEC EDGAR 8-K Item 2.02 earnings press release (EX-99.1)" };
+  });
+}
+// 3) Risk-factor comparison — this year's 10-K Item 1A headlines against last year's: new, removed, reworded.
+const RK_STOP = new Set("the a an and or of to in on for with our we us its it is are be may could can by as from that this which have has other such any including or not will would than these".split(" "));
+const rkWords = (t) => new Set(t.toLowerCase().replace(/[’']/g, "").replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !RK_STOP.has(w)));
+const rkSim = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.max(1, a.size + b.size - n); };
+async function riskDiff(symIn) {
+  const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
+  return cached("sec:rd:" + id.sym, 24 * 3600e3, async () => {
+    const r = (await secSubs(id.cik)).filings.recent, ks = [];
+    for (let i = 0; i < r.form.length && ks.length < 2; i++) if (r.form[i] === "10-K") ks.push(i);
+    if (ks.length < 2) return { symbol: id.sym, available: false, name: id.name, reason: "Needs two 10-K filings to compare." };
+    const meta = (i) => ({ filed: r.filingDate[i], period: r.reportDate[i], url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]) });
+    const cur = meta(ks[0]), prev = meta(ks[1]), A = await tenKRisks(cur.url), B = await tenKRisks(prev.url);
+    const bw = B.heads.map((h) => ({ h, w: rkWords(h), used: false })), heads = [];
+    for (const h of A.heads) {
+      const w = rkWords(h); let best = null, bs = 0;
+      for (const b of bw) { const s = rkSim(w, b.w); if (s > bs) { bs = s; best = b; } }
+      if (best && bs >= 0.55) { best.used = true; heads.push({ text: h, status: bs >= 0.86 ? "same" : "reworded", before: bs >= 0.86 ? null : best.h, sim: +bs.toFixed(2) }); }
+      else heads.push({ text: h, status: "new", sim: +bs.toFixed(2) });
+    }
+    const removed = bw.filter((b) => !b.used).map((b) => b.h);
+    return { symbol: id.sym, available: A.heads.length > 0, name: id.name, cik: id.cik, current: { ...cur, count: A.heads.length }, prior: { ...prev, count: B.heads.length }, intro: A.intro.slice(0, 500), heads, removed,
+      reason: A.heads.length ? null : "Couldn't find risk-factor headlines in this 10-K.", source: "Item 1A of the two most recent 10-K filings on SEC EDGAR" };
   });
 }
 
@@ -2466,6 +2578,11 @@ async function handle(req, res) {
         catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
       }
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
+      if (u.pathname === "/api/pub/insiders" || u.pathname === "/api/pub/release" || u.pathname === "/api/pub/riskdiff") {
+        const fn = { "/api/pub/insiders": insiderScan, "/api/pub/release": earningsRelease, "/api/pub/riskdiff": riskDiff }[u.pathname];
+        try { return send(res, 200, await fn(u.searchParams.get("symbol"))); }
+        catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
+      }
       if (u.pathname === "/api/pub/filing") {
         try { const sym = u.searchParams.get("symbol"); return send(res, 200, u.searchParams.get("fast") ? await filingFast(sym) : await filingKick(sym)); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
