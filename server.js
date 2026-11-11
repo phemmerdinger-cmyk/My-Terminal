@@ -2037,6 +2037,45 @@ function dtRestore(doc) {
 }
 setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
 
+// ---------------------------------------------------------------- live money (both bots, marked to market every few seconds)
+// While someone has the AI vs S&P page open, the server fetches live prices for every stock the bots hold — one batched
+// Yahoo request every 4 seconds — and the page polls this compact snapshot every ~2.5 seconds. Real-time Finnhub trades
+// are used instead when they're fresher. Nobody watching → no requests at all. Trading decisions don't use these prices
+// (they run on 1-minute bars); this is only the live scoreboard.
+const BL = { px: {}, t: 0, want: 0, busy: false, fails: 0, snap: null, snapT: 0 };
+const blOpenish = () => { const t = etParts(); return !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 9 * 60 + 25 && t.min <= 16 * 60 + 5; };
+async function blRefresh() {
+  if (BL.busy) return; BL.busy = true;
+  try {
+    const syms = [...new Set([...Object.keys(AP.positions), ...Object.keys(DT.positions), "^GSPC"])];
+    for (let i = 0; i < syms.length; i += 150) {
+      const j = await yget(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms.slice(i, i + 150).join(","))}&fields=regularMarketPrice,regularMarketTime`);
+      for (const q of (j.quoteResponse && j.quoteResponse.result) || []) if (q.regularMarketPrice != null) BL.px[q.symbol] = { p: q.regularMarketPrice, t: (q.regularMarketTime || 0) * 1000 || Date.now() };
+    }
+    BL.t = Date.now(); BL.fails = 0;
+  } catch (e) { BL.fails++; } finally { BL.busy = false; }
+}
+// back off to every 30 s if Yahoo keeps refusing, so the bots' own data never gets blocked
+setInterval(() => { if (Date.now() - BL.want < 30e3 && blOpenish() && (BL.fails < 3 || Date.now() - BL.t > 30e3)) blRefresh(); }, 4000);
+function blPx(sym, fallback) {
+  const a = BL.px[sym], f = live.last.get(sym), fT = f ? f.t : 0;
+  if (f && (!a || fT > a.t) && Date.now() - fT < 120e3) return f.p;
+  return a ? a.p : fallback;
+}
+function botsLive() {
+  BL.want = Date.now();
+  if (BL.snap && Date.now() - BL.snapT < 1000) return BL.snap;
+  const spx = blPx("^GSPC", null), r2 = (x) => +x.toFixed(2);
+  const sw = Object.entries(AP.positions).map(([sym, p]) => { const px = blPx(sym, apPx[sym] || p.cost), v = p.shares * px; return [sym, r2(px), r2(v), r2(v - p.shares * p.cost), +(px / p.cost - 1).toFixed(5)]; });
+  const swV = AP.cash + sw.reduce((a, x) => a + x[2], 0);
+  const dy = Object.entries(DT.positions).map(([sym, p]) => { const px = blPx(sym, dtPx[sym] || p.entry), pnl = DTC.pnlOf(p, px); return [sym, r2(px), r2(p.shares * px), r2(pnl), +(pnl / (p.shares * p.entry)).toFixed(5)]; });
+  const dyV = DT.cash + Object.entries(DT.positions).reduce((a, [sym, p]) => a + (p.dir === "long" ? 1 : -1) * p.shares * blPx(sym, dtPx[sym] || p.entry), 0);
+  BL.snap = { t: Date.now(), pricesAt: BL.t || null, open: blOpenish(), spx,
+    swing: { value: r2(swV), start: AP_START, spx0: AP.spx0 || null, cash: r2(AP.cash), pos: sw },
+    day: { value: r2(dyV), start: DT_START, spx0: DT.spx0 || null, cash: r2(DT.cash), pos: dy } };
+  BL.snapT = Date.now(); return BL.snap;
+}
+
 // ---------------------------------------------------------------- SEC EDGAR fundamentals (free, no key)
 // Annual figures from companies' own 10-K filings via the SEC's XBRL "company facts" API.
 // SEC fair-access rules: at most 10 requests/second and a User-Agent naming a contact
@@ -2336,6 +2375,7 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());
+      if (u.pathname === "/api/pub/botslive") return send(res, 200, botsLive());
       if (u.pathname === "/api/daytrader/restore" && req.method === "POST") { if (!dtLoaded) await dtLoad(); let doc = null; try { doc = await readBody(req); } catch {} return send(res, 200, dtRestore(doc)); }
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
         if (!apLoaded) await apLoad();

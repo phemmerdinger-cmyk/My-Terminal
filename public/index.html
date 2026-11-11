@@ -673,6 +673,19 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-score #apVs{display:flex;flex-direction:column;gap:8px}
 .ap-score .ap-side b{font-size:clamp(26px,4vw,44px)}
 .ap-score .ap-health{margin:0}
+.lv{border-top:1px dashed var(--line);padding-top:8px}
+.lv-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.lv-h b{color:var(--text);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.lv-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 0 rgba(34,197,94,.6);animation:lvPulse 1.6s infinite}
+.lv.off .lv-dot{background:var(--dim);animation:none}
+@keyframes lvPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+.lv-key{margin-left:auto;display:flex;align-items:center;gap:6px}.lv-key i{display:inline-block;width:12px;height:3px;border-radius:2px}.lv-key i.ai{background:#ff9f43}.lv-key i.sp{background:#8b93a7;margin-left:6px}
+#apLiveSvg{display:block;width:100%;height:70px;margin-top:4px}
+.ap-side b,.hd-r b,.hd-gh span,.hd-sum b,.bot-sw b,.bot-sw small{font-variant-numeric:tabular-nums}
+.lv-up{animation:lvUp .9s ease-out}.lv-dn{animation:lvDn .9s ease-out}
+@keyframes lvUp{0%{color:#22c55e;text-shadow:0 0 12px rgba(34,197,94,.5)}100%{}}
+@keyframes lvDn{0%{color:#ff5a6a;text-shadow:0 0 12px rgba(255,90,106,.5)}100%{}}
+@media (prefers-reduced-motion:reduce){.lv-up,.lv-dn,.lv-dot{animation:none}}
 .ap-tri{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
 .ap-tri > *{min-width:0}
 .ap-tri .ap-two{grid-template-columns:1fr}
@@ -1658,7 +1671,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
-      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
+      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div><div class="lv" id="apLive"><div class="lv-h"><span class="lv-dot"></span><b>Live</b><small id="apLiveNote">connecting…</small><span class="lv-key"><i class="ai"></i>AI <i class="sp"></i>S&amp;P 500 · same money</span></div><svg id="apLiveSvg" viewBox="0 0 800 90" preserveAspectRatio="none"></svg></div></div>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
         <aside class="ap-hold" id="apNote"></aside>
@@ -3241,7 +3254,9 @@ function apSvgChart(id,labels,series,{h=260,zero=false,fmt=v=>v,fills=false}={})
   const pl=s=>s.v.map((v,i)=>v==null?null:`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ");
   const grid=[0.25,0.5,0.75].map(f=>`<line x1="0" x2="${W}" y1="${h*f}" y2="${h*f}" stroke="var(--line)" vector-effect="non-scaling-stroke"/>`).join("");
   const z=zero?`<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`:"";
-  const step=Math.max(1,Math.ceil(n/6)), ticks=labels.map((l,i)=>i%step===0||i===n-1?`<span style="left:${(X(i)/W*100).toFixed(2)}%">${esc(l)}</span>`:"").join("");
+  // evenly spaced time labels, always including the first and last — few enough that they never overlap
+  const K=Math.min(n,(window.innerWidth||1000)<700?3:5), idx=[...new Set(Array.from({length:K},(_,j)=>K<2?0:Math.round(j*(n-1)/(K-1))))];
+  const ticks=idx.map(i=>`<span style="left:${(X(i)/W*100).toFixed(2)}%">${esc(labels[i])}</span>`).join("");
   const body=series.map(s=>{const p=pl(s); if(!p) return ""; if(s.area){ const first=p.split(" ")[0].split(",")[0], last=p.split(" ").at(-1).split(",")[0], base=zero?Y(0):h;
     return `<defs><clipPath id="${id}u"><rect x="0" y="0" width="${W}" height="${base}"/></clipPath><clipPath id="${id}d"><rect x="0" y="${base}" width="${W}" height="${h-base}"/></clipPath></defs><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.up||s.c}" opacity=".25" clip-path="url(#${id}u)"/><polygon points="${first},${base} ${p} ${last},${base}" fill="${s.down||s.c}" opacity=".25" clip-path="url(#${id}d)"/><polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke"/>`; }
     return `<polyline points="${p}" fill="none" stroke="${s.c}" stroke-width="${s.w||2}" vector-effect="non-scaling-stroke" ${s.dash?'stroke-dasharray="5 4"':""}/>`;}).join("");
@@ -3395,9 +3410,9 @@ function apRender(d){
   ${sig&&sig.stress?`<div class="ap-warn">🛡 Defense mode: ${esc(sig.stress)} — the bot cuts to 50% invested and makes no new buys.</div>`:""}`;
   $("apVs").innerHTML=`
   <div class="ap-vs">
-    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>🤖 AI bot</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret)}</small></div>
-    <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
-    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet)}</small></div>
+    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>🤖 AI bot</span><b data-lv="v">${$m(d.value)}</b><small data-lv="r" class="${cls(ret)}">${pct(ret)}</small></div>
+    <div class="ap-mid">${started?`<b data-lv="who" class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small data-lv="by">by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
+    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet)}</small></div>
   </div>${liveLine}`;
   $("apBox").innerHTML=`
   ${apPerf(d)}
@@ -3459,25 +3474,28 @@ function botNotepad(){
     const w=d.value?Math.min(100,inv/d.value*100):0;
     const orders=!swing&&d.orders.length?`<div class="hd-orders">⏳ Working orders: ${d.orders.map(o=>`${o.dir==="long"?"buy":"short"} ${o.shares} <b>${esc(o.sym)}</b> @ $${o.price.toFixed(2)}`).join(" · ")}</div>`:"";
     return `<div class="hd-grp ${BOTS.sel===kind?"on":""}">
-      <div class="hd-gh"><b>${swing?"🤖 Swing bot":"⚡ Day trader"}</b><span>${$m(d.value)} <small class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</small></span></div>
+      <div class="hd-gh" data-k="${kind}"><b>${swing?"🤖 Swing bot":"⚡ Day trader"}</b><span><span data-lv="gv">${$m(d.value)}</span> <small data-lv="gr" class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</small></span></div>
       <div class="hd-alloc"><i style="width:${w.toFixed(1)}%"></i></div>
-      <div class="hd-sum"><span><b>${$m(inv)}</b> invested</span><span><b>${$m(cash)}</b> cash</span><span>open P&amp;L <b class="${cls(pnl)}">${sgn(pnl)}</b></span></div>
-      ${rows.length?rows.map(r=>`<div class="hd-row"><div class="hd-l"><b>${esc(r.sym)}</b> ${r.tag}<small>${esc(r.name||"")}</small></div>
+      <div class="hd-sum" data-k="${kind}"><span><b data-lv="inv">${$m(inv)}</b> invested</span><span><b>${$m(cash)}</b> cash</span><span>open P&amp;L <b data-lv="opl" class="${cls(pnl)}">${sgn(pnl)}</b></span></div>
+      ${rows.length?rows.map(r=>`<div class="hd-row" data-k="${kind}" data-s="${esc(r.sym)}"><div class="hd-l"><b>${esc(r.sym)}</b> ${r.tag}<small>${esc(r.name||"")}</small></div>
         <div class="hd-m"><small>put in</small>${$m(r.inv)}</div>
-        <div class="hd-r"><b>${$m(r.val)}</b><small class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
+        <div class="hd-r"><b data-lv="pv">${$m(r.val)}</b><small data-lv="pp" class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
         <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
       :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now — it trades every minute from 9:31 AM to 3:59 PM ET."}</div>`}${orders}</div>`;
   };
   const order=BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing]]:[["swing",BOTS.d.swing],["day",BOTS.d.day]];
   const n=(BOTS.d.swing?BOTS.d.swing.positions.length:0)+(BOTS.d.day?BOTS.d.day.positions.length:0);
+  const keep=$("apNote").scrollTop;
   $("apNote").innerHTML=`<div class="hd-h"><h4>💼 What the AI is invested in</h4><small>${n} position${n===1?"":"s"} · updates every minute</small></div>${order.map(([k,d])=>group(k,d)).join("")}`;
+  $("apNote").scrollTop=keep; liveApply(false);
 }
 function botRet(d){ if(!d) return null; return d.value/d.startValue-1; }
 function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
-    return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`${sw?$m(sw.value):"$10,000"} · holds for days`,sw)+card("day","⚡","Day trader",`${dy?$m(dy.value):"$30,000"} · max speed, every stock every minute`,dy);
+    return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$10,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, every stock every minute`,dy);
+  liveApply(false);
 }
 function dtRender(d){
   const ret=d.value/d.startValue-1, spxV=d.spx0&&d.spxNow?d.startValue*d.spxNow/d.spx0:d.startValue, spxRet=spxV/d.startValue-1, lead=d.value-spxV;
@@ -3488,9 +3506,9 @@ function dtRender(d){
   const dirTag=x=>`<span class="sd ${x==="long"?"BUY":"SELL"}">${x==="long"?"LONG":"SHORT"}</span>`;
   $("apVs").innerHTML=`
   <div class="ap-vs">
-    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>⚡ Day trader</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret*100)}</small></div>
-    <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
-    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
+    <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>⚡ Day trader</span><b data-lv="v">${$m(d.value)}</b><small data-lv="r" class="${cls(ret)}">${pct(ret*100)}</small></div>
+    <div class="ap-mid">${started?`<b data-lv="who" class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small data-lv="by">by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
+    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
   <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">max speed · no daily stop</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
@@ -3526,6 +3544,7 @@ function dtRender(d){
   <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${d.runs.length} PDT lock${d.runs.length===1?"":"s"} so far`:"no busts yet — falling under $25,000 starts a new $30,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
   apWirePerf(d);
+  liveApply(false);
 }
 async function apBackup(kind,d){
   if(window.__VISITOR) return false;
@@ -3552,7 +3571,65 @@ async function apLoadView(){
   if(BOTS.sel==="day") dtRender(d); else apRender(d);
 }
 $("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else apRender(d); } else apLoadView(); };
-setInterval(()=>{ if(S.tab==="aitrade") apLoadView(); },60_000);
+setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apLoadView(); },60_000);
+/* ---------- live money: a tiny snapshot every ~2.5 s, numbers updated in place (no re-render, no layout shift) ---------- */
+var LIVE={d:null,fail:0,timer:null,hist:{swing:[],day:[]},shown:{}};
+function liveSchedule(ms){ clearTimeout(LIVE.timer); LIVE.timer=setTimeout(liveTick,ms); }
+async function liveTick(){
+  if(S.tab!=="aitrade"||document.hidden) return liveSchedule(4000);
+  try{ const j=await api("/api/pub/botslive"); if(!j||!j.swing) throw 0; LIVE.d=j; LIVE.fail=0;
+    for(const k of ["swing","day"]){ const h=LIVE.hist[k], b=j[k], spxV=b.spx0&&j.spx?b.start*j.spx/b.spx0:null; if(!h.length||h.at(-1).t!==j.t) h.push({t:j.t,v:b.value,s:spxV}); if(h.length>720) h.shift(); }
+    liveApply(true);
+  }catch{ LIVE.fail++; }
+  liveSchedule(LIVE.fail?Math.min(20000,2500*2**LIVE.fail):2500);
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.tab==="aitrade") liveSchedule(50); });
+function liveSet(el,key,text,num,flash){
+  if(!el) return; if(el.textContent!==text) el.textContent=text;
+  if(!flash||num==null) { LIVE.shown[key]=num; return; }
+  const prev=LIVE.shown[key]; LIVE.shown[key]=num;
+  if(prev!=null&&Math.abs(num-prev)>=0.005){ el.classList.remove("lv-up","lv-dn"); void el.offsetWidth; el.classList.add(num>prev?"lv-up":"lv-dn"); }
+}
+const liveCls=(el,v)=>{ if(!el) return; el.classList.toggle("up",v>0); el.classList.toggle("down",v<0); };
+function liveApply(flash){
+  const L=window.LIVE&&LIVE.d; if(!L) return;
+  const sgn=v=>(v>=0?"+":"−")+"$"+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0});
+  for(const k of ["swing","day"]){
+    const b=L[k], bot=BOTS.d[k]; if(!b||!bot) continue;
+    const ret=b.value/b.start-1, spxV=b.spx0&&L.spx?b.start*L.spx/b.spx0:null, started=bot.trades&&bot.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
+    // switch card
+    const card=document.querySelector(`#apSwitch [data-bot="${k}"]`);
+    if(card){ liveSet(card.querySelector('[data-lv="sw"]'),k+"sw",$m(b.value),b.value,flash); if(started){ const r=card.querySelector('[data-lv="swr"]'); liveSet(r,k+"swr",pct(ret*100),null,false); liveCls(r,ret);} }
+    // the big dollar row (selected bot only)
+    if(BOTS.sel===k){ const vs=$("apVs");
+      if(vs){ liveSet(vs.querySelector('[data-lv="v"]'),k+"v",$m(b.value),b.value,flash); const r=vs.querySelector('[data-lv="r"]'); liveSet(r,k+"r",pct(ret*100),null,false); liveCls(r,ret);
+        if(spxV!=null){ const sr=spxV/b.start-1; liveSet(vs.querySelector('[data-lv="sv"]'),k+"sv",$m(spxV),spxV,flash); const e=vs.querySelector('[data-lv="sr"]'); liveSet(e,k+"sr",pct(sr*100),null,false); liveCls(e,sr);
+          if(started){ const lead=b.value-spxV, who=vs.querySelector('[data-lv="who"]'); liveSet(who,k+"who",lead>=0?"AI leads":"S&P leads",null,false); liveCls(who,lead); liveSet(vs.querySelector('[data-lv="by"]'),k+"by","by "+$m(Math.abs(lead)),null,false);
+            const sides=vs.querySelectorAll(".ap-side"); if(sides.length===2){ sides[0].classList.toggle("lead",lead>=0); sides[1].classList.toggle("lead",lead<0); } } } } }
+    // holdings panel
+    const gh=document.querySelector(`#apNote .hd-gh[data-k="${k}"]`);
+    if(gh){ liveSet(gh.querySelector('[data-lv="gv"]'),k+"gv",$m(b.value),b.value,flash); const g=gh.querySelector('[data-lv="gr"]'); liveSet(g,k+"gr",pct(ret*100),null,false); liveCls(g,ret); }
+    let inv=0,opl=0;
+    for(const [sym,px,val,pnl,r] of b.pos){ inv+=val; opl+=pnl;
+      const row=document.querySelector(`#apNote .hd-row[data-k="${k}"][data-s="${CSS.escape(sym)}"]`); if(!row) continue;
+      liveSet(row.querySelector('[data-lv="pv"]'),k+sym+"pv",$m(val),val,flash); const pp=row.querySelector('[data-lv="pp"]'); liveSet(pp,k+sym+"pp",`${pct(r*100)} · ${sgn(pnl)}`,null,false); liveCls(pp,pnl); }
+    const sum=document.querySelector(`#apNote .hd-sum[data-k="${k}"]`);
+    if(sum&&b.pos.length){ liveSet(sum.querySelector('[data-lv="inv"]'),k+"inv",$m(inv),null,false); const o=sum.querySelector('[data-lv="opl"]'); liveSet(o,k+"opl",sgn(opl),null,false); liveCls(o,opl); }
+  }
+  liveChart();
+}
+function liveChart(){
+  const svg=$("apLiveSvg"), note=$("apLiveNote"), L=LIVE.d; if(!svg||!L) return;
+  const h=LIVE.hist[BOTS.sel]||[], ago=Math.max(0,Math.round((Date.now()-(L.pricesAt||L.t))/1000));
+  note.textContent=!L.open?"market closed — showing the last prices":`prices ${ago<3?"just now":ago+"s ago"} · ${h.length>1?(()=>{const sec=Math.round((h.at(-1).t-h[0].t)/1000);return sec<60?`${sec}s since you opened the page`:`${Math.round(sec/60)} min since you opened the page`;})():"building…"}`;
+  $("apLive").classList.toggle("off",!L.open);
+  if(h.length<2){ svg.innerHTML=""; return; }
+  const vals=h.flatMap(p=>[p.v,p.s]).filter(v=>v!=null); let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*0.15,hi*0.0002); lo-=pad; hi+=pad;
+  const X=i=>i/(h.length-1)*800, Y=v=>84-(v-lo)/(hi-lo)*78;
+  const line=(k,c)=>{ const pts=h.map((p,i)=>p[k]==null?null:`${X(i).toFixed(1)},${Y(p[k]).toFixed(1)}`).filter(Boolean).join(" "); return pts?`<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`:""; };
+  svg.innerHTML=line("s","#8b93a7")+line("v","#ff9f43");
+}
+liveSchedule(1500);
 function aiShow(k){
   S.aiPane=k; document.querySelectorAll("#aiNav [data-ai]").forEach(b=>b.classList.toggle("on",b.dataset.ai===k));
   document.querySelectorAll("[data-aipane]").forEach(d=>d.hidden=d.dataset.aipane!==k);
