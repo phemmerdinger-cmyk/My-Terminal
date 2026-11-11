@@ -3218,8 +3218,16 @@ function apDrivers(d){
   return Object.entries(m).map(([s,x])=>({s,r:x.r,u:x.u,t:x.r+x.u})).sort((a,b)=>Math.abs(b.t)-Math.abs(a.t)).slice(0,12);
 }
 function apPerf(d){
-  const started=d.trades.length>0;
-  if(!started) return `<div class="bt-card"><h4>Performance <em>AI vs. S&amp;P 500</em></h4><div class="ap-empty" style="padding:36px 10px">The comparison charts start the moment the bot makes its first trades at the opening bell (weekdays 9:30 AM ET). Until then there's nothing to compare yet.</div></div>`;
+  const started=d.trades.some(t=>/^(BUY|SHORT|SELL|COVER)$/.test(t.side));
+  if(!started){
+    const H=BOTS.spx5; let chart=`<div class="ap-empty" style="padding:30px 10px">Loading the S&amp;P 500's last 5 days…</div>`;
+    if(H&&H.length>1){ const lab=H.map(c=>new Date(c.time*1000).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"})), c0=H[0].close;
+      APV.pre={labels:lab,series:[{n:"S&P 500",c:"#8a93a3",v:H.map(c=>c.close/c0-1)},{n:"AI (in cash, not started)",c:"#ff9f43",v:H.map(()=>0),w:2.6,dash:true}],fmt:x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%"};
+      chart=apSvgChart("apPre",APV.pre.labels,APV.pre.series,{zero:true,fmt:APV.pre.fmt,h:260}).replace('<div class="apc" id="apPre">','<div class="apc" id="apPre" data-zero="1">'); }
+    return `<div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>AI vs. S&amp;P 500 · preview</em></h4></div>
+      <p class="ap-note" style="margin:0 0 8px">The bot hasn't made its first trade yet, so it's sitting in cash (flat line). Here's the S&amp;P 500's last 5 trading days for reference — from the opening bell, both lines start tracking live and every chart below fills in.</p>${chart}</div>
+      <div class="ap-two"><div class="bt-card"><h4>Returns side by side</h4><div class="ap-note">Fills in after the first trades.</div></div><div class="bt-card"><h4>Head to head</h4><div class="ap-note">Fills in after two trading days.</div></div></div>`;
+  }
   const R=apRangeSeries(d,APV.range), H=apH2H(d), a=d.analytics||{}, drv=apDrivers(d);
   const views=[["ret","Return %"],["val","Value $"],["gap","Gap $"],["dd","Drawdown"]], ranges=[["today","Today"],["5d","5D"],["1m","1M"],["3m","3M"],["all","All"]];
   const seg=(k,list,cur)=>`<div class="apseg" data-seg="${k}">${list.map(([v,l])=>`<button type="button" data-v="${v}" class="${v===cur?"on":""}">${l}</button>`).join("")}</div>`;
@@ -3287,6 +3295,7 @@ function apWirePerf(d){
   box.querySelectorAll(".apseg").forEach(g=>g.onclick=e=>{const b=e.target.closest("[data-v]"); if(!b) return; APV[g.dataset.seg]=b.dataset.v; g.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
     if(g.dataset.seg==="range"||g.dataset.seg==="view"){ const R=apRangeSeries(d,APV.range), w=$("apMainWrap"); if(w){ w.innerHTML=R.ai.length>=2?apMainChart(d,R):`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet.</div>`; if(APV.cur&&R.ai.length>=2) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt); } } });
   if($("apMain")&&APV.cur) apWireChart("apMain",APV.cur.labels,APV.cur.series,APV.cur.fmt);
+  if($("apPre")&&APV.pre) apWireChart("apPre",APV.pre.labels,APV.pre.series,APV.pre.fmt);
   const dd=$("apDays"); if(dd){ const H=apH2H(d), svg=dd.querySelector("svg"), n=H.ra.length;
     const show=e=>{ const r=svg.getBoundingClientRect(), cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left, i=Math.max(0,Math.min(n-1,Math.floor(cx/r.width*n)));
       $("apDaysRead").innerHTML=`<b>${esc(H.lab[i])}</b> <span><i style="background:#ff9f43"></i>AI <b class="${cls(H.ra[i])}">${pct(H.ra[i]*100)}</b></span> <span><i style="background:#8a93a3"></i>S&amp;P <b class="${cls(H.rs[i])}">${pct(H.rs[i]*100)}</b></span> <span>${H.ra[i]>H.rs[i]?"AI won the day":"S&amp;P won the day"}</span>`;
@@ -3436,6 +3445,7 @@ async function apLoadView(){
   const [sw,dy]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader")]);
   if(sw.status==="fulfilled"){ BOTS.d.swing=sw.value; if(await apBackup("swing",sw.value)) return apLoadView(); }
   if(dy.status==="fulfilled"){ BOTS.d.day=dy.value; if(await apBackup("day",dy.value)) return apLoadView(); }
+  if(!BOTS.spx5&&[BOTS.d.swing,BOTS.d.day].some(x=>x&&!(x.trades||[]).some(t=>/^(BUY|SHORT)$/.test(t.side)))){ try{ BOTS.spx5=(await api("/api/history?symbol=%5EGSPC&range=5d&interval=15m")).candles; }catch{} }
   botSwitch();
   const d=BOTS.d[BOTS.sel];
   if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
