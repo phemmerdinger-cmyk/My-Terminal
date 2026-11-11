@@ -20,6 +20,13 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **Markets** | Market mood gauge, upcoming earnings, top gainers/losers/most active, watchlist heatmap and table, sectors, indexes, Treasury yields, bond funds, crypto, ETFs, mutual funds, futures and currencies. |
 | **Research** | A Yahoo Finance-style page for any stock, ETF, fund, crypto, index or future: interactive chart first, then Summary, Statistics, Financials, Analysis, Holders, Holdings, Performance, Profile, News and Compare. |
 | **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts, and a **Risk & performance** panel (1-year return vs. the S&P 500, annualized volatility, Sharpe ratio, beta, max drawdown, best/worst day, plus the same for each holding). |
+| **Financials** (Research) | Up to six years of income statement, balance sheet, cash flow and ratios from SEC 10-K filings (EDGAR XBRL), with a side-by-side company comparison. |
+| **DCF valuation** (Research) | Five-year unlevered free cash flow model with bull/base/bear cases, CAPM WACC, terminal value, enterprise-to-equity bridge and a WACC × growth sensitivity table; every input labeled by source. |
+| **Backtest** (Portfolio) | Hypothetical portfolios vs. the S&P 500 with dividend-adjusted prices: CAGR, volatility, Sharpe, drawdown, beta, alpha, yearly returns, saved setups. |
+| **Risk & stress** (Portfolio) | VaR / expected shortfall, correlations, concentration, rate sensitivity, beta-scaled shocks and 2008 / 2020 / 2022 replays. |
+| **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
+| **AI vs. S&P 500** (AI Lab) | A rules-based $10,000 paper-trading bot (no API cost) racing the index, with trade analytics and test runs. |
+| **Prediction accuracy** (AI Lab) | Grades saved Claude predictions with non-overlapping outcome bands, calibration and sample sizes. |
 | **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
 **Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".
@@ -78,6 +85,9 @@ Run the checks with `npm test`.
 - `ANTHROPIC_API_KEY`: turns on predictions and Ask Claude
 - `FINNHUB_API_KEY`: turns on real-time streaming prices
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: free Upstash Redis database so device sync is permanent (otherwise synced data lives on the server and is wiped when it redeploys)
+- `SITE_PASSWORD`: replaces the built-in site password
+- `CLAUDE_DAILY_LIMIT`: Claude requests allowed per day (default 0 = off, so the site costs $0)
+- `SEC_USER_AGENT`: contact sent to the SEC with each request (their fair-access rules require one)
 - `CLAUDE_MODEL`: default `claude-sonnet-5-5` (set to `claude-opus-5-5` for deeper analysis)
 
 ## How the data works
