@@ -2573,7 +2573,7 @@ async function handle(req, res) {
         let c = STATIC_GZ.get(file);
         const done = () => {
           const html = /html/.test(type);
-          const hdr = { ETag: c.etag, "Cache-Control": html ? "no-cache" : "public, max-age=86400" };
+          const hdr = { ETag: c.etag, "Cache-Control": html || /javascript|css/.test(type) ? "no-cache" : "public, max-age=86400" }; // code always revalidates (cheap 304) so a deploy never mixes old and new files
           if (req.headers["if-none-match"] === c.etag) return send(res, 304, "", type, hdr);
           const gz = /\bgzip\b/.test(String(req.headers["accept-encoding"] || "")) && c.gz;
           send(res, 200, gz || c.raw, type, gz ? { ...hdr, "Content-Encoding": "gzip", Vary: "Accept-Encoding" } : hdr);
