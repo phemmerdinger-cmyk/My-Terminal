@@ -2314,17 +2314,24 @@ function releaseGuidance(sent, lastPer) {
 }
 async function earningsRelease(symIn) {
   const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
-  return cached("sec:er:" + id.sym, 6 * 3600e3, async () => {
+  return cached("sec:er2:" + id.sym, 6 * 3600e3, async () => {
     const r = (await secSubs(id.cik)).filings.recent;
     const i = r.form.findIndex((f, k) => (f === "8-K" || f === "6-K") && /2\.02/.test(r.items ? r.items[k] || "" : ""));
     if (i < 0) return { symbol: id.sym, available: false, name: id.name, reason: "No earnings press release (8-K, Item 2.02) found in the company's recent filings." };
     const acc = r.accessionNumber[i], dir = `https://www.sec.gov/Archives/edgar/data/${id.cik}/${acc.replace(/-/g, "")}/`;
-    const idx = await secGet(dir + "index.json"), files = ((idx.directory && idx.directory.item) || []).map((x) => x.name).filter((n) => /\.html?$/i.test(n));
-    const ex = files.find((n) => /ex-?99[-_.]?0?1\b|ex99[-_]?1|exhibit-?99[-_.]?1|ex991|_991\b|991\./i.test(n)) || files.find((n) => /99/.test(n) && n !== r.primaryDocument[i]) || r.primaryDocument[i];
+    // the filing index page labels every file's type, so the press release is the row typed EX-99.1 (or the first EX-99.x)
+    let ex = null;
+    try {
+      const ix = await secText(dir + acc + "-index.htm", 1e6), rows = [...ix.matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((m) => m[0]);
+      const pick = (re) => { for (const row of rows) { const t = row.match(/<td[^>]*>\s*(EX-[\d.A-Z]+)\s*<\/td>/i), h = row.match(/href="([^"]+\.html?)"/i); if (t && h && re.test(t[1])) return h[1].split("/").pop(); } return null; };
+      ex = pick(/^EX-99\.0?1$/i) || pick(/^EX-99/i);
+    } catch {}
+    if (!ex) { const idx = await secGet(dir + "index.json"), items = ((idx.directory && idx.directory.item) || []).filter((x) => /\.html?$/i.test(x.name) && x.name !== r.primaryDocument[i] && !/^R\d+\.htm/i.test(x.name));
+      ex = (items.find((x) => /ex-?99[-_.]?0?1\b|ex99[-_]?1|exhibit-?99[-_.]?1|ex991|_991\b|991\./i.test(x.name)) || items.sort((a, b) => (+b.size || 0) - (+a.size || 0))[0] || {}).name || r.primaryDocument[i]; }
     const url = dir + ex, text = htmlToText(await secText(url, 6e6));
     // narrative paragraphs only (financial tables come out as rows of numbers)
     const paras = text.split("\n").map((x) => x.trim()).filter((x) => x.length > 60 && (x.match(/\d/g) || []).length / x.length < 0.18 && !/^(This press release contains|Forward-Looking Statements|Safe Harbor|About [A-Z])/i.test(x)).slice(0, 45);
-    const out = [], guide = []; let lastPer = null, title = (text.split("\n").find((x) => x.length > 20 && x.length < 200 && !/^exhibit/i.test(x)) || "").slice(0, 200);
+    const out = [], guide = []; let lastPer = null, title = (text.split("\n").map((x) => x.trim()).find((x) => x.length > 20 && x.length < 200 && !/\.html?\b|^exhibit|securities and exchange|^form\b|^press release$|^\d|^(for immediate release|news release|contacts?:?)\b/i.test(x)) || "Earnings press release").slice(0, 200);
     for (const p of paras) {
       const said = p.match(/[”"]\s*,?\s*(?:said|says)\s+([A-Z][\w.'’ -]{2,40}?),\s*([^.,”"]{3,80})/) || p.match(/(?:said|says)\s+([A-Z][\w.'’ -]{2,40}?),\s*([^.,”"]{3,80})/);
       const speaker = said ? (/chief executive|ceo|president/i.test(said[2]) ? "CEO" : /chief financial|cfo/i.test(said[2]) ? "CFO" : said[2].trim().slice(0, 40)) + " — " + said[1].trim() : /\boutlook|guidance|expects?\b/i.test(p) ? "Outlook" : "Release";
