@@ -2193,15 +2193,17 @@ async function secFundamentals(sym) {
 // Numbers come from secFundamentals (XBRL company facts). Text comes from the latest 10-K's main document on EDGAR:
 // the start of Item 1 (Business), the risk-factor headlines in Item 1A, and forward-looking sentences in Item 7 (MD&A).
 // One HTML download per company per day, through the same polite SEC request queue.
+// big filing documents get their own queue so a download never holds up the quick JSON requests (≤ 4/s each, under SEC's 10/s)
+let secDocChain = Promise.resolve();
 function secText(url, maxBytes = 12e6) {
-  const run = secChain.then(async () => {
+  const run = secDocChain.then(async () => {
     const r = await secFetch(url, "text/html,*/*", 30000);
     await new Promise((ok) => setTimeout(ok, 250));
     if (!r.ok) throw new Error(`SEC returned ${r.status}`);
     const buf = await r.arrayBuffer(); if (buf.byteLength > maxBytes) throw new Error("filing too large");
     return new TextDecoder("utf-8").decode(buf);
   });
-  secChain = run.catch(() => {});
+  secDocChain = run.catch(() => {});
   return run;
 }
 const FENT = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", ldquo: "“", rdquo: "”", mdash: "—", ndash: "–", bull: "•", reg: "®", trade: "™", copy: "©" };
@@ -2249,6 +2251,26 @@ async function filingDoc(sym) {
     return out;
   });
 }
+
+// Fast path: if the full filing (numbers + text) is ready, send it; otherwise send the numbers now (usually cached or
+// one SEC request) with pending: true, and keep downloading the 10-K text in the background for the follow-up request.
+const FDOC = new Map(); // symbol → { t, v } once the full document has been built
+function filingKick(sym) {
+  const k = String(sym || "").toUpperCase().replace("-", ".");
+  const run = filingDoc(k).then((v) => { FDOC.set(k, { t: Date.now(), v }); if (FDOC.size > 300) FDOC.delete(FDOC.keys().next().value); return v; });
+  run.catch(() => {}); return run;
+}
+async function filingFast(sym) {
+  const k = String(sym || "").toUpperCase().replace("-", "."), hit = FDOC.get(k);
+  if (hit && Date.now() - hit.t < 20 * 3600e3) return hit.v;
+  const full = filingKick(k);
+  const quick = await Promise.race([full.then((v) => ({ v })), new Promise((ok) => setTimeout(() => ok(null), 400))]); // already cached → full doc
+  if (quick) return quick.v;
+  const f = await secFundamentals(k);
+  return f.available ? { ...f, filing: null, text: null, pending: true } : f;
+}
+// warm the crawler's quick picks a minute after start (one at a time through the polite SEC queue)
+setTimeout(async () => { for (const s of ["AAPL", "NVDA", "MSFT", "TSLA", "AMZN", "JPM"]) { try { await filingKick(s); } catch {} } }, 60_000);
 
 // ---------------------------------------------------------------- long price history for backtests and stress tests
 // Daily or weekly closes plus Yahoo's dividend-and-split adjusted closes ("adj") between two dates.
@@ -2445,7 +2467,7 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
       if (u.pathname === "/api/pub/filing") {
-        try { return send(res, 200, await filingDoc(u.searchParams.get("symbol"))); }
+        try { const sym = u.searchParams.get("symbol"); return send(res, 200, u.searchParams.get("fast") ? await filingFast(sym) : await filingKick(sym)); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
       }
       if (u.pathname === "/api/pub/sec") {

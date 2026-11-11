@@ -203,6 +203,8 @@ main{min-width:0}
 .cr-rail{position:relative;background:#11151b;border-radius:3px;cursor:pointer}
 .cr-fill{position:absolute;left:0;right:0;top:0;background:linear-gradient(180deg,var(--cr-cyan),var(--cr-mag));border-radius:3px;opacity:.7;transition:height .3s}
 .cr-rail button{position:absolute;left:-3px;width:16px;height:4px;border:0;border-radius:2px;background:var(--cr-amb);cursor:pointer;padding:0;transform:translateY(-50%)}
+.cr-prog{flex:1;min-width:120px;height:6px;border-radius:3px;background:var(--cr-l);overflow:hidden}.cr-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#f59e0b);transition:width .35s ease;box-shadow:0 0 10px rgba(56,189,248,.5)}
+.cr-rail span{position:absolute;left:0;right:0;height:3px;background:#f59e0b;border-radius:2px}
 .cr-dock{background:var(--cr-p);border:1px solid var(--cr-l);border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:8px;box-shadow:0 0 0 1px rgba(56,189,248,.06),0 -6px 18px rgba(0,0,0,.25)}
 .cr-dk-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .cr-ib{width:34px;height:30px;border:1px solid var(--cr-l);background:#0a0d12;color:var(--text);border-radius:3px;cursor:pointer;font-size:13px}
@@ -1714,7 +1716,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <section id="tab-filings" class="pad fx crx" hidden>
       <div class="fx-head"><div><div class="fx-kick">🕷 10-K CRAWLER</div><h1>Filing crawler</h1>
         <p class="fx-sub">A bot reads a company's latest annual report (10-K) and lasers every key figure into the panel on the right. Real numbers from the company's SEC filings, real text quoted from the filing.</p></div></div>
-      <form class="fx-bar cr-bar" id="crForm"><input class="field" id="crSym" placeholder="Ticker, e.g. AAPL" maxlength="10" autocomplete="off"><button class="btn">Crawl filing</button>
+      <form class="fx-bar cr-bar" id="crForm"><input class="field" id="crSym" placeholder="Type a ticker — e.g. AAPL" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
         <span class="cr-chips" id="crChips"><button type="button" data-sym="AAPL">AAPL</button><button type="button" data-sym="NVDA">NVDA</button><button type="button" data-sym="MSFT">MSFT</button><button type="button" data-sym="TSLA">TSLA</button><button type="button" data-sym="AMZN">AMZN</button><button type="button" data-sym="JPM">JPM</button></span>
         <span class="cr-lay" id="crLayout"><button type="button" data-l="doc" title="Document only">Document</button><button type="button" data-l="both" class="on" title="Document and numbers">Both</button><button type="button" data-l="nums" title="Numbers only">Numbers</button></span>
         <span class="cr-src" id="crSrc"></span></form>
@@ -1722,17 +1724,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <div class="cr-main">
           <div class="cr-docwrap"><div class="cr-doc" id="crDoc"><div class="cr-page" id="crPage"><div class="cr-loading">Enter a ticker to start.</div></div><svg class="cr-ov" id="crOv" aria-hidden="true"></svg></div><div class="cr-rail" id="crRail"></div></div>
           <div class="cr-dock" id="crDock">
-            <div class="cr-dk-row">
-              <button type="button" class="cr-ib" id="crReplay" title="Replay from the start">⟲</button>
-              <button type="button" class="cr-ib" id="crBack" title="Step back">⏮</button>
-              <button type="button" class="cr-ib cr-play" id="crPlay" title="Play">▶</button>
-              <button type="button" class="cr-ib" id="crFwd" title="Step forward">⏭</button>
-              <span class="cr-speed" id="crSpeed"><button type="button" data-s="2" class="on" title="The crawler reads at 2× speed">2x</button></span>
-              <span class="cr-live" id="crLive"><i></i>LIVE</span>
-              <span class="cr-jumps" id="crJumps"><button type="button" data-j="crH-income">Income statement</button><button type="button" data-j="crH-balance">Balance sheet</button><button type="button" data-j="crH-cash">Cash flow</button><button type="button" data-j="crS-risk">Risk factors</button></span>
-              <button type="button" class="cr-skip" id="crSkip">Skip to results ⇥</button>
-            </div>
-            <div class="cr-dk-row"><input type="range" id="crScrub" min="0" max="1" value="0" aria-label="Crawl progress"><span class="cr-status" id="crStatus">Enter a ticker to start</span></div>
+            <div class="cr-dk-row"><span class="cr-live" id="crLive"><i></i><b id="crLiveT">READY</b></span><div class="cr-prog" aria-hidden="true"><i id="crProg"></i></div><span class="cr-status" id="crStatus">Type a ticker to start</span></div>
           </div>
         </div>
         <aside class="cr-side" id="crSide"></aside>
@@ -5107,13 +5099,28 @@ const crBig=(v,k)=>{ if(v==null) return "—"; if(k==="eps") return "$"+v.toFixe
 const crPct=x=>x==null||!isFinite(x)?"—":(x>=0?"+":"−")+Math.abs(x*100).toFixed(1)+"%";
 
 async function crLoad(sym){
-  sym=normSym(sym||$("crSym").value); if(!sym) return; $("crSym").value=sym; CR.sym=sym; crStop();
-  $("crPage").innerHTML=`<div class="cr-loading"><span class="spin"></span> Pulling ${esc(sym)}'s latest 10-K from SEC EDGAR… (first load of a company can take ~20 seconds)</div>`; $("crSide").innerHTML=""; $("crOv").innerHTML=""; crDockSync();
-  try{ const d=await api("/api/pub/filing?symbol="+encodeURIComponent(sym));
-    if(!d.available||!d.years||!d.years.length){ $("crPage").innerHTML=`<div class="cr-loading">${esc(d.reason||"No 10-K data for this ticker.")}</div>`; return; }
-    CR.d=d; crBuild(); crSeek(0); crPlay();
+  sym=normSym(sym||$("crSym").value); if(!sym) return; $("crSym").value=sym; CR.sym=sym; crStop(); crSummary(false); const tok=CR.tok=(CR.tok||0)+1;
+  CR.loading=true; CR.textPending=false; CR.d=null; CR.q=[]; CR.i=0;
+  $("crPage").innerHTML=`<div class="cr-loading"><span class="spin"></span> Pulling ${esc(sym)}'s numbers from SEC EDGAR…</div>`; $("crSide").innerHTML=""; $("crOv").innerHTML=""; crDockSync();
+  try{ const d=await api("/api/pub/filing?fast=1&symbol="+encodeURIComponent(sym)); if(tok!==CR.tok) return;
+    CR.loading=false;
+    if(!d.available||!d.years||!d.years.length){ $("crPage").innerHTML=`<div class="cr-loading">${esc(d.reason||"No 10-K data for this ticker.")}</div>`; crDockSync(); return; }
+    CR.d=d; CR.textPending=!!d.pending; crBuild(); crSeek(0); crPlay();
     if(S.tab==="filings") try{history.replaceState(null,"","#filings/"+encodeURIComponent(d.symbol.replace(".","-")))}catch{}
-  }catch(e){ $("crPage").innerHTML=`<div class="cr-loading">Couldn't load the filing: ${esc(e.message||String(e))}. <button class="btn ghost" onclick="crLoad()">Retry</button></div>`; }
+    if(d.pending) crTextLater(sym,tok);
+  }catch(e){ if(tok!==CR.tok) return; CR.loading=false; crDockSync(); $("crPage").innerHTML=`<div class="cr-loading">Couldn't load the filing: ${esc(e.message||String(e))}. <button class="btn ghost" onclick="crLoad()">Retry</button></div>`; }
+}
+// the filing's text (risk factors, guidance) arrives after the numbers: drop it into the document and queue it for the crawler
+async function crTextLater(sym,tok){
+  let d=null; for(let a=0;a<4&&!d;a++){ try{ const r=await api("/api/pub/filing?symbol="+encodeURIComponent(sym)); if(r&&!r.pending) d=r; }catch{} if(!d) await new Promise(x=>setTimeout(x,2500)); }
+  if(tok!==CR.tok||!CR.d) return; CR.textPending=false;
+  const T=(d&&d.text)||{}; CR.d.text=T; if(d&&d.filing) CR.d.filing=d.filing;
+  $("crBizBody").innerHTML=(T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`;
+  $("crRiskBody").innerHTML=(T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:"")+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`);
+  $("crMdBody").innerHTML=((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
+  const add=[...(T.risks||[]).slice(0,8).map((r,i)=>({t:"risk",el:"crR-"+i,text:r})),...(T.guidance||[]).map((g,i)=>({t:"guide",el:"crG-"+i,text:g}))];
+  if(add.length){ const wasDone=CR.i>=CR.q.length; CR.q.splice(CR.i,0,...add); crRail(); if(wasDone){ crSummary(false); crPlay(); } }
+  crSideSync();
 }
 function crBuild(){
   const d=CR.d, Y=d.years.slice(-3).reverse(), f=d.filing||{}, T=d.text||{}, fy=y=>"FY"+String(y.end).slice(0,4), endTxt=new Date((f.period||Y[0].end)+"T12:00:00Z").toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
@@ -5126,11 +5133,12 @@ function crBuild(){
     <div class="cr-co">${esc(d.name)}</div><small>CIK ${esc(String(d.cik))}${f.exchange?` · ${esc(f.exchange)}: ${esc(d.symbol)}`:""}${f.sic?` · ${esc(f.sic)}`:""}${f.filed?` · filed ${esc(f.filed)}`:""}</small></div>
     <p class="cr-note">Reconstructed reading copy: the figures are the company's own XBRL-tagged numbers from its 10-K filings and the text is quoted from the filing itself.${f.url?` <a href="${esc(f.url)}" target="_blank" rel="noopener">Open the original on SEC.gov ↗</a>`:""}</p>`;
   sec("crS-cover","Cover page");
-  h+=`<div class="cr-part">PART I</div><h3 class="cr-h3" id="crS-biz">Item 1. Business</h3>`+((T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
+  const wait=`<p class="cr-dim"><span class="spin"></span> Fetching this section from the filing…</p>`, pend=!!CR.textPending;
+  h+=`<div class="cr-part">PART I</div><h3 class="cr-h3" id="crS-biz">Item 1. Business</h3><div id="crBizBody">`+(pend?wait:(T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`)+`</div>`;
   sec("crS-biz","Item 1. Business");
-  h+=`<h3 class="cr-h3" id="crS-risk">Item 1A. Risk Factors</h3>${T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:""}`+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`);
+  h+=`<h3 class="cr-h3" id="crS-risk">Item 1A. Risk Factors</h3><div id="crRiskBody">${pend?wait:(T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:"")+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`)}</div>`;
   sec("crS-risk","Item 1A. Risk Factors"); (T.risks||[]).slice(0,8).forEach((r,i)=>q.push({t:"risk",el:"crR-"+i,text:r}));
-  h+=`<div class="cr-part">PART II</div><h3 class="cr-h3" id="crS-mdna">Item 7. Management’s Discussion and Analysis</h3>`+((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
+  h+=`<div class="cr-part">PART II</div><h3 class="cr-h3" id="crS-mdna">Item 7. Management’s Discussion and Analysis</h3><div id="crMdBody">`+(pend?wait:((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`))+`</div>`;
   sec("crS-mdna","Item 7. MD&A"); (T.guidance||[]).forEach((g,i)=>q.push({t:"guide",el:"crG-"+i,text:g}));
   h+=`<h3 class="cr-h3" id="crS-fin">Item 8. Financial Statements and Supplementary Data</h3>`;
   sec("crS-fin","Item 8. Financial statements");
@@ -5166,8 +5174,7 @@ function crSide(){
   const d=CR.d, Y=CR.Y;
   $("crSide").innerHTML=`<div class="crs-h"><b>${esc(d.name)}</b><small>${esc((d.filing&&d.filing.form)||"10-K")} · ${esc(String(Y[0].end))}</small><div class="crs-count" id="crsCount"></div>
       <div class="crs-act"><button type="button" class="btn ghost" id="crCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crCsv">⇩ Export CSV</button></div>
-      <div class="crs-jump">${[["crS-risk","Risk"],["crS-mdna","MD&amp;A"],["crH-income","Income"],["crH-balance","Balance"],["crH-cash","Cash flow"]].map(([el,l])=>`<button type="button" data-j="${el}">${l}</button>`).join("")}</div></div>
-    ${CR_ST.map(([st,title])=>`<div class="crs-sec"><h5 class="crs-go" data-j="crH-${st}" title="Jump the crawler here">${title}<em>${"FY"+String(Y[0].end).slice(0,4)} · YoY</em></h5>${CR_ROWS[st].filter(([k])=>Y[0][k]!=null).map(([k,l])=>`<div class="crs-row" id="crs-${k}"><span>${esc(l)}</span><b>—</b><i></i></div>`).join("")}</div>`).join("")}
+    ${CR_ST.map(([st,title])=>`<div class="crs-sec"><h5>${title}<em>${"FY"+String(Y[0].end).slice(0,4)} · YoY</em></h5>${CR_ROWS[st].filter(([k])=>Y[0][k]!=null).map(([k,l])=>`<div class="crs-row" id="crs-${k}"><span>${esc(l)}</span><b>—</b><i></i></div>`).join("")}</div>`).join("")}
     <div class="crs-sec"><h5>Calculated<em>shown once every input is read</em></h5><div id="crsCalc"></div></div>
     <div class="crs-sec"><h5>Sections read<em>headings the crawler has passed</em></h5><div id="crsRead"></div></div>
     <div class="crs-sec"><h5>Risk factors<em>headlines flagged</em></h5><div id="crsRisk"></div></div>
@@ -5176,7 +5183,6 @@ function crSide(){
     <div class="crs-sec"><h5>Health scorecard<em>standard analyst checks</em></h5><div id="crsGrade"></div><div id="crsHealth"></div></div>`;
   crSideSync(false);
   $("crCopy").onclick=crCopy; $("crCsv").onclick=crCsv;
-  $("crSide").querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>crJump(b.dataset.j));
 }
 function crRowsOut(){ const Y=CR.Y, done=new Set(CR.q.slice(0,CR.i).filter(m=>m.t==="metric").map(m=>m.k)), out=[];
   for(const [st,title] of CR_ST) for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null){ const v=Y[0][k], p=Y[1]&&Y[1][k]; out.push({st:title,k,l,fmt,v:fmt==="neg"?-v:v,p:p==null?null:(fmt==="neg"?-p:p),yoy:p?(v-p)/Math.abs(p):null,scanned:done.has(k)}); }
@@ -5211,11 +5217,11 @@ function crSummary(show){
     ${obs.length?`<div class="cr-sum-box"><h5>What stands out</h5><ul>${obs.map(m=>`<li class="${m.tone>0?"up":"down"}">${esc(m.text)}</li>`).join("")}</ul></div>`:""}
     ${gd.length?`<div class="cr-sum-box"><h5>What management says <em>quoted from the filing</em></h5>${gd.slice(0,3).map(m=>`<blockquote>“${esc(m.text)}”</blockquote>`).join("")}</div>`:""}
     ${rk.length?`<div class="cr-sum-box"><h5>Top risks it lists <em>${rk.length} risk headlines read</em></h5><ul>${rk.slice(0,3).map(m=>`<li>${esc(m.text)}</li>`).join("")}</ul></div>`:""}
-    <div class="cr-sum-act"><button type="button" class="btn" id="crSumCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crSumCsv">⇩ Export CSV</button><button type="button" class="btn ghost" id="crSumReplay">⟲ Watch again</button>${f.url?`<a class="btn ghost" href="${esc(f.url)}" target="_blank" rel="noopener">Original filing ↗</a>`:""}</div>
+    <div class="cr-sum-act"><button type="button" class="btn" id="crSumCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crSumCsv">⇩ Export CSV</button>${f.url?`<a class="btn ghost" href="${esc(f.url)}" target="_blank" rel="noopener">Original filing ↗</a>`:""}</div>
     <p class="cr-sum-note">Figures are the company's own XBRL numbers from its SEC filings; ratios and observations are calculated from them. Not investment advice.</p></div>`;
   if($("crRoot").dataset.layout==="nums"){ $("crRoot").dataset.layout="both"; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l==="both")); } // the summary lives in the document pane
   el.hidden=false; el.scrollTop=0;
-  $("crSumX").onclick=()=>{ el.hidden=true; }; $("crSumCopy").onclick=crCopy; $("crSumCsv").onclick=crCsv; $("crSumReplay").onclick=()=>{ crSeek(0); crPlay(); };
+  $("crSumX").onclick=()=>{ el.hidden=true; }; $("crSumCopy").onclick=crCopy; $("crSumCsv").onclick=crCsv;
 }
 async function crCopy(){
   if(!CR.d) return; const d=CR.d, f=d.filing||{}, rows=crRowsOut(), Y=CR.Y, fy=y=>"FY"+String(y.end).slice(0,4), F=x=>x.fmt==="neg"?null:x.fmt;
@@ -5259,17 +5265,14 @@ function crSideSync(){
 /* ---------- rail + dock ---------- */
 function crRail(){
   const q=CR.q, n=q.length||1, marks=[["crS-risk","Risk"],["crS-mdna","MD&A"],["crH-income","Income"],["crH-balance","Balance"],["crH-cash","Cash flow"]];
-  $("crRail").innerHTML=`<div class="cr-fill" id="crFill"></div>`+marks.map(([el,l])=>{const i=q.findIndex(m=>m.el===el); return i<0?"":`<button type="button" style="top:${(i/n*100).toFixed(2)}%" data-i="${i}" title="${esc(l)}"></button>`;}).join("");
+  $("crRail").innerHTML=`<div class="cr-fill" id="crFill"></div>`+marks.map(([el,l])=>{const i=q.findIndex(m=>m.el===el); return i<0?"":`<span style="top:${(i/n*100).toFixed(2)}%" title="${esc(l)}"></span>`;}).join("");
 }
 function crDockSync(){
-  const q=CR.q, n=q.length;
-  $("crPlay").textContent=CR.playing?"❚❚":"▶"; $("crPlay").title=CR.playing?"Pause":"Play";
-  $("crLive").classList.toggle("on",CR.playing);
-  document.querySelectorAll("#crSpeed button").forEach(b=>b.classList.toggle("on",+b.dataset.s===CR.speed));
-  const sc=$("crScrub"); sc.max=Math.max(1,n); sc.value=CR.i;
+  const q=CR.q, n=q.length, d=CR.d, done=d&&n&&CR.i>=n, m=q[Math.min(CR.i,n-1)];
+  $("crLive").classList.toggle("on",!!CR.playing||!!CR.loading); $("crLiveT").textContent=CR.loading?"LOADING":CR.playing?"ANALYZING":done?"DONE":"READY";
+  $("crProg").style.width=(CR.loading?6:n?CR.i/n*100:0)+"%";
   if($("crFill")) $("crFill").style.height=(n?CR.i/n*100:0)+"%";
-  const m=q[Math.min(CR.i,n-1)], d=CR.d;
-  $("crStatus").textContent=!d?"Enter a ticker to start":CR.i>=n?`finished reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${q.filter(x=>x.t==="metric").length} figures extracted`:`reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${m?(m.label||m.text||"").slice(0,60):""}`;
+  $("crStatus").textContent=CR.loading?`loading ${CR.sym}…`:!d?"Type a ticker to start":done?`finished reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · grade ${CR.health&&CR.health.grade||"—"}${CR.textPending?" · still fetching the filing text…":""}`:`reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${m?(m.label||m.text||"").slice(0,60):""}`;
 }
 /* ---------- playback ---------- */
 const CR_DUR={section:900,metric:1250,risk:800,guide:1100,calc:1100,obs:1300,check:1000};
@@ -5350,15 +5353,8 @@ function crFrame(now){
     <circle cx="-${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="0" cy="${(12*s).toFixed(1)}" r="${(1.4*s).toFixed(1)}" fill="#f43f5e"/></g>${pulsesSvg}`;
 }
 /* ---------- wiring ---------- */
-$("crForm").onsubmit=e=>{e.preventDefault(); crLoad();};
-$("crPlay").onclick=()=>CR.playing?crPause():crPlay();
-$("crBack").onclick=()=>crStep(-1); $("crFwd").onclick=()=>crStep(1);
-$("crReplay").onclick=()=>{ if(!CR.d) return; crSeek(0); crPlay(); };
-$("crSpeed").onclick=e=>{const b=e.target.closest("[data-s]"); if(!b) return; CR.speed=+b.dataset.s; crDockSync(); if(CR.playing){ clearTimeout(CR.timer); crNext(); }};
-$("crJumps").onclick=e=>{const b=e.target.closest("[data-j]"); if(b&&CR.d) crJump(b.dataset.j);};
-$("crSkip").onclick=()=>{ if(!CR.d) return; crPause(); crSeek(CR.q.length); crSummary(true); };
-$("crScrub").oninput=e=>{ if(!CR.d) return; crPause(); crSeek(+e.target.value); };
-$("crRail").onclick=e=>{const b=e.target.closest("[data-i]"); if(b&&CR.d){ const was=CR.playing; crPause(); crSeek(+b.dataset.i); if(was) crPlay(); }};
+$("crForm").onsubmit=e=>{e.preventDefault(); clearTimeout(CR.typeT); const v=normSym($("crSym").value); if(v&&v!==CR.sym) crLoad(v); $("crSym").blur(); };
+$("crSym").addEventListener("input",()=>{ clearTimeout(CR.typeT); const v=normSym($("crSym").value); if(!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(v)||v===CR.sym) return; CR.typeT=setTimeout(()=>crLoad(v),900); });
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.tab==="filings") crLoop(); });
 $("crLayout").onclick=e=>{const b=e.target.closest("[data-l]"); if(!b) return; $("crRoot").dataset.layout=b.dataset.l; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x===b)); try{localStorage.setItem("md_crl",b.dataset.l)}catch{} setTimeout(()=>{ if(CR.d){ const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); } },60); };
 $("crChips").onclick=e=>{const b=e.target.closest("[data-sym]"); if(b) crLoad(b.dataset.sym);};
