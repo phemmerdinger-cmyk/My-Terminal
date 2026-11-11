@@ -1692,7 +1692,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
               <button type="button" class="cr-ib" id="crBack" title="Step back">⏮</button>
               <button type="button" class="cr-ib cr-play" id="crPlay" title="Play">▶</button>
               <button type="button" class="cr-ib" id="crFwd" title="Step forward">⏭</button>
-              <span class="cr-speed" id="crSpeed"><button type="button" data-s="0.5">0.5x</button><button type="button" data-s="1" class="on">1x</button><button type="button" data-s="2">2x</button><button type="button" data-s="4">4x</button></span>
+              <span class="cr-speed" id="crSpeed"><button type="button" data-s="1">1x</button><button type="button" data-s="2">2x</button><button type="button" data-s="4">4x</button><button type="button" data-s="8">8x</button><button type="button" data-s="16">16x</button><button type="button" data-s="40" class="on" title="As fast as it can go">MAX</button></span>
               <span class="cr-live" id="crLive"><i></i>LIVE</span>
               <span class="cr-jumps" id="crJumps"><button type="button" data-j="crH-income">Income statement</button><button type="button" data-j="crH-balance">Balance sheet</button><button type="button" data-j="crH-cash">Cash flow</button><button type="button" data-j="crS-risk">Risk factors</button></span>
               <button type="button" class="cr-skip" id="crSkip">Skip to results ⇥</button>
@@ -5060,7 +5060,7 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
 /* ---------- 10-K Filing Crawler: a spider bot reads the latest 10-K and lasers each figure into the sidebar ---------- */
-const CR={d:null,q:[],i:0,playing:false,speed:1,timer:null,raf:0,busy:false,sym:"",
+const CR={d:null,q:[],i:0,playing:false,speed:40,timer:null,raf:0,busy:false,sym:"",
   spider:null,lasers:[],pulses:[],vals:{},read:new Set(),risks:[],guides:[],calcs:[],obs:[]};
 const CR_ST=[["income","Income statement"],["balance","Balance sheet"],["cash","Cash flow statement"]];
 const CR_ROWS={
@@ -5193,11 +5193,12 @@ function crDockSync(){
 }
 /* ---------- playback ---------- */
 const CR_DUR={section:900,metric:1250,risk:800,guide:1100,calc:1100,obs:1300};
+const crMs=(ms,min)=>Math.max(min,ms/CR.speed); // speed-scaled time with a floor so lasers stay visible at MAX
 function crPlay(){ if(!CR.d) return; if(CR.i>=CR.q.length) crSeek(0); CR.playing=true; crDockSync(); crNext(); crLoop(); }
 function crPause(){ CR.playing=false; clearTimeout(CR.timer); crDockSync(); }
 function crStop(){ CR.playing=false; clearTimeout(CR.timer); CR.lasers=[]; CR.pulses=[]; }
-function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },(CR_DUR[m.t]||1000)/CR.speed); }
-function crStep(dir){ crPause(); if(dir<0) crSeek(Math.max(0,CR.i-1)); else if(CR.i<CR.q.length){ const m=CR.q[CR.i]; crRun(m,true); CR.i++; setTimeout(crSideSync,(CR_DUR[m.t]||1000)*0.6/CR.speed); } crLoop(); }
+function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },crMs(CR_DUR[m.t]||1000,45)); }
+function crStep(dir){ crPause(); if(dir<0) crSeek(Math.max(0,CR.i-1)); else if(CR.i<CR.q.length){ const m=CR.q[CR.i]; crRun(m,true); CR.i++; setTimeout(crSideSync,crMs((CR_DUR[m.t]||1000)*0.6,30)); } crLoop(); }
 function crSeek(i){ CR.i=Math.max(0,Math.min(CR.q.length,i)); CR.lasers=[]; CR.pulses=[];
   document.querySelectorAll("#crPage .cr-hit").forEach(e=>e.classList.remove("cr-hit")); document.querySelectorAll(".crs-row.on").forEach(r=>r.classList.remove("on"));
   crSideSync(); const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); }
@@ -5209,24 +5210,24 @@ function crRun(m,anim){
   const tx=r.left-pr.left+r.width/2, ty=r.top-pr.top+r.height/2, W=page.clientWidth, sc=CR.spider?CR.spider.scale:1;
   // park the spider to the left of the target (or right, near the edge), slightly above it
   const side=tx>W*0.55?-1:1; CR.spider&&(CR.spider.tx=Math.max(60*sc,Math.min(W-60*sc,tx-side*Math.min(220*sc,W*0.28))), CR.spider.ty=ty-30*sc);
-  const doc=$("crDoc"), want=r.top-pr.top-doc.clientHeight*0.45; if(Math.abs(doc.scrollTop-want)>40) doc.scrollTo({top:Math.max(0,want),behavior:anim?"smooth":"auto"});
+  const doc=$("crDoc"), want=r.top-pr.top-doc.clientHeight*0.45; if(Math.abs(doc.scrollTop-want)>40) doc.scrollTo({top:Math.max(0,want),behavior:anim&&CR.speed<8?"smooth":"auto"});
   if(!anim){ main.classList.add("cr-hit"); return; }
   const color=/^(risk|guide|obs)$/.test(m.t)?"#f43f5e":m.st==="balance"?"#f472b6":"#38bdf8";
-  const delay=(m.t==="section"?250:450)/CR.speed;
+  const delay=crMs(m.t==="section"?250:450,8);
   setTimeout(()=>{ if(!CR.d) return; const now=performance.now();
     els.forEach((e,k)=>{ const rr=e.getBoundingClientRect(), p2=page.getBoundingClientRect(); const p={x:rr.left-p2.left+(m.t==="metric"||m.t==="calc"||m.t==="obs"?rr.width*0.5:Math.min(rr.width*0.15,40)),y:rr.top-p2.top+rr.height/2};
-      CR.lasers.push({to:p,c:k?"#a78bfa":color,t0:now+k*120,life:(m.t==="section"?520:900)/CR.speed,w:k?1.4:2.4}); CR.pulses.push({p,c:color,t0:now+k*120+120/CR.speed}); e.classList.add("cr-hit"); });
+      CR.lasers.push({to:p,c:k?"#a78bfa":color,t0:now+k*crMs(120,10),life:crMs(m.t==="section"?520:900,150),w:k?1.4:2.4}); CR.pulses.push({p,c:color,t0:now+k*120+120/CR.speed}); e.classList.add("cr-hit"); });
     if(m.t==="metric") crPop(main,crMil(CR.Y[0][m.k],m.fmt),color);
     if(m.t==="metric"||m.t==="calc") crFly(main,m.t==="metric"?$("crs-"+m.k):$("crsCalc"),m.t==="metric"?crBig(m.fmt==="neg"?-CR.Y[0][m.k]:CR.Y[0][m.k],m.fmt):(m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)),color);
     crLoop(); },delay);
 }
-function crPop(el,text,color){ const page=$("crPage"), pr=page.getBoundingClientRect(), r=el.getBoundingClientRect(), b=document.createElement("div"); b.className="cr-pop"; b.style.cssText=`left:${r.left-pr.left+r.width/2}px;top:${r.top-pr.top-26}px;border-color:${color};color:${color}`; b.textContent=text; page.appendChild(b); setTimeout(()=>b.remove(),1500/CR.speed+300); }
+function crPop(el,text,color){ const page=$("crPage"), pr=page.getBoundingClientRect(), r=el.getBoundingClientRect(), b=document.createElement("div"); b.className="cr-pop"; b.style.cssText=`left:${r.left-pr.left+r.width/2}px;top:${r.top-pr.top-26}px;border-color:${color};color:${color}`; b.textContent=text; page.appendChild(b); setTimeout(()=>b.remove(),crMs(1500,250)+300); }
 function crFly(from,to,text,color){
   if(!to||matchMedia("(prefers-reduced-motion: reduce)").matches) return; const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
   if(b.bottom<0||b.top>innerHeight||b.right<0||b.left>innerWidth) return; // sidebar off screen (phones) — skip the flight
-  const c=document.createElement("div"); c.className="cr-fly"; c.textContent=text; c.style.cssText=`left:${a.left}px;top:${a.top}px;border-color:${color};color:${color}`; document.body.appendChild(c);
+  const c=document.createElement("div"); c.className="cr-fly"; c.textContent=text; const fd=crMs(600,140); c.style.cssText=`left:${a.left}px;top:${a.top}px;border-color:${color};color:${color};transition-duration:${fd}ms`; document.body.appendChild(c);
   requestAnimationFrame(()=>{ c.style.transform=`translate(${b.right-90-a.left}px,${b.top-a.top}px) scale(.9)`; c.style.opacity=".2"; });
-  setTimeout(()=>{ c.remove(); to.classList.remove("flash"); void to.offsetWidth; to.classList.add("flash"); },650/CR.speed+60);
+  setTimeout(()=>{ c.remove(); to.classList.remove("flash"); void to.offsetWidth; to.classList.add("flash"); },crMs(650,140)+60);
 }
 /* ---------- the spider: 8 two-segment legs with simple inverse kinematics and an alternating gait ---------- */
 function crSpiderInit(){
@@ -5244,21 +5245,21 @@ function crFrame(now){
   const Sp=CR.spider, page=$("crPage"), ov=$("crOv"); if(!page||!ov) return;
   const W=page.scrollWidth, H=page.scrollHeight; ov.setAttribute("width",W); ov.setAttribute("height",H); ov.setAttribute("viewBox",`0 0 ${W} ${H}`);
   // body: spring toward target
-  const k=0.012*CR.speed, damp=0.78; Sp.vx=(Sp.vx+(Sp.tx-Sp.x)*k)*damp; Sp.vy=(Sp.vy+(Sp.ty-Sp.y)*k)*damp; const vmax=14*CR.speed*Sp.scale, v=Math.hypot(Sp.vx,Sp.vy); if(v>vmax){Sp.vx*=vmax/v;Sp.vy*=vmax/v;} Sp.x+=Sp.vx; Sp.y+=Sp.vy; Sp.ph+=0.05;
+  const k=Math.min(0.32,0.012*CR.speed), damp=0.78; Sp.vx=(Sp.vx+(Sp.tx-Sp.x)*k)*damp; Sp.vy=(Sp.vy+(Sp.ty-Sp.y)*k)*damp; const vmax=Math.min(420,14*CR.speed)*Sp.scale, v=Math.hypot(Sp.vx,Sp.vy); if(v>vmax){Sp.vx*=vmax/v;Sp.vy*=vmax/v;} Sp.x+=Sp.vx; Sp.y+=Sp.vy; if(CR.speed>=8){ const f=CR.speed>=30?0.55:0.35; Sp.x+=(Sp.tx-Sp.x)*f; Sp.y+=(Sp.ty-Sp.y)*f; } Sp.ph+=0.05; // at high speed the body snaps along so it never trails its laser
   // legs: a foot steps when it drifts too far from its rest spot (only one gait group lifts at a time)
   let stepping=false; const lifted=Sp.legs.some(L=>L.to);
   for(const L of Sp.legs){ const rest=crRest(Sp,L); if(!L.foot) L.foot={...rest};
-    if(L.to){ const t=Math.min(1,(now-L.t0)/(150/Math.max(1,CR.speed*0.8))); L.foot={x:L.from.x+(L.to.x-L.from.x)*t,y:L.from.y+(L.to.y-L.from.y)*t-Math.sin(t*Math.PI)*22*Sp.scale}; if(t>=1){L.foot={...L.to};L.to=null;} stepping=true; }
+    if(L.to){ const t=Math.min(1,(now-L.t0)/crMs(150*1.25,45)); L.foot={x:L.from.x+(L.to.x-L.from.x)*t,y:L.from.y+(L.to.y-L.from.y)*t-Math.sin(t*Math.PI)*22*Sp.scale}; if(t>=1){L.foot={...L.to};L.to=null;} stepping=true; }
     else { const dist=Math.hypot(rest.x-L.foot.x,rest.y-L.foot.y);
       if(dist>300*Sp.scale) L.foot={...rest}; // fell far behind (big jump / seek): plant it
       else if(dist>46*Sp.scale&&(!lifted||Sp.legs.find(x=>x.to)?.g===L.g||dist>120*Sp.scale)){ L.from={...L.foot}; L.to={x:rest.x+Sp.vx*5,y:rest.y+Sp.vy*5}; L.t0=now; stepping=true; } } }
   Sp.stepping=stepping;
   const tw=Math.sin(now/180)*1.6*Sp.scale;
   const legsSvg=Sp.legs.map((L,i)=>{ const h=crHip(Sp,L), kn=crKnee(h,L.foot,Sp,L); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${(kn.y+(i%2?tw:-tw)).toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/>`; }).join("");
-  const lz=CR.lasers.filter(l=>now<l.t0+l.life), pz=CR.pulses.filter(p=>now<p.t0+700/CR.speed); CR.lasers=lz; CR.pulses=pz;
+  const lz=CR.lasers.filter(l=>now<l.t0+l.life), pz=CR.pulses.filter(p=>now<p.t0+crMs(700,200)); CR.lasers=lz; CR.pulses=pz;
   const mouth={x:Sp.x,y:Sp.y+10*Sp.scale};
   const lasersSvg=lz.filter(l=>now>=l.t0).map(l=>{ const t=(now-l.t0)/l.life, a=t<0.15?t/0.15:t>0.75?(1-t)/0.25:1; return `<g opacity="${a.toFixed(2)}"><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${(l.w*4).toFixed(1)}" opacity=".25" stroke-linecap="round"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${l.w}" stroke-linecap="round" filter="url(#crGlow)"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="#fff" stroke-width="${(l.w*0.4).toFixed(2)}" stroke-linecap="round"/></g>`; }).join("");
-  const pulsesSvg=pz.filter(p=>now>=p.t0).map(p=>{ const t=(now-p.t0)/(700/CR.speed); return `<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4+t*26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1-t).toFixed(2)}"/><circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(5*(1-t)).toFixed(1)}" fill="#fff" opacity="${(1-t).toFixed(2)}"/>`; }).join("");
+  const pulsesSvg=pz.filter(p=>now>=p.t0).map(p=>{ const t=(now-p.t0)/crMs(700,200); return `<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4+t*26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1-t).toFixed(2)}"/><circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(5*(1-t)).toFixed(1)}" fill="#fff" opacity="${(1-t).toFixed(2)}"/>`; }).join("");
   const s=Sp.scale, bob=Math.sin(Sp.ph*2)*1.2*s;
   ov.innerHTML=`<defs><filter id="crGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     ${lasersSvg}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>

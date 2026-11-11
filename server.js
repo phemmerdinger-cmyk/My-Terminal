@@ -2083,9 +2083,22 @@ function botsLive() {
 // the limit: one SEC request at a time, results cached for 12 hours.
 const SEC_UA = process.env.SEC_USER_AGENT || "Market Desk personal research project (github.com/phemmerdinger-cmyk/My-Terminal)";
 let secChain = Promise.resolve();
+// SEC requests: retry twice on dropped connections or 5xx (with a growing pause), and report the real network reason
+async function secFetch(url, accept, timeout) {
+  let last;
+  for (let a = 0; a < 3; a++) {
+    if (a) await new Promise((ok) => setTimeout(ok, 1200 * a));
+    try {
+      const r = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: accept, "Accept-Encoding": "gzip, deflate" }, signal: AbortSignal.timeout(timeout) });
+      if (r.status >= 500 || r.status === 429) { last = new Error(`SEC returned ${r.status}`); continue; }
+      return r;
+    } catch (e) { const c = e && e.cause; last = new Error(c ? `${e.message}: ${c.code || c.name || ""} ${c.message || ""}`.trim() : String(e.message || e)); }
+  }
+  throw last;
+}
 function secGet(url) {
   const run = secChain.then(async () => {
-    const r = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
+    const r = await secFetch(url, "application/json", 20000);
     await new Promise((ok) => setTimeout(ok, 250)); // ≤ 4 requests/second
     if (!r.ok) throw new Error(`SEC returned ${r.status}`);
     return r.json();
@@ -2181,7 +2194,7 @@ async function secFundamentals(sym) {
 // One HTML download per company per day, through the same polite SEC request queue.
 function secText(url, maxBytes = 12e6) {
   const run = secChain.then(async () => {
-    const r = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: "text/html,*/*" }, signal: AbortSignal.timeout(30000) });
+    const r = await secFetch(url, "text/html,*/*", 30000);
     await new Promise((ok) => setTimeout(ok, 250));
     if (!r.ok) throw new Error(`SEC returned ${r.status}`);
     const buf = await r.arrayBuffer(); if (buf.byteLength > maxBytes) throw new Error("filing too large");
