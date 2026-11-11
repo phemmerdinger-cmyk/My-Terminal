@@ -1857,6 +1857,41 @@ async function longHistory(sym, from, to, interval) {
   });
 }
 
+// ---------------------------------------------------------------- macro dashboard (FRED, free public CSV downloads)
+// Federal Reserve Bank of St. Louis FRED graph CSVs (no key). Each series is cached 6 hours;
+// daily series are thinned to one point a week to keep the page light.
+const MACRO = [
+  { id: "FEDFUNDS", name: "Federal funds rate", unit: "%", freq: "Monthly", src: "Board of Governors of the Federal Reserve System via FRED" },
+  { id: "CPIAUCSL", name: "CPI inflation (year over year)", unit: "%", freq: "Monthly", yoy: true, src: "U.S. Bureau of Labor Statistics via FRED" },
+  { id: "CPILFESL", name: "Core CPI inflation (ex food & energy)", unit: "%", freq: "Monthly", yoy: true, src: "U.S. Bureau of Labor Statistics via FRED" },
+  { id: "UNRATE", name: "Unemployment rate", unit: "%", freq: "Monthly", src: "U.S. Bureau of Labor Statistics via FRED" },
+  { id: "A191RL1Q225SBEA", name: "Real GDP growth (annualized)", unit: "%", freq: "Quarterly", src: "U.S. Bureau of Economic Analysis via FRED" },
+  { id: "DGS2", name: "2-year Treasury yield", unit: "%", freq: "Daily", daily: true, src: "Board of Governors of the Federal Reserve System via FRED" },
+  { id: "DGS10", name: "10-year Treasury yield", unit: "%", freq: "Daily", daily: true, src: "Board of Governors of the Federal Reserve System via FRED" },
+  { id: "T10Y2Y", name: "Yield curve: 10-year minus 2-year", unit: "pts", freq: "Daily", daily: true, src: "Federal Reserve Bank of St. Louis via FRED" },
+  { id: "T10Y3M", name: "Yield curve: 10-year minus 3-month", unit: "pts", freq: "Daily", daily: true, src: "Federal Reserve Bank of St. Louis via FRED" },
+  { id: "UMCSENT", name: "Consumer sentiment", unit: "index", freq: "Monthly", src: "Surveys of Consumers, University of Michigan, via FRED (copyrighted, cited)" },
+  { id: "SAHMREALTIME", name: "Sahm rule recession indicator", unit: "pts", freq: "Monthly", src: "Claudia Sahm via FRED" },
+  { id: "USREC", name: "NBER recession (1 = in recession)", unit: "", freq: "Monthly", hidden: true, src: "Federal Reserve Bank of St. Louis via FRED (NBER dates)" },
+];
+async function fredSeries(m) {
+  return cached("fred:" + m.id, 6 * 3600e3, async () => {
+    const start = m.daily ? new Date(Date.now() - 31 * 365.25 * 864e5).toISOString().slice(0, 10) : "1960-01-01";
+    const csv = await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${m.id}&cosd=${start}`, "text/csv");
+    let rows = csv.trim().split(/\r?\n/).slice(1).map((l) => l.split(",")).filter((r) => r[1] && r[1] !== "." && isFinite(+r[1])).map((r) => [r[0], +r[1]]);
+    if (!rows.length) throw new Error("empty series");
+    if (m.yoy) { const by = new Map(rows); rows = rows.map(([d, v]) => { const p = by.get(String(+d.slice(0, 4) - 1) + d.slice(4)); return p ? [d, +((v / p - 1) * 100).toFixed(2)] : null; }).filter(Boolean); }
+    if (m.daily) { const wk = new Map(); for (const [d, v] of rows) { const t = Date.parse(d + "T12:00:00Z"); wk.set(Math.floor((t / 864e5 + 3) / 7), [d, v]); } const last = rows[rows.length - 1]; rows = [...wk.values()]; if (rows[rows.length - 1][0] !== last[0]) rows.push(last); }
+    return rows;
+  });
+}
+async function macroData() {
+  return cached("macro:all", 30 * 60e3, async () => {
+    const out = await Promise.allSettled(MACRO.map(fredSeries));
+    return { updated: Date.now(), source: "FRED, Federal Reserve Bank of St. Louis (fred.stlouisfed.org)", series: MACRO.map((m, i) => ({ ...m, data: out[i].status === "fulfilled" ? out[i].value : null, error: out[i].status === "rejected" ? String(out[i].reason && out[i].reason.message || out[i].reason) : null })) };
+  });
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -1913,6 +1948,7 @@ async function handle(req, res) {
         try { return send(res, 200, await longHistory(s, from, to, u.searchParams.get("interval"))); }
         catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
       }
+      if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
       if (u.pathname === "/api/pub/sec") {
         try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }

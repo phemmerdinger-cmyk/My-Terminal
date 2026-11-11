@@ -552,6 +552,28 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .rk-scn span{display:block;font-size:12px;color:var(--muted)}
 .rk-scn b{display:block;font-family:var(--mono);font-size:18px;margin:3px 0}
 .rk-scn small{font-size:11px;color:var(--dim)}
+
+/* macro */
+.mc-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.mc-bar .dcf-scn button.on{color:#111;background:#4da3ff;border-color:#4da3ff}
+.mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px;margin-bottom:14px}
+@media (max-width:420px){.mc-grid{grid-template-columns:1fr}}
+.mc-grid>*{min-width:0}
+.mc-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.mc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.mc-top span{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mc-val{font-family:var(--mono);font-size:24px}
+.mc-val small{font-size:12px;color:var(--muted);margin-left:6px}
+.mc-card svg{width:100%;height:110px;display:block;margin:4px 0}
+.mc-card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+.mc-card .mc-src{font-size:11px;color:var(--dim)}
+.mc-sig{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:14px}
+.mc-sig div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.mc-sig div.warn{border-color:color-mix(in srgb,#f5a524 55%,var(--line));background:color-mix(in srgb,#f5a524 8%,var(--panel))}
+.mc-sig div.ok{border-color:color-mix(in srgb,#21c37a 45%,var(--line))}
+.mc-sig span{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.mc-sig b{display:block;font-size:15px;margin:3px 0}
+.mc-sig small{font-size:12px;color:var(--muted)}
 /* AI vs S&P (Autopilot) */
 .aitrade .ap-head{margin-bottom:16px}
 .ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff9f43}
@@ -1529,6 +1551,20 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <p class="ap-lede">I gave a trading bot <b>$10,000</b> of paper money and pitted it against simply buying the S&amp;P 500 with the same $10,000. It plays aggressively — <b>80% risk</b> — trading all day on live prices, reads the news and earnings overnight, and acts at the opening bell — with no human input. Can it beat the market, or how fast does it go bust? Every bust starts a new $10,000 test run.</p></div></div>
       <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
     </section>
+
+    <section id="tab-macro" class="pad fx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">🏦 ECONOMY</div><h1>Macro dashboard</h1>
+        <p class="fx-sub">The economic numbers that move markets — interest rates, inflation, jobs, growth and recession signals — straight from U.S. government data. Each card shows the latest reading and the date it covers.</p></div></div>
+      <div class="mc-bar"><div class="dcf-scn" id="mcRange" style="max-width:360px;margin:0"></div><span class="fx-note" id="mcAsOf" style="margin:0"></span></div>
+      <div id="mcSignals"></div>
+      <div class="mc-grid" id="mcGrid"><div class="fx-empty"><span class="spin"></span> Loading economic data from FRED…</div></div>
+      <div class="fx-card"><h3>Daily, monthly, quarterly — why the dates differ</h3><p class="fx-formula">
+        <b>Daily</b> series (Treasury yields, the yield curve) come from markets and update every business day.
+        <b>Monthly</b> series (inflation, unemployment, consumer sentiment, the Fed funds average) are surveys or averages released a few weeks after the month ends.
+        <b>Quarterly</b> GDP covers three months and is first published about a month after the quarter ends, then revised twice.
+        So on any given day the cards describe different points in time — always check the “as of” date.
+        Gray bands on the charts mark recessions as dated by the National Bureau of Economic Research (NBER).</p></div>
+    </section>
     <section id="tab-analysis" class="pad an" hidden>
       <div class="an-head"><div><div class="an-k">◈ MARKET ANALYSIS</div><h1 id="anTitle">Today's market, explained</h1><div class="an-sub" id="anSub"></div></div><div class="an-verdict" id="anVerdict"></div></div>
       <div class="an-brief" id="anBrief"><div class="skeleton"></div></div>
@@ -1743,10 +1779,10 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","research","fin","dcf","portfolio","backtest","risk","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","backtest","risk","analysis","nyse","aitrade",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
-  ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
+  ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
   ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
   ["portfolio",[["portfolio","My portfolio"],["backtest","Backtest"],["risk","Risk & stress"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"]]],
@@ -1875,6 +1911,7 @@ function setTab(t){
   if(t==="aitrade"){ apLoadView(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="backtest"){ btInit(); }
+  if(t==="macro"){ mcOpen(); }
   if(t==="risk"){ rkInit(); }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
@@ -2916,6 +2953,60 @@ async function rkRun(){
 }
 function rkInit(){ rkSources(); if(!RK.wired){ RK.wired=true; $("rkRun").onclick=rkRun; } }
 const RK={};
+
+
+/* ---------- Macro dashboard (FRED) ---------- */
+const MC={range:"10Y"};
+const MC_INFO={
+  FEDFUNDS:"The overnight rate banks charge each other, steered by the Federal Reserve. Higher rates make borrowing costlier and tend to cool stocks, housing and inflation.",
+  CPIAUCSL:"How much consumer prices rose over the past 12 months. The Fed targets about 2%; hot inflation usually means higher rates and pressure on stock valuations.",
+  CPILFESL:"Inflation without volatile food and energy prices — the trend the Fed watches most closely.",
+  UNRATE:"Share of the labor force looking for work. Rising unemployment signals a slowing economy and weaker consumer spending.",
+  A191RL1Q225SBEA:"Growth of the whole economy after inflation, at an annual pace. Two negative quarters in a row is a common (unofficial) recession rule of thumb.",
+  DGS2:"Yield on 2-year U.S. government debt. Moves closely with where traders expect the Fed to set rates.",
+  DGS10:"Yield on 10-year U.S. government debt — the benchmark for mortgages and for discounting future profits, so higher yields weigh on stock valuations.",
+  T10Y2Y:"Long-term minus short-term yields. Below zero (“inverted”) has come before most U.S. recessions since the 1970s, usually by 6–24 months.",
+  T10Y3M:"The Fed's favorite version of the yield-curve recession signal: 10-year minus 3-month Treasury yields.",
+  UMCSENT:"How confident households feel about their finances and the economy. Low readings can foreshadow weaker spending.",
+  SAHMREALTIME:"Rises when the 3-month average unemployment rate climbs 0.5 points above its 12-month low — a reading of 0.5+ has signaled the start of every recession since 1970.",
+};
+function mcChart(s,rec){
+  const cut={"1Y":1,"5Y":5,"10Y":10,"30Y":30,"Max":200}[MC.range], since=Date.now()-cut*365.25*864e5;
+  const d=s.data.filter(([t])=>Date.parse(t)>=since); if(d.length<2) return "";
+  const t0=Date.parse(d[0][0]), t1=Date.parse(d.at(-1)[0]), vs=d.map(x=>x[1]), lo=Math.min(...vs,s.id.startsWith("T10Y")||s.id==="A191RL1Q225SBEA"?0:Infinity), hi=Math.max(...vs), pad=(hi-lo||1)*0.1;
+  const W=400,H=110, X=t=>(t-t0)/(t1-t0||1)*W, Y=v=>H-(v-(lo-pad))/((hi+pad)-(lo-pad))*H;
+  let bands=""; if(rec){ let st=null; for(const [t,v] of rec.data){ const x=Date.parse(t); if(x<t0) continue; if(v===1&&st==null) st=x; if(v===0&&st!=null){ bands+=`<rect x="${X(st)}" y="0" width="${Math.max(1,X(x)-X(st))}" height="${H}" fill="var(--muted)" opacity=".18"/>`; st=null; } } if(st!=null) bands+=`<rect x="${X(st)}" y="0" width="${W-X(st)}" height="${H}" fill="var(--muted)" opacity=".18"/>`; }
+  const zero=lo<0||s.id.startsWith("T10Y")?`<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line2)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`:"";
+  const pts=d.map(([t,v])=>`${X(Date.parse(t)).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${bands}${zero}<polyline points="${pts}" fill="none" stroke="#4da3ff" stroke-width="1.8" vector-effect="non-scaling-stroke"/><text x="3" y="11" font-size="10" fill="var(--dim)">${hi.toFixed(1)}</text><text x="3" y="${H-3}" font-size="10" fill="var(--dim)">${lo.toFixed(1)}</text></svg>`;
+}
+function mcRender(){
+  const j=MC.data, by=Object.fromEntries(j.series.map(s=>[s.id,s])), rec=by.USREC&&by.USREC.data?by.USREC:null;
+  $("mcRange").innerHTML=["1Y","5Y","10Y","30Y","Max"].map(r=>`<button type="button" data-r="${r}" class="${MC.range===r?"on":""}">${r}</button>`).join("");
+  $("mcAsOf").textContent=`Fetched ${new Date(j.updated).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})} · source: FRED, Federal Reserve Bank of St. Louis`;
+  const last=id=>by[id]&&by[id].data&&by[id].data.at(-1);
+  const dfmt=(d,f)=>{const x=new Date(d+"T12:00:00Z");return f==="Quarterly"?`Q${Math.floor(x.getUTCMonth()/3)+1} ${x.getUTCFullYear()}`:f==="Monthly"?x.toLocaleDateString("en-US",{month:"long",year:"numeric",timeZone:"UTC"}):x.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"});};
+  const sig=[]; const yc=last("T10Y2Y"), y3=last("T10Y3M"), sahm=last("SAHMREALTIME"), r=last("USREC"), gdp=by.A191RL1Q225SBEA&&by.A191RL1Q225SBEA.data;
+  if(yc) sig.push([yc[1]<0?"warn":"ok","Yield curve (10y − 2y)",yc[1]<0?"Inverted":"Normal (positive)",`${yc[1].toFixed(2)} pts on ${dfmt(yc[0],"Daily")}`]);
+  if(y3) sig.push([y3[1]<0?"warn":"ok","Yield curve (10y − 3m)",y3[1]<0?"Inverted":"Normal (positive)",`${y3[1].toFixed(2)} pts on ${dfmt(y3[0],"Daily")}`]);
+  if(sahm) sig.push([sahm[1]>=0.5?"warn":"ok","Sahm rule",sahm[1]>=0.5?"Triggered (0.5+)":"Not triggered",`${sahm[1].toFixed(2)} in ${dfmt(sahm[0],"Monthly")}`]);
+  if(gdp&&gdp.length>1){ const neg=gdp.at(-1)[1]<0&&gdp.at(-2)[1]<0; sig.push([neg?"warn":"ok","GDP: two negative quarters?",neg?"Yes":"No",`latest ${gdp.at(-1)[1].toFixed(1)}% (${dfmt(gdp.at(-1)[0],"Quarterly")})`]); }
+  if(r) sig.push([r[1]===1?"warn":"ok","Official NBER recession",r[1]===1?"In recession":"Not in recession",`as of ${dfmt(r[0],"Monthly")} · NBER dates recessions months later`]);
+  $("mcSignals").innerHTML=sig.length?`<div class="mc-sig">${sig.map(([c,a,b,s])=>`<div class="${c}"><span>${a}</span><b>${b}</b><small>${esc(s)}</small></div>`).join("")}</div><p class="fx-note" style="margin:-6px 0 14px">Recession signals have false alarms and long lags; none of them predicts timing reliably.</p>`:"";
+  $("mcGrid").innerHTML=j.series.filter(s=>!s.hidden).map(s=>{
+    if(!s.data) return `<div class="mc-card"><div class="mc-top"><span>${esc(s.name)}</span><span class="fx-badge">${s.freq}</span></div><p>Couldn't load this series right now (${esc(s.error||"unavailable")}).</p></div>`;
+    const l=s.data.at(-1), prev=s.data.length>1?s.data.at(-2):null, ago=s.data.find(([t])=>Date.parse(t)>=Date.parse(l[0])-365.25*864e5);
+    const ch=prev?l[1]-prev[1]:null, ch1=ago?l[1]-ago[1]:null, u=s.unit==="%"?"%":s.unit==="pts"?" pts":"";
+    return `<div class="mc-card"><div class="mc-top"><span>${esc(s.name)}</span><span class="fx-badge">${s.freq}</span></div>
+    <div class="mc-val">${l[1].toFixed(s.unit==="index"?1:2)}${u}<small>${ch!=null?(ch>=0?"▲ ":"▼ ")+Math.abs(ch).toFixed(2)+" vs prior":""}${ch1!=null?" · "+(ch1>=0?"+":"")+ch1.toFixed(2)+" in 1 yr":""}</small></div>
+    <div class="fx-note" style="margin:0">As of <b>${dfmt(l[0],s.freq)}</b></div>${mcChart(s,rec)}<p>${MC_INFO[s.id]||""}</p><div class="mc-src">${esc(s.src)} · series ${esc(s.id)}</div></div>`;
+  }).join("");
+}
+async function mcOpen(){
+  if(MC.data&&Date.now()-MC.at<30*60e3) return mcRender();
+  try{ MC.data=await api("/api/pub/macro"); MC.at=Date.now(); mcRender(); }catch(e){ $("mcGrid").innerHTML=`<div class="fx-empty">Economic data is unavailable right now (${esc(e.message)}).</div>`; }
+}
+$("mcRange").onclick=e=>{const b=e.target.closest("[data-r]"); if(b&&MC.data){ MC.range=b.dataset.r; mcRender(); }};
 
 /* ---------- Autopilot: free rules-based paper trading (no Claude API) ---------- */
 const $m=n=>n==null||isNaN(n)?"—":(n<0?"−$":"$")+fmt(Math.abs(n));
