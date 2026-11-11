@@ -667,6 +667,22 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-hood>summary small{color:var(--muted);font-weight:400}
 .ap-hood[open]>summary{margin-bottom:14px}.ap-hood>.bt-card,.ap-hood>.ap-two{margin-bottom:14px}
 .ap-health{font-size:12px;color:var(--muted);margin:-4px 0 4px;line-height:1.5}
+.notepad{margin:0 0 14px;border-radius:12px;border:1px solid color-mix(in srgb,#f5d76e 35%,var(--line));background:
+  repeating-linear-gradient(to bottom,transparent 0,transparent 29px,color-mix(in srgb,#f5d76e 10%,transparent) 29px,color-mix(in srgb,#f5d76e 10%,transparent) 30px),
+  linear-gradient(90deg,transparent 0,transparent 42px,color-mix(in srgb,#ff6b6b 30%,transparent) 42px,color-mix(in srgb,#ff6b6b 30%,transparent) 43px,transparent 43px),color-mix(in srgb,#f5d76e 5%,var(--panel));padding:0 0 10px}
+.notepad>summary{cursor:pointer;list-style:none;padding:11px 14px 11px 56px;font-weight:600;font-size:14px}
+.notepad>summary::-webkit-details-marker{display:none}
+.notepad>summary small{color:var(--muted);font-weight:400;margin-left:6px}
+.np-wrap{overflow-x:auto;padding:0 12px 0 52px}
+.np-tbl{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;min-width:980px}
+.np-tbl th{text-align:left;font-weight:600;color:var(--muted);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding:6px 8px;font-family:var(--sans)}
+.np-tbl td{padding:0 8px;height:30px;white-space:nowrap}
+.np-tbl td small{display:block;font-size:10px;color:var(--dim);line-height:1;margin-top:-2px;max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.np-tbl .np-n{text-align:left!important;color:var(--muted);font-size:11.5px;white-space:normal;min-width:220px}
+.np-empty{padding:6px 14px 6px 56px;color:var(--muted);font-size:13px;line-height:30px}
+.np-tot{padding:4px 14px 0 56px;font-size:12.5px;line-height:26px;color:var(--muted)}
+.np-tot b{color:var(--text);font-weight:600;margin-right:4px}
+@media (max-width:600px){.np-wrap{padding-left:12px}.notepad>summary,.np-empty,.np-tot{padding-left:14px}.notepad{background:color-mix(in srgb,#f5d76e 5%,var(--panel))}}
 .bot-sw{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 14px}
 .bot-sw button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--text)}
 .bot-sw button span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
@@ -1610,6 +1626,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="ap-head"><div><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1>
         <p class="ap-lede">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> goes long and short within the day using limit orders, liquidity sweeps and news gaps, and is flat by the close. Every bust starts a new test run.</p></div></div>
       <div class="bot-sw" id="apSwitch"></div>
+      <div id="apNote"></div>
       <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
     </section>
 
@@ -3390,6 +3407,23 @@ function botHealth(d,kind){
   if(g.errors&&g.errors.length) bits.push(`<span class="down">last error ${tm(g.errors[0].t)}: ${esc(g.errors[0].e)}</span>`);
   return `<div class="ap-health">🩺 ${bits.join(" · ")}</div>`;
 }
+/* notepad: every stock both bots hold right now, with the money in it and how it's doing */
+function botNotepad(){
+  const sw=BOTS.d.swing, dy=BOTS.d.day, rows=[], tm=t=>t?new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric"})+" "+new Date(t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):"—";
+  const sgn=v=>(v>=0?"+":"−")+"$"+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0});
+  if(sw) for(const p of sw.positions) rows.push({bot:"🤖 Swing",sym:p.sym,name:p.name,side:"Long",sh:p.shares,inv:p.shares*p.cost,val:p.value,pnl:p.pnl,ret:p.pnlPct/100,day:p.dayPct,w:sw.value?p.value/sw.value:0,at:p.at,note:`${p.sleeve==="safe"?"safe pick":"high-risk pick"} · stop $${p.stop.toFixed(2)}`});
+  if(dy) for(const p of dy.positions) rows.push({bot:"⚡ Day",sym:p.sym,name:"",side:p.dir==="long"?"Long":"Short",sh:p.shares,inv:p.shares*p.entry,val:p.value,pnl:p.pnl,ret:p.pnl/(p.shares*p.entry),day:null,w:dy.value?p.value/dy.value:0,at:p.at,note:`${esc(p.setup)} · stop $${p.stop.toFixed(2)} · target $${p.target.toFixed(2)} · ${p.R>=0?"+":""}${p.R.toFixed(2)}R`});
+  const tot=k=>rows.filter(r=>r.bot.includes(k)), sum=(l,f)=>l.reduce((a,r)=>a+f(r),0);
+  const foot=(name,d,k)=>{ if(!d) return ""; const l=tot(k), inv=sum(l,r=>r.val), pnl=sum(l,r=>r.pnl);
+    return `<div class="np-tot"><b>${name}</b> ${l.length} position${l.length===1?"":"s"} · ${$m(inv)} invested · ${$m(Math.max(0,d.value-sum(l.filter(r=>r.side==="Long"),r=>r.val)))} cash · open P&amp;L <span class="${cls(pnl)}">${sgn(pnl)}</span> · account ${$m(d.value)} (<span class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</span>)</div>`; };
+  const pend=dy&&dy.orders.length?`<div class="np-tot">⏳ Day trader working orders: ${dy.orders.map(o=>`${o.dir==="long"?"buy":"short"} ${o.shares} ${esc(o.sym)} @ $${o.price.toFixed(2)}`).join(" · ")}</div>`:"";
+  $("apNote").innerHTML=`<details class="notepad" ${BOTS.noteClosed?"":"open"} ontoggle="BOTS.noteClosed=!this.open;try{localStorage.setItem('md_note',BOTS.noteClosed?'0':'1')}catch{}"><summary>📝 What the AIs own right now <small>${rows.length} position${rows.length===1?"":"s"} · updates every minute</small></summary>
+  ${rows.length?`<div class="np-wrap"><table class="np-tbl"><thead><tr><th>Bot</th><th>Stock</th><th>Side</th><th>Shares</th><th>Put in</th><th>Worth now</th><th>Return</th><th>P&amp;L</th><th>Today</th><th>% of acct</th><th>Since</th><th>Notes</th></tr></thead><tbody>
+  ${rows.sort((a,b)=>b.val-a.val).map(r=>`<tr><td>${r.bot}</td><td><b>${esc(r.sym)}</b>${r.name?`<small>${esc(r.name)}</small>`:""}</td><td class="${r.side==="Short"?"down":""}">${r.side}</td><td>${(+r.sh).toFixed(r.sh%1?2:0)}</td><td>${$m(r.inv)}</td><td>${$m(r.val)}</td><td class="${cls(r.ret)}">${pct(r.ret*100)}</td><td class="${cls(r.pnl)}">${sgn(r.pnl)}</td><td class="${r.day==null?"":cls(r.day)}">${r.day==null?"—":pct(r.day)}</td><td>${Math.round(r.w*100)}%</td><td>${tm(r.at)}</td><td class="np-n">${r.note}</td></tr>`).join("")}</tbody></table></div>`
+  :`<div class="np-empty">Nothing held right now${(dy&&dy.orders.length)?"":" — positions show up here the moment either bot buys or shorts"}.</div>`}
+  ${pend}${foot("🤖 Swing bot",sw,"Swing")}${foot("⚡ Day trader",dy,"Day")}</details>`;
+}
+try{ BOTS.noteClosed=localStorage.getItem("md_note")==="0"; }catch{}
 function botRet(d){ if(!d) return null; return d.value/d.startValue-1; }
 function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
@@ -3457,7 +3491,7 @@ async function apLoadView(){
   if(sw.status==="fulfilled"){ BOTS.d.swing=sw.value; if(await apBackup("swing",sw.value)) return apLoadView(); }
   if(dy.status==="fulfilled"){ BOTS.d.day=dy.value; if(await apBackup("day",dy.value)) return apLoadView(); }
   if(!BOTS.spx5&&[BOTS.d.swing,BOTS.d.day].some(x=>x&&!(x.trades||[]).some(t=>/^(BUY|SHORT)$/.test(t.side)))){ try{ BOTS.spx5=(await api("/api/history?symbol=%5EGSPC&range=5d&interval=15m")).candles; }catch{} }
-  botSwitch();
+  botSwitch(); botNotepad();
   const d=BOTS.d[BOTS.sel];
   if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
   if(BOTS.sel==="day") dtRender(d); else apRender(d);
