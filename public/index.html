@@ -135,6 +135,26 @@ main{min-width:0}
 .cr[data-layout="nums"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="nums"] .cr-docwrap{display:none}
 .cr[data-layout="nums"] .cr-side{max-height:none}
 .cr-main{min-width:0;display:flex;flex-direction:column;gap:8px}
+.cr-sum{position:absolute;inset:6px 22px 6px 6px;z-index:5;overflow:auto;background:rgba(7,9,12,.97);border:1px solid #f59e0b;border-radius:4px;box-shadow:0 0 0 1px rgba(245,158,11,.15),0 0 28px rgba(245,158,11,.12);animation:crSumIn .35s ease-out}
+.cr-sum[hidden]{display:none}
+@keyframes crSumIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.cr-sum-in{padding:18px 20px;display:flex;flex-direction:column;gap:12px;font-family:var(--cr-m)}
+.cr-sum-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.cr-sum-k{font-size:10.5px;letter-spacing:.14em;color:#f59e0b}
+.cr-sum-h h3{margin:4px 0 2px;font-size:18px;color:var(--text)}.cr-sum-h small{color:var(--muted);font-size:11.5px}
+.cr-sum-x{background:none;border:1px solid var(--cr-l);color:var(--muted);border-radius:4px;width:30px;height:30px;cursor:pointer;flex:none}.cr-sum-x:hover{color:var(--text);border-color:#f59e0b}
+.cr-sum-lead{margin:0;font-size:14px;line-height:1.6;color:var(--text)}
+.cr-sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cr-sum-grid>*{min-width:0}
+.cr-sum-box{border:1px solid var(--cr-l);border-radius:4px;padding:10px 12px;background:var(--cr-p)}
+.cr-sum-box h5{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.cr-sum-box h5 em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400}
+.cr-sum-box>div{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--cr-l)}.cr-sum-box>div:last-child{border-bottom:0}
+.cr-sum-box>div span{color:var(--muted)}.cr-sum-box>div b{font-weight:600;color:var(--text);text-align:right;white-space:nowrap}.cr-sum-box b .up,.cr-sum-box b .down{font-weight:500;font-size:11.5px;margin-left:4px}
+.cr-sum-box ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;line-height:1.5;color:var(--text)}
+.cr-sum-box li.up::marker{color:var(--up)}.cr-sum-box li.down::marker{color:var(--down)}
+.cr-sum-box blockquote{margin:0 0 6px;padding:6px 10px;border-left:2px solid #f43f5e;font-size:12.5px;line-height:1.5;color:var(--text);background:rgba(244,63,94,.06)}
+.cr-sum-act{display:flex;gap:8px;flex-wrap:wrap}
+.cr-sum-note{margin:0;font-size:11px;color:var(--dim)}
+@media (max-width:700px){.cr-sum{inset:4px 16px 4px 4px}.cr-sum-in{padding:12px}.cr-sum-grid{grid-template-columns:1fr}.cr-sum-h h3{font-size:15px}}
 .cr-docwrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 10px;gap:6px;background:var(--cr-bg);border:1px solid var(--cr-l);border-radius:4px;padding:6px}
 .cr-doc{position:relative;height:min(68vh,720px);overflow:auto;border-radius:3px;scrollbar-width:thin;overscroll-behavior:contain}
 .cr-page{position:relative;padding:22px 26px 60px;font:12.5px/1.55 var(--cr-m);color:#aeb6c4;background:linear-gradient(180deg,#0b0e13,#090b0f)}
@@ -1692,7 +1712,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
               <button type="button" class="cr-ib" id="crBack" title="Step back">⏮</button>
               <button type="button" class="cr-ib cr-play" id="crPlay" title="Play">▶</button>
               <button type="button" class="cr-ib" id="crFwd" title="Step forward">⏭</button>
-              <span class="cr-speed" id="crSpeed"><button type="button" data-s="1">1x</button><button type="button" data-s="2">2x</button><button type="button" data-s="4">4x</button><button type="button" data-s="8">8x</button><button type="button" data-s="16">16x</button><button type="button" data-s="40" class="on" title="As fast as it can go">MAX</button></span>
+              <span class="cr-speed" id="crSpeed"><button type="button" data-s="2" class="on" title="The crawler reads at 2× speed">2x</button></span>
               <span class="cr-live" id="crLive"><i></i>LIVE</span>
               <span class="cr-jumps" id="crJumps"><button type="button" data-j="crH-income">Income statement</button><button type="button" data-j="crH-balance">Balance sheet</button><button type="button" data-j="crH-cash">Cash flow</button><button type="button" data-j="crS-risk">Risk factors</button></span>
               <button type="button" class="cr-skip" id="crSkip">Skip to results ⇥</button>
@@ -5060,7 +5080,7 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
 /* ---------- 10-K Filing Crawler: a spider bot reads the latest 10-K and lasers each figure into the sidebar ---------- */
-const CR={d:null,q:[],i:0,playing:false,speed:40,timer:null,raf:0,busy:false,sym:"",
+const CR={d:null,q:[],i:0,playing:false,speed:2,timer:null,raf:0,busy:false,sym:"",
   spider:null,lasers:[],pulses:[],vals:{},read:new Set(),risks:[],guides:[],calcs:[],obs:[]};
 const CR_ST=[["income","Income statement"],["balance","Balance sheet"],["cash","Cash flow statement"]];
 const CR_ROWS={
@@ -5142,6 +5162,39 @@ function crSide(){
 function crRowsOut(){ const Y=CR.Y, done=new Set(CR.q.slice(0,CR.i).filter(m=>m.t==="metric").map(m=>m.k)), out=[];
   for(const [st,title] of CR_ST) for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null){ const v=Y[0][k], p=Y[1]&&Y[1][k]; out.push({st:title,k,l,fmt,v:fmt==="neg"?-v:v,p:p==null?null:(fmt==="neg"?-p:p),yoy:p?(v-p)/Math.abs(p):null,scanned:done.has(k)}); }
   return out; }
+/* ---------- the written summary shown when the crawl is done ---------- */
+function crSummary(show){
+  let el=$("crSum"); if(!show){ if(el) el.hidden=true; return; } if(!CR.d) return;
+  if(!el){ el=document.createElement("div"); el.id="crSum"; el.className="cr-sum"; document.querySelector("#crRoot .cr-docwrap").appendChild(el); }
+  const d=CR.d, f=d.filing||{}, Y=CR.Y, y0=Y[0], y1=Y[1]||{}, fy=y=>"FY"+String(y.end).slice(0,4);
+  const yoy=k=>y0[k]!=null&&y1[k]?(y0[k]-y1[k])/Math.abs(y1[k]):null, chg=k=>{const v=yoy(k); return v==null?"":` <span class="${v>=0?"up":"down"}">${crPct(v)}</span>`;};
+  const calc=Object.fromEntries(CR.q.filter(m=>m.t==="calc").map(m=>[m.id,m])), obs=CR.q.filter(m=>m.t==="obs"), gd=CR.q.filter(m=>m.t==="guide"), rk=CR.q.filter(m=>m.t==="risk");
+  const pc=id=>calc[id]?(calc[id].v*100).toFixed(1)+"%":"—", rv=yoy("revenue"), ni=yoy("netIncome");
+  // one-paragraph verdict built from the numbers
+  const tone=[rv!=null?`revenue ${rv>=0?"grew":"shrank"} ${Math.abs(rv*100).toFixed(1)}% to ${crBig(y0.revenue)}`:y0.revenue!=null?`revenue was ${crBig(y0.revenue)}`:null,
+    ni!=null?`net income ${ni>=0?"rose":"fell"} ${Math.abs(ni*100).toFixed(1)}% to ${crBig(y0.netIncome)}`:y0.netIncome!=null?`net income was ${crBig(y0.netIncome)}`:null,
+    calc.om?`it kept ${pc("om")} of every sales dollar as operating profit`:null,
+    y0.fcf!=null?`and generated ${crBig(y0.fcf)} of free cash flow`:null].filter(Boolean);
+  const lead=tone.length?`In ${fy(y0)}, ${d.name}'s ${tone.slice(0,-1).join(", ")}${tone.length>1?", ":""}${tone.at(-1)}.`:`${d.name}'s ${fy(y0)} figures are below.`;
+  const bal=calc.nc?(calc.nc.v>=0?`It holds more cash than debt (net cash ${crBig(calc.nc.v)}).`:`It carries more debt than cash (net debt ${crBig(-calc.nc.v)}).`):"";
+  const kv=(l,v)=>`<div><span>${l}</span><b>${v}</b></div>`;
+  el.innerHTML=`<div class="cr-sum-in"><div class="cr-sum-h"><div><div class="cr-sum-k">📋 FILING SUMMARY · read by the crawler</div><h3>${esc(d.name)} — ${esc(f.form||"10-K")} for ${fy(y0)}</h3><small>Fiscal year ended ${esc(f.period||y0.end)}${f.filed?` · filed ${esc(f.filed)}`:""} · ${CR.q.filter(m=>m.t==="metric").length} figures read</small></div><button type="button" class="cr-sum-x" id="crSumX" title="Close the summary">✕</button></div>
+    <p class="cr-sum-lead">${esc(lead)} ${esc(bal)}</p>
+    <div class="cr-sum-grid">
+      <div class="cr-sum-box"><h5>The numbers <em>${fy(y0)} · vs. prior year</em></h5>
+        ${y0.revenue!=null?kv("Revenue",crBig(y0.revenue)+chg("revenue")):""}${y0.operatingIncome!=null?kv("Operating income",crBig(y0.operatingIncome)+chg("operatingIncome")):""}${y0.netIncome!=null?kv("Net income",crBig(y0.netIncome)+chg("netIncome")):""}${y0.eps!=null?kv("Diluted EPS","$"+y0.eps.toFixed(2)+chg("eps")):""}${y0.cfo!=null?kv("Operating cash flow",crBig(y0.cfo)+chg("cfo")):""}${y0.totalAssets!=null?kv("Total assets",crBig(y0.totalAssets)+chg("totalAssets")):""}</div>
+      <div class="cr-sum-box"><h5>Profitability &amp; cash <em>calculated</em></h5>
+        ${kv("Operating margin",pc("om"))}${kv("Net margin",pc("nm"))}${calc.fcf?kv("Free cash flow",crBig(calc.fcf.v)):""}${kv("FCF margin",pc("fcfm"))}${calc.nc?kv(calc.nc.v>=0?"Net cash":"Net debt",crBig(Math.abs(calc.nc.v))):""}${kv("Return on equity",pc("roe"))}</div>
+    </div>
+    ${obs.length?`<div class="cr-sum-box"><h5>What stands out</h5><ul>${obs.map(m=>`<li class="${m.tone>0?"up":"down"}">${esc(m.text)}</li>`).join("")}</ul></div>`:""}
+    ${gd.length?`<div class="cr-sum-box"><h5>What management says <em>quoted from the filing</em></h5>${gd.slice(0,3).map(m=>`<blockquote>“${esc(m.text)}”</blockquote>`).join("")}</div>`:""}
+    ${rk.length?`<div class="cr-sum-box"><h5>Top risks it lists <em>${rk.length} risk headlines read</em></h5><ul>${rk.slice(0,3).map(m=>`<li>${esc(m.text)}</li>`).join("")}</ul></div>`:""}
+    <div class="cr-sum-act"><button type="button" class="btn" id="crSumCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crSumCsv">⇩ Export CSV</button><button type="button" class="btn ghost" id="crSumReplay">⟲ Watch again</button>${f.url?`<a class="btn ghost" href="${esc(f.url)}" target="_blank" rel="noopener">Original filing ↗</a>`:""}</div>
+    <p class="cr-sum-note">Figures are the company's own XBRL numbers from its SEC filings; ratios and observations are calculated from them. Not investment advice.</p></div>`;
+  if($("crRoot").dataset.layout==="nums"){ $("crRoot").dataset.layout="both"; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l==="both")); } // the summary lives in the document pane
+  el.hidden=false; el.scrollTop=0;
+  $("crSumX").onclick=()=>{ el.hidden=true; }; $("crSumCopy").onclick=crCopy; $("crSumCsv").onclick=crCsv; $("crSumReplay").onclick=()=>{ crSeek(0); crPlay(); };
+}
 async function crCopy(){
   if(!CR.d) return; const d=CR.d, f=d.filing||{}, rows=crRowsOut(), Y=CR.Y, fy=y=>"FY"+String(y.end).slice(0,4), F=x=>x.fmt==="neg"?null:x.fmt;
   let t=`## ${d.name} (${d.symbol}) — ${f.form||"10-K"}, fiscal year ended ${f.period||Y[0].end}\n\n`;
@@ -5197,9 +5250,9 @@ const crMs=(ms,min)=>Math.max(min,ms/CR.speed); // speed-scaled time with a floo
 function crPlay(){ if(!CR.d) return; if(CR.i>=CR.q.length) crSeek(0); CR.playing=true; crDockSync(); crNext(); crLoop(); }
 function crPause(){ CR.playing=false; clearTimeout(CR.timer); crDockSync(); }
 function crStop(){ CR.playing=false; clearTimeout(CR.timer); CR.lasers=[]; CR.pulses=[]; }
-function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },crMs(CR_DUR[m.t]||1000,45)); }
+function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); crSummary(true); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },crMs(CR_DUR[m.t]||1000,45)); }
 function crStep(dir){ crPause(); if(dir<0) crSeek(Math.max(0,CR.i-1)); else if(CR.i<CR.q.length){ const m=CR.q[CR.i]; crRun(m,true); CR.i++; setTimeout(crSideSync,crMs((CR_DUR[m.t]||1000)*0.6,30)); } crLoop(); }
-function crSeek(i){ CR.i=Math.max(0,Math.min(CR.q.length,i)); CR.lasers=[]; CR.pulses=[];
+function crSeek(i){ CR.i=Math.max(0,Math.min(CR.q.length,i)); CR.lasers=[]; CR.pulses=[]; if(CR.i<CR.q.length) crSummary(false);
   document.querySelectorAll("#crPage .cr-hit").forEach(e=>e.classList.remove("cr-hit")); document.querySelectorAll(".crs-row.on").forEach(r=>r.classList.remove("on"));
   crSideSync(); const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); }
 function crJump(el){ const i=CR.q.findIndex(m=>m.el===el); if(i<0) return; const was=CR.playing; crPause(); crSeek(i); if(was) crPlay(); }
@@ -5273,7 +5326,7 @@ $("crBack").onclick=()=>crStep(-1); $("crFwd").onclick=()=>crStep(1);
 $("crReplay").onclick=()=>{ if(!CR.d) return; crSeek(0); crPlay(); };
 $("crSpeed").onclick=e=>{const b=e.target.closest("[data-s]"); if(!b) return; CR.speed=+b.dataset.s; crDockSync(); if(CR.playing){ clearTimeout(CR.timer); crNext(); }};
 $("crJumps").onclick=e=>{const b=e.target.closest("[data-j]"); if(b&&CR.d) crJump(b.dataset.j);};
-$("crSkip").onclick=()=>{ if(!CR.d) return; crPause(); crSeek(CR.q.length); };
+$("crSkip").onclick=()=>{ if(!CR.d) return; crPause(); crSeek(CR.q.length); crSummary(true); };
 $("crScrub").oninput=e=>{ if(!CR.d) return; crPause(); crSeek(+e.target.value); };
 $("crRail").onclick=e=>{const b=e.target.closest("[data-i]"); if(b&&CR.d){ const was=CR.playing; crPause(); crSeek(+b.dataset.i); if(was) crPlay(); }};
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.tab==="filings") crLoop(); });
