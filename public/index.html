@@ -2729,8 +2729,8 @@ function dcfRenderOut(){
   const sens=FIN.sensitivity(a,ws,gs);
   $("dcfRes").innerHTML=`
   <div class="dcf-hero"><div><span>Intrinsic value / share</span><b>${r.perShare!=null?"$"+r.perShare.toFixed(2):"—"}</b><small>${DCF.scn} case</small></div>
-  <div><span>Current price</span><b>${a.price?"$"+a.price.toFixed(2):"—"}</b><small>live quote</small></div>
-  <div><span>Implied ${r.upside>=0?"upside":"downside"}</span><b class="${cls(r.upside)}">${r.upside!=null?pct(r.upside*100):"—"}</b><small>vs. today's price</small></div></div>
+  <div><span>Current price</span><b>${a.price?"$"+a.price.toFixed(2):"—"}</b></div>
+  <div><span>Implied ${r.upside>=0?"upside":"downside"}</span><b class="${cls(r.upside)}">${r.upside!=null?pct(r.upside*100):"—"}</b></div></div>
   <div class="fx-card"><h3>Five-year forecast <em>unlevered free cash flow (UFCF)</em></h3><div class="fx-wrap"><table class="fx-tbl"><thead><tr><th></th>${r.rows.map(x=>`<th>Year ${x.t}</th>`).join("")}</tr></thead><tbody>
   ${[["revenue","Revenue"],["growth","Growth",1],["ebit","EBIT (operating income)"],["nopat","NOPAT = EBIT × (1 − tax)"],["da","+ D&A"],["capex","− CapEx"],["dNwc","− Change in working capital"],["ufcf","= Unlevered free cash flow"],["discountFactor","Discount factor",2],["pv","Present value"]].map(([k,l,f])=>`<tr><td>${l}</td>${r.rows.map(x=>`<td>${f===1?fxP(x[k]):f===2?x[k].toFixed(3):$m2(x[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
   <div class="fx-card"><h3>From cash flows to value per share</h3><div class="fx-wrap"><table class="fx-tbl" style="min-width:0"><tbody>
@@ -3005,9 +3005,9 @@ function mcRender(){
   if(yc) sig.push([yc[1]<0?"warn":"ok","Yield curve (10y − 2y)",yc[1]<0?"Inverted":"Normal (positive)",`${yc[1].toFixed(2)} pts on ${dfmt(yc[0],"Daily")}`]);
   if(y3) sig.push([y3[1]<0?"warn":"ok","Yield curve (10y − 3m)",y3[1]<0?"Inverted":"Normal (positive)",`${y3[1].toFixed(2)} pts on ${dfmt(y3[0],"Daily")}`]);
   if(sahm) sig.push([sahm[1]>=0.5?"warn":"ok","Sahm rule",sahm[1]>=0.5?"Triggered (0.5+)":"Not triggered",`${sahm[1].toFixed(2)} in ${dfmt(sahm[0],"Monthly")}`]);
-  if(gdp&&gdp.length>1){ const neg=gdp.at(-1)[1]<0&&gdp.at(-2)[1]<0; sig.push([neg?"warn":"ok","GDP: two negative quarters?",neg?"Yes":"No",`latest ${gdp.at(-1)[1].toFixed(1)}% (${dfmt(gdp.at(-1)[0],"Quarterly")})`]); }
-  if(r) sig.push([r[1]===1?"warn":"ok","Official NBER recession",r[1]===1?"In recession":"Not in recession",`as of ${dfmt(r[0],"Monthly")} · NBER dates recessions months later`]);
-  $("mcSignals").innerHTML=sig.length?`<div class="mc-sig">${sig.map(([c,a,b,s])=>`<div class="${c}"><span>${a}</span><b>${b}</b><small>${esc(s)}</small></div>`).join("")}</div><p class="fx-note" style="margin:-6px 0 14px">Recession signals have false alarms and long lags; none of them predicts timing reliably.</p>`:"";
+  if(gdp&&gdp.length>1&&gdp.at(-1)[1]<0&&gdp.at(-2)[1]<0){ const neg=true; sig.push([neg?"warn":"ok","GDP: two negative quarters?",neg?"Yes":"No",`latest ${gdp.at(-1)[1].toFixed(1)}% (${dfmt(gdp.at(-1)[0],"Quarterly")})`]); }
+  if(r&&r[1]===1) sig.push([r[1]===1?"warn":"ok","Official NBER recession",r[1]===1?"In recession":"Not in recession",`as of ${dfmt(r[0],"Monthly")} · NBER dates recessions months later`]);
+  $("mcSignals").innerHTML=sig.length?`<div class="mc-sig">${sig.map(([c,a,b,s])=>`<div class="${c}"><span>${a}</span><b>${b}</b><small>${esc(s)}</small></div>`).join("")}</div>`:"";
   $("mcGrid").innerHTML=j.series.filter(s=>!s.hidden).map(s=>{
     if(!s.data) return `<div class="mc-card"><div class="mc-top"><span>${esc(s.name)}</span><span class="fx-badge">${s.freq}</span></div><p>Couldn't load this series right now (${esc(s.error||"unavailable")}).</p></div>`;
     const l=s.data.at(-1), prev=s.data.length>1?s.data.at(-2):null, ago=s.data.find(([t])=>Date.parse(t)>=Date.parse(l[0])-365.25*864e5);
@@ -3089,7 +3089,7 @@ function apAnalytics(d){
   const k=(l,v,sub,c="")=>`<div class="ap-k"><span>${l}</span><b class="${c}">${v}</b><small>${sub}</small></div>`;
   const n=a.closed, few=n<20?` <span class="ap-tag">${n} closed trades — too few to judge</span>`:"";
   return `<div class="bt-card"><h4>Performance analytics <em>run #${d.run} · hypothetical paper trading${few}</em></h4><div class="ap-top">
-  ${k("Starting capital",$m(d.startValue),"paper money")}
+
   ${k("Current value",$m(d.value),`total return ${pct(a.totalReturn*100)}`,cls(a.totalReturn))}
   ${k("vs. S&amp;P 500",a.excessReturn!=null?pct(a.excessReturn*100):"—",`S&amp;P ${a.benchmarkReturn!=null?pct(a.benchmarkReturn*100):"—"} since the first trade (price only, both sides)`,cls(a.excessReturn))}
   ${k("Win rate",a.winRate!=null?Math.round(a.winRate*100)+"%":"—",`${n} closed trade${n===1?"":"s"}`)}
@@ -3100,7 +3100,7 @@ function apAnalytics(d){
   ${k("Sharpe ratio",a.sharpe!=null?a.sharpe.toFixed(2):"—",a.sharpe!=null?`annualized, from ${a.tradingDays} daily values`:`needs 20+ trading days (has ${a.tradingDays})`)}
   ${k("Turnover",a.turnover!=null?a.turnover.toFixed(1)+"×":"—",`${$m(a.traded)} traded vs. the average account value`)}
   ${k("Simulated costs",$m(a.costs),"0.05% slippage on every trade")}
-  ${k("Trades",a.trades,"buys + sells this run")}
+
   </div></div>`;
 }
 function apRender(d){
