@@ -115,6 +115,94 @@ main{min-width:0}
 .wl .ch{font-size:11px;text-align:right}
 .wl .x{position:absolute;right:4px;top:4px;opacity:0;background:none;border:0;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 5px}
 .wl li:hover .x{opacity:1}
+.wl .x10k{position:absolute;right:26px;top:5px;opacity:0;background:var(--panel2);border:1px solid var(--line2);color:var(--amber);cursor:pointer;font:600 9.5px/1 "IBM Plex Mono",ui-monospace,monospace;padding:3px 4px;border-radius:3px}
+.wl li:hover .x10k,.wl li:focus-within .x10k{opacity:1}
+@media (hover:none){.wl .x10k{opacity:.85}}
+.np-tags .tg10k{color:var(--amber);border-color:rgba(255,158,27,.35);cursor:pointer}
+/* ---------- 10-K crawler: terminal look ---------- */
+.crx{--cr-m:"IBM Plex Mono",ui-monospace,Menlo,monospace;--cr-cyan:#38bdf8;--cr-mag:#f43f5e;--cr-amb:#ffb000;--cr-bg:#07090c;--cr-p:#0d1015;--cr-l:#1d232c}
+.crx .fx-sub{max-width:760px}
+.cr-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.cr-bar .field{width:150px;font-family:var(--cr-m);text-transform:uppercase}
+.cr-chips,.cr-lay,.cr-speed,.cr-jumps{display:inline-flex;gap:0;border:1px solid var(--cr-l);border-radius:4px;overflow:hidden;background:var(--cr-p)}
+.cr-chips button,.cr-lay button,.cr-speed button,.cr-jumps button,.crs-jump button{font:500 11.5px/1 var(--cr-m);color:var(--muted);background:none;border:0;border-right:1px solid var(--cr-l);padding:7px 9px;cursor:pointer;white-space:nowrap}
+.cr-chips button:last-child,.cr-lay button:last-child,.cr-speed button:last-child,.cr-jumps button:last-child{border-right:0}
+.cr-chips button:hover,.cr-lay button:hover,.cr-speed button:hover,.cr-jumps button:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.cr-lay button.on,.cr-speed button.on{color:#0b0d10;background:var(--cr-amb)}
+.cr-src{font:11.5px var(--cr-m);margin-left:auto}.cr-src a{color:var(--cr-cyan)}
+.cr{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:10px;margin-top:10px;align-items:start}
+.cr[data-layout="doc"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="doc"] .cr-side{display:none}
+.cr[data-layout="nums"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="nums"] .cr-docwrap{display:none}
+.cr[data-layout="nums"] .cr-side{max-height:none}
+.cr-main{min-width:0;display:flex;flex-direction:column;gap:8px}
+.cr-docwrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 10px;gap:6px;background:var(--cr-bg);border:1px solid var(--cr-l);border-radius:4px;padding:6px}
+.cr-doc{position:relative;height:min(68vh,720px);overflow:auto;border-radius:3px;scrollbar-width:thin;overscroll-behavior:contain}
+.cr-page{position:relative;padding:22px 26px 60px;font:12.5px/1.55 var(--cr-m);color:#aeb6c4;background:linear-gradient(180deg,#0b0e13,#090b0f)}
+.cr-ov{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+.cr-legs polyline{stroke:#eef2ff;stroke-width:2.1;filter:drop-shadow(0 0 3px rgba(244,63,94,.85)) drop-shadow(0 0 7px rgba(56,189,248,.35))}
+.cr-abd{fill:#121620;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 6px rgba(244,63,94,.8))}
+.cr-head{fill:#0d1118;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 5px rgba(56,189,248,.8))}
+.cr-loading{padding:40px 10px;text-align:center;color:var(--muted);font-family:var(--cr-m)}
+.cr-cover{text-align:center;border:1px solid var(--cr-l);padding:18px;margin-bottom:12px;line-height:1.6}
+.cr-cover>div:first-child{color:#e6eaf2;font-weight:600;letter-spacing:.04em}.cr-cover b{display:block;color:#fff;font-size:17px;margin:8px 0;letter-spacing:.1em}
+.cr-chk{font-size:11px;margin:6px 0}.cr-co{color:#fff;font-size:16px;font-weight:600;margin-top:8px}.cr-cover small{color:var(--dim);display:block}
+.cr-note{font-size:11px;color:var(--dim);border-left:2px solid var(--cr-amb);padding:4px 10px;margin:0 0 14px}.cr-note a{color:var(--cr-cyan)}
+.cr-part{margin:22px 0 4px;text-align:center;color:#e6eaf2;letter-spacing:.2em;font-size:12px}
+.cr-h3{font:600 13px var(--cr-m);color:#f1f4fa;margin:18px 0 8px;padding:3px 6px;border-radius:2px;display:inline-block;transition:background .3s,box-shadow .3s}
+.cr-page p{margin:0 0 9px}.cr-dim{color:var(--dim)}.cr-end{text-align:center;margin-top:22px}
+.cr-risk{margin:12px 0 4px!important;padding:3px 6px;border-radius:2px}.cr-risk b{color:#e6eaf2;font-weight:600}
+.cr-lines{display:grid;gap:5px;margin:0 6px 10px}.cr-lines i{display:block;height:5px;border-radius:2px;background:#1a202a}
+.cr-guide{padding:4px 7px;border-left:2px solid rgba(244,63,94,.4);border-radius:2px}
+.cr-unit{font-size:10.5px;color:var(--dim);margin:0 0 4px!important}
+.cr-tbl{width:100%;border-collapse:collapse;font:12px var(--cr-m);margin-bottom:8px}
+.cr-tbl th{font-weight:600;color:#cfd6e2;text-align:right;padding:4px 8px;border-bottom:1px solid #2a313c}.cr-tbl th small{display:block;font-weight:400;color:var(--dim);font-size:10px}
+.cr-tbl td{padding:4px 8px;border-bottom:1px dotted #1c222b;text-align:right;white-space:nowrap;color:#c3cad6}.cr-tbl td:first-child{text-align:left;white-space:normal;color:#aeb6c4}
+.cr-tbl td em{font-style:normal;font-size:9.5px;color:var(--cr-amb);border:1px solid rgba(255,176,0,.35);border-radius:2px;padding:0 3px;margin-left:4px}
+.cr-tbl td[data-metric]{border-radius:2px;transition:box-shadow .25s,background .25s,color .25s}
+.cr-hit{box-shadow:0 0 0 1.5px var(--cr-mag),0 0 14px rgba(244,63,94,.45)!important;background:rgba(244,63,94,.12)!important;color:#fff!important}
+.cr-done.cr-tbl td,.cr-tbl td.cr-done{color:#fff}.cr-h3.cr-done{background:rgba(56,189,248,.12);box-shadow:inset 2px 0 0 var(--cr-cyan)}
+.cr-risk.cr-done,.cr-guide.cr-done{background:rgba(244,63,94,.08)}
+.cr-pop{position:absolute;transform:translate(-50%,-100%);font:600 13px var(--cr-m);background:rgba(7,9,12,.92);border:1.5px solid;border-radius:3px;padding:2px 7px;pointer-events:none;z-index:3;animation:crPop 1.4s ease-out forwards;white-space:nowrap}
+@keyframes crPop{0%{opacity:0;transform:translate(-50%,-60%) scale(.7)}15%{opacity:1;transform:translate(-50%,-100%) scale(1.08)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-150%)}}
+.cr-fly{position:fixed;z-index:60;font:600 12px var(--cr-m);background:rgba(7,9,12,.92);border:1.5px solid;border-radius:3px;padding:2px 7px;pointer-events:none;transition:transform .6s cubic-bezier(.3,.7,.2,1),opacity .6s;white-space:nowrap}
+.cr-rail{position:relative;background:#11151b;border-radius:3px;cursor:pointer}
+.cr-fill{position:absolute;left:0;right:0;top:0;background:linear-gradient(180deg,var(--cr-cyan),var(--cr-mag));border-radius:3px;opacity:.7;transition:height .3s}
+.cr-rail button{position:absolute;left:-3px;width:16px;height:4px;border:0;border-radius:2px;background:var(--cr-amb);cursor:pointer;padding:0;transform:translateY(-50%)}
+.cr-dock{background:var(--cr-p);border:1px solid var(--cr-l);border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:8px;box-shadow:0 0 0 1px rgba(56,189,248,.06),0 -6px 18px rgba(0,0,0,.25)}
+.cr-dk-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cr-ib{width:34px;height:30px;border:1px solid var(--cr-l);background:#0a0d12;color:var(--text);border-radius:3px;cursor:pointer;font-size:13px}
+.cr-ib:hover{border-color:var(--cr-cyan)}.cr-play{background:var(--cr-amb);color:#0b0d10;border-color:var(--cr-amb);font-weight:700}
+.cr-live{font:600 10.5px var(--cr-m);color:var(--dim);display:inline-flex;align-items:center;gap:5px;letter-spacing:.08em}
+.cr-live i{width:7px;height:7px;border-radius:50%;background:var(--dim)}.cr-live.on{color:#22c55e}.cr-live.on i{background:#22c55e;animation:lvPulse 1.6s infinite}
+.cr-jumps button{color:var(--cr-cyan)}
+.cr-skip{margin-left:auto;font:600 11.5px var(--cr-m);background:rgba(33,195,122,.12);color:#3ee09b;border:1px solid rgba(33,195,122,.4);border-radius:3px;padding:7px 10px;cursor:pointer}
+#crScrub{flex:1;min-width:140px;accent-color:var(--cr-amb)}
+.cr-status{font:11.5px var(--cr-m);color:var(--muted);max-width:52%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-side{background:var(--cr-p);border:1px solid var(--cr-l);border-radius:4px;max-height:calc(min(68vh,720px) + 120px);overflow:auto;font-family:var(--cr-m);scrollbar-width:thin}
+.crs-h{padding:10px 12px;border-bottom:1px solid var(--cr-l);position:sticky;top:0;background:var(--cr-p);z-index:1}
+.crs-h b{display:block;color:#fff;font-size:13px}.crs-h small{color:var(--dim);font-size:11px}
+.crs-count{font-size:11px;color:var(--muted);margin-top:4px}.crs-count b{display:inline;color:var(--cr-amb)}
+.crs-act{display:flex;gap:6px;margin-top:8px}.crs-act .btn{font:500 11px var(--cr-m);padding:5px 8px;border-radius:3px}
+.crs-jump{display:flex;flex-wrap:wrap;margin-top:6px;border:1px solid var(--cr-l);border-radius:3px;overflow:hidden}.crs-jump button{color:var(--cr-cyan);padding:5px 7px;font-size:10.5px}
+.crs-sec{padding:8px 12px;border-bottom:1px solid var(--cr-l)}
+.crs-sec h5{margin:0 0 6px;font:600 10.5px var(--cr-m);letter-spacing:.1em;text-transform:uppercase;color:#cfd6e2;display:flex;justify-content:space-between;gap:8px}
+.crs-sec h5 em{font-style:normal;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px}
+.crs-go{cursor:pointer}.crs-go:hover{color:var(--cr-cyan)}
+.crs-row{display:grid;grid-template-columns:minmax(0,1fr) auto 54px;gap:8px;align-items:baseline;padding:3px 4px;border-radius:2px;font-size:11.5px;color:var(--dim);transition:background .4s}
+.crs-row span{min-width:0}.crs-row span small{display:block;color:var(--dim);font-size:9.5px}
+.crs-row b{font-weight:600;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+.crs-row i{font-style:normal;text-align:right;font-size:10.5px}.crs-row i.up{color:var(--up)}.crs-row i.down{color:var(--down)}
+.crs-row.on{color:#c3cad6}.crs-row.on b{color:#fff}
+.crs-row.flash,#crsCalc.flash{animation:crsFlash 1s ease-out}
+@keyframes crsFlash{0%{background:rgba(244,63,94,.35);box-shadow:0 0 12px rgba(244,63,94,.5)}100%{background:transparent}}
+.crs-chip{display:inline-block;font-size:10.5px;color:#9be7ff;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:3px;padding:2px 6px;margin:0 4px 4px 0}
+.crs-q{font-size:11px;line-height:1.45;color:#c3cad6;border-left:2px solid var(--cr-mag);padding:3px 8px;margin-bottom:6px;background:rgba(244,63,94,.05)}
+.crs-q.up{border-color:var(--up);background:rgba(33,195,122,.06)}.crs-q.down{border-color:var(--down)}.crs-q.risk{border-color:var(--cr-amb);background:rgba(255,176,0,.05)}
+.crs-empty{font-size:11px;color:var(--dim)}
+@media (max-width:1000px){.cr{grid-template-columns:minmax(0,1fr)}.cr-side{max-height:none}.cr-status{max-width:100%}}
+@media (max-width:640px){.cr-page{padding:14px 12px 50px;font-size:11.5px}.cr-doc{height:58vh}.cr-tbl{font-size:10.5px}.cr-tbl td,.cr-tbl th{padding:3px 4px}.cr-src{margin-left:0;width:100%}.cr-jumps{order:9;width:100%;overflow-x:auto}.cr-skip{margin-left:0}.cr-bar .field{width:120px}.cr-chips{max-width:100%;overflow-x:auto}}
+@media (prefers-reduced-motion:reduce){.cr-pop{animation:none;opacity:0}.crs-row.flash{animation:none}}
+
 .wl .cnt{font-size:10px;color:var(--amber);font-family:var(--mono)}
 svg.spark{display:block}
 .flash-up{animation:fu 1s}.flash-down{animation:fd 1s}
@@ -1588,6 +1676,33 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <form class="fx-bar" id="dcfForm"><input class="field" id="dcfSym" placeholder="Ticker, e.g. MSFT" maxlength="10" autocomplete="off"><button class="btn">Build model</button></form>
       <div id="dcfOut"><div class="fx-empty">Enter a ticker to build a model from its latest 10-K.</div></div>
     </section>
+    <section id="tab-filings" class="pad fx crx" hidden>
+      <div class="fx-head"><div><div class="fx-kick">🕷 10-K CRAWLER</div><h1>Filing crawler</h1>
+        <p class="fx-sub">A bot reads a company's latest annual report (10-K) and lasers every key figure into the panel on the right. Real numbers from the company's SEC filings, real text quoted from the filing.</p></div></div>
+      <form class="fx-bar cr-bar" id="crForm"><input class="field" id="crSym" placeholder="Ticker, e.g. AAPL" maxlength="10" autocomplete="off"><button class="btn">Crawl filing</button>
+        <span class="cr-chips" id="crChips"><button type="button" data-sym="AAPL">AAPL</button><button type="button" data-sym="NVDA">NVDA</button><button type="button" data-sym="MSFT">MSFT</button><button type="button" data-sym="TSLA">TSLA</button><button type="button" data-sym="AMZN">AMZN</button><button type="button" data-sym="JPM">JPM</button></span>
+        <span class="cr-lay" id="crLayout"><button type="button" data-l="doc" title="Document only">Document</button><button type="button" data-l="both" class="on" title="Document and numbers">Both</button><button type="button" data-l="nums" title="Numbers only">Numbers</button></span>
+        <span class="cr-src" id="crSrc"></span></form>
+      <div class="cr" id="crRoot" data-layout="both">
+        <div class="cr-main">
+          <div class="cr-docwrap"><div class="cr-doc" id="crDoc"><div class="cr-page" id="crPage"><div class="cr-loading">Enter a ticker to start.</div></div><svg class="cr-ov" id="crOv" aria-hidden="true"></svg></div><div class="cr-rail" id="crRail"></div></div>
+          <div class="cr-dock" id="crDock">
+            <div class="cr-dk-row">
+              <button type="button" class="cr-ib" id="crReplay" title="Replay from the start">⟲</button>
+              <button type="button" class="cr-ib" id="crBack" title="Step back">⏮</button>
+              <button type="button" class="cr-ib cr-play" id="crPlay" title="Play">▶</button>
+              <button type="button" class="cr-ib" id="crFwd" title="Step forward">⏭</button>
+              <span class="cr-speed" id="crSpeed"><button type="button" data-s="0.5">0.5x</button><button type="button" data-s="1" class="on">1x</button><button type="button" data-s="2">2x</button><button type="button" data-s="4">4x</button></span>
+              <span class="cr-live" id="crLive"><i></i>LIVE</span>
+              <span class="cr-jumps" id="crJumps"><button type="button" data-j="crH-income">Income statement</button><button type="button" data-j="crH-balance">Balance sheet</button><button type="button" data-j="crH-cash">Cash flow</button><button type="button" data-j="crS-risk">Risk factors</button></span>
+              <button type="button" class="cr-skip" id="crSkip">Skip to results ⇥</button>
+            </div>
+            <div class="cr-dk-row"><input type="range" id="crScrub" min="0" max="1" value="0" aria-label="Crawl progress"><span class="cr-status" id="crStatus">Enter a ticker to start</span></div>
+          </div>
+        </div>
+        <aside class="cr-side" id="crSide"></aside>
+      </div>
+    </section>
     <section id="tab-portfolio" class="pad pfx" hidden>
       <div class="pf-bar">
         <div class="dd" id="pfDD"><button class="dd-btn pf-btn" type="button" data-dd="pfDD" title="Right-click to rename or delete"><span id="pfName"></span> <span class="car">▾</span></button><div class="dd-menu" id="pfMenu"></div></div>
@@ -1913,11 +2028,11 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","macro","research","fin","dcf","portfolio","backtest","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
+const TABS = ["news","data","macro","research","fin","dcf","filings","portfolio","backtest","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
-  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
+  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["filings","10-K crawler"]]],
   ["portfolio",[["portfolio","My portfolio"],["backtest","Backtest"],["risk","Risk & stress"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
 ];
@@ -2044,6 +2159,7 @@ function setTab(t){
   if(t==="analysis"){ anOpen(); }
   if(t==="aitrade"){ apLoadView(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
+  if(t==="filings"){ crOpen(); }
   if(t==="backtest"){ btInit(); if(!BT.ran){ BT.ran=true; btRun(); } }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
@@ -2052,7 +2168,7 @@ function setTab(t){
   if(t==="predict"){ renderPredict(); refreshUsage(); }
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1); const m=h.match(/^filings\/([A-Za-z0-9.\-]{1,10})$/); if(m){ if(!CR.d||CR.d.symbol.replace(".","-")!==m[1].toUpperCase()) crOpenSym(m[1]); return; } if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
@@ -2135,7 +2251,7 @@ function renderWL(prev={}){
       <div><div class="sym">${esc(s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.error?"No quote":q.name||"…")}</div></div>
       ${spark(q.spark,64,22,q.prevClose)}
       <div><div class="px">${fmt(q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
-      <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
+      <button class="x10k" data-10k="${esc(s)}" title="Read ${esc(s)}'s 10-K with the crawler">10-K</button><button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
   }).join("");
 }
 function renderMovers(){
@@ -2359,7 +2475,7 @@ function renderFeed(){
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
   const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._bs===2?`<b class="np-swan" title="Black swan: a rare, unexpected event with outsized market impact">⚠ Black swan</b>`:i._bs===1?`<b class="np-shock" title="Shock watch: unusual, potentially market-moving event">⚠ Shock watch</b>`:""}${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
-    return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
+    return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}${/^[A-Z][A-Z.\-]{0,5}$/.test(shown[0])?`<span class="tg tg10k" data-10k="${esc(shown[0])}" title="Read ${esc(shown[0])}'s latest 10-K with the crawler">📄 10-K</span>`:""}</div>`:""; };
   const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
   // pick the lead: the most-covered, most substantial recent story
   const top=list.slice(0,12), score=i=>(S.newsSort||"top")==="top"?i._heat*10+(usefulSummary(i)?.3:0):i.also.length*3+(usefulSummary(i)?2:0)+(i.tickers.length?1:0)-(top.indexOf(i)*0.25);
@@ -3876,6 +3992,7 @@ function renderResearchHead(){
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
       <button class="btn ghost" data-rs-sub="compare">Compare</button>
       <button class="btn ghost" data-rs-alert="${esc(s)}">Set alert</button>
+      ${!type||type==="EQUITY"?`<button class="btn ghost" data-10k="${esc(s)}">📄 Read 10-K</button>`:""}
       <button class="btn claude" data-rs-pred="${esc(s)}">✦ Claude's prediction</button>
     </div></div>`;
 }
@@ -4163,7 +4280,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={analysis:"Analysis",news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
+const TAB_NAMES={filings:"10-K crawler",analysis:"Analysis",news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -4255,11 +4372,12 @@ function buildCmd(){
   if(valid&&!cmdResults.length) items.push([`Open ${v} research page`,"Research",()=>openQuote(v)]);
   if(valid&&exact){
     items.push([`Chart ${v}`,"Charts",()=>openChart(v)]);
+    items.push([`Read ${v}'s 10-K with the crawler`,"10-K crawler",()=>crOpenSym(v)]);
     items.push([`Claude's prediction for ${v}`,"Predictions",()=>{setTab("predict");runPredict(v);}]);
     if(!S.wl.includes(v)) items.push([`Add ${v} to watchlist`,"Watchlist",()=>{S.wl.push(v);store.set("wl",S.wl);renderWL();loadQuotes();loadNews();toast(v+" added to your watchlist");}]);
     items.push([`Set a price alert for ${v}`,"Portfolio",()=>{setTab("portfolio");$("aSym").value=v;$("aPx").focus();}]);
   }
-  [["News","news"],["Markets","data"],["Research","research"],["Portfolio","portfolio"],["Claude Predictor","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
+  [["News","news"],["Markets","data"],["Research","research"],["10-K crawler","filings"],["Portfolio","portfolio"],["Claude Predictor","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
   cmdItems=items; cmdSel=0; drawCmd();
 }
 function drawCmd(){ $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||'<div style="color:var(--muted)">Type a company name or ticker, like Apple or VFIAX</div>'; }
@@ -4941,8 +5059,234 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
+/* ---------- 10-K Filing Crawler: a spider bot reads the latest 10-K and lasers each figure into the sidebar ---------- */
+const CR={d:null,q:[],i:0,playing:false,speed:1,timer:null,raf:0,busy:false,sym:"",
+  spider:null,lasers:[],pulses:[],vals:{},read:new Set(),risks:[],guides:[],calcs:[],obs:[]};
+const CR_ST=[["income","Income statement"],["balance","Balance sheet"],["cash","Cash flow statement"]];
+const CR_ROWS={
+  income:[["revenue","Net sales / revenue"],["cogs","Cost of sales"],["grossProfit","Gross margin"],["operatingIncome","Operating income"],["pretaxIncome","Income before income taxes"],["incomeTax","Provision for income taxes"],["netIncome","Net income"],["eps","Diluted earnings per share","eps"],["dilutedShares","Diluted shares (millions)","sh"]],
+  balance:[["cash","Cash and cash equivalents"],["inventory","Inventories"],["currentAssets","Total current assets"],["totalAssets","Total assets"],["currentLiabilities","Total current liabilities"],["totalDebt","Total debt"],["equity","Shareholders’ equity"]],
+  cash:[["da","Depreciation and amortization"],["cfo","Cash generated by operating activities"],["capex","Payments for property, plant and equipment","neg"],["fcf","Free cash flow"],["cff","Cash used in financing activities"]]};
+const crMil=(v,k)=>{ if(v==null) return "—"; if(k==="eps") return (v<0?"(":"")+Math.abs(v).toFixed(2)+(v<0?")":""); const m=(k==="sh"?v/1e6:v/1e6), r=Math.round(Math.abs(m)).toLocaleString("en-US"); return v<0||k==="neg"?`(${r})`:r; };
+const crBig=(v,k)=>{ if(v==null) return "—"; if(k==="eps") return "$"+v.toFixed(2); if(k==="sh") return (v/1e6).toLocaleString("en-US",{maximumFractionDigits:0})+"M"; const a=Math.abs(v), s=v<0?"−":""; return s+"$"+(a>=1e12?(a/1e12).toFixed(2)+"T":a>=1e9?(a/1e9).toFixed(1)+"B":a>=1e6?(a/1e6).toFixed(1)+"M":a.toLocaleString("en-US")); };
+const crPct=x=>x==null||!isFinite(x)?"—":(x>=0?"+":"−")+Math.abs(x*100).toFixed(1)+"%";
+
+async function crLoad(sym){
+  sym=normSym(sym||$("crSym").value); if(!sym) return; $("crSym").value=sym; CR.sym=sym; crStop();
+  $("crPage").innerHTML=`<div class="cr-loading"><span class="spin"></span> Pulling ${esc(sym)}'s latest 10-K from SEC EDGAR… (first load of a company can take ~20 seconds)</div>`; $("crSide").innerHTML=""; $("crOv").innerHTML=""; crDockSync();
+  try{ const d=await api("/api/pub/filing?symbol="+encodeURIComponent(sym));
+    if(!d.available||!d.years||!d.years.length){ $("crPage").innerHTML=`<div class="cr-loading">${esc(d.reason||"No 10-K data for this ticker.")}</div>`; return; }
+    CR.d=d; crBuild(); crSeek(0); crPlay();
+    if(S.tab==="filings") try{history.replaceState(null,"","#filings/"+encodeURIComponent(d.symbol.replace(".","-")))}catch{}
+  }catch(e){ $("crPage").innerHTML=`<div class="cr-loading">Couldn't load the filing: ${esc(e.message||String(e))}. <button class="btn ghost" onclick="crLoad()">Retry</button></div>`; }
+}
+function crBuild(){
+  const d=CR.d, Y=d.years.slice(-3).reverse(), f=d.filing||{}, T=d.text||{}, fy=y=>"FY"+String(y.end).slice(0,4), endTxt=new Date((f.period||Y[0].end)+"T12:00:00Z").toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
+  CR.Y=Y; const q=[]; const sec=(id,label)=>q.push({t:"section",el:id,label});
+  const table=(st,title,cols)=>{ const rows=CR_ROWS[st].filter(([k])=>Y[0][k]!=null);
+    return `<h3 class="cr-h3" id="crH-${st}">${title}</h3><p class="cr-unit">(In millions, except per-share amounts)</p><table class="cr-tbl"><thead><tr><th></th>${cols.map(y=>`<th>${fy(y)}<small>${esc(y.end)}</small></th>`).join("")}</tr></thead><tbody>
+      ${rows.map(([k,l,fmt])=>`<tr><td>${esc(l)}${d.years[0]&&Y[0]._src&&Y[0]._src[k]&&/computed/.test(Y[0]._src[k])?' <em title="'+esc(Y[0]._src[k])+'">derived</em>':""}</td>${cols.map((y,ci)=>`<td id="cr-${k}-${ci}" data-metric="${k}" data-period="${esc(y.end)}">${crMil(y[k],fmt)}</td>`).join("")}</tr>`).join("")}</tbody></table>`; };
+  let h=`<div class="cr-cover" id="crS-cover"><div>UNITED STATES<br>SECURITIES AND EXCHANGE COMMISSION</div><small>Washington, D.C. 20549</small><b>FORM ${esc(f.form||"10-K")}</b>
+    <div class="cr-chk">☒ ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934<br>For the fiscal year ended ${esc(endTxt)}</div>
+    <div class="cr-co">${esc(d.name)}</div><small>CIK ${esc(String(d.cik))}${f.exchange?` · ${esc(f.exchange)}: ${esc(d.symbol)}`:""}${f.sic?` · ${esc(f.sic)}`:""}${f.filed?` · filed ${esc(f.filed)}`:""}</small></div>
+    <p class="cr-note">Reconstructed reading copy: the figures are the company's own XBRL-tagged numbers from its 10-K filings and the text is quoted from the filing itself.${f.url?` <a href="${esc(f.url)}" target="_blank" rel="noopener">Open the original on SEC.gov ↗</a>`:""}</p>`;
+  sec("crS-cover","Cover page");
+  h+=`<div class="cr-part">PART I</div><h3 class="cr-h3" id="crS-biz">Item 1. Business</h3>`+((T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
+  sec("crS-biz","Item 1. Business");
+  h+=`<h3 class="cr-h3" id="crS-risk">Item 1A. Risk Factors</h3>${T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:""}`+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`);
+  sec("crS-risk","Item 1A. Risk Factors"); (T.risks||[]).slice(0,8).forEach((r,i)=>q.push({t:"risk",el:"crR-"+i,text:r}));
+  h+=`<div class="cr-part">PART II</div><h3 class="cr-h3" id="crS-mdna">Item 7. Management’s Discussion and Analysis</h3>`+((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
+  sec("crS-mdna","Item 7. MD&A"); (T.guidance||[]).forEach((g,i)=>q.push({t:"guide",el:"crG-"+i,text:g}));
+  h+=`<h3 class="cr-h3" id="crS-fin">Item 8. Financial Statements and Supplementary Data</h3>`;
+  sec("crS-fin","Item 8. Financial statements");
+  const cols={income:Y,balance:Y.slice(0,2),cash:Y};
+  for(const [st,title] of [["income","Consolidated Statements of Operations"],["balance","Consolidated Balance Sheets"],["cash","Consolidated Statements of Cash Flows"]]){
+    h+=table(st,title,cols[st]); q.push({t:"section",el:"crH-"+st,label:title,st});
+    for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null) q.push({t:"metric",st,k,label:l,fmt,el:`cr-${k}-0`,prev:Y[1]&&Y[1][k]!=null?`cr-${k}-1`:null}); }
+  const y0=Y[0], y1=Y[1]||{}, R=(a,b)=>a!=null&&b?a/b:null;
+  const calc=(id,label,v,fmt,els,how)=>{ if(v!=null&&isFinite(v)) q.push({t:"calc",id,label,v,fmt,els:els.filter(e=>$("x")||true),how}); };
+  calc("om","Operating margin",R(y0.operatingIncome,y0.revenue),"pct",["cr-operatingIncome-0","cr-revenue-0"],"Operating income ÷ revenue");
+  calc("nm","Net margin",R(y0.netIncome,y0.revenue),"pct",["cr-netIncome-0","cr-revenue-0"],"Net income ÷ revenue");
+  calc("fcf","Free cash flow",y0.fcf,"usd",["cr-cfo-0","cr-capex-0"],"Operating cash flow − capex");
+  calc("fcfm","FCF margin",R(y0.fcf,y0.revenue),"pct",["cr-fcf-0","cr-revenue-0"],"Free cash flow ÷ revenue");
+  calc("nc","Net cash (debt)",y0.cash!=null&&y0.totalDebt!=null?y0.cash-y0.totalDebt:null,"usd",["cr-cash-0","cr-totalDebt-0"],"Cash − total debt");
+  calc("roe","Return on equity",R(y0.netIncome,y0.equity),"pct",["cr-netIncome-0","cr-equity-0"],"Net income ÷ shareholders’ equity");
+  // observations: plain-English takeaways, each pointing at the cells it comes from
+  const ob=(text,els,tone)=>q.push({t:"obs",text,els,tone});
+  if(y0.revenue&&y1.revenue){ const g=y0.revenue/y1.revenue-1; ob(`Revenue ${g>=0?"grew":"fell"} ${Math.abs(g*100).toFixed(1)}% to ${crBig(y0.revenue)} in ${fy(y0)}.`,["cr-revenue-0","cr-revenue-1"],g>=0?1:-1); }
+  if(y0.operatingIncome&&y0.revenue&&y1.operatingIncome&&y1.revenue){ const a=y0.operatingIncome/y0.revenue,b=y1.operatingIncome/y1.revenue; ob(`Operating margin ${a>=b?"widened":"narrowed"} from ${(b*100).toFixed(1)}% to ${(a*100).toFixed(1)}%.`,["cr-operatingIncome-0","cr-operatingIncome-1"],a>=b?1:-1); }
+  if(y0.cfo&&y0.netIncome>0){ const c=y0.cfo/y0.netIncome; ob(`Operating cash flow was ${c.toFixed(2)}× net income — ${c>=1?"earnings are backed by cash":"less cash came in than profit reported"}.`,["cr-cfo-0","cr-netIncome-0"],c>=1?1:-1); }
+  if(y0.cash!=null&&y0.totalDebt!=null){ const n=y0.cash-y0.totalDebt; ob(`${n>=0?"Net cash":"Net debt"} of ${crBig(Math.abs(n))} (cash ${crBig(y0.cash)} vs. debt ${crBig(y0.totalDebt)}).`,["cr-cash-0","cr-totalDebt-0"],n>=0?1:-1); }
+  if(y0.eps!=null&&y1.eps){ const g=y0.eps/y1.eps-1; ob(`Diluted EPS ${g>=0?"rose":"fell"} ${Math.abs(g*100).toFixed(1)}% to $${y0.eps.toFixed(2)}.`,["cr-eps-0","cr-eps-1"],g>=0?1:-1); }
+  h+=`<p class="cr-dim cr-end">— End of extracted sections —</p>`;
+  $("crPage").innerHTML=h; CR.q=q;
+  $("crSrc").innerHTML=f.url?`<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(d.symbol)} ${esc(f.form||"10-K")} · period ${esc(f.period||Y[0].end)}</a>`:"";
+  crSide(); crRail(); crSpiderInit();
+}
+/* ---------- sidebar ---------- */
+function crSide(){
+  const d=CR.d, Y=CR.Y;
+  $("crSide").innerHTML=`<div class="crs-h"><b>${esc(d.name)}</b><small>${esc((d.filing&&d.filing.form)||"10-K")} · ${esc(String(Y[0].end))}</small><div class="crs-count" id="crsCount"></div>
+      <div class="crs-act"><button type="button" class="btn ghost" id="crCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crCsv">⇩ Export CSV</button></div>
+      <div class="crs-jump">${[["crS-risk","Risk"],["crS-mdna","MD&amp;A"],["crH-income","Income"],["crH-balance","Balance"],["crH-cash","Cash flow"]].map(([el,l])=>`<button type="button" data-j="${el}">${l}</button>`).join("")}</div></div>
+    ${CR_ST.map(([st,title])=>`<div class="crs-sec"><h5 class="crs-go" data-j="crH-${st}" title="Jump the crawler here">${title}<em>${"FY"+String(Y[0].end).slice(0,4)} · YoY</em></h5>${CR_ROWS[st].filter(([k])=>Y[0][k]!=null).map(([k,l])=>`<div class="crs-row" id="crs-${k}"><span>${esc(l)}</span><b>—</b><i></i></div>`).join("")}</div>`).join("")}
+    <div class="crs-sec"><h5>Calculated<em>shown once every input is read</em></h5><div id="crsCalc"></div></div>
+    <div class="crs-sec"><h5>Sections read<em>headings the crawler has passed</em></h5><div id="crsRead"></div></div>
+    <div class="crs-sec"><h5>Risk factors<em>headlines flagged</em></h5><div id="crsRisk"></div></div>
+    <div class="crs-sec"><h5>Guidance<em>forward-looking statements, quoted</em></h5><div id="crsGuide"></div></div>
+    <div class="crs-sec"><h5>Observations<em>what the numbers say</em></h5><div id="crsObs"></div></div>`;
+  crSideSync(false);
+  $("crCopy").onclick=crCopy; $("crCsv").onclick=crCsv;
+  $("crSide").querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>crJump(b.dataset.j));
+}
+function crRowsOut(){ const Y=CR.Y, done=new Set(CR.q.slice(0,CR.i).filter(m=>m.t==="metric").map(m=>m.k)), out=[];
+  for(const [st,title] of CR_ST) for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null){ const v=Y[0][k], p=Y[1]&&Y[1][k]; out.push({st:title,k,l,fmt,v:fmt==="neg"?-v:v,p:p==null?null:(fmt==="neg"?-p:p),yoy:p?(v-p)/Math.abs(p):null,scanned:done.has(k)}); }
+  return out; }
+async function crCopy(){
+  if(!CR.d) return; const d=CR.d, f=d.filing||{}, rows=crRowsOut(), Y=CR.Y, fy=y=>"FY"+String(y.end).slice(0,4), F=x=>x.fmt==="neg"?null:x.fmt;
+  let t=`## ${d.name} (${d.symbol}) — ${f.form||"10-K"}, fiscal year ended ${f.period||Y[0].end}\n\n`;
+  for(const [,title] of CR_ST){ const r=rows.filter(x=>x.st===title); if(!r.length) continue; t+=`### ${title}\n| Line item | ${fy(Y[0])} | ${Y[1]?fy(Y[1]):"Prior"} | YoY |\n|---|---:|---:|---:|\n`+r.map(x=>`| ${x.l} | ${crBig(x.v,F(x))} | ${x.p==null?"—":crBig(x.p,F(x))} | ${crPct(x.yoy)} |`).join("\n")+"\n\n"; }
+  const calc=CR.q.filter(m=>m.t==="calc"), obs=CR.q.filter(m=>m.t==="obs"), gd=CR.q.filter(m=>m.t==="guide");
+  if(calc.length) t+="### Calculated\n"+calc.map(m=>`- ${m.label}: ${m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)} (${m.how})`).join("\n")+"\n\n";
+  if(obs.length) t+="### Observations\n"+obs.map(m=>"- "+m.text).join("\n")+"\n\n";
+  if(gd.length) t+="### Guidance (quoted)\n"+gd.map(m=>"> "+m.text).join("\n")+"\n\n";
+  t+=`Source: SEC EDGAR — ${f.url||"XBRL company facts"}`;
+  try{ await navigator.clipboard.writeText(t); toast("Summary copied to your clipboard"); }catch{ toast("Your browser blocked the clipboard — try again after clicking the page"); }
+}
+function crCsv(){
+  if(!CR.d) return; const rows=crRowsOut(), Y=CR.Y, q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const lines=[["Statement","Line item","Metric key",`FY${String(Y[0].end).slice(0,4)} (USD)`,Y[1]?`FY${String(Y[1].end).slice(0,4)} (USD)`:"Prior year","YoY change","Scanned by crawler"].map(q).join(",")];
+  for(const x of rows) lines.push([x.st,x.l,x.k,x.v,x.p??"",x.yoy==null?"":(x.yoy*100).toFixed(2)+"%",x.scanned?"yes":"no"].map(q).join(","));
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([lines.join("\r\n")],{type:"text/csv"})); a.download=`${CR.d.symbol}-${(CR.d.filing&&CR.d.filing.form)||"10-K"}-${Y[0].end}.csv`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+}
+function crSideSync(){
+  const q=CR.q, done=q.slice(0,CR.i), Y=CR.Y;
+  const figs=q.filter(m=>m.t==="metric"), got=done.filter(m=>m.t==="metric").length;
+  $("crsCount").innerHTML=`<b>${got}</b> of ${figs.length} figures · <b>${done.filter(m=>m.t==="guide").length}</b> guidance · <b>${done.filter(m=>m.t==="obs").length}</b> observations`;
+  for(const m of figs){ const row=$("crs-"+m.k); if(!row) continue; const on=done.includes(m), v=Y[0][m.k], p=Y[1]&&Y[1][m.k];
+    if(!on){ row.classList.remove("on"); row.querySelector("b").textContent="—"; row.querySelector("i").textContent=""; continue; }
+    if(!row.classList.contains("on")){ row.classList.add("on"); row.querySelector("b").textContent=crBig(m.fmt==="neg"?-v:v,m.fmt); const dl=p?((v-p)/Math.abs(p)):null, el=row.querySelector("i"); el.textContent=crPct(dl); el.className=dl==null?"":dl>=0?"up":"down"; } }
+  const list=(id,arr,f)=>{ const el=$(id); const html=arr.length?arr.map(f).join(""):`<div class="crs-empty">${CR.i>=q.length?"none found":"pending…"}</div>`; if(el.innerHTML!==html) el.innerHTML=html; };
+  list("crsCalc",done.filter(m=>m.t==="calc"),m=>`<div class="crs-row on"><span>${esc(m.label)}<small>${esc(m.how)}</small></span><b>${m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)}</b></div>`);
+  list("crsRead",done.filter(m=>m.t==="section"),m=>`<div class="crs-chip">✓ ${esc(m.label)}</div>`);
+  list("crsRisk",done.filter(m=>m.t==="risk"),m=>`<div class="crs-q risk">${esc(m.text)}</div>`);
+  list("crsGuide",done.filter(m=>m.t==="guide"),m=>`<div class="crs-q">“${esc(m.text)}”</div>`);
+  list("crsObs",done.filter(m=>m.t==="obs"),m=>`<div class="crs-q ${m.tone>0?"up":"down"}">${esc(m.text)}</div>`);
+  // document marks
+  q.forEach((m,i)=>{ const ids=m.el?[m.el]:[]; for(const id of ids){ const e=$(id); if(e) e.classList.toggle("cr-done",i<CR.i); } });
+  crDockSync();
+}
+/* ---------- rail + dock ---------- */
+function crRail(){
+  const q=CR.q, n=q.length||1, marks=[["crS-risk","Risk"],["crS-mdna","MD&A"],["crH-income","Income"],["crH-balance","Balance"],["crH-cash","Cash flow"]];
+  $("crRail").innerHTML=`<div class="cr-fill" id="crFill"></div>`+marks.map(([el,l])=>{const i=q.findIndex(m=>m.el===el); return i<0?"":`<button type="button" style="top:${(i/n*100).toFixed(2)}%" data-i="${i}" title="${esc(l)}"></button>`;}).join("");
+}
+function crDockSync(){
+  const q=CR.q, n=q.length;
+  $("crPlay").textContent=CR.playing?"❚❚":"▶"; $("crPlay").title=CR.playing?"Pause":"Play";
+  $("crLive").classList.toggle("on",CR.playing);
+  document.querySelectorAll("#crSpeed button").forEach(b=>b.classList.toggle("on",+b.dataset.s===CR.speed));
+  const sc=$("crScrub"); sc.max=Math.max(1,n); sc.value=CR.i;
+  if($("crFill")) $("crFill").style.height=(n?CR.i/n*100:0)+"%";
+  const m=q[Math.min(CR.i,n-1)], d=CR.d;
+  $("crStatus").textContent=!d?"Enter a ticker to start":CR.i>=n?`finished reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${q.filter(x=>x.t==="metric").length} figures extracted`:`reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${m?(m.label||m.text||"").slice(0,60):""}`;
+}
+/* ---------- playback ---------- */
+const CR_DUR={section:900,metric:1250,risk:800,guide:1100,calc:1100,obs:1300};
+function crPlay(){ if(!CR.d) return; if(CR.i>=CR.q.length) crSeek(0); CR.playing=true; crDockSync(); crNext(); crLoop(); }
+function crPause(){ CR.playing=false; clearTimeout(CR.timer); crDockSync(); }
+function crStop(){ CR.playing=false; clearTimeout(CR.timer); CR.lasers=[]; CR.pulses=[]; }
+function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },(CR_DUR[m.t]||1000)/CR.speed); }
+function crStep(dir){ crPause(); if(dir<0) crSeek(Math.max(0,CR.i-1)); else if(CR.i<CR.q.length){ const m=CR.q[CR.i]; crRun(m,true); CR.i++; setTimeout(crSideSync,(CR_DUR[m.t]||1000)*0.6/CR.speed); } crLoop(); }
+function crSeek(i){ CR.i=Math.max(0,Math.min(CR.q.length,i)); CR.lasers=[]; CR.pulses=[];
+  document.querySelectorAll("#crPage .cr-hit").forEach(e=>e.classList.remove("cr-hit")); document.querySelectorAll(".crs-row.on").forEach(r=>r.classList.remove("on"));
+  crSideSync(); const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); }
+function crJump(el){ const i=CR.q.findIndex(m=>m.el===el); if(i<0) return; const was=CR.playing; crPause(); crSeek(i); if(was) crPlay(); }
+// one milestone: walk to it, fire the laser(s), extract
+function crRun(m,anim){
+  const els=(m.els||[m.el,m.prev]).filter(Boolean).map(id=>$(id)).filter(Boolean); if(!els.length) return;
+  const main=els[0], page=$("crPage"), pr=page.getBoundingClientRect(), r=main.getBoundingClientRect();
+  const tx=r.left-pr.left+r.width/2, ty=r.top-pr.top+r.height/2, W=page.clientWidth, sc=CR.spider?CR.spider.scale:1;
+  // park the spider to the left of the target (or right, near the edge), slightly above it
+  const side=tx>W*0.55?-1:1; CR.spider&&(CR.spider.tx=Math.max(60*sc,Math.min(W-60*sc,tx-side*Math.min(220*sc,W*0.28))), CR.spider.ty=ty-30*sc);
+  const doc=$("crDoc"), want=r.top-pr.top-doc.clientHeight*0.45; if(Math.abs(doc.scrollTop-want)>40) doc.scrollTo({top:Math.max(0,want),behavior:anim?"smooth":"auto"});
+  if(!anim){ main.classList.add("cr-hit"); return; }
+  const color=/^(risk|guide|obs)$/.test(m.t)?"#f43f5e":m.st==="balance"?"#f472b6":"#38bdf8";
+  const delay=(m.t==="section"?250:450)/CR.speed;
+  setTimeout(()=>{ if(!CR.d) return; const now=performance.now();
+    els.forEach((e,k)=>{ const rr=e.getBoundingClientRect(), p2=page.getBoundingClientRect(); const p={x:rr.left-p2.left+(m.t==="metric"||m.t==="calc"||m.t==="obs"?rr.width*0.5:Math.min(rr.width*0.15,40)),y:rr.top-p2.top+rr.height/2};
+      CR.lasers.push({to:p,c:k?"#a78bfa":color,t0:now+k*120,life:(m.t==="section"?520:900)/CR.speed,w:k?1.4:2.4}); CR.pulses.push({p,c:color,t0:now+k*120+120/CR.speed}); e.classList.add("cr-hit"); });
+    if(m.t==="metric") crPop(main,crMil(CR.Y[0][m.k],m.fmt),color);
+    if(m.t==="metric"||m.t==="calc") crFly(main,m.t==="metric"?$("crs-"+m.k):$("crsCalc"),m.t==="metric"?crBig(m.fmt==="neg"?-CR.Y[0][m.k]:CR.Y[0][m.k],m.fmt):(m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)),color);
+    crLoop(); },delay);
+}
+function crPop(el,text,color){ const page=$("crPage"), pr=page.getBoundingClientRect(), r=el.getBoundingClientRect(), b=document.createElement("div"); b.className="cr-pop"; b.style.cssText=`left:${r.left-pr.left+r.width/2}px;top:${r.top-pr.top-26}px;border-color:${color};color:${color}`; b.textContent=text; page.appendChild(b); setTimeout(()=>b.remove(),1500/CR.speed+300); }
+function crFly(from,to,text,color){
+  if(!to||matchMedia("(prefers-reduced-motion: reduce)").matches) return; const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
+  if(b.bottom<0||b.top>innerHeight||b.right<0||b.left>innerWidth) return; // sidebar off screen (phones) — skip the flight
+  const c=document.createElement("div"); c.className="cr-fly"; c.textContent=text; c.style.cssText=`left:${a.left}px;top:${a.top}px;border-color:${color};color:${color}`; document.body.appendChild(c);
+  requestAnimationFrame(()=>{ c.style.transform=`translate(${b.right-90-a.left}px,${b.top-a.top}px) scale(.9)`; c.style.opacity=".2"; });
+  setTimeout(()=>{ c.remove(); to.classList.remove("flash"); void to.offsetWidth; to.classList.add("flash"); },650/CR.speed+60);
+}
+/* ---------- the spider: 8 two-segment legs with simple inverse kinematics and an alternating gait ---------- */
+function crSpiderInit(){
+  const small=(window.innerWidth||1000)<700, sc=small?0.62:1;
+  const legs=[]; for(const s of [-1,1]) [-62,-24,18,56].forEach((a,i)=>legs.push({s,a:a*Math.PI/180,g:(i+(s>0?1:0))%2,foot:null,from:null,to:null,t0:0}));
+  CR.spider={x:120*sc,y:120*sc,tx:120*sc,ty:120*sc,vx:0,vy:0,scale:sc,legs,ph:0};
+}
+function crHip(S,L){ return {x:S.x+L.s*(8+Math.abs(Math.sin(L.a))*4)*S.scale,y:S.y+Math.sin(L.a)*10*S.scale}; }
+function crRest(S,L){ const R=118*S.scale; return {x:S.x+L.s*Math.cos(L.a)*R+S.vx*7,y:S.y+Math.sin(L.a)*R*0.95+30*S.scale+S.vy*7}; }
+function crKnee(h,f,S,L){ const L1=74*S.scale,L2=88*S.scale; let dx=f.x-h.x,dy=f.y-h.y,d=Math.hypot(dx,dy)||1; const dd=Math.min(d,L1+L2-1),a=(L1*L1-L2*L2+dd*dd)/(2*dd),hh=Math.sqrt(Math.max(0,L1*L1-a*a)),ux=dx/d,uy=dy/d;
+  let px=-uy,py=ux; if(py>0){px=-px;py=-py;} // knee bends up, like a real spider
+  return {x:h.x+ux*a+px*hh,y:h.y+uy*a+py*hh}; }
+function crLoop(){ if(CR.raf) return; const tick=(now)=>{ CR.raf=0; if(S.tab!=="filings"||document.hidden||!CR.spider) return; crFrame(now); if(CR.playing||CR.lasers.length||CR.pulses.length||Math.hypot(CR.spider.tx-CR.spider.x,CR.spider.ty-CR.spider.y)>0.5||CR.spider.stepping) CR.raf=requestAnimationFrame(tick); else { CR.idle=setTimeout(()=>crLoop(),90); } }; clearTimeout(CR.idle); CR.raf=requestAnimationFrame(tick); }
+function crFrame(now){
+  const Sp=CR.spider, page=$("crPage"), ov=$("crOv"); if(!page||!ov) return;
+  const W=page.scrollWidth, H=page.scrollHeight; ov.setAttribute("width",W); ov.setAttribute("height",H); ov.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  // body: spring toward target
+  const k=0.012*CR.speed, damp=0.78; Sp.vx=(Sp.vx+(Sp.tx-Sp.x)*k)*damp; Sp.vy=(Sp.vy+(Sp.ty-Sp.y)*k)*damp; const vmax=14*CR.speed*Sp.scale, v=Math.hypot(Sp.vx,Sp.vy); if(v>vmax){Sp.vx*=vmax/v;Sp.vy*=vmax/v;} Sp.x+=Sp.vx; Sp.y+=Sp.vy; Sp.ph+=0.05;
+  // legs: a foot steps when it drifts too far from its rest spot (only one gait group lifts at a time)
+  let stepping=false; const lifted=Sp.legs.some(L=>L.to);
+  for(const L of Sp.legs){ const rest=crRest(Sp,L); if(!L.foot) L.foot={...rest};
+    if(L.to){ const t=Math.min(1,(now-L.t0)/(150/Math.max(1,CR.speed*0.8))); L.foot={x:L.from.x+(L.to.x-L.from.x)*t,y:L.from.y+(L.to.y-L.from.y)*t-Math.sin(t*Math.PI)*22*Sp.scale}; if(t>=1){L.foot={...L.to};L.to=null;} stepping=true; }
+    else { const dist=Math.hypot(rest.x-L.foot.x,rest.y-L.foot.y);
+      if(dist>300*Sp.scale) L.foot={...rest}; // fell far behind (big jump / seek): plant it
+      else if(dist>46*Sp.scale&&(!lifted||Sp.legs.find(x=>x.to)?.g===L.g||dist>120*Sp.scale)){ L.from={...L.foot}; L.to={x:rest.x+Sp.vx*5,y:rest.y+Sp.vy*5}; L.t0=now; stepping=true; } } }
+  Sp.stepping=stepping;
+  const tw=Math.sin(now/180)*1.6*Sp.scale;
+  const legsSvg=Sp.legs.map((L,i)=>{ const h=crHip(Sp,L), kn=crKnee(h,L.foot,Sp,L); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${(kn.y+(i%2?tw:-tw)).toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/>`; }).join("");
+  const lz=CR.lasers.filter(l=>now<l.t0+l.life), pz=CR.pulses.filter(p=>now<p.t0+700/CR.speed); CR.lasers=lz; CR.pulses=pz;
+  const mouth={x:Sp.x,y:Sp.y+10*Sp.scale};
+  const lasersSvg=lz.filter(l=>now>=l.t0).map(l=>{ const t=(now-l.t0)/l.life, a=t<0.15?t/0.15:t>0.75?(1-t)/0.25:1; return `<g opacity="${a.toFixed(2)}"><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${(l.w*4).toFixed(1)}" opacity=".25" stroke-linecap="round"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${l.w}" stroke-linecap="round" filter="url(#crGlow)"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="#fff" stroke-width="${(l.w*0.4).toFixed(2)}" stroke-linecap="round"/></g>`; }).join("");
+  const pulsesSvg=pz.filter(p=>now>=p.t0).map(p=>{ const t=(now-p.t0)/(700/CR.speed); return `<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4+t*26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1-t).toFixed(2)}"/><circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(5*(1-t)).toFixed(1)}" fill="#fff" opacity="${(1-t).toFixed(2)}"/>`; }).join("");
+  const s=Sp.scale, bob=Math.sin(Sp.ph*2)*1.2*s;
+  ov.innerHTML=`<defs><filter id="crGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    ${lasersSvg}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>
+    <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y+bob).toFixed(1)})"><ellipse cx="0" cy="-${(16*s).toFixed(1)}" rx="${(13*s).toFixed(1)}" ry="${(17*s).toFixed(1)}" class="cr-abd"/><circle cx="0" cy="${(6*s).toFixed(1)}" r="${(10*s).toFixed(1)}" class="cr-head"/>
+    <circle cx="-${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="0" cy="${(12*s).toFixed(1)}" r="${(1.4*s).toFixed(1)}" fill="#f43f5e"/></g>${pulsesSvg}`;
+}
+/* ---------- wiring ---------- */
+$("crForm").onsubmit=e=>{e.preventDefault(); crLoad();};
+$("crPlay").onclick=()=>CR.playing?crPause():crPlay();
+$("crBack").onclick=()=>crStep(-1); $("crFwd").onclick=()=>crStep(1);
+$("crReplay").onclick=()=>{ if(!CR.d) return; crSeek(0); crPlay(); };
+$("crSpeed").onclick=e=>{const b=e.target.closest("[data-s]"); if(!b) return; CR.speed=+b.dataset.s; crDockSync(); if(CR.playing){ clearTimeout(CR.timer); crNext(); }};
+$("crJumps").onclick=e=>{const b=e.target.closest("[data-j]"); if(b&&CR.d) crJump(b.dataset.j);};
+$("crSkip").onclick=()=>{ if(!CR.d) return; crPause(); crSeek(CR.q.length); };
+$("crScrub").oninput=e=>{ if(!CR.d) return; crPause(); crSeek(+e.target.value); };
+$("crRail").onclick=e=>{const b=e.target.closest("[data-i]"); if(b&&CR.d){ const was=CR.playing; crPause(); crSeek(+b.dataset.i); if(was) crPlay(); }};
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.tab==="filings") crLoop(); });
+$("crLayout").onclick=e=>{const b=e.target.closest("[data-l]"); if(!b) return; $("crRoot").dataset.layout=b.dataset.l; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x===b)); try{localStorage.setItem("md_crl",b.dataset.l)}catch{} setTimeout(()=>{ if(CR.d){ const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); } },60); };
+$("crChips").onclick=e=>{const b=e.target.closest("[data-sym]"); if(b) crLoad(b.dataset.sym);};
+try{ const l=localStorage.getItem("md_crl"); if(l){ $("crRoot").dataset.layout=l; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l===l)); } }catch{}
+// open the crawler preloaded for a ticker — from the watchlist, news tags, search, research page or a #filings/TICKER link
+function crOpenSym(sym){ sym=normSym(sym); if(!sym) return; $("crSym").value=sym; if(S.tab!=="filings") setTab("filings"); else crLoad(sym); }
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-10k]"); if(!b) return; e.preventDefault(); e.stopPropagation(); crOpenSym(b.dataset["10k"]); },true);
+function crOpen(){ const want=normSym($("crSym").value||"AAPL"); if(CR.sym!==want&&!CR.busy){ CR.busy=true; crLoad(want).finally(()=>CR.busy=false); } else crLoop(); }
+
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news");
+{ const fm=location.hash.match(/^#filings\/([A-Za-z0-9.\-]{1,10})$/); if(fm) $("crSym").value=fm[1].toUpperCase();
+  setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":fm?"filings":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news"); }
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";

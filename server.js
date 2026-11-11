@@ -2175,6 +2175,67 @@ async function secFundamentals(sym) {
   });
 }
 
+// ---------------------------------------------------------------- 10-K filing crawler: statements + real filing text
+// Numbers come from secFundamentals (XBRL company facts). Text comes from the latest 10-K's main document on EDGAR:
+// the start of Item 1 (Business), the risk-factor headlines in Item 1A, and forward-looking sentences in Item 7 (MD&A).
+// One HTML download per company per day, through the same polite SEC request queue.
+function secText(url, maxBytes = 12e6) {
+  const run = secChain.then(async () => {
+    const r = await fetch(url, { headers: { "User-Agent": SEC_UA, Accept: "text/html,*/*" }, signal: AbortSignal.timeout(30000) });
+    await new Promise((ok) => setTimeout(ok, 250));
+    if (!r.ok) throw new Error(`SEC returned ${r.status}`);
+    const buf = await r.arrayBuffer(); if (buf.byteLength > maxBytes) throw new Error("filing too large");
+    return new TextDecoder("utf-8").decode(buf);
+  });
+  secChain = run.catch(() => {});
+  return run;
+}
+const FENT = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", ldquo: "“", rdquo: "”", mdash: "—", ndash: "–", bull: "•", reg: "®", trade: "™", copy: "©" };
+function htmlToText(h) {
+  return h.replace(/<ix:header[\s\S]*?<\/ix:header>/gi, " ").replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(br|\/p|\/div|\/tr|\/li|\/h\d|\/table)[^>]*>/gi, "\n").replace(/<[^>]+>/g, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_, x) => String.fromCodePoint(parseInt(x, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&([a-z]+);/gi, (m, k) => FENT[k.toLowerCase()] ?? m)
+    .replace(/[ \t  ​]+/g, " ").replace(/ *\n[ \n]*/g, "\n").trim();
+}
+// the real section (not the table of contents): the heading whose next section heading is far away
+function secSection(text, startRe, endRe, minLen = 800) {
+  for (const m of text.matchAll(startRe)) { const i = m.index + m[0].length, rest = text.slice(i), e = rest.search(endRe), len = e < 0 ? rest.length : e; if (len >= minLen) return text.slice(m.index, i + Math.min(len, 400000)); }
+  return "";
+}
+async function filingDoc(sym) {
+  sym = String(sym || "").toUpperCase().replace("-", ".");
+  if (!/^[A-Z][A-Z0-9.]{0,9}$/.test(sym)) throw new Error("bad symbol");
+  return cached("sec:doc:" + sym, 24 * 3600e3, async () => {
+    const f = await secFundamentals(sym); if (!f.available) return { ...f, text: null };
+    const out = { ...f, filing: null, text: null };
+    try {
+      const sub = await secGet(`https://data.sec.gov/submissions/CIK${String(f.cik).padStart(10, "0")}.json`), r = sub.filings && sub.filings.recent;
+      const i = r ? r.form.findIndex((x) => x === "10-K" || x === "20-F" || x === "40-F") : -1;
+      if (i >= 0) {
+        const acc = r.accessionNumber[i], url = `https://www.sec.gov/Archives/edgar/data/${f.cik}/${acc.replace(/-/g, "")}/${r.primaryDocument[i]}`;
+        out.filing = { form: r.form[i], accession: acc, filed: r.filingDate[i], period: r.reportDate[i], url, fiscalYearEnd: sub.fiscalYearEnd || null, exchange: (sub.exchanges || [])[0] || null, sic: sub.sicDescription || null };
+        const text = htmlToText(await secText(url));
+        const paras = (t) => t.split("\n").map((x) => x.trim()).filter((x) => x.length > 40);
+        const biz = secSection(text, /Item\s*1\.?\s*\n?\s*Business/gi, /Item\s*1A\.?\s*\n?\s*Risk\s*Factors/gi);
+        const risk = secSection(text, /Item\s*1A\.?\s*\n?\s*Risk\s*Factors/gi, /Item\s*1B\.?|Item\s*1C\.?|Item\s*2\.?\s*\n?\s*Properties/gi);
+        const mdna = secSection(text, /Item\s*7\.?\s*\n?\s*Management.{0,3}s\s*Discussion/gi, /Item\s*7A\.?|Item\s*8\.?\s*\n?\s*Financial\s*Statements/gi);
+        const clip = (x, n) => (x.length > n ? x.slice(0, n).replace(/\s+\S*$/, "") + "…" : x);
+        const bizP = paras(biz.replace(/^Item\s*1\.?\s*Business/i, "")).filter((x) => !/^(Company Background|General|Overview|Business)$/i.test(x)).slice(0, 3).map((x) => clip(x, 600));
+        // risk-factor headlines: one-sentence paragraphs (bold titles in the filing) between 50 and 300 characters
+        const riskP = paras(risk.replace(/^Item\s*1A\.?\s*Risk\s*Factors/i, ""));
+        const intro0 = riskP.find((x) => x.length > 120) || "";
+        const heads = riskP.filter((x) => x !== intro0 && x.length >= 50 && x.length <= 300 && /[.:]$/.test(x) && (x.match(/\.\s/g) || []).length === 0 && !/^(The following|This section|You should|Investing in|In addition|Risks? (Related|Relating) to)/i.test(x)).slice(0, 10);
+        const intro = intro0;
+        const sents = mdna.replace(/\n/g, " ").split(/(?<=[.!?])\s+(?=[A-Z“"])/).map((x) => x.trim());
+        const guide = sents.filter((x) => x.length >= 70 && x.length <= 320 && /\b(expects?|anticipates?|outlook|plans? to|intends? to|believes?[^.]{0,80}\bwill\b|will continue to|guidance|forecast)\b/i.test(x) && !/forward-looking statements|Private Securities Litigation|Part I, Item 1A/i.test(x)).slice(0, 6).map((x) => clip(x, 320));
+        const mdIntro = paras(mdna.replace(/^Item\s*7\.?[^\n]*/i, "")).filter((x) => x.length > 150).slice(0, 2).map((x) => clip(x, 520));
+        out.text = { business: bizP, riskIntro: clip(intro, 420), risks: heads, mdna: mdIntro, guidance: guide };
+      }
+    } catch (e) { out.textError = String(e.message || e); }
+    return out;
+  });
+}
+
 // ---------------------------------------------------------------- long price history for backtests and stress tests
 // Daily or weekly closes plus Yahoo's dividend-and-split adjusted closes ("adj") between two dates.
 // Cached for 6 hours; the backtester and risk tools run their math in the browser.
@@ -2369,6 +2430,10 @@ async function handle(req, res) {
         catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
       }
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
+      if (u.pathname === "/api/pub/filing") {
+        try { return send(res, 200, await filingDoc(u.searchParams.get("symbol"))); }
+        catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
+      }
       if (u.pathname === "/api/pub/sec") {
         try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
