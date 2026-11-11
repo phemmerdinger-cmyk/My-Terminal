@@ -12,14 +12,22 @@ function levels(prev, bars) {
   if (pre.length >= 5) { L.push({ k: "PMH", name: "pre-market high", p: Math.max(...pre.map((b) => b.h)), side: "high" }, { k: "PML", name: "pre-market low", p: Math.min(...pre.map((b) => b.l)), side: "low" }); }
   const lastM = bars.length ? bars[bars.length - 1].m : 0;
   if (or.length >= 10 && lastM >= OPEN + 15) { L.push({ k: "ORH", name: "opening-range high", p: Math.max(...or.map((b) => b.h)), side: "high" }, { k: "ORL", name: "opening-range low", p: Math.min(...or.map((b) => b.l)), side: "low" }); }
+  // intraday liquidity: the session high/low and the last 30 minutes' swing high/low, measured before the
+  // most recent 5 bars (so a fresh run through them can count as a sweep)
+  const reg = bars.filter((b) => b.m >= OPEN), base = reg.slice(0, -5);
+  if (base.length >= 15) {
+    L.push({ k: "HOD", name: "high of day", p: Math.max(...base.map((b) => b.h)), side: "high" }, { k: "LOD", name: "low of day", p: Math.min(...base.map((b) => b.l)), side: "low" });
+    const sw = base.slice(-30);
+    if (base.length >= 45) L.push({ k: "SWH", name: "30-minute swing high", p: Math.max(...sw.map((b) => b.h)), side: "high" }, { k: "SWL", name: "30-minute swing low", p: Math.min(...sw.map((b) => b.l)), side: "low" });
+  }
   return L;
 }
 const vwap = (bars) => { let pv = 0, v = 0; for (const b of bars) if (b.m >= OPEN) { pv += ((b.h + b.l + b.c) / 3) * b.v; v += b.v; } return v ? pv / v : null; };
 const avgVol = (bars, n = 20) => { const a = bars.slice(-n - 1, -1).map((b) => b.v).filter((x) => x > 0); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; };
 
-// Liquidity sweep: within the last 3 completed bars, price ran past a level (taking the stops resting there)
-// on above-average volume, and the latest bar closed back on the other side. Returns a trade idea or null.
-function sweep(bars, lv, { buf = 0.0005, volMult = 1.5, lookback = 3 } = {}) {
+// Liquidity sweep: within the last 5 completed bars, price ran past a level (taking the stops resting there)
+// on above-average volume (1.25×), and the latest bar closed back on the other side. Returns a trade idea or null.
+function sweep(bars, lv, { buf = 0.0004, volMult = 1.25, lookback = 5 } = {}) {
   const reg = bars.filter((b) => b.m >= OPEN); if (reg.length < 8) return null;
   const last = reg[reg.length - 1], win = reg.slice(-lookback);
   for (const L of lv) {
@@ -37,14 +45,16 @@ function sweep(bars, lv, { buf = 0.0005, volMult = 1.5, lookback = 3 } = {}) {
   return null;
 }
 
-// Gap and go: a stock that gapped ≥ 3% on a catalyst breaks its first-5-minute range in the gap's direction.
+// Gap and go: a stock that gapped ≥ 2% on a matching catalyst — or ≥ 4% with no known catalyst (a gap that big
+// is news in itself) — breaks its first-5-minute range in the gap's direction.
 // Entry is a limit at the breakout level (a retest), stop on the far side of the 5-minute range.
-function gapGo(bars, prevClose, catalyst, { minGap = 0.03 } = {}) {
+function gapGo(bars, prevClose, catalyst, { minGap = 0.02, bigGap = 0.04 } = {}) {
   const reg = bars.filter((b) => b.m >= OPEN); if (reg.length < 6 || !prevClose) return null;
   const gap = reg[0].o / prevClose - 1, r5 = reg.slice(0, 5), hi = Math.max(...r5.map((b) => b.h)), lo = Math.min(...r5.map((b) => b.l)), last = reg[reg.length - 1];
-  if (last.m > OPEN + 90) return null; // gap plays only in the first 90 minutes
-  if (gap >= minGap && catalyst > 0 && last.c > hi) return { dir: "long", gap, entry: hi, stop: lo, at: last.t };
-  if (gap <= -minGap && catalyst < 0 && last.c < lo) return { dir: "short", gap, entry: lo, stop: hi, at: last.t };
+  if (last.m > OPEN + 120) return null; // gap plays only in the first two hours
+  const up = gap >= bigGap || (gap >= minGap && catalyst > 0), dn = gap <= -bigGap || (gap <= -minGap && catalyst < 0);
+  if (up && !(catalyst < 0) && last.c > hi) return { dir: "long", gap, entry: hi, stop: lo, at: last.t };
+  if (dn && !(catalyst > 0) && last.c < lo) return { dir: "short", gap, entry: lo, stop: hi, at: last.t };
   return null;
 }
 

@@ -54,3 +54,21 @@ test("bracket: stop first when both are hit, target, breakeven after +1R, P&L si
   assert.match(D.manage(q, bar(0, 101, 101, 99.9, 100)).why, /breakeven/);
   assert.equal(D.pnlOf({ dir: "short", entry: 50, shares: 10 }, 48), 20);
 });
+test("intraday levels: high/low of day and 30-minute swing, measured before the last 5 bars", () => {
+  const b = session(60); b[10] = bar(D.OPEN + 10, 100, 103, 99.9, 100); b[50] = bar(D.OPEN + 50, 100, 101.5, 98.5, 100);
+  const L = Object.fromEntries(D.levels(null, b).map((x) => [x.k, x.p]));
+  assert.equal(L.HOD, 103); assert.equal(L.LOD, 98.5); assert.equal(L.SWH, 101.5); assert.equal(L.SWL, 98.5);
+  assert.ok(!D.levels(null, session(12)).some((x) => x.k === "HOD"), "needs 15 bars of history first");
+});
+test("a sweep of the high of day on 1.3× volume is now enough", () => {
+  const b = session(30); b.push(bar(D.OPEN + 30, 100, 103.2, 99.9, 99.95, 1300));
+  const s = D.sweep(b, [{ k: "HOD", name: "high of day", p: 103, side: "high" }]);
+  assert.equal(s.dir, "short");
+});
+test("gap and go: a ≥4% gap needs no catalyst, but never trades against one", () => {
+  const b = [bar(D.OPEN, 104.5, 105, 104, 104.5), ...Array.from({ length: 4 }, (_, i) => bar(D.OPEN + 1 + i, 104.5, 105, 104.2, 104.6)), bar(D.OPEN + 5, 104.6, 105.5, 104.5, 105.3)];
+  assert.equal(D.gapGo(b, 100, 0).dir, "long");
+  assert.equal(D.gapGo(b, 100, -1), null);
+  assert.equal(D.gapGo(b, 102, 0), null, "a 2.5% gap still needs a catalyst");
+  assert.equal(D.gapGo(b, 102, 1).dir, "long");
+});

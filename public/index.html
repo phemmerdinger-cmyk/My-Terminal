@@ -667,6 +667,40 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .ap-hood>summary small{color:var(--muted);font-weight:400}
 .ap-hood[open]>summary{margin-bottom:14px}.ap-hood>.bt-card,.ap-hood>.ap-two{margin-bottom:14px}
 .ap-health{font-size:12px;color:var(--muted);margin:-4px 0 4px;line-height:1.5}
+.aitrade .ap-head h1{margin:2px 0 10px}
+.ap-score{background:color-mix(in srgb,var(--panel) 60%,transparent);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.ap-score .bot-sw{margin:0}
+.ap-score #apVs{display:flex;flex-direction:column;gap:8px}
+.ap-score .ap-side b{font-size:clamp(26px,4vw,44px)}
+.ap-score .ap-health{margin:0}
+.ap-tri{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
+.ap-tri > *{min-width:0}
+.ap-tri .ap-two{grid-template-columns:1fr}
+.ap-tri .ap-mini{grid-template-columns:repeat(3,1fr)}
+#apMore:empty{display:none}
+.ap-about{margin:18px 0 0;font-size:13px;color:var(--muted)}
+.ap-hold{position:sticky;top:100px;max-height:calc(100vh - 116px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.hd-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.hd-h h4{margin:0;font-size:15px}.hd-h small{color:var(--muted);font-size:12px}
+.hd-grp{border-top:1px solid var(--line);padding:12px 0 6px}
+.hd-grp:not(.on){opacity:.82}
+.hd-gh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hd-gh b{font-size:14px}.hd-gh span{font-family:var(--mono);font-size:15px}.hd-gh small{font-size:12px;margin-left:4px}
+.hd-alloc{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:8px 0 6px}
+.hd-alloc i{display:block;height:100%;background:#ff9f43;border-radius:99px}
+.hd-sum{display:flex;gap:6px 14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:6px}
+.hd-sum b{color:var(--text);font-family:var(--mono);font-weight:500}
+.hd-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.9fr) minmax(0,1.1fr);gap:4px 10px;align-items:center;padding:9px 0;border-bottom:1px dashed var(--line)}
+.hd-row:last-of-type{border-bottom:0}
+.hd-l b{font-size:14px}.hd-l small{display:block;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd-m{font-family:var(--mono);font-size:13px;color:var(--muted)}.hd-m small{display:block;font-family:var(--sans);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.hd-r{text-align:right;font-family:var(--mono)}.hd-r b{display:block;font-size:14px;font-weight:500}.hd-r small{font-size:12px}
+.hd-x{grid-column:1/-1;font-size:11px;color:var(--dim);line-height:1.4}
+.hd-empty{font-size:13px;color:var(--muted);padding:6px 0 4px}
+.hd-orders{font-size:12px;color:var(--muted);padding:6px 0 0}
+@media (max-width:1000px){.ap-tri{grid-template-columns:minmax(0,1fr)}.ap-hold{position:static;max-height:none}}
+.ap-score .ap-side{min-width:0}
+@media (max-width:640px){.ap-score{padding:8px}.ap-score .ap-side{padding:12px}.ap-score .ap-side b{font-size:clamp(20px,6.4vw,28px)}.ap-hold{padding:12px}}
 .notepad{margin:0 0 14px;border-radius:12px;border:1px solid color-mix(in srgb,#f5d76e 35%,var(--line));background:
   repeating-linear-gradient(to bottom,transparent 0,transparent 29px,color-mix(in srgb,#f5d76e 10%,transparent) 29px,color-mix(in srgb,#f5d76e 10%,transparent) 30px),
   linear-gradient(90deg,transparent 0,transparent 42px,color-mix(in srgb,#ff6b6b 30%,transparent) 42px,color-mix(in srgb,#ff6b6b 30%,transparent) 43px,transparent 43px),color-mix(in srgb,#f5d76e 5%,var(--panel));padding:0 0 10px}
@@ -1623,11 +1657,14 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div id="rkOut"><div class="fx-empty">Choose a portfolio and press Analyze.</div></div>
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
-      <div class="ap-head"><div><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1>
-        <p class="ap-lede">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> goes long and short within the day using limit orders, liquidity sweeps and news gaps, and is flat by the close. Every bust starts a new test run.</p></div></div>
-      <div class="bot-sw" id="apSwitch"></div>
-      <div id="apNote"></div>
-      <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
+      <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
+      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
+      <div class="ap-tri">
+        <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
+        <aside class="ap-hold" id="apNote"></aside>
+      </div>
+      <div class="apx" id="apMore"></div>
+      <p class="ap-lede ap-about">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> goes long and short within the day using limit orders, liquidity sweeps and news gaps, and is flat by the close. Every bust starts a new test run.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3354,16 +3391,18 @@ function apRender(d){
   const started=!!d.trades.length, sig=d.lastScan, plan=d.plan;
   const busts=(d.runs||[]).filter(r=>r.busted).length;
   const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?" <span class=\"ap-tag own\">live</span>":""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">💀 Busted</b>':"ended"}</td></tr>`; };
-  $("apBox").innerHTML=`
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Test run #${d.run}</b> · <span class="ap-tag risk">80% risk</span> ${(()=>{const r=d.positions.filter(p=>p.sleeve!=="safe").reduce((a,p)=>a+p.value,0),f=d.positions.filter(p=>p.sleeve==="safe").reduce((a,p)=>a+p.value,0);return d.value?`${Math.round(r/d.value*100)}% high-risk · ${Math.round(f/d.value*100)}% safe · ${Math.round(d.cash/d.value*100)}% cash · `:""})()}${esc(d.status)}${sig?` · last scan ${ago(sig.t)}`:""}</div>${botHealth(d,"swing")}
-  ${sig&&sig.stress?`<div class="ap-warn">🛡 Defense mode: ${esc(sig.stress)} — the bot cuts to 50% invested and makes no new buys.</div>`:""}
+  const liveLine=`<div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Test run #${d.run}</b> · <span class="ap-tag risk">80% risk</span> ${(()=>{const r=d.positions.filter(p=>p.sleeve!=="safe").reduce((a,p)=>a+p.value,0),f=d.positions.filter(p=>p.sleeve==="safe").reduce((a,p)=>a+p.value,0);return d.value?`${Math.round(r/d.value*100)}% high-risk · ${Math.round(f/d.value*100)}% safe · ${Math.round(d.cash/d.value*100)}% cash · `:""})()}${esc(d.status)}${sig?` · last scan ${ago(sig.t)}`:""}</div>${botHealth(d,"swing")}
+  ${sig&&sig.stress?`<div class="ap-warn">🛡 Defense mode: ${esc(sig.stress)} — the bot cuts to 50% invested and makes no new buys.</div>`:""}`;
+  $("apVs").innerHTML=`
   <div class="ap-vs">
     <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>🤖 AI bot</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret)}</small></div>
     <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet)}</small></div>
-  </div>
-  <div class="ap-mini">${[["Days running",days,d.firstTrade?"since "+new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"not started"],["Peak",$m(peak),"low "+$m(low)],["Worst drop",dd.toFixed(1)+"%","from a peak"],["To bust",$m(Math.max(0,d.value-d.bustAt)),"busts under "+$m(d.bustAt)],["Invested",(d.value?Math.round(inv/d.value*100):0)+"%",d.positions.length+" stocks"]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>
+  </div>${liveLine}`;
+  $("apBox").innerHTML=`
   ${apPerf(d)}
+  <div class="ap-mini">${[["Days running",days,d.firstTrade?"since "+new Date(d.firstTrade).toLocaleDateString("en-US",{month:"short",day:"numeric"}):"not started"],["Peak",$m(peak),"low "+$m(low)],["Worst drop",dd.toFixed(1)+"%","from a peak"],["To bust",$m(Math.max(0,d.value-d.bustAt)),"busts under "+$m(d.bustAt)],["Invested",(d.value?Math.round(inv/d.value*100):0)+"%",d.positions.length+" stocks"]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
+  $("apMore").innerHTML=`
   <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· holdings, trade log, signals, rankings &amp; rules</small></summary>
   ${plan&&!d.marketOpen?`<div class="bt-card"><h4>🔔 Opening-bell plan <em>built overnight from news &amp; earnings · updated ${ago(plan.t)}</em></h4>${plan.orders.length?`<div class="ap-log">${plan.orders.map(o=>`<div class="ap-tr"><span class="sd ${o.side}">${o.side}</span><div><b>${esc(o.sym)}</b> · about ${$m(o.amount)}<p>${esc(o.why)}</p></div><time>at 9:30 AM</time></div>`).join("")}</div>`:`<div class="ap-note">No changes planned — if overnight news or earnings change that, this list updates before the bell.</div>`}</div>`:""}
   <div class="ap-two">
@@ -3407,23 +3446,32 @@ function botHealth(d,kind){
   if(g.errors&&g.errors.length) bits.push(`<span class="down">last error ${tm(g.errors[0].t)}: ${esc(g.errors[0].e)}</span>`);
   return `<div class="ap-health">🩺 ${bits.join(" · ")}</div>`;
 }
-/* notepad: every stock both bots hold right now, with the money in it and how it's doing */
+/* right-hand panel: everything the AIs have money in right now (selected bot first, then the other) */
 function botNotepad(){
-  const sw=BOTS.d.swing, dy=BOTS.d.day, rows=[], tm=t=>t?new Date(t).toLocaleDateString("en-US",{month:"short",day:"numeric"})+" "+new Date(t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):"—";
   const sgn=v=>(v>=0?"+":"−")+"$"+Math.abs(v).toLocaleString(undefined,{maximumFractionDigits:0});
-  if(sw) for(const p of sw.positions) rows.push({bot:"🤖 Swing",sym:p.sym,name:p.name,side:"Long",sh:p.shares,inv:p.shares*p.cost,val:p.value,pnl:p.pnl,ret:p.pnlPct/100,day:p.dayPct,w:sw.value?p.value/sw.value:0,at:p.at,note:`${p.sleeve==="safe"?"safe pick":"high-risk pick"} · stop $${p.stop.toFixed(2)}`});
-  if(dy) for(const p of dy.positions) rows.push({bot:"⚡ Day",sym:p.sym,name:"",side:p.dir==="long"?"Long":"Short",sh:p.shares,inv:p.shares*p.entry,val:p.value,pnl:p.pnl,ret:p.pnl/(p.shares*p.entry),day:null,w:dy.value?p.value/dy.value:0,at:p.at,note:`${esc(p.setup)} · stop $${p.stop.toFixed(2)} · target $${p.target.toFixed(2)} · ${p.R>=0?"+":""}${p.R.toFixed(2)}R`});
-  const tot=k=>rows.filter(r=>r.bot.includes(k)), sum=(l,f)=>l.reduce((a,r)=>a+f(r),0);
-  const foot=(name,d,k)=>{ if(!d) return ""; const l=tot(k), inv=sum(l,r=>r.val), pnl=sum(l,r=>r.pnl);
-    return `<div class="np-tot"><b>${name}</b> ${l.length} position${l.length===1?"":"s"} · ${$m(inv)} invested · ${$m(Math.max(0,d.value-sum(l.filter(r=>r.side==="Long"),r=>r.val)))} cash · open P&amp;L <span class="${cls(pnl)}">${sgn(pnl)}</span> · account ${$m(d.value)} (<span class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</span>)</div>`; };
-  const pend=dy&&dy.orders.length?`<div class="np-tot">⏳ Day trader working orders: ${dy.orders.map(o=>`${o.dir==="long"?"buy":"short"} ${o.shares} ${esc(o.sym)} @ $${o.price.toFixed(2)}`).join(" · ")}</div>`:"";
-  $("apNote").innerHTML=`<details class="notepad" ${BOTS.noteClosed?"":"open"} ontoggle="BOTS.noteClosed=!this.open;try{localStorage.setItem('md_note',BOTS.noteClosed?'0':'1')}catch{}"><summary>📝 What the AIs own right now <small>${rows.length} position${rows.length===1?"":"s"} · updates every minute</small></summary>
-  ${rows.length?`<div class="np-wrap"><table class="np-tbl"><thead><tr><th>Bot</th><th>Stock</th><th>Side</th><th>Shares</th><th>Put in</th><th>Worth now</th><th>Return</th><th>P&amp;L</th><th>Today</th><th>% of acct</th><th>Since</th><th>Notes</th></tr></thead><tbody>
-  ${rows.sort((a,b)=>b.val-a.val).map(r=>`<tr><td>${r.bot}</td><td><b>${esc(r.sym)}</b>${r.name?`<small>${esc(r.name)}</small>`:""}</td><td class="${r.side==="Short"?"down":""}">${r.side}</td><td>${(+r.sh).toFixed(r.sh%1?2:0)}</td><td>${$m(r.inv)}</td><td>${$m(r.val)}</td><td class="${cls(r.ret)}">${pct(r.ret*100)}</td><td class="${cls(r.pnl)}">${sgn(r.pnl)}</td><td class="${r.day==null?"":cls(r.day)}">${r.day==null?"—":pct(r.day)}</td><td>${Math.round(r.w*100)}%</td><td>${tm(r.at)}</td><td class="np-n">${r.note}</td></tr>`).join("")}</tbody></table></div>`
-  :`<div class="np-empty">Nothing held right now${(dy&&dy.orders.length)?"":" — positions show up here the moment either bot buys or shorts"}.</div>`}
-  ${pend}${foot("🤖 Swing bot",sw,"Swing")}${foot("⚡ Day trader",dy,"Day")}</details>`;
+  const since=t=>t?new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
+  const group=(kind,d)=>{
+    if(!d) return "";
+    const swing=kind==="swing", rows=d.positions.map(p=>swing
+      ?{sym:p.sym,name:p.name,tag:`<span class="ap-tag ${p.sleeve==="safe"?"safe":"risk"}">${p.sleeve==="safe"?"safe":"risk"}</span>`,inv:p.shares*p.cost,val:p.value,pnl:p.pnl,ret:p.pnlPct/100,day:p.dayPct,sh:p.shares,at:p.at,note:`stop $${p.stop.toFixed(2)}`}
+      :{sym:p.sym,name:p.setup,tag:`<span class="ap-tag ${p.dir==="long"?"up":"down"}">${p.dir==="long"?"long":"short"}</span>`,inv:p.shares*p.entry,val:p.value,pnl:p.pnl,ret:p.pnl/(p.shares*p.entry),day:null,sh:p.shares,at:p.at,note:`stop $${p.stop.toFixed(2)} · target $${p.target.toFixed(2)} · ${p.R>=0?"+":""}${p.R.toFixed(2)}R`}).sort((a,b)=>b.val-a.val);
+    const inv=rows.reduce((a,r)=>a+r.val,0), pnl=rows.reduce((a,r)=>a+r.pnl,0), cash=Math.max(0,swing?d.cash:d.value-d.positions.filter(p=>p.dir==="long").reduce((a,p)=>a+p.value,0));
+    const w=d.value?Math.min(100,inv/d.value*100):0;
+    const orders=!swing&&d.orders.length?`<div class="hd-orders">⏳ Working orders: ${d.orders.map(o=>`${o.dir==="long"?"buy":"short"} ${o.shares} <b>${esc(o.sym)}</b> @ $${o.price.toFixed(2)}`).join(" · ")}</div>`:"";
+    return `<div class="hd-grp ${BOTS.sel===kind?"on":""}">
+      <div class="hd-gh"><b>${swing?"🤖 Swing bot":"⚡ Day trader"}</b><span>${$m(d.value)} <small class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</small></span></div>
+      <div class="hd-alloc"><i style="width:${w.toFixed(1)}%"></i></div>
+      <div class="hd-sum"><span><b>${$m(inv)}</b> invested</span><span><b>${$m(cash)}</b> cash</span><span>open P&amp;L <b class="${cls(pnl)}">${sgn(pnl)}</b></span></div>
+      ${rows.length?rows.map(r=>`<div class="hd-row"><div class="hd-l"><b>${esc(r.sym)}</b> ${r.tag}<small>${esc(r.name||"")}</small></div>
+        <div class="hd-m"><small>put in</small>${$m(r.inv)}</div>
+        <div class="hd-r"><b>${$m(r.val)}</b><small class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
+        <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
+      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades — it only trades when a sweep or gap sets up."}</div>`}${orders}</div>`;
+  };
+  const order=BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing]]:[["swing",BOTS.d.swing],["day",BOTS.d.day]];
+  const n=(BOTS.d.swing?BOTS.d.swing.positions.length:0)+(BOTS.d.day?BOTS.d.day.positions.length:0);
+  $("apNote").innerHTML=`<div class="hd-h"><h4>💼 What the AI is invested in</h4><small>${n} position${n===1?"":"s"} · updates every minute</small></div>${order.map(([k,d])=>group(k,d)).join("")}`;
 }
-try{ BOTS.noteClosed=localStorage.getItem("md_note")==="0"; }catch{}
 function botRet(d){ if(!d) return null; return d.value/d.startValue-1; }
 function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
@@ -3438,32 +3486,34 @@ function dtRender(d){
   const today=d.trades.filter(t=>t.pnl!=null&&day.d&&new Date(t.t).toISOString().slice(0,10)>=day.d.slice(0,10));
   const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?' <span class="ap-tag own">live</span>':""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">🔒 PDT lock</b>':"ended"}</td></tr>`; };
   const dirTag=x=>`<span class="sd ${x==="long"?"BUY":"SELL"}">${x==="long"?"LONG":"SHORT"}</span>`;
-  $("apBox").innerHTML=`
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>${botHealth(d,"day")}
+  $("apVs").innerHTML=`
   <div class="ap-vs">
     <div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>⚡ Day trader</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret*100)}</small></div>
     <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">2% risk / trade</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
+  $("apBox").innerHTML=`
+  ${apPerf(d)}
   <div class="ap-mini">${[["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",day.halted?"loss limit hit — done for today":`${day.trades||0} of ${d.rules.maxTrades} trades used`],
     ["Avg. trade",a.avgR!=null?(a.avgR>=0?"+":"")+a.avgR.toFixed(2)+"R":"—","R = multiples of the risk taken"],
     ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
     ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
-    ["Open now",`${d.positions.length} pos · ${d.orders.length} orders`,`max ${d.rules.maxPos} at a time`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>
+    ["Open now",`${d.positions.length} pos · ${d.orders.length} orders`,`max ${d.rules.maxPos} at a time`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
+  $("apMore").innerHTML=`
   ${d.positions.length||d.orders.length?`<div class="bt-card"><h4>Live book <em>open positions and working limit orders</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Entry / limit</th><th>Stop</th><th>Target</th><th>Now</th><th>P&amp;L</th><th>Setup</th></tr></thead><tbody>
     ${d.positions.map(p=>`<tr><td class="n"><b>${esc(p.sym)}</b></td><td>${dirTag(p.dir)}</td><td>${p.shares}</td><td>${$m(p.entry)}</td><td>${$m(p.stop)}${p.be?' <small style="color:var(--muted)">BE</small>':""}</td><td>${$m(p.target)}</td><td>${$m(p.price)}</td><td class="${cls(p.pnl)}">${(p.pnl>=0?"+":"−")+"$"+Math.abs(p.pnl).toFixed(0)} <small>${p.R>=0?"+":""}${p.R.toFixed(2)}R</small></td><td class="n">${esc(p.setup)}</td></tr>`).join("")}
     ${d.orders.map(o=>`<tr style="opacity:.75"><td class="n"><b>${esc(o.sym)}</b></td><td>${dirTag(o.dir)} <small>limit</small></td><td>${o.shares}</td><td>${$m(o.price)}</td><td>${$m(o.stop)}</td><td>2R</td><td>—</td><td><small>expires ${new Date(o.expires*1000).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}</small></td><td class="n">${esc(o.setup)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
-  ${apPerf(d)}
   ${(a.bySetup||[]).length?`<div class="bt-card"><h4>By setup <em>which plays are working</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Setup</th><th>Trades</th><th>Win rate</th><th>P&amp;L</th></tr></thead><tbody>${a.bySetup.map(x=>`<tr><td class="n">${esc(x.setup)}</td><td>${x.n}</td><td>${Math.round(x.win*100)}%</td><td class="${cls(x.pnl)}">${(x.pnl>=0?"+":"−")+"$"+Math.abs(x.pnl).toFixed(0)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· trade log, orders and the rules</small></summary>
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
     ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts scanning at 9:35 AM ET.</div>`}</div>
   <div class="bt-card"><h4>How the day trader works <em>paper money only · rules designed by Claude, run by the server</em></h4><ul class="ap-rules">
-    <li><b>Liquidity sweeps:</b> stops pile up just beyond obvious levels — yesterday's high and low, the pre-market high and low, and the first 15 minutes' range. When price spikes through one of those on 1.5× normal volume and the next close snaps back, the stops have been "swept". The bot fades it: a <b>short</b> after a sweep of a high, a <b>long</b> after a sweep of a low.</li>
-    <li><b>News / earnings gaps:</b> a stock that gaps ±3% at the open on a catalyst the site found (earnings beat or miss, strong headlines) and then breaks its first-5-minute range in the same direction — gap and go.</li>
+    <li><b>Liquidity sweeps:</b> stops pile up just beyond obvious levels — yesterday's high and low, the pre-market high and low, the first 15 minutes' range, the high and low of the day so far, and the last 30 minutes' swing high and low. When price spikes through one of those on 1.25× normal volume and closes back within 5 minutes, the stops have been "swept". The bot fades it: a <b>short</b> after a sweep of a high, a <b>long</b> after a sweep of a low.</li>
+    <li><b>News / earnings gaps:</b> a stock that gaps ±2% at the open on a catalyst the site found (earnings beat or miss, strong headlines) — or ±4% with no known catalyst — and then breaks its first-5-minute range in the same direction within the first two hours — gap and go.</li>
     <li><b>Limit orders only:</b> entries are limit orders at the swept level or breakout level. If price doesn't come back within 10 minutes, the order expires unfilled.</li>
     <li><b>Brackets:</b> every position has a stop just past the sweep wick (or the 5-minute range) and a profit target at 2× the risk (2R). At +1R the stop moves to breakeven.</li>
-    <li><b>Risk:</b> each trade risks 2% of the account. Max 3 positions, 12 trades a day, 4× intraday buying power (2× in one stock). A −6% day stops trading for the day. Everything is closed by 3:55 PM.</li>
+    <li><b>Risk:</b> each trade risks 2% of the account. Max 4 positions (including working orders), 20 trades a day, 4× intraday buying power (2× in one stock). A −6% day stops trading for the day. Everything is closed by 3:55 PM.</li>
     <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}, plus the day's catalyst stocks.</li>
     <li><b>Starts with $30,000</b> to clear the $25,000 pattern-day-trader minimum. Falling below $25,000 would lock a real account out of day trading, so it counts as a bust and a new $30,000 run starts.</li>
     <li>Simulated on free 1-minute bars: a limit fills only if a later bar trades through it; if a stop and target fall in the same bar, the stop is assumed to hit first. No order-book data, so liquidity is read from price and volume. 0.02% slippage on exits, 0.01% borrow fee on shorts. Not financial advice.</li>
@@ -3496,7 +3546,7 @@ async function apLoadView(){
   if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
   if(BOTS.sel==="day") dtRender(d); else apRender(d);
 }
-$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else apRender(d); } else apLoadView(); };
+$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else apRender(d); } else apLoadView(); };
 setInterval(()=>{ if(S.tab==="aitrade") apLoadView(); },60_000);
 function aiShow(k){
   S.aiPane=k; document.querySelectorAll("#aiNav [data-ai]").forEach(b=>b.classList.toggle("on",b.dataset.ai===k));

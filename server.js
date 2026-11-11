@@ -1787,11 +1787,12 @@ setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60
 // 2% of equity at risk per trade, max 3 positions, 12 trades a day, −6% daily loss limit, flat by 3:55 PM.
 // Starts with $30,000 so it is above the $25,000 pattern-day-trader minimum; falling under $25,000 would lock a
 // real account out of day trading, so that counts as a bust and a fresh $30,000 run starts.
-// Data: free 1-minute Yahoo bars (each symbol about every 2 minutes); all rules live in daytrade-core.js.
+// Data: free 1-minute Yahoo bars (every symbol every minute); all rules live in daytrade-core.js.
 const DTC = require("./daytrade-core.js");
 const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY = "pft:daytrader:v1";
-const DT_START = 30_000, DT_PDT = 25_000, DT_RISK = 0.02, DT_MAXPOS = 3, DT_MAXTRADES = 12, DT_DAYSTOP = 0.06, DT_FEE_SHORT = 0.0001;
-const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA", "UBER"];
+const DT_START = 30_000, DT_PDT = 25_000, DT_RISK = 0.02, DT_MAXPOS = 4, DT_MAXTRADES = 20, DT_DAYSTOP = 0.06, DT_FEE_SHORT = 0.0001;
+const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA", "UBER",
+  "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB"];
 const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, updated: Date.now() });
 let DT = dtFresh(), dtLoaded = false, dtBusy = false, dtTickN = 0;
 const dtPx = {}, dtSeq = { n: 0 };
@@ -1873,7 +1874,7 @@ async function dtTick() {
     if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, halted: false, used: {} };
     const cats = dtCatalysts(), syms = [...new Set([...DT_UNIVERSE, ...Object.keys(cats).slice(0, 5), ...Object.keys(DT.positions), ...DT.orders.map((o) => o.sym)])];
     dtTickN++; BOTDIAG.day.scans++; BOTDIAG.day.lastOpenTick = Date.now();
-    const batch = syms.filter((s, i) => DT.positions[s] || DT.orders.some((o) => o.sym === s) || i % 2 === dtTickN % 2); // each symbol about every 2 minutes; open trades every minute
+    const batch = syms; // every symbol every minute
     const now = Date.now() / 1000;
     for (const sym of batch) {
       let bars; try { bars = await dtBars(sym); BOTDIAG.day.barsOk++; } catch (e) { BOTDIAG.day.barsFail++; diagErr("day", `${sym}: ${e.message || e}`); continue; }
@@ -1885,18 +1886,18 @@ async function dtTick() {
       if (DT.day.halted || t.min < DTC.OPEN + 5 || t.min >= 15 * 60 + 30 || DT.day.trades >= DT_MAXTRADES) continue;
       if (DT.positions[sym] || DT.orders.some((o) => o.sym === sym) || Object.keys(DT.positions).length + DT.orders.length >= DT_MAXPOS) continue;
       let prev = null; try { prev = await dtPrev(sym, t.day); } catch {}
-      const lv = DTC.levels(prev, done).filter((L) => !DT.day.used[sym + ":" + L.k]);
+      const lk = (L) => sym + ":" + L.k + ":" + L.p.toFixed(2), lv = DTC.levels(prev, done).filter((L) => !DT.day.used[lk(L)]);
       const sw = DTC.sweep(done, lv);
       if (sw) {
         BOTDIAG.day.signals++; BOTDIAG.day.lastSignal = { t: Date.now(), sym, setup: "sweep " + sw.level.k };
-        DT.day.used[sym + ":" + sw.level.k] = 1;
+        DT.day.used[lk(sw.level)] = 1;
         const why = `${sym} swept the ${sw.level.name} ($${sw.level.p.toFixed(2)}) to $${sw.wick.toFixed(2)} on ${sw.volX.toFixed(1)}× normal volume, then closed back ${sw.dir === "short" ? "below" : "above"} it — stops were taken, fading the move`;
-        dtPlace(sym, sw, "Liquidity sweep", why, Math.min(0.95, 0.5 + (sw.volX - 1.5) * 0.1), last.t); continue;
+        dtPlace(sym, sw, "Liquidity sweep", why, Math.min(0.95, 0.5 + (sw.volX - 1.25) * 0.1), last.t); continue;
       }
       const c = cats[sym];
-      if (c && prev && !DT.day.used[sym + ":GAP"]) {
-        const g = DTC.gapGo(done, prev.c, c.s);
-        if (g) { DT.day.used[sym + ":GAP"] = 1; dtPlace(sym, g, "News/earnings gap", `${sym} gapped ${g.gap >= 0 ? "up" : "down"} ${(Math.abs(g.gap) * 100).toFixed(1)}% on ${c.why}, then broke its first-5-minute ${g.dir === "long" ? "high" : "low"} — limit at the breakout level`, 0.6, last.t); }
+      if (prev && !DT.day.used[sym + ":GAP"]) {
+        const g = DTC.gapGo(done, prev.c, c ? c.s : 0);
+        if (g) { DT.day.used[sym + ":GAP"] = 1; dtPlace(sym, g, "News/earnings gap", `${sym} gapped ${g.gap >= 0 ? "up" : "down"} ${(Math.abs(g.gap) * 100).toFixed(1)}% on ${c ? c.why : "no single headline — a gap that size is news in itself"}, then broke its first-5-minute ${g.dir === "long" ? "high" : "low"} — limit at the breakout level`, 0.6, last.t); }
       }
     }
     // daily loss limit and end of day
