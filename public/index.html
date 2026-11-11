@@ -3026,7 +3026,7 @@ async function lbOpen(){
   const db=(S.db||[]).filter(e=>e.priceAt&&e.generated);
   if(!db.length){ $("lbOut").innerHTML=`<div class="fx-empty">${VIEW?"The owner's prediction log is private, so it isn't shown in the public demo.":"No saved predictions yet. Claude predictions are saved automatically when you run them (Claude is currently turned off to keep the site free)."}<br><br><b>How grading works:</b> a Bullish call is correct if the stock rises more than 2% over the next 14 days, Bearish if it falls more than 2%, Neutral if it stays within ±2%. These three ranges don't overlap.</div>`; return; }
   let spy=null; try{ spy=await api("/api/history?symbol=SPY&range=2y&interval=1d"); }catch{}
-  const at=t=>{ if(!spy) return null; const c=spy.candles.find(x=>x.time>=t/1000); return c?c.close:null; };
+  const at=t=>{ if(!spy) return null; const c=spy.candles.find(x=>x.time>=t/1000); return c&&c.time-t/1000<5*86400?c.close:null; }; // only a close within 5 days counts
   const spyNow=S.quotes.SPY&&S.quotes.SPY.price;
   const rows=[]; for(const e of db){
     const q=S.quotes[e.priceSymbol||e.symbol], end=e.final?e.final.close:(q&&!q.error?q.price:null), move=end!=null?(end/e.priceAt-1)*100:null;
@@ -3049,7 +3049,7 @@ async function lbOpen(){
   </div>
   ${G.length<30?`<div class="fx-warn">Only ${G.length} graded prediction${G.length===1?"":"s"} so far. With fewer than ~30, accuracy can swing a lot by chance — the 95% range above shows how uncertain it is. A coin flip on three outcomes would be right about 33% of the time.</div>`:""}
   <div class="fx-card"><h3>Confidence calibration <em>a well-calibrated model is right about as often as its stated confidence</em></h3><div class="fx-wrap"><table class="fx-tbl" style="min-width:420px"><thead><tr><th>Stated confidence</th><th>Graded</th><th>Avg. stated</th><th>Actually right</th><th>Gap</th></tr></thead><tbody>
-  ${grp(conf).sort().map(([g,l])=>{const st=avg(l.map(r=>r.e.confidence||0)),a=acc(l)*100;return `<tr><td>${g}</td><td>${l.length}</td><td>${st.toFixed(0)}%</td><td>${a.toFixed(0)}%</td><td class="${cls(a-st)}">${(a-st>=0?"+":"")+(a-st).toFixed(0)} pts</td></tr>`;}).join("")||`<tr><td colspan="5">No graded predictions yet.</td></tr>`}</tbody></table></div></div>
+  ${grp(conf).sort((a,b)=>["Under 50","50–64","65–79","80–100"].indexOf(a[0])-["Under 50","50–64","65–79","80–100"].indexOf(b[0])).map(([g,l])=>{const st=avg(l.map(r=>r.e.confidence||0)),a=acc(l)*100;return `<tr><td>${g}</td><td>${l.length}</td><td>${st.toFixed(0)}%</td><td>${a.toFixed(0)}%</td><td class="${cls(a-st)}">${(a-st>=0?"+":"")+(a-st).toFixed(0)} pts</td></tr>`;}).join("")||`<tr><td colspan="5">No graded predictions yet.</td></tr>`}</tbody></table></div></div>
   ${tbl("By predicted direction",grp(r=>r.e.stance))}
   ${tbl("By sector",grp("sector"))}
   ${tbl("By market environment",grp("env")," <em>S&amp;P 500 above or below its 50-day average when the call was made</em>")}
