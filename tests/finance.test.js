@@ -74,3 +74,18 @@ test("Backtest: buy-and-hold math, no look-ahead, benchmark alignment", () => {
   const rb = F.backtest({ series, weights: { A: 1, B: 1 }, initial: 1000, rebalance: "monthly" });
   assert.equal(Math.round(rb.values[1]), 1050);
 });
+test("Health scorecard: a strong company grades A, a deteriorating one fails and raises red flags", () => {
+  const prev = { revenue: 100, grossProfit: 40, operatingIncome: 20, netIncome: 15, cfo: 18, fcf: 14, totalAssets: 200, totalDebt: 40, currentAssets: 60, currentLiabilities: 40, interestExpense: 2, dilutedShares: 100, receivables: 10, inventory: 8, equity: 110 };
+  const good = F.health({ ...prev, revenue: 112, grossProfit: 46, operatingIncome: 24, netIncome: 18, cfo: 22, fcf: 17, totalAssets: 210, totalDebt: 38, currentAssets: 70, dilutedShares: 98, receivables: 11, inventory: 8.5, equity: 125 }, prev);
+  assert.equal(good.grade, "A"); assert.equal(good.failed, 0); assert.equal(good.flags.length, 0); assert.equal(good.checks.length, 15);
+  const bad = F.health({ ...prev, revenue: 90, grossProfit: 30, operatingIncome: 4, netIncome: 5, cfo: 2, fcf: -6, totalAssets: 205, totalDebt: 70, currentAssets: 30, interestExpense: 4, dilutedShares: 110, receivables: 16, inventory: 14, equity: -5 }, prev);
+  assert.ok(["D", "F"].includes(bad.grade));
+  const ids = bad.flags.map((c) => c.id); for (const k of ["cash", "dilution", "ar", "inv", "equity"]) assert.ok(ids.includes(k), k + " should be flagged");
+  assert.equal(bad.checks.find((c) => c.id === "growth").status, "fail");
+});
+test("Health scorecard: skips checks a filing can't support, and won't grade on too little", () => {
+  const bank = F.health({ revenue: 50, netIncome: 10, cfo: 12, totalAssets: 1000, equity: 90, dilutedShares: 10 }, { revenue: 48, netIncome: 9, totalAssets: 950, dilutedShares: 10 });
+  assert.ok(!bank.checks.some((c) => ["gm", "liq", "inv", "ar"].includes(c.id)));
+  assert.ok(bank.grade);
+  assert.equal(F.health({ netIncome: 5 }, {}).grade, null);
+});

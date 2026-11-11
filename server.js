@@ -2130,6 +2130,7 @@ const SEC_TAGS = {
   currentAssets: ["AssetsCurrent"],
   currentLiabilities: ["LiabilitiesCurrent"],
   inventory: ["InventoryNet"],
+  receivables: ["AccountsReceivableNetCurrent", "ReceivablesNetCurrent", "AccountsNotesAndLoansReceivableNetCurrent"],
   totalAssets: ["Assets"],
   equity: ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
   ltDebt: ["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"],

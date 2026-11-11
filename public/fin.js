@@ -149,5 +149,49 @@
     }
     return out;
   }
-  return { sum, mean, stdev, ratios, dcf, wacc, sensitivity, cagr, returns, beta, maxDrawdown, drawdownSeries, correlation, varEs, backtest, stats };
+  /* ---------- health scorecard: standard analyst checks on two fiscal years (y = latest, p = the year before) ----------
+     Each check is pass / warn / fail, or skipped when the filing doesn't report the inputs (banks have no gross margin
+     or current assets, for example). Grade = points earned ÷ points possible (pass 1, warn 0.5, fail 0).
+     `flag: true` marks the classic accounting red flags. `keys` are the line items each check reads. */
+  function health(y, p) {
+    p = p || {};
+    const has = (...v) => v.every((x) => x != null && isFinite(x)), div = (a, b) => (has(a, b) && b !== 0 ? a / b : null);
+    const pc = (x) => (x >= 0 ? "+" : "−") + Math.abs(x * 100).toFixed(1) + "%", pt = (x) => (x >= 0 ? "+" : "−") + Math.abs(x * 100).toFixed(1) + " pts", pct = (x) => (x * 100).toFixed(1) + "%";
+    const out = [], add = (id, group, label, keys, status, detail, flag) => out.push({ id, group, label, keys, status, detail, flag: !!flag && status === "fail" });
+    const g = (k) => (has(y[k], p[k]) && p[k] !== 0 ? (y[k] - p[k]) / Math.abs(p[k]) : null);
+    // --- profit & cash
+    if (has(y.netIncome)) add("profit", "Profit & cash", "Made a profit", ["netIncome"], y.netIncome > 0 ? "pass" : "fail", y.netIncome > 0 ? "Net income was positive." : "The company lost money this year.");
+    if (has(y.cfo, y.netIncome) && y.netIncome > 0) { const r = y.cfo / y.netIncome; add("cash", "Profit & cash", "Profit is backed by cash", ["cfo", "netIncome"], r >= 1 ? "pass" : r >= 0.8 ? "warn" : "fail", `Operating cash flow was ${r.toFixed(2)}× net income${r >= 1 ? "." : " — less cash came in than the profit reported."}`, true); }
+    else if (has(y.cfo)) add("cash", "Profit & cash", "Operations bring in cash", ["cfo"], y.cfo > 0 ? "pass" : "fail", y.cfo > 0 ? "Operating cash flow was positive." : "Operations used more cash than they brought in.", true);
+    if (has(y.fcf)) add("fcf", "Profit & cash", "Free cash flow is positive", ["cfo", "capex"], y.fcf > 0 ? "pass" : "fail", y.fcf > 0 ? "Cash was left over after investing in the business." : "Spending on equipment and buildings exceeded the cash operations produced.");
+    const roa = div(y.netIncome, y.totalAssets), roaP = div(p.netIncome, p.totalAssets);
+    if (has(roa, roaP)) add("roa", "Profit & cash", "Earning more on its assets", ["netIncome", "totalAssets"], roa >= roaP ? "pass" : roa >= roaP - 0.01 ? "warn" : "fail", `Return on assets went from ${pct(roaP)} to ${pct(roa)}.`);
+    // --- growth & margins
+    const rg = g("revenue");
+    if (rg != null) add("growth", "Growth & margins", "Sales are growing", ["revenue"], rg > 0.02 ? "pass" : rg >= -0.02 ? "warn" : "fail", `Revenue changed ${pc(rg)} from the year before.`);
+    const gm = div(y.grossProfit, y.revenue), gmP = div(p.grossProfit, p.revenue);
+    if (has(gm, gmP)) add("gm", "Growth & margins", "Gross margin is holding up", ["grossProfit", "revenue"], gm >= gmP - 0.005 ? "pass" : gm >= gmP - 0.02 ? "warn" : "fail", `Gross margin moved ${pt(gm - gmP)} to ${pct(gm)}.`);
+    const om = div(y.operatingIncome, y.revenue), omP = div(p.operatingIncome, p.revenue);
+    if (has(om, omP)) add("om", "Growth & margins", "Operating margin is holding up", ["operatingIncome", "revenue"], om >= omP - 0.005 ? "pass" : om >= omP - 0.02 ? "warn" : "fail", `Operating margin moved ${pt(om - omP)} to ${pct(om)}.`);
+    // --- balance sheet
+    const lev = div(y.totalDebt, y.totalAssets), levP = div(p.totalDebt, p.totalAssets);
+    if (has(lev, levP)) add("lev", "Balance sheet", "Debt isn't piling up", ["totalDebt", "totalAssets"], lev <= levP + 0.005 ? "pass" : lev <= levP + 0.03 ? "warn" : "fail", `Debt went from ${pct(levP)} to ${pct(lev)} of total assets.`);
+    const cr = div(y.currentAssets, y.currentLiabilities);
+    if (cr != null) add("liq", "Balance sheet", "Can pay its near-term bills", ["currentAssets", "currentLiabilities"], cr >= 1.2 ? "pass" : cr >= 0.9 ? "warn" : "fail", `Current assets are ${cr.toFixed(2)}× current liabilities.`);
+    if (has(y.operatingIncome, y.interestExpense) && y.interestExpense > 0) { const c = y.operatingIncome / y.interestExpense; add("cover", "Balance sheet", "Earnings cover the interest bill", ["operatingIncome"], c >= 5 ? "pass" : c >= 2 ? "warn" : "fail", `Operating income is ${c >= 100 ? "100+" : c.toFixed(1)}× interest expense.`); }
+    if (has(y.totalDebt, y.fcf) && y.totalDebt > 0) { const yrs = y.fcf > 0 ? y.totalDebt / y.fcf : Infinity; add("payoff", "Balance sheet", "Could pay off debt from cash flow", ["totalDebt", "cfo"], yrs <= 4 ? "pass" : yrs <= 8 ? "warn" : "fail", isFinite(yrs) ? `Total debt equals ${yrs.toFixed(1)} years of free cash flow.` : "No free cash flow to pay debt down with."); }
+    // --- accounting red flags
+    const sg = g("dilutedShares");
+    if (sg != null) add("dilution", "Red-flag checks", "Not diluting shareholders", ["dilutedShares"], sg <= 0.01 ? "pass" : sg <= 0.04 ? "warn" : "fail", `Share count changed ${pc(sg)}${sg < -0.005 ? " — it bought back stock." : "."}`, true);
+    const ar = g("receivables");
+    if (ar != null && rg != null) add("ar", "Red-flag checks", "Customers are paying on time", ["receivables", "revenue"], ar - rg <= 0.05 ? "pass" : ar - rg <= 0.15 ? "warn" : "fail", `Unpaid customer bills changed ${pc(ar)} while sales changed ${pc(rg)}.`, true);
+    const ig = g("inventory");
+    if (ig != null && rg != null) add("inv", "Red-flag checks", "Inventory isn't piling up", ["inventory", "revenue"], ig - rg <= 0.1 ? "pass" : ig - rg <= 0.25 ? "warn" : "fail", `Inventory changed ${pc(ig)} while sales changed ${pc(rg)}.`, true);
+    if (has(y.equity)) add("equity", "Red-flag checks", "Owns more than it owes", ["equity"], y.equity > 0 ? "pass" : "fail", y.equity > 0 ? "Shareholders’ equity is positive." : "Liabilities exceed assets (negative equity) — sometimes from heavy buybacks, sometimes from losses.", true);
+    const pts = out.reduce((a, c) => a + (c.status === "pass" ? 1 : c.status === "warn" ? 0.5 : 0), 0), score = out.length ? pts / out.length : null;
+    const grade = score == null || out.length < 5 ? null : score >= 0.85 ? "A" : score >= 0.7 ? "B" : score >= 0.55 ? "C" : score >= 0.4 ? "D" : "F";
+    return { checks: out, score, grade, passed: out.filter((c) => c.status === "pass").length, warned: out.filter((c) => c.status === "warn").length, failed: out.filter((c) => c.status === "fail").length, flags: out.filter((c) => c.flag),
+      verdict: grade == null ? "Not enough reported data to grade." : { A: "Strong — passes nearly every check.", B: "Solid — a few things to watch.", C: "Mixed — real strengths and real weak spots.", D: "Weak — fails many checks.", F: "Poor — fails most checks." }[grade] };
+  }
+  return { sum, mean, stdev, ratios, dcf, wacc, sensitivity, cagr, returns, beta, maxDrawdown, drawdownSeries, correlation, varEs, backtest, stats, health };
 });
