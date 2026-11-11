@@ -1448,9 +1448,12 @@ async function apMarketOpen() {
   if (t.wd === "Sat" || t.wd === "Sun" || t.min < 9 * 60 + 30 || t.min >= 16 * 60) return { open: false, t };
   try { const q = await quote("SPY"); return { open: Date.now() - q.marketTime < 20 * 60e3, t, spy: q }; } catch { return { open: false, t }; }
 }
+// latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
+const apPx = {}, apScoreOf = {};
+const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
 function apTrade(st, side, sym, shares, price, why, name, sleeve) {
   const px = side === "BUY" ? price * (1 + AP_SLIP) : price * (1 - AP_SLIP), amt = shares * px;
-  const p = st.positions[sym];
+  const p = st.positions[sym]; let pnl = null, pnlPct = null;
   if (side === "BUY") {
     st.cash -= amt;
     if (p) { p.cost = (p.cost * p.shares + amt) / (p.shares + shares); p.shares += shares; p.peak = Math.max(p.peak, px); }
@@ -1458,12 +1461,14 @@ function apTrade(st, side, sym, shares, price, why, name, sleeve) {
   } else {
     if (!p) return;
     st.cash += amt;
-    const pnl = (px - p.cost) * shares;
+    pnl = (px - p.cost) * shares; pnlPct = px / p.cost - 1;
     p.shares -= shares; if (p.shares < 1e-6) delete st.positions[sym];
     why += ` (${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(0)})`;
   }
   st.recent = st.recent || {}; st.recent[sym] = Date.now();
-  st.trades.unshift({ t: Date.now(), side, sym, shares: +shares.toFixed(4), price: +px.toFixed(2), amount: +amt.toFixed(2), why });
+  const after = st.cash + Object.entries(st.positions).reduce((a, [k, q]) => a + q.shares * (apPx[k] || q.cost), 0);
+  st.trades.unshift({ t: Date.now(), side, sym, shares: +shares.toFixed(4), price: +px.toFixed(2), amount: +amt.toFixed(2), why, rule: apRule(side, why),
+    score: apScoreOf[sym] != null ? +apScoreOf[sym].toFixed(3) : null, after: +after.toFixed(2), cost: +(shares * price * AP_SLIP).toFixed(2), pnl: pnl == null ? null : +pnl.toFixed(2), pnlPct: pnlPct == null ? null : +pnlPct.toFixed(4) });
   st.trades = st.trades.slice(0, 1500);
 }
 
@@ -1578,7 +1583,7 @@ async function apScore(live) {
     const e = x.earn, eAdj = !e ? 0 : e.kind === "beat" ? Math.min(0.2, 0.08 + e.surprise) : e.kind === "miss" ? -0.35 : 0;
     x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj;
   }
-  out.sort((a, b) => b.score - a.score); out.forEach((x, i) => (x.rank = i + 1));
+  out.sort((a, b) => b.score - a.score); out.forEach((x, i) => { x.rank = i + 1; apPx[x.sym] = x.px; apScoreOf[x.sym] = x.score; });
   // 80% risk: the more volatile 60% of names feed the risk sleeve (8 slots), the calmest 40% the safe sleeve (2 slots)
   const vols = out.map((x) => x.vol).sort((a, b) => a - b), cut = vols[Math.floor(vols.length * 0.4)] || 0;
   let rr = 0, sr = 0; for (const x of out) { x.sleeve = x.vol > cut ? "risk" : "safe"; x.srank = x.sleeve === "risk" ? ++rr : ++sr; }
@@ -1680,7 +1685,7 @@ async function apTick() {
     // stops every minute
     for (const s of syms) {
       const p = AP.positions[s], x = q[s]; if (!x || x.error || !x.price) continue;
-      p.peak = Math.max(p.peak || p.cost, x.price);
+      p.peak = Math.max(p.peak || p.cost, x.price); apPx[s] = x.price;
       const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), p.peak * (1 - tr));
       if (x.price <= stop) apTrade(AP, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
     }
@@ -1718,7 +1723,24 @@ async function apView() {
   const t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun"), open = wk && t.min >= 570 && t.min < 960;
   const mode = open ? "Trading live — stops checked every minute, full re-score every 10 minutes" : "Market closed — reading news and earnings overnight, ready for the opening bell";
   const current = apSummary(value, false, q["^GSPC"] && q["^GSPC"].price);
-  return { ...AP, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
+  // subsequent performance: each recent trade's price vs. now (buys: gain since buying; sells: move since selling)
+  const recentSyms = [...new Set(AP.trades.slice(0, 80).map((t) => t.sym))].filter((s) => !q[s]).slice(0, 40);
+  const q2 = recentSyms.length ? (await getQuotes(recentSyms)).quotes : {};
+  const nowPx = (s) => { const x = q[s] || q2[s]; return x && !x.error && x.price ? x.price : null; };
+  const tradesOut = AP.trades.map((t, i) => (i < 80 && nowPx(t.sym) ? { ...t, since: nowPx(t.sym) / t.price - 1 } : t));
+  const sells = AP.trades.filter((t) => t.side === "SELL" && t.pnl != null), wins = sells.filter((t) => t.pnl > 0), losses = sells.filter((t) => t.pnl <= 0);
+  const gw = wins.reduce((a, t) => a + t.pnl, 0), gl = -losses.reduce((a, t) => a + t.pnl, 0);
+  const eqv = AP.equity.map((p) => p.v), dr = eqv.slice(1).map((v, i) => v / eqv[i] - 1);
+  const mean = dr.length ? dr.reduce((a, b) => a + b, 0) / dr.length : 0, sd = dr.length > 1 ? Math.sqrt(dr.reduce((a, b) => a + (b - mean) ** 2, 0) / (dr.length - 1)) : 0;
+  let peak = AP_START, mdd = 0; for (const v of [AP_START, ...eqv, value]) { peak = Math.max(peak, v); mdd = Math.min(mdd, v / peak - 1); }
+  const traded = AP.trades.reduce((a, t) => a + t.amount, 0), avgEq = eqv.length ? eqv.reduce((a, b) => a + b, 0) / eqv.length : AP_START;
+  const spxNow = q["^GSPC"] && q["^GSPC"].price, spxRet = AP.spx0 && spxNow ? spxNow / AP.spx0 - 1 : null, ret = value / AP_START - 1;
+  const analytics = { trades: AP.trades.length, closed: sells.length, winRate: sells.length ? wins.length / sells.length : null,
+    avgWin: wins.length ? gw / wins.length : null, avgLoss: losses.length ? -gl / losses.length : null, avgWinPct: wins.length ? wins.reduce((a, t) => a + t.pnlPct, 0) / wins.length : null, avgLossPct: losses.length ? losses.reduce((a, t) => a + t.pnlPct, 0) / losses.length : null,
+    profitFactor: gl > 0 ? gw / gl : wins.length ? null : null, grossWins: gw, grossLosses: gl, maxDrawdown: mdd, tradingDays: eqv.length,
+    sharpe: dr.length >= 20 && sd ? (mean / sd) * Math.sqrt(252) : null, turnover: avgEq ? traded / avgEq : null, traded,
+    costs: AP.trades.reduce((a, t) => a + (t.cost != null ? t.cost : t.amount * AP_SLIP), 0), totalReturn: ret, benchmarkReturn: spxRet, excessReturn: spxRet != null ? ret - spxRet : null };
+  return { ...AP, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
 }
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
@@ -1857,9 +1879,11 @@ async function longHistory(sym, from, to, interval) {
   });
 }
 
-// ---------------------------------------------------------------- macro dashboard (FRED, free public CSV downloads)
-// Federal Reserve Bank of St. Louis FRED graph CSVs (no key). Each series is cached 6 hours;
-// daily series are thinned to one point a week to keep the page light.
+// ---------------------------------------------------------------- macro dashboard (free government data, no keys)
+// Primary source: FRED public CSV downloads. If FRED is slow or unreachable from the server, each series falls
+// back to the original agency: U.S. Treasury yield-curve CSVs, the BLS public API (v1, no key), the New York
+// Fed's effective fed funds API, the University of Michigan's sentiment CSV, and the NBER's recession dates.
+// Everything is cached (6 hours; older history for 7 days) so each source is called only a few times a day.
 const MACRO = [
   { id: "FEDFUNDS", name: "Federal funds rate", unit: "%", freq: "Monthly", src: "Board of Governors of the Federal Reserve System via FRED" },
   { id: "CPIAUCSL", name: "CPI inflation (year over year)", unit: "%", freq: "Monthly", yoy: true, src: "U.S. Bureau of Labor Statistics via FRED" },
@@ -1872,23 +1896,95 @@ const MACRO = [
   { id: "T10Y3M", name: "Yield curve: 10-year minus 3-month", unit: "pts", freq: "Daily", daily: true, src: "Federal Reserve Bank of St. Louis via FRED" },
   { id: "UMCSENT", name: "Consumer sentiment", unit: "index", freq: "Monthly", src: "Surveys of Consumers, University of Michigan, via FRED (copyrighted, cited)" },
   { id: "SAHMREALTIME", name: "Sahm rule recession indicator", unit: "pts", freq: "Monthly", src: "Claudia Sahm via FRED" },
-  { id: "USREC", name: "NBER recession (1 = in recession)", unit: "", freq: "Monthly", hidden: true, src: "Federal Reserve Bank of St. Louis via FRED (NBER dates)" },
+  { id: "USREC", name: "NBER recession (1 = in recession)", unit: "", freq: "Monthly", hidden: true, src: "NBER business-cycle dates via FRED" },
 ];
-async function fredSeries(m) {
-  return cached("fred:" + m.id, 6 * 3600e3, async () => {
-    const start = m.daily ? new Date(Date.now() - 31 * 365.25 * 864e5).toISOString().slice(0, 10) : "1960-01-01";
-    const csv = await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${m.id}&cosd=${start}`, "text/csv");
-    let rows = csv.trim().split(/\r?\n/).slice(1).map((l) => l.split(",")).filter((r) => r[1] && r[1] !== "." && isFinite(+r[1])).map((r) => [r[0], +r[1]]);
-    if (!rows.length) throw new Error("empty series");
-    if (m.yoy) { const by = new Map(rows); rows = rows.map(([d, v]) => { const p = by.get(String(+d.slice(0, 4) - 1) + d.slice(4)); return p ? [d, +((v / p - 1) * 100).toFixed(2)] : null; }).filter(Boolean); }
-    if (m.daily) { const wk = new Map(); for (const [d, v] of rows) { const t = Date.parse(d + "T12:00:00Z"); wk.set(Math.floor((t / 864e5 + 3) / 7), [d, v]); } const last = rows[rows.length - 1]; rows = [...wk.values()]; if (rows[rows.length - 1][0] !== last[0]) rows.push(last); }
-    return rows;
+async function getT(url, accept, ms, init) {
+  const r = await fetch(url, { ...(init || {}), headers: { "User-Agent": UA, Accept: accept || "*/*", ...((init && init.headers) || {}) }, signal: AbortSignal.timeout(ms || 20000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text();
+}
+const weekly = (rows) => { const wk = new Map(); for (const r of rows) wk.set(Math.floor((Date.parse(r[0] + "T12:00:00Z") / 864e5 + 3) / 7), r); const out = [...wk.values()]; if (rows.length && out[out.length - 1] !== rows[rows.length - 1]) out.push(rows[rows.length - 1]); return out; };
+const yoy = (rows) => { const by = new Map(rows); return rows.map(([d, v]) => { const p = by.get(String(+d.slice(0, 4) - 1) + d.slice(4)); return p ? [d, +((v / p - 1) * 100).toFixed(2)] : null; }).filter(Boolean); };
+async function fredCsv(m) {
+  const start = m.daily ? new Date(Date.now() - 31 * 365.25 * 864e5).toISOString().slice(0, 10) : "1960-01-01";
+  const csv = await getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${m.id}&cosd=${start}`, "text/csv", 15000);
+  let rows = csv.trim().split(/\r?\n/).slice(1).map((l) => l.split(",")).filter((r) => r[1] && r[1] !== "." && isFinite(+r[1])).map((r) => [r[0], +r[1]]);
+  if (!rows.length) throw new Error("empty series");
+  return rows;
+}
+// ---- fallbacks ----
+async function treasuryYields() {
+  return cached("ust:all", 6 * 3600e3, async () => {
+    const y0 = new Date().getUTCFullYear(), rows = [];
+    for (let y = y0 - 9; y <= y0; y++) {
+      const csv = await cached("ust:" + y, y < y0 ? 7 * 864e5 : 6 * 3600e3, () => getT(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${y}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${y}&page&_format=csv`, "text/csv", 20000));
+      const lines = csv.trim().split(/\r?\n/), head = lines[0].split(",").map((h) => h.replace(/"/g, "").trim());
+      const ix = (n) => head.indexOf(n), i3 = ix("3 Mo"), i2 = ix("2 Yr"), i10 = ix("10 Yr");
+      for (const l of lines.slice(1)) { const c = l.split(","); const [mm, dd, yy] = c[0].replace(/"/g, "").split("/"); if (!yy) continue; rows.push([`${yy}-${mm}-${dd}`, +c[i3], +c[i2], +c[i10]]); }
+    }
+    return rows.filter((r) => r.slice(1).every(isFinite)).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  });
+}
+async function blsSeries(id) {
+  const y0 = new Date().getUTCFullYear(), out = [];
+  for (const [a, b] of [[y0 - 19, y0 - 10], [y0 - 9, y0]]) {
+    const j = await cached(`bls:${a}`, b < y0 ? 7 * 864e5 : 12 * 3600e3, async () => JSON.parse(await getT("https://api.bls.gov/publicAPI/v1/timeseries/data/", "application/json", 20000,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seriesid: ["CUSR0000SA0", "CUSR0000SA0L1E", "LNS14000000"], startyear: String(a), endyear: String(b) }) })));
+    const s = (j.Results && j.Results.series || []).find((x) => x.seriesID === id);
+    if (s) for (const d of s.data) if (/^M(0[1-9]|1[0-2])$/.test(d.period) && isFinite(+d.value)) out.push([`${d.year}-${d.period.slice(1)}-01`, +d.value]);
+  }
+  if (!out.length) throw new Error("BLS returned no data");
+  return [...new Map(out.map((r) => [r[0], r])).values()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+}
+async function nyfedEffr() {
+  const end = new Date().toISOString().slice(0, 10), start = new Date(Date.now() - 10 * 365.25 * 864e5).toISOString().slice(0, 10);
+  const j = JSON.parse(await getT(`https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate=${start}&endDate=${end}`, "application/json", 20000));
+  const daily = (j.refRates || []).map((r) => [r.effectiveDate, +r.percentRate]).filter((r) => isFinite(r[1])).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const m = new Map(); for (const [d, v] of daily) { const k = d.slice(0, 7) + "-01"; const x = m.get(k) || [0, 0]; m.set(k, [x[0] + v, x[1] + 1]); }
+  return [...m].map(([d, [s, n]]) => [d, +(s / n).toFixed(2)]);
+}
+async function umichSentiment() {
+  const csv = await getT("https://www.sca.isr.umich.edu/files/tbmics.csv", "text/csv", 20000);
+  const M = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+  return csv.trim().split(/\r?\n/).slice(1).map((l) => l.split(",")).filter((c) => M[(c[0] || "").trim().toLowerCase()] && isFinite(+c[2])).map((c) => [`${c[1].trim()}-${String(M[c[0].trim().toLowerCase()]).padStart(2, "0")}-01`, +c[2]]);
+}
+const NBER = [["1960-05", "1961-02"], ["1970-01", "1970-11"], ["1973-12", "1975-03"], ["1980-02", "1980-07"], ["1981-08", "1982-11"], ["1990-08", "1991-03"], ["2001-04", "2001-11"], ["2008-01", "2009-06"], ["2020-03", "2020-04"]];
+function nberMonthly() { const rows = []; const now = new Date(); for (let y = 1960; y <= now.getUTCFullYear(); y++) for (let m = 1; m <= 12; m++) { const k = `${y}-${String(m).padStart(2, "0")}`; if (Date.parse(k + "-01") > now) break; rows.push([k + "-01", NBER.some(([a, b]) => k >= a && k <= b) ? 1 : 0]); } return rows; }
+function sahmFrom(unrate) { // 3-month average unemployment minus the lowest 3-month average of the prior 12 months
+  const a3 = unrate.map((r, i) => (i >= 2 ? [r[0], (unrate[i][1] + unrate[i - 1][1] + unrate[i - 2][1]) / 3] : null)).filter(Boolean);
+  return a3.map((r, i) => (i >= 12 ? [r[0], +(r[1] - Math.min(...a3.slice(i - 12, i).map((x) => x[1]))).toFixed(2)] : null)).filter(Boolean);
+}
+async function macroFallback(id, have) {
+  if (["DGS2", "DGS10", "T10Y2Y", "T10Y3M"].includes(id)) { const t = await treasuryYields(); const f = { DGS2: (r) => r[2], DGS10: (r) => r[3], T10Y2Y: (r) => r[3] - r[2], T10Y3M: (r) => r[3] - r[1] }[id]; return { rows: t.map((r) => [r[0], +f(r).toFixed(2)]), src: "U.S. Department of the Treasury daily par yield curve (last 10 years)" }; }
+  if (id === "CPIAUCSL") return { rows: await blsSeries("CUSR0000SA0"), src: "U.S. Bureau of Labor Statistics public API (CPI-U, seasonally adjusted)" };
+  if (id === "CPILFESL") return { rows: await blsSeries("CUSR0000SA0L1E"), src: "U.S. Bureau of Labor Statistics public API (core CPI-U, seasonally adjusted)" };
+  if (id === "UNRATE") return { rows: await blsSeries("LNS14000000"), src: "U.S. Bureau of Labor Statistics public API" };
+  if (id === "SAHMREALTIME") { const u = have.UNRATE || await blsSeries("LNS14000000"); return { rows: sahmFrom(u), src: "Computed here from BLS unemployment with the Sahm-rule formula (not the official real-time series)" }; }
+  if (id === "FEDFUNDS") return { rows: await nyfedEffr(), src: "Federal Reserve Bank of New York, effective federal funds rate (monthly average)" };
+  if (id === "UMCSENT") return { rows: await umichSentiment(), src: "Surveys of Consumers, University of Michigan (copyrighted, cited)" };
+  if (id === "USREC") return { rows: nberMonthly(), src: "NBER business-cycle dates" };
+  throw new Error("no free fallback for this series");
+}
+async function macroSeries(m, have) {
+  return cached("macro:s:" + m.id, 6 * 3600e3, async () => {
+    let rows = null, src = m.src, note = null;
+    try { rows = await fredCsv(m); } catch (e) { note = `FRED unavailable (${e.message}); used the original agency instead`; }
+    if (!rows) { const f = await macroFallback(m.id, have); rows = f.rows; src = f.src; }
+    if (m.yoy) rows = yoy(rows);
+    if (m.daily) rows = weekly(rows);
+    return { rows, src, note };
   });
 }
 async function macroData() {
-  return cached("macro:all", 30 * 60e3, async () => {
-    const out = await Promise.allSettled(MACRO.map(fredSeries));
-    return { updated: Date.now(), source: "FRED, Federal Reserve Bank of St. Louis (fred.stlouisfed.org)", series: MACRO.map((m, i) => ({ ...m, data: out[i].status === "fulfilled" ? out[i].value : null, error: out[i].status === "rejected" ? String(out[i].reason && out[i].reason.message || out[i].reason) : null })) };
+  const hit = cache.get("macro:all");
+  if (hit && hit.data && Date.now() - hit.at < (hit.data.complete ? 30 * 60e3 : 3 * 60e3)) return hit.data;
+  return cached("macro:all", 0, async () => {
+    const have = {}, res = [];
+    for (let i = 0; i < MACRO.length; i += 3) { // a few at a time, to be gentle with the sources
+      const part = await Promise.allSettled(MACRO.slice(i, i + 3).map((m) => macroSeries(m, have)));
+      part.forEach((p, k) => { const m = MACRO[i + k]; if (p.status === "fulfilled" && m.id === "UNRATE") have.UNRATE = p.value.rows; res.push(p); });
+    }
+    const series = MACRO.map((m, i) => res[i].status === "fulfilled" ? { ...m, data: res[i].value.rows, src: res[i].value.src, note: res[i].value.note } : { ...m, data: null, error: String((res[i].reason && res[i].reason.message) || res[i].reason) });
+    return { updated: Date.now(), complete: series.every((s) => s.data), source: "FRED (Federal Reserve Bank of St. Louis), with Treasury, BLS, New York Fed, University of Michigan and NBER as fallbacks", series };
   });
 }
 
