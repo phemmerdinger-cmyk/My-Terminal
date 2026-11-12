@@ -1980,6 +1980,33 @@ function savePorts(){ if(VIEW) return; store.set("portfolios",S.pfs); store.set(
 savePorts();
 
 const $ = (id)=>document.getElementById(id);
+/* put(el, html): update a live section in place instead of replacing it. Unchanged markup is skipped entirely;
+   otherwise the new markup is morphed into the existing nodes (same tags are kept and only changed text and
+   attributes are touched), so periodic price refreshes don't flicker, jump the scroll position or drop hover/focus. */
+function morphNode(a,b){
+  if(a.nodeType!==b.nodeType||a.nodeName!==b.nodeName){ a.replaceWith(b.cloneNode(true)); return; }
+  if(a.nodeType===3||a.nodeType===8){ if(a.nodeValue!==b.nodeValue) a.nodeValue=b.nodeValue; return; }
+  if(a.nodeType!==1) return;
+  const aa=a.attributes, ba=b.attributes;
+  for(let i=aa.length-1;i>=0;i--){ const n=aa[i].name; if(!b.hasAttribute(n)) a.removeAttribute(n); }
+  for(let i=0;i<ba.length;i++){ const {name,value}=ba[i]; if(a.getAttribute(name)!==value) a.setAttribute(name,value); }
+  if(a.nodeName==="svg"||a.nodeName==="CANVAS"){ if(a.innerHTML!==b.innerHTML) a.innerHTML=b.innerHTML; return; }
+  morphKids(a,b);
+}
+function morphKids(a,b){
+  const A=[...a.childNodes], B=[...b.childNodes];
+  for(let i=0;i<B.length;i++){ if(i<A.length) morphNode(A[i],B[i]); else a.appendChild(B[i].cloneNode(true)); }
+  for(let i=A.length-1;i>=B.length;i--) A[i].remove();
+}
+function put(el,html){ if(typeof el==="string") el=$(el); if(!el) return;
+  if(el.__h===html&&el.__f===el.firstChild&&el.__n===el.childNodes.length) return; // unchanged, and nobody replaced it meanwhile
+  if(!el.firstChild){ NATIVE_HTML.set.call(el,html); }
+  else { const t=document.createElement(el.tagName==="TABLE"?"table":el.tagName==="TBODY"?"tbody":el.tagName==="TR"?"tr":el.tagName==="UL"?"ul":"div"); t.innerHTML=html; morphKids(el,t); }
+  el.__h=html; el.__f=el.firstChild; el.__n=el.childNodes.length; }
+const NATIVE_HTML=Object.getOwnPropertyDescriptor(Element.prototype,"innerHTML");
+// sections that are redrawn on every price refresh: any innerHTML write to them becomes an in-place update
+function liveHTML(...ids){ for(const id of ids){ const el=$(id); if(!el||el.__live) continue; el.__live=true;
+  Object.defineProperty(el,"innerHTML",{configurable:true,get(){ return NATIVE_HTML.get.call(this); },set(v){ put(this,String(v)); }}); } }
 const esc = (s)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (n,d=2)=>n==null||isNaN(n)?"—":Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct = (n)=>n==null||isNaN(n)?"—":(n>=0?"+":"")+Number(n).toFixed(2)+"%";
@@ -2129,12 +2156,12 @@ function renderTape(){
     const q=S.quotes[s]; if(!q||q.error) return "";
     return `<span class="tk" data-s="${esc(s)}"><span class="s">${esc(n)}</span><span>${s==="^TNX"?fmt(q.price,3):fmt(q.price)}</span><span class="${cls(q.change)}">${pct(q.changePct)}</span></span>`;
   }).join("");
-  $("tape").innerHTML=parts+parts;
+  put("tape",parts+parts);
 }
 function countFor(t){ return S.news?S.news.items.filter(i=>i.tickers.includes(t)&&!S.srcOff.has(i.source)).length:0; }
 function renderWL(prev={}){
   $("wlCount").textContent=S.wl.length;
-  $("wl").innerHTML=S.wl.map(s=>{
+  put("wl",S.wl.map(s=>{
     const q=S.quotes[s]||{}; const p=prev[s];
     const fl=p&&q.price!=null&&p.price!=null&&q.price!==p.price?(q.price>p.price?"flash-up":"flash-down"):"";
     const n=countFor(s);
@@ -2143,13 +2170,13 @@ function renderWL(prev={}){
       ${spark(q.spark,64,22,q.prevClose)}
       <div><div class="px">${fmt(q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
       <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
-  }).join("");
+  }).join(""));
 }
 function renderMovers(){ // News-owned: which companies the headlines are about (prices live in the watchlist)
   if(!$("movers")) return; let tp; try{ tp=newsTopics(); }catch{ return; }
   const rows=tp.top.slice(0,8);
-  $("movers").innerHTML=rows.length?rows.map(([t,n])=>{ const m=moodFor(t), q=S.quotes[t];
-    return `<div data-quote="${esc(t)}" style="cursor:pointer"><span class="num" style="color:var(--amber)">${esc(t)}</span><span class="num">${n} headline${n>1?"s":""}</span><span class="num ${m.t?(m.p>m.n?"up":m.n>m.p?"down":""):""}">${m.t?(m.p>m.n?"positive":m.n>m.p?"negative":"mixed"):(q&&!q.error?pct(q.changePct):"")}</span></div>`; }).join(""):'<div style="color:var(--muted);font-size:13px">Counting mentions…</div>';
+  put("movers",rows.length?rows.map(([t,n])=>{ const m=moodFor(t), q=S.quotes[t];
+    return `<div data-quote="${esc(t)}" style="cursor:pointer"><span class="num" style="color:var(--amber)">${esc(t)}</span><span class="num">${n} headline${n>1?"s":""}</span><span class="num ${m.t?(m.p>m.n?"up":m.n>m.p?"down":""):""}">${m.t?(m.p>m.n?"positive":m.n>m.p?"negative":"mixed"):(q&&!q.error?pct(q.changePct):"")}</span></div>`; }).join(""):'<div style="color:var(--muted);font-size:13px">Counting mentions…</div>');
 }
 
 /* ---------- NEWS ---------- */
@@ -2204,9 +2231,17 @@ function filtered(){
   });
 }
 const STOP=new Set("a an the and or of to in on for with at by from as is are be its it this that after over into amid says said new stock stocks shares".split(" "));
-function words(t){ return new Set(String(t||"").toLowerCase().replace(/\s[-–|]\s[^-–|]{2,40}$/,"").replace(/[^a-z0-9$%. ]/g," ").split(/\s+/).filter(w=>w.length>1&&!STOP.has(w))); }
+const WORDS_C=new Map(); // title → word set, so clustering doesn't re-tokenize 500 headlines on every refresh
+function words(t){ const k=String(t||""); let w=WORDS_C.get(k); if(w) return w; if(WORDS_C.size>6000) WORDS_C.clear(); w=wordsRaw(k); WORDS_C.set(k,w); return w; }
+function wordsRaw(t){ return new Set(String(t||"").toLowerCase().replace(/\s[-–|]\s[^-–|]{2,40}$/,"").replace(/[^a-z0-9$%. ]/g," ").split(/\s+/).filter(w=>w.length>1&&!STOP.has(w))); }
 function overlap(a,b){ if(!a.size||!b.size) return 0; let n=0; for(const w of a) if(b.has(w)) n++; return n/Math.min(a.size,b.size); }
-function cluster(list){ // merge the same story from different outlets into one entry
+const CLUSTER_C=new Map(); // a few recent inputs (the feed, the Analysis page and Overview each cluster a different slice)
+function cluster(list){ // merge the same story from different outlets into one entry (memoized: reused until the headlines change)
+  const key=(S.newsAt||0)+"|"+list.length+"|"+list.map(i=>i.id).join(",");
+  const hit=CLUSTER_C.get(key); if(hit) return hit;
+  const out=clusterRaw(list); CLUSTER_C.set(key,out); if(CLUSTER_C.size>4) CLUSTER_C.delete(CLUSTER_C.keys().next().value); return out;
+}
+function clusterRaw(list){
   const out=[];
   for(const i of list){
     const w=words(i.title);
@@ -2232,6 +2267,9 @@ const TOPIC_ALIAS={NVDA:["Nvidia","Jensen Huang"],GOOGL:["Google","Alphabet"],GO
 const TOPIC_SKIP=new Set(["target","block","ball","best","fox","match","general","first","american","united","global","international","southern","public","progressive","digital","federal","pool","host","edison","universal","national","eastern","western","central","state","news","quest","snap","chart","arch","axon","align","copart","waters","gap","ford"]);
 let SPN=null; fetch("/sp500.json").then(r=>r.json()).then(j=>{ const L=Array.isArray(j)?j:(j.list||j.rows||j.companies||j.data||[]); SPN=Array.isArray(L)?L:[]; TOPIC_RE=null; S._tpAt=0; }).catch(()=>{});
 let TOPIC_RE=null;
+const TOPICS_C={re:null,m:new Map()}; // title → [tickers it names], rebuilt when the company list changes
+function topicsOf(title){ const R=topicRegexes(); if(TOPICS_C.re!==R){ TOPICS_C.re=R; TOPICS_C.m.clear(); }
+  let v=TOPICS_C.m.get(title); if(v) return v; v=[]; for(const [t,re] of R) if(re.test(title)) v.push(t); if(TOPICS_C.m.size>8000) TOPICS_C.m.clear(); TOPICS_C.m.set(title,v); return v; }
 function topicRegexes(){
   if(TOPIC_RE) return TOPIC_RE;
   const names={};
@@ -2253,7 +2291,7 @@ function newsTopics(){
   if(S._tpAt&&Date.now()-S._tpAt<60e3&&S._tp) return S._tp;
   const day=Date.now()-24*3600e3, cnt={}, R=topicRegexes();
   const titles=[...(S.news?S.news.items.filter(i=>(i.time||0)>day).map(i=>i.title):[]),...(S.trend||[]).map(t=>t.title)];
-  for(const title of new Set(titles)) for(const [t,re] of R) if(re.test(title)) cnt[t]=(cnt[t]||0)+1;
+  void R; for(const title of new Set(titles)) for(const t of topicsOf(title)) cnt[t]=(cnt[t]||0)+1;
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
   S._tp={cnt,top,max:top.length?top[0][1]:1}; S._tpAt=Date.now(); return S._tp;
 }
@@ -2265,16 +2303,18 @@ function newsHeat(list){
   for(const i of list){
     // match against the "top stories" lists
     let g=0,c=0,rel=1;
+    if(i._trAt===S.trendAt&&i._trT===T.length){ g=i._trG; c=i._trC; rel=i._trR; } else {
     for(const t of T){ if(Math.min(t._w.size,i._w.size)<3||overlap(t._w,i._w)<0.5) continue;
       const pos=1-t.rank/Math.max(1,t.of);
       if(t.feed==="google"){ g=Math.max(g,(t.list===0?1:.75)*(.5+.5*pos)); rel=Math.max(rel,t.related); } else c=Math.max(c,.5+.5*pos); }
+    i._trAt=S.trendAt; i._trT=T.length; i._trG=g; i._trC=c; i._trR=rel; }
     const outlets=1+i.also.length;
     const cov=Math.min(1,(outlets-1)/3);                 // 1 outlet = 0, 4+ outlets = 1
     const web=Math.min(1,Math.log2(rel)/4);               // publishers across the web: 1 → 0, 16+ → 1
     const age=Math.max(0,(now-(i.time||now))/3600e3);
     const fade=age<=keep*.35?1:Math.pow(.5,(age-keep*.35)/(keep*.35));  // only old stories lose points
     // topic boost: stories about the day's most-talked-about companies (relative to the #1 company)
-    const tb=Math.max(0,...topicRegexes().filter(([t,re])=>TP.cnt[t]&&re.test(i.title)).map(([t])=>TP.cnt[t]/TP.max));
+    const tb=Math.max(0,...topicsOf(i.title).filter(t=>TP.cnt[t]).map(t=>TP.cnt[t]/TP.max));
     i._topic=tb;
     i._heat=(0.26*g+0.22*web+0.17*cov+0.13*c+0.22*Math.pow(tb,1.5))*fade + (g||c||outlets>1?0:-0.01)*age/24; // single-outlet, untracked stories sink with age
     i._cov=outlets; i._web=rel; i._top=g>0||c>0;
@@ -2433,8 +2473,8 @@ function table(el,syms,sortable,extra){
   const rows=syms.map(s=>S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:{symbol:s,name:S.quotes[s]?"No quote":"Loading…"});
   if(sortable){ const {k,d}=S.sort; rows.sort((a,b)=>{const x=sortVal(a,k),y=sortVal(b,k);return (x>y?1:x<y?-1:0)*d;}); }
   const cols=extra?[...COLS.slice(0,13),extra]:COLS;
-  $(el).innerHTML=`<thead><tr>${cols.map(c=>`<th data-sort="${sortable?c[0]:""}" class="${sortable&&S.sort.k===c[0]?"sorted":""}">${c[1]}${sortable&&S.sort.k===c[0]?(S.sort.d>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead>
-  <tbody>${rows.map(q=>`<tr data-quote="${esc(q.symbol)}">${cols.map(c=>`<td class="${c[0]==="name"?"name":""}">${c[2](q)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  put(el,`<thead><tr>${cols.map(c=>`<th data-sort="${sortable?c[0]:""}" class="${sortable&&S.sort.k===c[0]?"sorted":""}">${c[1]}${sortable&&S.sort.k===c[0]?(S.sort.d>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead>
+  <tbody>${rows.map(q=>`<tr data-quote="${esc(q.symbol)}">${cols.map(c=>`<td class="${c[0]==="name"?"name":""}">${c[2](q)}</td>`).join("")}</tr>`).join("")}</tbody>`);
 }
 function renderData(){
   table("wlTable",S.wl,true,["news","News mood",q=>moodCell(q.symbol)]);
@@ -3787,8 +3827,8 @@ async function loadMarkets(){
 function renderMarkets(){
   for(const [id,list] of Object.entries(MK)){
     const yld=id==="mkBonds";
-    $(id).innerHTML=`<thead><tr><th>Symbol</th><th>Name</th><th>${yld?"Yield %":"Last"}</th><th>Chg</th><th>% Chg</th><th>52-wk range</th></tr></thead><tbody>${list.map(([s,n])=>{const q=S.quotes[s]||{};
-      return `<tr data-quote="${esc(s)}"><td class="sym-cell">${esc(s.replace("-USD",""))}</td><td class="name">${esc(n)}</td><td>${fmt(q.price,yld?3:2)}</td><td class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change,yld?3:2):"—"}</td><td class="${cls(q.changePct)}">${pct(q.changePct)}</td><td>${rangeBar(q.low52,q.high52,q.price)}</td></tr>`;}).join("")}</tbody>`;
+    put(id,`<thead><tr><th>Symbol</th><th>Name</th><th>${yld?"Yield %":"Last"}</th><th>Chg</th><th>% Chg</th><th>52-wk range</th></tr></thead><tbody>${list.map(([s,n])=>{const q=S.quotes[s]||{};
+      return `<tr data-quote="${esc(s)}"><td class="sym-cell">${esc(s.replace("-USD",""))}</td><td class="name">${esc(n)}</td><td>${fmt(q.price,yld?3:2)}</td><td class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change,yld?3:2):"—"}</td><td class="${cls(q.changePct)}">${pct(q.changePct)}</td><td>${rangeBar(q.low52,q.high52,q.price)}</td></tr>`;}).join("")}</tbody>`);
   }
 }
 
@@ -4010,10 +4050,10 @@ function ovPfRender(){ if(!$("ovPf")) return;
     const contrib=rows.map(r=>({s:r.h.symbol,c:r.h.shares*r.q.change,w:r.h.shares*r.q.price/val})).sort((a,b)=>b.c-a.c);
     const big=contrib.slice().sort((a,b)=>b.w-a.w)[0]; const spx=S.quotes["^GSPC"], vsSpx=spx&&!spx.error&&spx.changePct!=null?dp-spx.changePct:null;
     $("ovPfH").textContent=`${((S.pfs||[]).find(p=>p.id===S.pfActive)||{}).name||"Your portfolio"} today`;
-    $("ovPf").innerHTML=`<div class="an-pf"><b class="${cls(day)}">${day>=0?"+":"−"}$${Math.abs(day).toFixed(2)} (${pct(dp)})</b>${vsSpx!=null?`<span>${vsSpx>=0?"beating":"trailing"} the S&amp;P 500 by ${Math.abs(vsSpx).toFixed(2)} pts</span>`:""}</div>
+    put("ovPf",`<div class="an-pf"><b class="${cls(day)}">${day>=0?"+":"−"}$${Math.abs(day).toFixed(2)} (${pct(dp)})</b>${vsSpx!=null?`<span>${vsSpx>=0?"beating":"trailing"} the S&amp;P 500 by ${Math.abs(vsSpx).toFixed(2)} pts</span>`:""}</div>
       <div class="an-two"><div><h4>Helping most</h4>${contrib.filter(x=>x.c>0).slice(0,3).map(x=>`<div class="an-li"><span>${esc(x.s)}</span><b class="up">+$${x.c.toFixed(2)}</b></div>`).join("")||'<p class="an-note">Nothing up today.</p>'}</div>
       <div><h4>Hurting most</h4>${contrib.filter(x=>x.c<0).reverse().slice(0,3).map(x=>`<div class="an-li"><span>${esc(x.s)}</span><b class="down">−$${Math.abs(x.c).toFixed(2)}</b></div>`).join("")||'<p class="an-note">Nothing down today.</p>'}</div></div>
-      ${big&&big.w>=.25?`<p class="an-note">⚠ ${esc(big.s)} is ${(big.w*100).toFixed(0)}% of this portfolio — one stock is driving most of your results.</p>`:""}`; }
+      ${big&&big.w>=.25?`<p class="an-note">⚠ ${esc(big.s)} is ${(big.w*100).toFixed(0)}% of this portfolio — one stock is driving most of your results.</p>`:""}`); }
 }
 async function ovWebRender(){ const el=$("ovWeb"); if(!el||VIEW) { if(el) el.closest(".ov-card").hidden=true; return; }
   if(S._ovWebAt&&Date.now()-S._ovWebAt<120e3&&el.dataset.done) return; S._ovWebAt=Date.now();
@@ -4028,9 +4068,9 @@ function renderMood(){ // compact view of the Analysis page's scorecard: one mar
   if(!$("mood")) return; const d=anData(), sc=anScores(d);
   if(!d.spx&&!d.vix&&!d.sec.length){ $("mood").innerHTML='<h2 class="h">Market health</h2><div class="skeleton" style="margin:0"></div>'; return; }
   const v=sc.avg, [lab,col]=v>=65?["Risk-on","var(--up)"]:v>=45?["Mixed","#eab308"]:["Risk-off","var(--down)"];
-  $("mood").innerHTML=`<div class="ov-h"><h2 class="h">Market health</h2><button type="button" class="ov-go" data-gotab="analysis">Full analysis →</button></div><div style="display:flex;align-items:baseline"><span class="mood-n">${v}</span><span class="mood-l" style="color:${col}">${lab}</span></div>
+  put("mood",`<div class="ov-h"><h2 class="h">Market health</h2><button type="button" class="ov-go" data-gotab="analysis">Full analysis →</button></div><div style="display:flex;align-items:baseline"><span class="mood-n">${v}</span><span class="mood-l" style="color:${col}">${lab}</span></div>
     <div class="mood-g"><i style="left:${v}%"></i></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:10px"><span>Risk-off</span><span>Risk-on</span></div>
-    <div class="mood-parts">${sc.out.map(x=>`<div title="${esc(x.t)}"><span>${esc(x.k)}</span><b>${x.v}</b></div>`).join("")}</div>`;
+    <div class="mood-parts">${sc.out.map(x=>`<div title="${esc(x.t)}"><span>${esc(x.k)}</span><b>${x.v}</b></div>`).join("")}</div>`);
 }
 async function loadMovers(){
   try{ const j=await api("/api/movers"); S.movers=j; }catch{ S.movers={error:true}; }
@@ -4407,7 +4447,7 @@ const r2=n=>Math.round(n*100)/100+0;
 const usd=(n,sign)=>n==null||isNaN(n)?"—":(sign?(n>=0?"+":"−"):(n<0?"−":""))+"$"+fmt(Math.abs(n));
 const ptQ=sym=>{ const q=S.quotes[sym]; return q&&!q.error&&q.price!=null?q:null; };
 const isCrypto=sym=>/-USD$/.test(sym);
-const setHTML=(id,h)=>{ const e=$(id); if(e&&e.innerHTML!==h) e.innerHTML=h; }; // skip redraws that would eat a click
+const setHTML=(id,h)=>put(id,h); // in-place update: skip redraws that would eat a click
 
 /* ---------- resizable watchlist ---------- */
 (function(){
@@ -4924,6 +4964,7 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nyLoad(); },15e3);
 setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 
 /* ---------- boot ---------- */
+liveHTML("kpis","allocWrap","holdTable","alertTable","earnings","mvGain","mvLose","mvActive","pfRiskKpis","pfRiskTable","anScore","anSectors","anDrivers","anBrief","anVerdict","feed","status","aiStats","ovWeb","pfcStat","pfcLegend");
 renderNotif(); renderToolbar(); renderWL();
 /* ---------- start-up: Claude budget, live prices, first page, refresh timers ---------- */
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
@@ -4949,7 +4990,7 @@ setInterval(()=>{ if(!document.hidden) loadQuotes(); },15000);
 setInterval(()=>{ if(document.hidden) return; const long=["month","6m","year","all"].includes(S.newsRange); if(!long||Date.now()-(S.newsAt||0)>10*60e3) loadNews(); },60000);
 setInterval(()=>{ if(!document.hidden&&S.tab==="data"){ loadMarkets(); renderMood(); } },30000);
 setInterval(()=>{ if(!document.hidden&&S.tab==="data"){ S.moversAt=Date.now(); loadMovers(); } },120000);
-setInterval(()=>{ if(S.news) renderFeed(); },30000);
+setInterval(()=>{ if(S.news&&S.tab==="news"&&!document.hidden) renderFeed(); },30000); // relative times ("5 min ago") only matter on the News page
 setInterval(()=>{ if(!document.hidden&&S.tab==="research"&&S.rq.sym&&["1d","5d"].includes(S.chartRange)) loadChart(); },60000);
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuotes(); loadNews(); } });
 
@@ -5117,7 +5158,7 @@ function anData(){
   let up=0,down=0; const snap=S.an&&S.an.snap&&S.an.snap.quotes; if(snap) for(const v of Object.values(snap)){ if(v[2]>0) up++; else if(v[2]<0) down++; }
   let items=(S.news?S.news.items:[]).filter(i=>Date.now()-(i.time||0)<24*3600e3); if(items.length<10) items=(S.news?S.news.items:[]).slice(0,80);
   const pos=items.filter(i=>i.mood>0).length, neg=items.filter(i=>i.mood<0).length;
-  let list=[]; try{ list=cluster(items); newsHeat(list); list.sort((a,b)=>b._heat-a._heat); }catch{}
+  let list=[]; try{ list=cluster(items).slice(); newsHeat(list); list.sort((a,b)=>b._heat-a._heat); }catch{}
   return {spx,ndq,dji,rut,vix,sec,up,down,pos,neg,list,stress:marketStress()};
 }
 function anScores(d){

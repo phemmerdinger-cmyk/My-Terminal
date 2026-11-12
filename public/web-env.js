@@ -101,13 +101,13 @@
   }
   const rdWait = setInterval(() => { if (typeof S !== "undefined" && $("ovRadar") && X()) { clearInterval(rdWait); if (typeof VIEW !== "undefined" && VIEW) { $("ovRadar").hidden = true; return; } radarMount(); } }, 300);
   function radarStart() {
-    const cv = $("rdCv"); if (!cv || E.radarRaf) return; const ctx = cv.getContext("2d"); let last = 0;
+    const cv = $("rdCv"); if (!cv || E.radarRaf) return; const ctx = cv.getContext("2d"); let last = 0; E.rdVis = true; try { new IntersectionObserver((es) => (E.rdVis = es[0].isIntersecting)).observe(cv); } catch {}
     cv.onclick = (e) => { const r = cv.getBoundingClientRect(), R = r.width / 2, x = e.clientX - r.left - R, y = e.clientY - r.top - R; let best = null, bd = 14;
       for (const g of E.sig) { const gx = Math.cos(g.ang) * g.r * R * 0.86, gy = Math.sin(g.ang) * g.r * R * 0.86, d = Math.hypot(gx - x, gy - y); if (d < bd) { bd = d; best = g; } } if (best) openSignal(best); };
     cv.onmousemove = (e) => { const r = cv.getBoundingClientRect(), R = r.width / 2, x = e.clientX - r.left - R, y = e.clientY - r.top - R; let best = null, bd = 12; for (const g of E.sig) { const d = Math.hypot(Math.cos(g.ang) * g.r * R * 0.86 - x, Math.sin(g.ang) * g.r * R * 0.86 - y); if (d < bd) { bd = d; best = g; } } cv.title = best ? `${best.label} — ${best.sub}` : ""; cv.style.cursor = best ? "pointer" : "default"; };
     const draw = (t) => {
-      E.radarRaf = requestAnimationFrame(draw); if (S.tab !== "data" || document.hidden) return; // the radar lives on the Overview dashboard
-      const fpsCap = cfg.perf === "low" ? 4 : cfg.perf === "balanced" ? 24 : 60; if (t - last < 1000 / fpsCap) return; last = t;
+      E.radarRaf = requestAnimationFrame(draw); if (S.tab !== "data" || document.hidden || !E.rdVis) return; // the radar lives on the Overview dashboard; idle when scrolled away
+      const fpsCap = 30; if (t - last < 1000 / fpsCap) return; last = t;
       const d = Math.min(2, devicePixelRatio || 1), size = cv.clientWidth; if (cv.width !== size * d) { cv.width = cv.height = size * d; } const R = size / 2, ctx2 = ctx; ctx2.setTransform(d, 0, 0, d, 0, 0); ctx2.clearRect(0, 0, size, size);
       const cx = R, cy = R, Rr = R * 0.86, sweep = reduced() || cfg.perf === "low" ? -Math.PI / 2 : ((t / 4200) % 1) * Math.PI * 2 - Math.PI / 2;
       // sector heat ring

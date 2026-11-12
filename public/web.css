@@ -499,3 +499,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 @media (max-width:760px){.twb-radar{display:none}}
 .twb-tools .twb-find{width:260px}
 @media (max-width:760px){.twb .twb-modes{top:52px!important;bottom:auto!important;right:10px!important;left:10px;justify-content:center}}
+
+/* smoothness: the big SVG repaints on every animation frame, so keep continuous animation inside it to a minimum */
+.twb-web .shim{display:none}
+.twb-lit .glow{animation:none!important;filter:none!important;opacity:.16}

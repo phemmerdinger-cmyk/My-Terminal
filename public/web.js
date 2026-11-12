@@ -162,8 +162,8 @@
     const EC = { holds: "#f5c518", correlation: "#a78bfa", sensitivity: "#22d3ee", event: "#fb923c", trader: "#ff6fae", industry: "#7c6bb8", sector: "#4da3ff" };
     for (const e of ((W.graph && W.graph.edges) || []).slice(0, 140)) { const a = posOf(e.a || e.from || e.source), b = posOf(e.b || e.to || e.target); if (a && b) add(a, b, EC[e.type] || "#5eead4", e.type || "link", [e.a || e.from || e.source, e.b || e.to || e.target], e.why); }
     for (const x of mine) if (W.place && W.place[x] != null) { const sec = W.sec && W.sec[x]; if (sec && secNode[sec]) add(stockP(x), nodeP(secNode[sec]), "#f5c518", "holding", [x, secNode[sec].id]); }
-    const low = document.documentElement.classList.contains("tw-low");
-    g.innerHTML = W.kg.map((e, i) => `<path id="kg${i}" class="kg ${esc(e.kind)}" data-a="${esc(e.ids[0])}" data-b="${esc(e.ids[1])}" stroke="${e.c}" d="${kgD(e)}">${e.why ? `<title>${esc(e.why)}</title>` : ""}</path>${low ? "" : `<circle class="kgp" r="1.9" fill="${e.c}"><animateMotion dur="${(3.2 + (i % 7) * 0.7).toFixed(1)}s" begin="-${((i * 0.37) % 4).toFixed(2)}s" repeatCount="indefinite"><mpath href="#kg${i}"/></animateMotion></circle>`}`).join("");
+    const low = document.documentElement.classList.contains("tw-low") || innerWidth < 760, PULSE = new Set(W.kg.map((e, i) => [i, e]).sort((x, y) => (y[1].kind === "holding") - (x[1].kind === "holding")).slice(0, 10).map(([i]) => i));
+    g.innerHTML = W.kg.map((e, i) => `<path id="kg${i}" class="kg ${esc(e.kind)}" data-a="${esc(e.ids[0])}" data-b="${esc(e.ids[1])}" stroke="${e.c}" d="${kgD(e)}">${e.why ? `<title>${esc(e.why)}</title>` : ""}</path>${low || !PULSE.has(i) ? "" : `<circle class="kgp" r="1.9" fill="${e.c}"><animateMotion dur="${(3.2 + (i % 7) * 0.7).toFixed(1)}s" begin="-${((i * 0.37) % 4).toFixed(2)}s" repeatCount="indefinite"><mpath href="#kg${i}"/></animateMotion></circle>`}`).join("");
   }
   function kgD(e) { const a = e.a(), b = e.b(); if (!a || !b) return "M0 0"; const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, cx = mx + (G.cx - mx) * 0.28, cy = my + (G.cy - my) * 0.28; return `M${a.x.toFixed(1)} ${a.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`; }
   // search: tickers, company names, sectors, indicators and research nodes; matches and their links light up
@@ -316,7 +316,9 @@
     if (scanning) { const r = HALF * 1.25, a0 = (t / 380) % (Math.PI * 2); c.strokeStyle = "rgba(94,234,212,.55)"; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, r, a0, a0 + 1.1); c.stroke();
       const g = (t % 1200) / 1200; c.strokeStyle = `rgba(77,163,255,${(0.4 * (1 - g)).toFixed(3)})`; c.beginPath(); c.arc(cx, cy, HALF * (0.6 + g * 1.2), 0, Math.PI * 2); c.stroke(); }
   }
-  const scr = (p) => { const o = $("twb").getBoundingClientRect(); return { x: o.left + p.x * CAM.k + CAM.x - HALF, y: o.top + p.y * CAM.k + CAM.y - HALF }; };
+  const BOX = { t: -1, r: null }, boxRect = () => { const n = performance.now(); if (!BOX.r || n - BOX.t > 100) { BOX.r = $("twb").getBoundingClientRect(); BOX.t = n; } return BOX.r; };
+  addEventListener("scroll", () => (BOX.r = null), { passive: true, capture: true }); addEventListener("resize", () => (BOX.r = null));
+  const scr = (p) => { const o = boxRect(); return { x: o.left + p.x * CAM.k + CAM.x - HALF, y: o.top + p.y * CAM.k + CAM.y - HALF }; };
   const jf = (s, k) => () => scr(J(s, k));
   // path along the web: around ring k from spoke s1 to s2 (shorter way), then along spoke s2 to ring k2
   function webPath(from, s2, k2) {

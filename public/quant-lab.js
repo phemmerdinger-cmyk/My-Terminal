@@ -279,10 +279,10 @@
     cv.onwheel = (e) => { e.preventDefault(); QL.rot.zoom = Math.max(0.5, Math.min(3, QL.rot.zoom * (e.deltaY > 0 ? 0.92 : 1.08))); };
     const label = (txt, x, y, col, bold) => { ctx.font = `${bold ? "600 " : ""}11px ui-monospace,SFMono-Regular,monospace`; ctx.textAlign = "center"; ctx.fillStyle = "rgba(6,10,14,.75)"; const w = ctx.measureText(txt).width + 8; ctx.fillRect(x - w / 2, y - 10, w, 14); ctx.fillStyle = col; ctx.fillText(txt, x, y + 1); };
     const vis = (i) => !QL.sector || b.assets[i].sector === QL.sector;
-    let last = 0;
+    let last = 0; QL.cvVis = true; try { new IntersectionObserver((es) => (QL.cvVis = es[0].isIntersecting)).observe(cv); } catch {}
     const draw = (t) => {
       if (!document.body.contains(cv)) return; QL.raf = requestAnimationFrame(draw);
-      if (S.tab !== "quant" || document.hidden) return; const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t;
+      if (S.tab !== "quant" || document.hidden || !QL.cvVis) { last = 0; return; } /* only draw while the 3-D view is on screen */ const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t;
       const d = QL.cvD, W = cv.width / d, H = cv.height / d; ctx.setTransform(d, 0, 0, d, 0, 0); ctx.clearRect(0, 0, W, H);
       const vals = b.assets.map((a) => (COLOR[QL.color][1] ? COLOR[QL.color][1](a) : 0)).filter(isFinite), lo = Math.min(...vals), hi = Math.max(...vals);
       const hov = QL.hover, near = hov >= 0 ? new Set([hov, ...b.nbr[hov]]) : null, dim = (i) => (!vis(i) ? 0.12 : near && !near.has(i) ? 0.28 : 1);
