@@ -390,7 +390,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 
 /* PREDICTIONS tab */
 .pred-hero{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
-.pred-hero .field{flex:1;min-width:200px;text-transform:uppercase;font-size:15px;padding:10px 12px}
+.pred-hero .field{flex:1;min-width:200px;font-size:15px;padding:10px 12px}
 .pred-hero .field:focus{border-color:var(--claude)}
 .pred-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
 .pcard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;position:relative}
@@ -1198,6 +1198,9 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 .cl-sw.on{border-color:rgba(217,119,87,.7);box-shadow:0 0 14px rgba(217,119,87,.25)} .cl-sw.on .cl-k{background:#d97757} .cl-sw.on .cl-k i{left:18px} .cl-sw.on em{color:#f0a283}
 .cl-pop{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);width:280px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:14px;box-shadow:0 18px 40px rgba(0,0,0,.5);z-index:30}
 .cl-pop[hidden]{display:none}
+.cl-pop.cl-center{position:fixed;top:28vh;left:50%;right:auto;transform:translateX(-50%);width:min(360px,92vw);z-index:1000;padding:20px;box-shadow:0 0 0 100vmax rgba(0,0,0,.6),0 24px 60px rgba(0,0,0,.6)}
+.pred-ans{background:var(--panel);border:1px solid var(--line2);border-left:3px solid #e8835c;border-radius:12px;padding:16px 18px;margin:0 0 16px}
+.pred-ans .pa-q{font-weight:700;margin-bottom:8px;color:#e8835c} .pred-ans .pa-a{white-space:pre-wrap;line-height:1.6} .pred-ans .pa-st{font-size:11px;color:var(--dim);margin-top:12px}
 .cl-ph{font-weight:700;margin-bottom:4px} .cl-pop p{margin:0 0 10px;font-size:12px;color:var(--muted);line-height:1.5}
 .cl-pop input{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:8px;color:var(--text);padding:9px 10px;font-size:15px}
 .cl-err{color:var(--down);font-size:12px;min-height:16px;margin:6px 0}
@@ -2012,10 +2015,11 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
       <div data-aipane="predict">
         <form class="pred-hero" id="predForm">
-          <input class="field" id="predInput" autocomplete="off" placeholder="Search any stock for Claude's prediction — e.g. NVDA" maxlength="12">
+          <input class="field" id="predInput" autocomplete="off" placeholder="Type a ticker or ask anything — e.g. NVDA, or “Will Apple beat earnings?”" maxlength="400" enterkeyhint="send">
           <button class="btn claude" id="predBtn">✦ Predict</button>
         </form>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="predChips"></div>
+        <div class="pred-ans" id="predAns" hidden></div>
         <div class="pred-grid" id="predGrid"></div>
       </div>
 
@@ -2195,7 +2199,7 @@ function spark(arr,width=64,h=22,prev){
 }
 // Claude lock: requests that spend Claude credits carry the owner's password (checked on the server)
 const CL={pass:"",pending:null}; // starts Off on every visit; the password is only kept in memory until the page closes
-function clNeed(run){ if(CL.pass) return false; CL.pending=run; clOpen(); toast("🔒 Enter your Claude password — your request will run right after."); return true; }
+function clNeed(run){ if(CL.pass) return false; CL.pending=run; clOpen("",true); toast("🔒 Enter your Claude password — your request will run right after."); return true; }
 try{ localStorage.removeItem("claudePass"); }catch{}
 const api = (p,opt={})=>{
   if(/^\/api\/(predict|ask|autopilot\/restore)/.test(p)&&CL.pass) opt={...opt,headers:{...(opt.headers||{}),"x-claude-pass":CL.pass}};
@@ -2916,10 +2920,22 @@ async function runPredict(s,fresh){
   }
   if(S.tab==="predict") renderPredict();
 }
-$("predForm").onsubmit=e=>{ e.preventDefault(); const s=normSym($("predInput").value);
-  if(!(s==="MARKET"||/^[A-Z0-9.\-]{1,10}$/.test(s))) return toast("Enter a valid ticker, like NVDA.");
+$("predForm").onsubmit=e=>{ e.preventDefault(); const raw=$("predInput").value.trim(); if(!raw) return toast("Type a ticker or a question first.");
+  const s=normSym(raw), isSym=!/\s/.test(raw)&&(s==="MARKET"||/^[A-Z0-9.\-]{1,10}$/.test(s));
   if(clNeed(()=>$("predForm").requestSubmit())) return;
-  $("predInput").value=""; runPredict(s); };
+  $("predInput").value=""; if(isSym) runPredict(s); else predAsk(raw); };
+/* free-text questions typed into the predictor: answered by Claude with the server key */
+async function predAsk(q){
+  const box=$("predAns"); box.hidden=false; $("predBtn").disabled=true;
+  box.innerHTML=`<div class="pa-q">✦ ${esc(q)}</div><div class="pa-a"><span class="spin"></span>Claude is reading prices, headlines, your watchlist and portfolio…</div>`;
+  try{
+    const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port})});
+    const acts=j.actions||(j.action?[j.action]:[]); let did=""; for(const a of acts){ const m=await applyAction(a); did+=(did?"\n":"")+m; }
+    box.querySelector(".pa-a").textContent=j.answer+(did?"\n\n"+did:"");
+    const st=document.createElement("div"); st.className="pa-st"; st.textContent=`${j.model||"Claude"} · ${new Date(j.generated||Date.now()).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`; box.appendChild(st);
+  }catch(e){ box.querySelector(".pa-a").innerHTML=`<span class="bad">${esc(e.code==="no_key"?"No API key is set up yet.":"Couldn't get an answer: "+e.message)}</span>`; }
+  $("predBtn").disabled=false;
+}
 
 
 /* ---------- AI DATABASE: saved predictions, grading, screener, head-to-head ---------- */
@@ -4029,6 +4045,7 @@ document.addEventListener("submit",e=>{ const f=e.target.closest("[data-follow]"
 async function runAsk(){
   const q=$("askInput").value.trim(); if(!q) return toast("Type a question first.");
   if(!hasKey()) return toast("Claude Predictor isn't switched on yet.");
+  if(clNeed(runAsk)) return;
   const out=$("askOut"); out.hidden=false; out.innerHTML='<span class="spin"></span>Claude is reading the market, your watchlist and your portfolio…'; $("askBtn").disabled=true;
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},
@@ -5010,7 +5027,7 @@ setInterval(()=>{ if(S.tab==="signals"&&!document.hidden&&!SG.scanning) sgScan(f
 /* ---------- Claude on/off switch ---------- */
 function clRender(){ const on=!!CL.pass; $("clSwitch").classList.toggle("on",on); $("clState").textContent=on?"On":"Off"; }
 function clSave(pw){ CL.pass=pw; clRender(); }
-function clOpen(msg){ CL.openedAt=Date.now(); $("clPop").hidden=false; $("clErr").textContent=msg||""; $("clPass").value=""; setTimeout(()=>$("clPass").focus(),30); }
+function clOpen(msg,center){ CL.openedAt=Date.now(); $("clPop").classList.toggle("cl-center",!!center); $("clPop").hidden=false; $("clErr").textContent=msg||""; $("clPass").value=""; setTimeout(()=>$("clPass").focus(),30); }
 function clLocked(msg){ if(CL.pass){ clSave(""); } clOpen(/wrong|too many/i.test(msg||"")?msg:""); toast("🔒 Claude is off. Switch it on at the top and enter your password."); }
 $("clSwitch").onclick=()=>{ if(CL.pass){ clSave(""); $("clPop").hidden=true; toast("Claude switched off on this device."); } else if($("clPop").hidden) clOpen(); else $("clPop").hidden=true; };
 $("clCancel").onclick=()=>{ $("clPop").hidden=true; CL.pending=null; };
