@@ -172,10 +172,7 @@
   function planVisit(v) { // v = { page, text, lines:[indexes] }
     const [grp, pageName] = PAGE[v.page] || ["markets", "Overview"], spokes = GSPOKES[grp], s = spokes[Math.floor(spokes.length / 2)];
     crawl(s, RINGS, `Heading to ${GNAME[grp]} › ${pageName}`);
-    const anchor = jf(s, RINGS), out = () => leftMid();
-    cmd({ pts: () => [out], speed: 420, cap: `Heading into ${GNAME[grp]} › ${pageName}` });
-    cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}` });
-    cmd({ pts: () => [anchor], speed: 420, cap: "Climbing back into the web" });
+    cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}` }); // reads it from the web's edge; never leaves the page
     const mine = G.nodes.filter((n) => groupOfNode(n) === grp).sort((a, b) => a.k - b.k || (b.importance || 0) - (a.importance || 0));
     const wanted = (v.lines || []).flatMap((i) => (SUM.target[i] ? G.nodes.filter((n) => n.label.length > 1 && new RegExp(`\\b${n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(SUM.target[i].t)) : []));
     const picks = [...new Set([...wanted, ...mine])].slice(0, 2);
@@ -202,7 +199,8 @@
     if (!SPD.on) return; SPD.raf = requestAnimationFrame(step);
     const dt = Math.min(0.05, (t - (SPD.last || t)) / 1000); SPD.last = t;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!SPD.cur) { if (!SPD.q.length) (W.open ? nextCycle() : pageCycle()); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
+    if (!W.open) return hideSpider();
+    if (!SPD.cur) { if (!SPD.q.length) nextCycle(); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
     const c = SPD.cur, busy = W.st && W.st.state !== "idle" && W.st.state !== "error", mult = busy ? 1.35 : 1;
     let moving = false;
     if (c.jump) { const p = c.jump(); SPD.x = p.x; SPD.y = p.y; SPD.head = 0; SPD.trail = []; SPD.cur = null; }
@@ -277,8 +275,11 @@
     cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top - HALF + 6 }; }], speed: 220, cap: title ? `Reading ${title}` : `Reading ${pageLabel(t)}` });
     cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * Math.min(0.95, fx + 0.12) - HALF, y: r.top + Math.min(r.height - HALF, 40) - HALF }; }], speed: 70, cap: FOL.job && !FOL.found ? `Researching ${FOL.jobLabel} on the server…` : title ? `Reading ${title}` : "" });
   }
+  function hideSpider() { SPD.wanted = false; SPD.on = false; cancelAnimationFrame(SPD.raf); SPD.q = []; SPD.cur = null; if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = "none"; }
   function onTab(t) {
-    if (!SPD.el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (t !== "web") return hideSpider(); // the spider stays on THE WEB page; the 10-K crawler has its own reader
+    if (!SPD.el) return; for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = ""; startSpider();
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     SPD.q = []; SPD.cur = null; FOL.page = t;
     if (t === "web") { cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 260, cap: "Crawling into the web", end: () => (SPD.at = { s: 12, k: RINGS }) }); return; }
     const first = () => { const T = targetsOn(t), e = T[0]; if (!e) return { x: innerWidth / 2 - HALF, y: innerHeight / 2 - HALF }; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width - SIZE, 40), y: r.top - HALF + 6 }; };
@@ -406,7 +407,7 @@
   };
   window.webClose = function () { W.open = false; clearInterval(W.poll); clearInterval(W.sumPoll); clearInterval(W.gPoll); };
   function startSpider() { spiderEl(); SPD.wanted = true; if (SPD.on || document.hidden) return; SPD.on = true; SPD.last = 0; SPD.raf = requestAnimationFrame(step); }
-  setTimeout(() => { startSpider(); if (S.tab !== "web") onTab(S.tab); }, 1500); // the spider lives on every page
+
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);
   W.navPoll = setInterval(() => { if (!W.open && !document.hidden) loadStatus(); }, 8000);

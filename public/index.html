@@ -2097,11 +2097,11 @@ const TABS = ["news","data","macro","research","fin","dcf","filings","portfolio"
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
-  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["filings","10-K crawler"]]],
+  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
-  ["web",[["web","Command center"],["health","System health"]]],
+  ["web",[["web","Command center"],["filings","10-K crawler"],["health","System health"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
