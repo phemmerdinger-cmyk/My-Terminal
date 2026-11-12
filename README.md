@@ -80,6 +80,13 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## Quant › Backtest lab
+- **Strategies:** buy-and-hold, fixed-weight rebalancing, momentum, mean reversion, moving-average crossover, RSI, multi-factor (momentum + low volatility + trend), risk parity (inverse volatility), and custom rules (`rsi(14) < 30 and price > sma(200)`).
+- **Realism:** signals use data through each day's close and trade at the next day's close (no look-ahead); dividend- and split-adjusted prices; the benchmark's real trading calendar; commission, half the bid-ask spread and slippage on every trade; max position size and minimum cash; cash earns the risk-free rate (default = today's 13-week T-bill yield). Survivorship bias and other data limits are listed on every result.
+- **Metrics:** CAGR, volatility, Sharpe, Sortino, max drawdown, Calmar, alpha, beta, information ratio, 1-day VaR and expected shortfall (95%), win rate, profit factor, average win/loss, turnover, total costs; equity and drawdown charts, monthly-return heatmap, full trade history.
+- **Overfitting controls:** optimize on the first 70% and test once on the unseen 30%; walk-forward (re-tune each year on the previous 3, chain only out-of-sample years); parameter-sensitivity heatmap (descriptive only).
+- **Backtested vs. paper-traded vs. market-observed** results are labeled and shown separately. All math runs in the browser (`public/quant.js`), so it costs nothing on the server.
+
 ## Data integrity and system health
 - **Data Integrity Engine** (`data/integrity.js`): every company's SEC figures are checked on the Financials and DCF pages — Assets = Liabilities + Equity, liabilities + equity components, operating + investing + financing cash flow = change in cash, gross profit and EPS consistency, sign checks, an independent re-computation of the ratios the site shows, fiscal-period and filing identification, currency, recency, merged duplicate periods, restatements (from the SEC's own filing history) and revisions (changes since the last time the site checked).
 - **Data Confidence Score (0–100):** `100 × (0.35·completeness + 0.25·recency + 0.25·consistency + 0.15·source quality)`. A data-quality diagnostic, not a probability that a number is correct.
