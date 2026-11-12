@@ -146,7 +146,7 @@ main{min-width:0}
 .fa-note{position:fixed;right:18px;bottom:18px;z-index:70;max-width:340px;background:var(--panel);border:1px solid #f59e0b;border-radius:6px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:6px;animation:crSumIn .3s ease-out}
 .fa-note b{font-size:13.5px}.fa-note small{color:var(--muted);font-size:12px}.fa-note div{display:flex;gap:8px;margin-top:4px}
 @media (max-width:700px){.fa-note{left:12px;right:12px;bottom:84px;max-width:none}}
-body.fa-has [data-tab="filings"]::after,body.fa-has [data-group="research"]::after{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:6px;vertical-align:middle;box-shadow:0 0 8px rgba(245,158,11,.8)}
+/* (tab alert dots removed: new filings still show in the alert box on the 10-K crawler page) */
 .cr-modes{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--cr-l);border-radius:4px;overflow:hidden;background:var(--cr-p);margin:0 0 10px;width:max-content;max-width:100%}
 .cr-modes button{font:600 12px/1 var(--cr-m);color:var(--muted);background:none;border:0;border-right:1px solid var(--cr-l);padding:10px 14px;cursor:pointer;white-space:nowrap}
 .cr-modes button:last-child{border-right:0}.cr-modes button:hover{color:var(--text)}
@@ -1631,7 +1631,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-group="research"><span class="ti">🔎</span>Research</button>
   <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
   <button data-group="ailab" class="lab"><span class="ti">🤖</span>AI Lab</button>
-  <button data-group="web" title="THE WEB · autonomous research"><span class="tw-navdot" aria-hidden="true"></span>THE WEB</button>
+  <button data-group="web" title="THE WEB · autonomous research"><span class="ti">🕸</span>THE WEB</button>
   <span class="tsep" aria-hidden="true"></span>
   <div class="subtabs" id="subtabs" role="tablist"></div>
 </nav>

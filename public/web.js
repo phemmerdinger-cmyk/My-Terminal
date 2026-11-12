@@ -85,7 +85,6 @@
   async function loadStatus() {
     try { W.st = await api("/api/web/status"); W.stAt = Date.now(); W.offline = false; }
     catch (e) { W.offline = true; }
-    navDot();
     if (W.open) { renderHud(); renderAct(); }
     const s = W.st; if (!s) return;
     // react to completed work: new discoveries refresh the feed; a finished briefing reloads the briefing
@@ -94,11 +93,6 @@
     W.lastDisc = n;
     const lastB = (s.recent || []).find((j) => j.type === "briefing" && j.status === "done");
     if (W.open && lastB && (!W.brief || (lastB.ended || 0) > (W.brief.generatedAt || 0) + 1000) && (!W.viewing || W.viewing === "latest")) loadBrief("latest");
-  }
-  function navDot() {
-    const b = document.querySelector('#tabs [data-group="web"] .tw-navdot'); if (!b) return;
-    const s = W.st; b.className = "tw-navdot " + (W.offline ? "err" : !s ? "" : s.state === "error" ? "err" : s.state === "idle" ? "idle" : "run");
-    b.parentElement.title = W.offline ? "THE WEB · can't reach the Spider" : s ? `THE WEB · Spider ${STATE[s.state] || s.state}${s.running ? ": " + s.running.label : ""}` : "THE WEB";
   }
   async function notifyNew() {
     if (Date.now() - W.toastAt < 5 * 60e3 || document.hidden) return;
@@ -382,13 +376,55 @@
   const _rp = renderPortfolio; renderPortfolio = function () { const r = _rp.apply(this, arguments); try { pfCard(); } catch {} return r; };
   const _ap = apLoadView; apLoadView = async function () { const r = await _ap.apply(this, arguments); try { apCard(); } catch {} return r; };
 
+
+  // ---------------------------------------------------------------- the crawling Spider
+  // It walks the edges of the visible part of THE WEB page. Fast while a research job is really running, a slow
+  // wander when the backend is idle, stopped (red) on an error or lost connection; it turns around when a new job starts.
+  const CR = { el: null, raf: 0, s: 0, dir: 1, last: 0, job: null, flip: 0 };
+  function crawlerEl() {
+    if (CR.el) return CR.el;
+    const legs = [[-1, -1, "la"], [-1, -0.35, "lb"], [-1, 0.35, "la"], [-1, 1, "lb"], [1, -1, "lb"], [1, -0.35, "la"], [1, 0.35, "lb"], [1, 1, "la"]].map(([sx, sy, g]) =>
+      `<g class="${g}"><path class="leg" d="M${15 + sx * 3} ${15 + sy * 3} Q${15 + sx * 9} ${15 + sy * 5 - 4} ${15 + sx * 13} ${15 + sy * 10 + 1}"/></g>`).join("");
+    const el = document.createElement("div"); el.className = "tw-crawler idle"; el.setAttribute("role", "button"); el.setAttribute("tabindex", "0");
+    el.innerHTML = `<svg viewBox="0 0 30 30" aria-hidden="true">${legs}<ellipse class="body" cx="15" cy="17" rx="4.6" ry="6"/><circle class="body" cx="15" cy="9.5" r="3"/><circle class="eye" cx="13.8" cy="8.6" r=".9"/><circle class="eye" cx="16.2" cy="8.6" r=".9"/></svg><span class="tip"></span>`;
+    el.onclick = () => { const a = $("twAct"); if (a) a.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    document.body.appendChild(el); return (CR.el = el);
+  }
+  function crawlStep(t) {
+    const el = CR.el, root = $("tab-web"); if (!el || !W.open || !root) return;
+    const dt = Math.min(0.05, (t - (CR.last || t)) / 1000); CR.last = t;
+    const nav = document.getElementById("tabs"), top0 = nav ? nav.getBoundingClientRect().bottom : 0, r = root.getBoundingClientRect();
+    const L = Math.max(r.left, 0) + 4, R = Math.min(r.right, innerWidth) - 34, T = Math.max(r.top, top0) + 4, B = Math.min(r.bottom, innerHeight) - 34;
+    if (R - L < 60 || B - T < 60) { el.style.display = "none"; CR.raf = requestAnimationFrame(crawlStep); return; }
+    el.style.display = "";
+    const s0 = W.offline ? "offline" : W.st ? W.st.state : "idle", busy = !["idle", "error", "offline"].includes(s0);
+    const job = W.st && W.st.running ? W.st.running.id : null;
+    if (job && job !== CR.job) CR.dir = -CR.dir; // a new job started: turn around
+    CR.job = job;
+    const speed = s0 === "error" || s0 === "offline" ? 0 : busy ? 95 : 22, w = R - L, h = B - T, P = 2 * (w + h);
+    const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reduce) CR.s = (((CR.s + CR.dir * speed * dt) % P) + P) % P;
+    let x, y, ang, d = CR.s;
+    if (d < w) { x = L + d; y = T; ang = 90; } else if ((d -= w) < h) { x = R; y = T + d; ang = 180; } else if ((d -= h) < w) { x = R - d; y = B; ang = 270; } else { d -= w; x = L; y = B - d; ang = 0; }
+    if (CR.dir < 0) ang += 180;
+    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${ang}deg)`;
+    el.style.setProperty("--gait", busy ? ".16s" : ".55s");
+    el.className = "tw-crawler " + (busy ? "busy" : s0) + (speed === 0 || reduce ? " stopped" : "");
+    const tip = el.querySelector(".tip"), label = W.offline ? "Disconnected — retrying" : W.st && W.st.running ? `${STATE[s0] || s0}: ${W.st.running.label}` : `${STATE[s0] || s0}${W.st && W.st.queue[0] ? " — next: " + W.st.queue[0].label : ""}`;
+    if (tip.textContent !== label) { tip.textContent = label; el.setAttribute("aria-label", "Spider: " + label); }
+    tip.style.transform = `rotate(${-ang}deg)`; tip.style.transformOrigin = "-19px 13px";
+    CR.raf = requestAnimationFrame(crawlStep);
+  }
+  function crawlStart() { crawlerEl(); cancelAnimationFrame(CR.raf); CR.last = 0; CR.raf = requestAnimationFrame(crawlStep); }
+  function crawlStop() { cancelAnimationFrame(CR.raf); if (CR.el) CR.el.style.display = "none"; }
+
   // ---------------------------------------------------------------- open / close
   window.webOpen = function () {
-    shell(); W.open = true; loadStatus(); loadFeed(true); loadBrief(W.viewing || "latest"); loadGraph(); pushCtx(true);
+    shell(); W.open = true; crawlStart(); loadStatus(); loadFeed(true); loadBrief(W.viewing || "latest"); loadGraph(); pushCtx(true);
     clearInterval(W.poll); W.poll = setInterval(() => { if (!document.hidden) loadStatus(); }, 4000);
     W.feedPoll = W.feedPoll || setInterval(() => { if (W.open && !document.hidden) loadFeed(); }, 30e3);
   };
-  window.webClose = function () { W.open = false; clearInterval(W.poll); W.poll = null; };
+  window.webClose = function () { W.open = false; crawlStop(); clearInterval(W.poll); W.poll = null; };
   // background: keep the nav indicator honest and share context once the page loads
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);

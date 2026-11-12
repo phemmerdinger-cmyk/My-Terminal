@@ -3,10 +3,6 @@
 /* nav tab */
 nav.tabs button[data-group="web"]{display:inline-flex;align-items:center;gap:7px;letter-spacing:.14em;font-size:12px}
 nav.tabs button[data-group="web"].on{color:var(--tw-c);border-bottom-color:var(--tw-c)}
-.tw-navdot{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block;flex:none;transition:background .3s}
-.tw-navdot.run{background:var(--tw-c);box-shadow:0 0 8px var(--tw-c);animation:twPulse 1.4s infinite}
-.tw-navdot.err{background:var(--down)}
-.tw-navdot.idle{background:#3c7f74}
 html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCard{display:none!important}
 @keyframes twPulse{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes twSpin{to{transform:rotate(360deg)}}
@@ -192,7 +188,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .tw-net svg.focus .syn.hl .e{stroke:var(--tw-c);stroke-width:1.3}
 .tw-net svg.focus .syn.hl .glow{stroke:rgba(94,234,212,.35)}
 .tw-net .dim{opacity:.1}
-@media (prefers-reduced-motion:reduce){.tw-spider *,.tw-navdot.run{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.tw-spider *{animation:none!important}}
 .tw-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--dim);margin:8px 0 0}
 .tw-legend span{display:inline-flex;align-items:center;gap:5px}
 .tw-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
@@ -238,3 +234,23 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .tw-mini .tw-d h4{font-size:13px}
 .tw-mini .row{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
 #webApCard{margin-top:16px}
+
+/* the crawling Spider: walks the edges of THE WEB page; its speed and color follow the real backend job state */
+.tw-crawler{position:fixed;left:0;top:0;width:30px;height:30px;z-index:40;cursor:pointer;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
+.tw-crawler svg{width:100%;height:100%;overflow:visible}
+.tw-crawler .leg{stroke:var(--tw-c);stroke-width:1.8;stroke-linecap:round;fill:none;transform-box:fill-box}
+.tw-crawler .la{transform-origin:15px 15px;animation:twGaitA var(--gait,.5s) ease-in-out infinite alternate}
+.tw-crawler .lb{transform-origin:15px 15px;animation:twGaitB var(--gait,.5s) ease-in-out infinite alternate}
+.tw-crawler .body{fill:#0d1a1f;stroke:var(--tw-c);stroke-width:1.6}
+.tw-crawler .eye{fill:var(--tw-c)}
+.tw-crawler.idle{filter:drop-shadow(0 0 3px rgba(94,234,212,.3))}
+.tw-crawler.idle .leg,.tw-crawler.idle .body{stroke:#4fb3a3}
+.tw-crawler.error .leg,.tw-crawler.error .body,.tw-crawler.offline .leg,.tw-crawler.offline .body{stroke:var(--down)}
+.tw-crawler.error .eye,.tw-crawler.offline .eye{fill:var(--down)}
+.tw-crawler.error,.tw-crawler.offline{filter:drop-shadow(0 0 6px rgba(246,70,93,.5))}
+.tw-crawler.stopped .la,.tw-crawler.stopped .lb{animation-play-state:paused}
+.tw-crawler .tip{position:absolute;left:34px;top:2px;white-space:nowrap;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.92);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;opacity:0;pointer-events:none;transition:opacity .15s}
+.tw-crawler:hover .tip{opacity:1}
+@keyframes twGaitA{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+@keyframes twGaitB{from{transform:rotate(14deg)}to{transform:rotate(-14deg)}}
+@media (prefers-reduced-motion:reduce){.tw-crawler .la,.tw-crawler .lb{animation:none}}
