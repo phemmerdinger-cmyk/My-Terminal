@@ -12,6 +12,10 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+// data integrity + system health (data/): per-source availability, redacted error log, validation checks
+const { createHealth } = require("./data/health.js");
+const INTEG = require("./data/integrity.js");
+const HEALTH = createHealth();
 const PUBLIC = path.join(__dirname, "public");
 const FINNHUB = process.env.FINNHUB_API_KEY;
 const UA =
@@ -110,6 +114,7 @@ async function get(url, accept = "*/*") {
   if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
   return res.text();
 }
+get = HEALTH.track(get, (url) => url);
 
 // ---------------------------------------------------------------- RSS / Atom parsing
 const ENT = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
@@ -1054,6 +1059,7 @@ async function yget(url) {
   }
   throw last;
 }
+yget = HEALTH.track(yget, (url) => url);
 // {raw, fmt} -> raw, recursively
 function unwrap(v) {
   if (Array.isArray(v)) return v.map(unwrap);
@@ -1141,6 +1147,7 @@ async function fh(path) {
   if (!r.ok) throw new Error("Finnhub " + r.status);
   return r.json();
 }
+fh = HEALTH.track(fh, () => "https://finnhub.io/");
 async function addFinnhub(sym, out) {
   const fsym = sym.replace("-", ".");
   const [prof, met, rec, earn, ins, tgt] = await Promise.allSettled([
@@ -2126,6 +2133,7 @@ async function secFetch(url, accept, timeout) {
   }
   throw last;
 }
+secFetch = HEALTH.track(secFetch, (url) => url);
 function secGet(url) {
   const run = secChain.then(async () => {
     const r = await secFetch(url, "application/json", 20000);
@@ -2167,20 +2175,29 @@ const SEC_TAGS = {
   ltDebtCurrent: ["LongTermDebtCurrent", "LongTermDebtAndCapitalLeaseObligationsCurrent", "DebtCurrent"],
   ltDebtTotal: ["LongTermDebt"],
   shortDebt: ["ShortTermBorrowings", "CommercialPaper"],
+  // used by the data-integrity checks (accounting identity, cash-flow reconciliation)
+  totalLiabilities: ["Liabilities"],
+  liabilitiesAndEquity: ["LiabilitiesAndStockholdersEquity"],
+  equityTotal: ["StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
+  cfi: ["NetCashProvidedByUsedInInvestingActivities", "NetCashProvidedByUsedInInvestingActivitiesContinuingOperations"],
+  cashChange: ["CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseIncludingExchangeRateEffect", "CashAndCashEquivalentsPeriodIncreaseDecrease", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalentsPeriodIncreaseDecreaseExcludingExchangeRateEffect"],
+  fx: ["EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "EffectOfExchangeRateOnCashAndCashEquivalents"],
   dilutedShares: ["WeightedAverageNumberOfDilutedSharesOutstanding"],
 };
-const FLOW = new Set(["revenue", "cogs", "grossProfit", "operatingIncome", "pretaxIncome", "incomeTax", "netIncome", "eps", "interestExpense", "da", "capex", "cfo", "cff", "dilutedShares"]);
+const FLOW = new Set(["revenue", "cogs", "grossProfit", "operatingIncome", "pretaxIncome", "incomeTax", "netIncome", "eps", "interestExpense", "da", "capex", "cfo", "cff", "dilutedShares", "cfi", "cashChange", "fx"]);
 function secSeries(facts, tag, flow) {
   const f = facts["us-gaap"] && facts["us-gaap"][tag]; if (!f) return null;
   const unitKey = Object.keys(f.units).find((u) => u === "USD" || u === "USD/shares" || u === "shares") || Object.keys(f.units)[0];
-  const byEnd = {};
+  const byEnd = {}, hist = {};
   for (const x of f.units[unitKey]) {
     if (!/^(10-K|10-K\/A|20-F|20-F\/A|40-F)$/.test(x.form || "")) continue;
     if (flow) { if (!x.start) continue; const d = (Date.parse(x.end) - Date.parse(x.start)) / 864e5; if (d < 340 || d > 380) continue; } // full fiscal years only
     else if (x.start) continue;
     const prev = byEnd[x.end]; if (!prev || (x.filed || "") > (prev.filed || "")) byEnd[x.end] = x; // latest filing wins (restatements)
+    (hist[x.end] = hist[x.end] || []).push({ val: x.val, filed: x.filed, form: x.form, fy: x.fy, fp: x.fp });
   }
-  return { unit: unitKey, byEnd };
+  for (const k in hist) hist[k].sort((a, b) => ((a.filed || "") < (b.filed || "") ? -1 : 1));
+  return { unit: unitKey, byEnd, hist };
 }
 async function secFundamentals(sym) {
   sym = String(sym || "").toUpperCase().replace("-", ".");
@@ -2197,12 +2214,13 @@ async function secFundamentals(sym) {
     const sorted = [...ends].sort().reverse(), years = [];
     for (const e of sorted) if (!years.some((y) => Math.abs(Date.parse(y) - Date.parse(e)) < 20 * 864e5)) years.push(e);
     const pick = (k, end) => {
-      for (const [tag, s] of S[k]) for (const e in s.byEnd) if (Math.abs(Date.parse(e) - Date.parse(end)) < 20 * 864e5) return { v: s.byEnd[e].val, tag, unit: s.unit, filed: s.byEnd[e].filed, form: s.byEnd[e].form };
+      for (const [tag, s] of S[k]) for (const e in s.byEnd) if (Math.abs(Date.parse(e) - Date.parse(end)) < 20 * 864e5) return { v: s.byEnd[e].val, tag, unit: s.unit, filed: s.byEnd[e].filed, form: s.byEnd[e].form, fy: s.byEnd[e].fy, fp: s.byEnd[e].fp, hist: s.hist[e] };
       return null;
     };
     const rows = years.slice(0, 6).map((end) => {
       const r = { end }; const src = {};
-      for (const k in SEC_TAGS) { const p = pick(k, end); if (p) { r[k] = p.v; src[k] = p.tag; r._unit = r._unit || (p.unit.startsWith("USD") ? "USD" : p.unit); r._filed = p.filed; r._form = p.form; } }
+      r._hist = {};
+      for (const k in SEC_TAGS) { const p = pick(k, end); if (p) { r[k] = p.v; src[k] = p.tag; r._unit = r._unit || (p.unit.startsWith("USD") ? "USD" : p.unit); r._filed = p.filed; r._form = p.form; if (p.fy && !r._fy) { r._fy = p.fy; r._fp = p.fp; } if (p.hist && new Set(p.hist.map((h) => h.val)).size > 1) r._hist[k] = p.hist; } }
       if (r.grossProfit == null && r.revenue != null && r.cogs != null) { r.grossProfit = r.revenue - r.cogs; src.grossProfit = "computed: revenue − cost of revenue"; }
       const debtParts = r.ltDebtTotal != null ? [r.ltDebtTotal, r.shortDebt] : [r.ltDebt, r.ltDebtCurrent, r.shortDebt];
       if (debtParts.some((x) => x != null)) { r.totalDebt = debtParts.reduce((a, b) => a + (b || 0), 0); src.totalDebt = "computed: long-term + current debt + short-term borrowings"; }
@@ -2215,7 +2233,7 @@ async function secFundamentals(sym) {
     // dual-class companies report each class separately on the cover; fall back to diluted weighted shares if that looks too small
     const dil = rows[0] && rows[0].dilutedShares;
     if (dil && (!shares || shares.v < dil * 0.5)) shares = { v: dil, asOf: rows[0].end, src: "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding (latest 10-K)" };
-    return { symbol: sym, available: true, name: j.entityName || hit.name, cik: hit.cik, currency: (rows[0] && rows[0]._unit) || "USD", years: rows.reverse(), shares, source: "SEC EDGAR XBRL company facts (10-K / 20-F annual filings)", fetched: Date.now() };
+    return { symbol: sym, available: true, name: j.entityName || hit.name, cik: hit.cik, currency: (rows[0] && rows[0]._unit) || "USD", years: rows.reverse(), shares, mergedPeriods: Math.max(0, sorted.length - years.length), source: "SEC EDGAR XBRL company facts (10-K / 20-F annual filings)", fetched: Date.now() };
   });
 }
 
@@ -2492,6 +2510,7 @@ async function getT(url, accept, ms, init) {
   const r = await fetch(url, { ...(init || {}), headers: { "User-Agent": UA, Accept: accept || "*/*", ...((init && init.headers) || {}) }, signal: AbortSignal.timeout(ms || 20000) });
   if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text();
 }
+getT = HEALTH.track(getT, (url) => url);
 const weekly = (rows) => { const wk = new Map(); for (const r of rows) wk.set(Math.floor((Date.parse(r[0] + "T12:00:00Z") / 864e5 + 3) / 7), r); const out = [...wk.values()]; if (rows.length && out[out.length - 1] !== rows[rows.length - 1]) out.push(rows[rows.length - 1]); return out; };
 const yoy = (rows) => { const by = new Map(rows); return rows.map(([d, v]) => { const p = by.get(String(+d.slice(0, 4) - 1) + d.slice(4)); return p ? [d, +((v / p - 1) * 100).toFixed(2)] : null; }).filter(Boolean); };
 async function fredCsv(m) {
@@ -2657,6 +2676,73 @@ async function webRoute(req, res, u) {
   return send(res, 404, { error: "unknown THE WEB endpoint" });
 }
 
+// ---------------------------------------------------------------- data integrity + system health
+// /api/pub/integrity?symbol=  — validation report for a company's SEC data and its quote (public data, public route)
+// /api/pub/integrity/status   — the small header indicator: current / delayed / stale / unavailable
+// /api/system/health          — owner-only System Health page (sources, errors, freshness, scheduler, bots, CI)
+let INTEG_STORE = null;
+const integStore = () => INTEG_STORE || (INTEG_STORE = createWebStore({ url: UP_URL, token: UP_TOKEN, prefix: "pft:integrity:v1:" }));
+function sessionInfo() { const t = etParts(); return { ...t, open: !(t.wd === "Sat" || t.wd === "Sun") && !NYSE_HOLIDAYS.has(t.day) && t.min >= 570 && t.min < (NYSE_EARLY.has(t.day) ? 780 : 960) }; }
+async function integrityReport(symIn) {
+  const sym = String(symIn || "").toUpperCase().trim();
+  const f = await secFundamentals(sym);
+  let prev = null; if (f.available) { try { prev = await integStore().get("snap:" + f.symbol); } catch {} }
+  const rep = INTEG.fundamentalsReport(f, { ratiosFn: FINS.ratios, previousSnapshot: prev });
+  if (rep.available) { // revision tracking: compare with what we stored last time, keep a log of changes
+    if (!prev || JSON.stringify(prev) !== JSON.stringify(rep.snapshot)) { try { await integStore().set("snap:" + f.symbol, rep.snapshot); } catch {} }
+    let log = []; try { log = (await integStore().get("rev:" + f.symbol)) || []; } catch {}
+    if (rep.revisions.length) { log = [...rep.revisions, ...log].slice(0, 60); try { await integStore().set("rev:" + f.symbol, log); } catch {} }
+    rep.revisionLog = log; rep.firstCheck = !prev; delete rep.snapshot;
+  }
+  const ys = sym.replace(".", "-"), ses = sessionInfo();
+  let q = null; try { q = (await getQuotes([ys])).quotes[ys]; } catch {}
+  const quote = { symbol: ys, price: q && q.price != null ? q.price : null, marketTime: (q && q.marketTime) || null, ...INTEG.classifyQuote(q, { marketOpen: ses.open }), source: "Yahoo Finance chart API (unadjusted last price)", retrieved: Date.now() };
+  if (FINNHUB && quote.price) { try { const fq = await cached("fhq:" + ys, 60e3, () => fh(`/quote?symbol=${encodeURIComponent(ys.replace("-", "."))}`)); quote.crossCheck = INTEG.crossCheckPrice(quote.price, fq && fq.c); } catch { quote.crossCheck = { status: "skip", detail: "Finnhub didn't answer" }; } }
+  else quote.crossCheck = { status: "skip", detail: FINNHUB ? "no price to compare" : "no second price source configured (set FINNHUB_API_KEY)" };
+  return { symbol: sym, fundamentals: rep, quote, formula: INTEG.CONFIDENCE_FORMULA, note: INTEG.CONFIDENCE_NOTE };
+}
+let integStatusCache = null;
+async function integrityStatus() {
+  if (integStatusCache && Date.now() - integStatusCache.at < 30e3) return integStatusCache.v;
+  const ses = sessionInfo(), syms = ["^GSPC", "SPY", "^IXIC", "QQQ", "^VIX"];
+  let qs = {}; try { qs = (await getQuotes(syms)).quotes; } catch {}
+  const sum = INTEG.summarizeQuotes(syms.map((k) => (qs[k] && !qs[k].error ? qs[k] : { symbol: k, error: true })), { marketOpen: ses.open });
+  const label = { current: ses.open ? "Current" : "Current · last close", delayed: "Delayed", stale: "Stale", unavailable: "Unavailable" }[sum.overall];
+  const newest = Math.max(0, ...syms.map((k) => (qs[k] && qs[k].marketTime) || 0));
+  const v = { status: sum.overall, label, marketOpen: ses.open, checkedAt: Date.now(), newestQuote: newest || null, counts: sum.counts, rows: sum.rows.map((r) => ({ symbol: r.symbol, status: r.status, reason: r.reason })) };
+  integStatusCache = { at: Date.now(), v }; return v;
+}
+let ciCache = null;
+async function ciRuns() {
+  if (ciCache && Date.now() - ciCache.at < 10 * 60e3) return ciCache.v;
+  const repo = process.env.GITHUB_REPO || "phemmerdinger-cmyk/My-Terminal"; let v;
+  try {
+    const url = `https://api.github.com/repos/${repo}/actions/runs?branch=main&per_page=6`;
+    const r = await fetch(url, { headers: { "User-Agent": "Market-Desk-health", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(8000) });
+    HEALTH.note(url, r.ok, r.ok ? null : "HTTP " + r.status);
+    const j = await r.json();
+    v = { repo, runs: (j.workflow_runs || []).map((w) => ({ name: w.name, status: w.status, conclusion: w.conclusion, sha: w.head_sha, at: Date.parse(w.updated_at || w.created_at), url: w.html_url, event: w.event })) };
+  } catch (e) { v = { repo, runs: [], error: require("./data/health.js").redact(e.message) }; }
+  ciCache = { at: Date.now(), v }; return v;
+}
+async function systemHealth() {
+  const { redact } = require("./data/health.js"), hv = HEALTH.view();
+  let feedAt = 0; for (const [k, e] of cache) if (k.startsWith("feed:") && e.at > feedAt) feedAt = e.at;
+  const macro = cache.get("macro:all"), sec = hv.sources.find((x) => x.name === "SEC EDGAR");
+  const st = SPIDER ? SPIDER.status() : null;
+  const red = (l) => (l || []).map((e) => ({ t: e.t, e: redact(e.e) }));
+  return {
+    now: Date.now(), deployed: { commit: process.env.RENDER_GIT_COMMIT || null, node: process.version, startedAt: hv.started, uptimeSec: hv.uptimeSec },
+    config: { finnhub: !!FINNHUB, durableStorage: !!(UP_URL && UP_TOKEN), claudeDailyLimit: DAILY_LIMIT, spider: !!SPIDER, secUserAgent: !!process.env.SEC_USER_AGENT },
+    sources: hv.sources, errors: hv.errors,
+    freshness: { quotes: await integrityStatus(), news: { at: feedAt || null }, macro: macro && macro.data ? { at: macro.at, complete: !!macro.data.complete } : null, sec: { lastOk: sec ? sec.lastOk : null, lastFail: sec ? sec.lastFail : null }, analystScan: { rated: Object.keys(BB.ratings || {}).length, universe: (BB.universe || []).length } },
+    scheduler: st ? { state: st.state, running: st.running ? st.running.label : null, lastTick: st.scheduler.lastTick, error: st.scheduler.error ? redact(st.scheduler.error) : null, jobsToday: st.stats.jobs, errorsToday: st.stats.errors, queued: st.queued, budget: st.stats.budget, memory: st.stats.memory, storage: st.storage.backend, durable: st.storage.durable, nextBriefing: st.scheduler.nextBriefing,
+      recentFailures: st.recent.filter((j) => j.status === "error").slice(0, 6).map((j) => ({ t: j.ended, label: j.label, error: redact(j.error) })) } : null,
+    trader: { swing: { loaded: apLoaded, updated: AP.updated || null, lastTick: BOTDIAG.swing.lastTick || null, lastOpenTick: BOTDIAG.swing.lastOpenTick || null, market: BOTDIAG.market, errors: red(BOTDIAG.swing.errors) }, day: { loaded: dtLoaded, updated: (DT && DT.updated) || null, errors: red(BOTDIAG.day.errors) } },
+    ci: await ciRuns(),
+  };
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -2714,6 +2800,12 @@ async function handle(req, res) {
         try { return send(res, 200, await longHistory(s, from, to, u.searchParams.get("interval"))); }
         catch (e) { return send(res, 502, { error: `No price history for ${s} (${String(e.message || e)}).` }); }
       }
+      if (u.pathname === "/api/pub/integrity/status") return send(res, 200, await integrityStatus());
+      if (u.pathname === "/api/pub/integrity") {
+        const [sym] = parseList(u.searchParams.get("symbol"), 1); if (!sym) return send(res, 400, { error: "symbol required" });
+        try { return send(res, 200, await integrityReport(sym)); } catch (e) { return send(res, 502, { error: "Couldn't validate " + sym + " right now (" + String(e.message || e) + ")." }); }
+      }
+      if (u.pathname === "/api/system/health") return send(res, 200, await systemHealth()); // owner-only (not public)
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
       if (u.pathname === "/api/pub/filings") {
         const syms = [...new Set(String(u.searchParams.get("symbols") || "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(x)))];

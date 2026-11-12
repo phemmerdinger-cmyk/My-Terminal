@@ -80,6 +80,13 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## Data integrity and system health
+- **Data Integrity Engine** (`data/integrity.js`): every company's SEC figures are checked on the Financials and DCF pages — Assets = Liabilities + Equity, liabilities + equity components, operating + investing + financing cash flow = change in cash, gross profit and EPS consistency, sign checks, an independent re-computation of the ratios the site shows, fiscal-period and filing identification, currency, recency, merged duplicate periods, restatements (from the SEC's own filing history) and revisions (changes since the last time the site checked).
+- **Data Confidence Score (0–100):** `100 × (0.35·completeness + 0.25·recency + 0.25·consistency + 0.15·source quality)`. A data-quality diagnostic, not a probability that a number is correct.
+- **Quotes** are classified current / delayed / stale / unavailable (header indicator), with an optional cross-check against Finnhub.
+- **System Health page** (THE WEB → System health): every data source's success rate and last error (keys and tokens removed), data freshness, the research scheduler, both paper-trading bots, and the latest GitHub Actions test runs. A pass is only shown for a run that actually happened.
+- **Automated tests** run on every push via `.github/workflows/tests.yml` (free for public repos).
+
 ## THE WEB — how the Spider works
 - **Where it runs:** inside `server.js` on a 15-second scheduler (`web/spider.js`). It reads the site's own data services directly (news feeds, quotes, S&P 500 snapshot, FRED macro, SEC EDGAR filings/8-Ks/Form 4s/XBRL, Finnhub's free earnings calendar, the Fed/SEC/Treasury/BLS feeds) — it never crawls this site's pages.
 - **What it decides:** a priority engine scores every job on portfolio relevance, market impact, freshness, source reliability, price move, upcoming catalysts, research gaps, existing coverage and AI Trader relevance, and re-ranks the queue every tick. Findings queue follow-ups (an 8-K → read the earnings release; a 6% move → look for the catalyst; several peers moving together → a sector pattern).

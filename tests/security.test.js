@@ -32,7 +32,7 @@ test("the demo is public, compressed and sends security headers", async () => {
   assert.match(await r.text(), /Market Desk|MARKET/i);
 });
 test("private APIs are blocked for visitors, public data APIs are open", async () => {
-  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph"]) {
+  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health"]) {
     const r = await get(p); assert.equal(r.status, 401, p); assert.equal((await r.json()).code, "private");
   }
   assert.equal((await get("/api/health")).status, 200);
@@ -62,4 +62,8 @@ test("index.html can't be fetched directly around the login", async () => {
 });
 test("Claude is off by default ($0)", async () => {
   const j = await (await get("/api/health")).json(); assert.equal(j.claudeDailyLimit, 0);
+});
+test("the data-integrity status is public and honest when sources are unreachable", async () => {
+  const r = await get("/api/pub/integrity/status"); assert.equal(r.status, 200);
+  const j = await r.json(); assert.ok(["current", "delayed", "stale", "unavailable"].includes(j.status)); assert.ok(Array.isArray(j.rows));
 });

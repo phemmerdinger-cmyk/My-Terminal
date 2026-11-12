@@ -1,0 +1,20 @@
+# Runs the full test suite on every push and pull request (free for public repositories).
+# The System Health page reads these results from GitHub; it never shows a pass for a run that didn't happen.
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run tests (finance formulas, data integrity, the Spider, security)
+        run: npm test

@@ -1,0 +1,74 @@
+/* Data integrity indicator (header), System Health page, and the data-integrity panel on Financials / DCF.
+   Everything shown comes from the server's actual checks; nothing is assumed. Test results come only from real
+   GitHub Actions runs — the page never shows a pass for a run that didn't happen. */
+(function () {
+  const ago = (t) => { if (!t) return "never"; const s = (Date.now() - t) / 1000; return s < 60 ? Math.round(s) + "s ago" : s < 3600 ? Math.round(s / 60) + " min ago" : s < 86400 ? (s / 3600).toFixed(1) + " h ago" : Math.round(s / 86400) + " d ago"; };
+  const etT = (t) => (t ? new Date(t).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET" : "—");
+  const ICON = { pass: "✓", warn: "!", fail: "✕", skip: "–" };
+  const STAT = { current: "ok", available: "ok", delayed: "warn", degraded: "warn", stale: "bad", down: "bad", unavailable: "bad", idle: "", success: "ok", failure: "bad" };
+  const big = (x) => (x == null ? "—" : Math.abs(x) >= 1e9 ? (x / 1e9).toFixed(2) + "B" : Math.abs(x) >= 1e6 ? (x / 1e6).toFixed(1) + "M" : (+x).toLocaleString("en-US", { maximumFractionDigits: 2 }));
+
+  // ---------------------------------------------------------------- header indicator
+  const btn = $("diBtn");
+  async function diPoll() {
+    if (!btn || document.hidden) return;
+    try { const s = await api("/api/pub/integrity/status"); btn.dataset.s = s.status; $("diLbl").textContent = s.label;
+      btn.title = `Market data: ${s.label}\n` + s.rows.map((r) => `${r.symbol}: ${r.status} — ${r.reason}`).join("\n") + `\nChecked ${etT(s.checkedAt)}${window.__VISITOR ? "" : "\nClick for System Health"}`; }
+    catch { btn.dataset.s = "unavailable"; $("diLbl").textContent = "Unavailable"; btn.title = "Couldn't reach the data-integrity check"; }
+  }
+  if (btn) { btn.onclick = () => { if (window.__VISITOR || (typeof VIEW !== "undefined" && VIEW)) return toast(btn.title.split("\n")[0]); setTab("health"); }; setTimeout(diPoll, 1200); setInterval(diPoll, 60e3); }
+
+  // ---------------------------------------------------------------- System Health page
+  let HL = { timer: null };
+  window.hlOpen = function () { hlLoad(); clearInterval(HL.timer); HL.timer = setInterval(() => { if (S.tab === "health" && !document.hidden) hlLoad(); else if (S.tab !== "health") clearInterval(HL.timer); }, 30e3); };
+  const pill = (s, txt) => `<span class="hl-pill ${STAT[s] || ""}">${esc(txt || s)}</span>`;
+  async function hlLoad() {
+    const el = $("tab-health"); if (!el) return;
+    if (!el.dataset.ready) { el.dataset.ready = "1"; el.innerHTML = `<div class="fx-head"><div><div class="fx-kick">🩺 SYSTEM HEALTH</div><h1>System health</h1><p class="fx-sub">Live status of every data source, the research scheduler, the paper-trading bots and the automated tests. Everything here is measured by the server; nothing is assumed.</p></div><button class="btn ghost" type="button" id="hlRe">Refresh</button></div><div id="hlOut"><div class="fx-empty"><span class="spin"></span> Checking…</div></div>`; $("hlRe").onclick = hlLoad; }
+    let h; try { h = await api("/api/system/health"); } catch (e) { $("hlOut").innerHTML = `<div class="fx-warn">Couldn't load system health: ${esc(e.message)}</div>`; return; }
+    const q = h.freshness.quotes, sc = h.scheduler, ci = h.ci || { runs: [] }, run = ci.runs[0], dep = h.deployed.commit;
+    const tested = dep ? ci.runs.find((r) => r.sha === dep) : null;
+    const ciTxt = !run ? (ci.error ? "Couldn't reach GitHub" : "No test runs recorded yet") : run.status !== "completed" ? "Tests running…" : run.conclusion === "success" ? "Latest tests passed" : `Latest tests: ${run.conclusion}`;
+    const ciS = !run ? "" : run.status !== "completed" ? "warn" : run.conclusion === "success" ? "ok" : "bad";
+    const kpi = (k, v, s, sub) => `<div class="hl-kpi"><span>${k}</span><b class="${s || ""}">${v}</b><em>${sub || ""}</em></div>`;
+    $("hlOut").innerHTML = `
+      <div class="hl-kpis">${kpi("Market data", esc(q.label), STAT[q.status], q.newestQuote ? "newest quote " + ago(q.newestQuote) : "")}${kpi("Data sources", `${h.sources.filter((s) => s.status === "available").length}/${h.sources.length} available`, h.sources.some((s) => s.status === "down") ? "warn" : "ok", h.sources.filter((s) => s.status === "down").map((s) => s.name).join(", ") || "none down")}
+        ${kpi("Research scheduler", sc ? esc(sc.state) : "off", sc ? (sc.error ? "warn" : "ok") : "bad", sc ? `last check ${ago(sc.lastTick)}` : "")}${kpi("Automated tests", esc(ciTxt), ciS, run ? `${esc(run.name)} · ${ago(run.at)}` : "GitHub Actions")}${kpi("Server", `up ${(h.deployed.uptimeSec / 3600).toFixed(1)} h`, "", dep ? "commit " + dep.slice(0, 7) : "commit unknown (local run)")}</div>
+      <div class="hl-grid">
+        <div class="fx-card"><h3>Data sources <em>success and failure since the server started</em></h3><table class="hl-t"><tr><th>Source</th><th>Status</th><th>Success</th><th>Last success</th><th>Last error</th></tr>${h.sources.map((s) => `<tr><td>${esc(s.name)}</td><td>${pill(s.status)}</td><td>${s.successRate == null ? "—" : Math.round(s.successRate * 100) + "% of " + (s.ok + s.fail)}</td><td>${ago(s.lastOk)}</td><td class="hl-err">${s.lastError ? esc(s.lastError) + ` <span class="dim">(${ago(s.lastFail)})</span>` : "—"}</td></tr>`).join("") || '<tr><td colspan="5" class="dim">No requests yet.</td></tr>'}</table></div>
+        <div class="fx-card"><h3>Data freshness</h3><table class="hl-t"><tr><td>Market quotes</td><td>${pill(q.status, q.label)}</td><td>${q.rows.map((r) => `${esc(r.symbol)}: ${esc(r.reason)}`).join("<br>")}</td></tr>
+          <tr><td>News feeds</td><td>${h.freshness.news.at ? pill(Date.now() - h.freshness.news.at < 15 * 60e3 ? "current" : "stale", ago(h.freshness.news.at)) : pill("idle", "not fetched")}</td><td>RSS from five outlets, cached 60 s</td></tr>
+          <tr><td>Economic data</td><td>${h.freshness.macro ? pill(h.freshness.macro.complete ? "current" : "degraded", ago(h.freshness.macro.at)) : pill("idle", "not fetched")}</td><td>FRED with government fallbacks${h.freshness.macro && !h.freshness.macro.complete ? " — some series missing" : ""}</td></tr>
+          <tr><td>SEC EDGAR</td><td>${h.freshness.sec.lastOk ? pill("current", ago(h.freshness.sec.lastOk)) : pill("idle", "no request yet")}</td><td>${h.config.secUserAgent ? "Contact set in SEC_USER_AGENT" : "Using the default SEC contact string"}</td></tr>
+          <tr><td>Analyst scan</td><td>${pill(h.freshness.analystScan.rated ? "current" : "idle", h.freshness.analystScan.rated + " rated")}</td><td>of ${h.freshness.analystScan.universe || "?"} US stocks (Finnhub free tier${h.config.finnhub ? "" : " — not configured"})</td></tr></table></div>
+        <div class="fx-card"><h3>Research scheduler <em>THE WEB</em></h3>${sc ? `<table class="hl-t"><tr><td>State</td><td>${esc(sc.state)}${sc.running ? " — " + esc(sc.running) : ""}</td></tr><tr><td>Last check</td><td>${ago(sc.lastTick)}</td></tr><tr><td>Jobs today</td><td>${sc.jobsToday} (${sc.errorsToday} errors) · budget ${sc.budget.used}/${sc.budget.max} this hour · ${sc.queued} queued</td></tr><tr><td>Research memory</td><td>${sc.memory} findings · ${esc(sc.storage)}${sc.durable ? "" : ' — <span class="warn">temporary: add free Upstash so it survives restarts</span>'}</td></tr>${sc.error ? `<tr><td>Last error</td><td class="hl-err">${esc(sc.error)}</td></tr>` : ""}${sc.recentFailures.map((f) => `<tr><td class="dim">${etT(f.t)}</td><td class="hl-err">${esc(f.label)}: ${esc(f.error)}</td></tr>`).join("")}</table>` : '<p class="dim">The Spider is turned off (SPIDER_OFF).</p>'}</div>
+        <div class="fx-card"><h3>AI Trader simulation <em>paper money only</em></h3><table class="hl-t"><tr><td>Swing bot</td><td>${h.trader.swing.loaded ? pill("available", "running") : pill("idle", "loading")} last tick ${ago(h.trader.swing.lastTick)}</td></tr><tr><td>Market check</td><td>${esc((h.trader.swing.market && h.trader.swing.market.why) || "—")}</td></tr><tr><td>Day trader</td><td>${h.trader.day.loaded ? pill("available", "running") : pill("idle", "loading")} state saved ${ago(h.trader.day.updated)}</td></tr>${[...h.trader.swing.errors.map((e) => ["Swing", e]), ...h.trader.day.errors.map((e) => ["Day", e])].slice(0, 5).map(([b, e]) => `<tr><td class="dim">${b} · ${etT(e.t)}</td><td class="hl-err">${esc(e.e)}</td></tr>`).join("")}</table></div>
+        <div class="fx-card"><h3>Automated tests <em>GitHub Actions · ${esc(ci.repo || "")}</em></h3>${ci.runs.length ? `<table class="hl-t"><tr><th>Run</th><th>Result</th><th>Commit</th><th>When</th></tr>${ci.runs.map((r) => `<tr><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.name)}</a></td><td>${pill(r.status !== "completed" ? "delayed" : r.conclusion === "success" ? "current" : "down", r.status !== "completed" ? r.status : r.conclusion)}</td><td class="num">${esc(r.sha.slice(0, 7))}${dep && r.sha === dep ? " (deployed)" : ""}</td><td>${ago(r.at)}</td></tr>`).join("")}</table>` : `<p class="dim">${ci.error ? "Couldn't reach GitHub: " + esc(ci.error) : "No GitHub Actions runs recorded yet."}</p>`}
+          <p class="fx-note">${dep ? (tested ? `The deployed commit ${dep.slice(0, 7)} was tested: ${esc(tested.conclusion || tested.status)}.` : `No test run found for the deployed commit ${dep.slice(0, 7)} among the latest runs.`) : "Deployed commit unknown (Render sets RENDER_GIT_COMMIT)."} Results are read from GitHub; a pass is never shown for a run that didn't happen.</p></div>
+        <div class="fx-card"><h3>Recent errors <em>keys and tokens removed</em></h3>${h.errors.length ? `<table class="hl-t">${h.errors.slice(0, 14).map((e) => `<tr><td class="dim">${etT(e.t)}</td><td>${esc(e.source)}</td><td class="hl-err">${esc(e.error)}</td></tr>`).join("")}</table>` : '<p class="dim">No errors since the server started.</p>'}</div>
+        <div class="fx-card"><h3>Configuration</h3><table class="hl-t"><tr><td>Durable storage (Upstash)</td><td>${h.config.durableStorage ? pill("available", "on") : pill("degraded", "off — data in temp folder")}</td></tr><tr><td>Finnhub (free)</td><td>${h.config.finnhub ? pill("available", "on") : pill("idle", "off")}</td></tr><tr><td>Claude</td><td>${h.config.claudeDailyLimit ? `${h.config.claudeDailyLimit} requests/day` : "off ($0)"}</td></tr><tr><td>Node.js</td><td>${esc(h.deployed.node)}</td></tr><tr><td>Server started</td><td>${etT(h.deployed.startedAt)}</td></tr></table></div>
+      </div><p class="disc">Checked ${etT(h.now)} · refreshes every 30 seconds while open.</p>`;
+  }
+
+  // ---------------------------------------------------------------- integrity panel on Financials and DCF
+  async function diCard(sym, outId) {
+    sym = String(sym || "").trim().toUpperCase(); const out = $(outId); if (!sym || !out || out.querySelector(".di-card")) return;
+    const card = document.createElement("details"); card.className = "di-card fx-card"; card.innerHTML = `<summary><span class="spin"></span> Validating ${esc(sym)}'s data…</summary>`; out.prepend(card);
+    let r; try { r = await api("/api/pub/integrity?symbol=" + encodeURIComponent(sym)); } catch (e) { card.innerHTML = `<summary>Data integrity: couldn't validate (${esc(e.message)})</summary>`; return; }
+    const f = r.fundamentals, qx = r.quote;
+    if (!f.available) { card.innerHTML = `<summary>Data integrity · ${esc(sym)}: ${esc(f.reason)}</summary>`; return; }
+    const c = f.confidence, band = { high: "ok", moderate: "warn", low: "bad", "very low": "bad" }[c.band];
+    card.innerHTML = `<summary><b class="di-score ${band}">${c.score}</b><span><b>Data integrity · ${esc(f.symbol)}</b> — confidence ${c.score}/100 (${esc(c.band)}) · ${f.summary.pass} checks passed${f.summary.warn ? `, ${f.summary.warn} warnings` : ""}${f.summary.fail ? `, <b class="bad">${f.summary.fail} failed</b>` : ""}${f.restatements.length ? ` · ${f.restatements.length} restated figure${f.restatements.length > 1 ? "s" : ""}` : ""} · price ${esc(qx.status)}</span><em>details ›</em></summary>
+      <div class="di-body">
+        <h5>Checks on fiscal year ${esc(f.latestPeriod || "")}</h5><ul class="di-checks">${f.checks.map((k) => `<li class="${k.status}"><i>${ICON[k.status]}</i><b>${esc(k.label)}</b><span>${esc(k.detail)}</span></li>`).join("")}</ul>
+        <h5>Confidence score</h5><p class="di-f">${esc(r.formula)} = 100 × (0.35·${c.parts.completeness} + 0.25·${c.parts.recency} + 0.25·${c.parts.consistency} + 0.15·${c.parts.source}) = <b>${c.score}</b>. ${esc(r.note)}${f.missing.length ? ` Missing fields: ${esc(f.missing.join(", "))}.` : ""}</p>
+        ${f.restatements.length ? `<h5>Restatements found in SEC filings</h5><table class="hl-t"><tr><th>Period</th><th>Item</th><th>Originally</th><th>Now</th><th>Filed</th></tr>${f.restatements.slice(0, 12).map((x) => `<tr><td>${esc(x.period)}</td><td>${esc(x.field)}</td><td class="num">${big(x.original)} <span class="dim">(${esc(x.originalForm || "")} ${esc(x.originalFiled || "")})</span></td><td class="num">${big(x.current)}</td><td>${esc(x.currentForm || "")} ${esc(x.currentFiled || "")}</td></tr>`).join("")}</table>` : ""}
+        <h5>Revision tracking</h5><p class="di-f">${f.firstCheck ? "First check for this company — today's figures are now the baseline; later changes will be listed here." : f.revisionLog && f.revisionLog.length ? "" : "No changes since the last time these figures were checked."}</p>${f.revisionLog && f.revisionLog.length ? `<table class="hl-t">${f.revisionLog.slice(0, 10).map((x) => `<tr><td>${esc(x.period)}</td><td>${esc(x.field)}</td><td class="num">${big(x.before)} → ${big(x.after)}</td><td>${etT(x.detected)}</td></tr>`).join("")}</table>` : ""}
+        <h5>Price</h5><p class="di-f">${qx.price != null ? `${qx.price} · ` : ""}${esc(qx.status)} — ${esc(qx.reason)} · ${esc(qx.source)}${qx.marketTime ? ` · last trade ${etT(qx.marketTime)}` : ""}. Cross-source check: ${esc(qx.crossCheck.status)} — ${esc(qx.crossCheck.detail)}.</p>
+        <h5>Periods and sources</h5><p class="di-f">${f.periods.map((p) => `${esc(p.end)} (${esc(p.form || "?")}, filed ${esc(p.filed || "?")}${p.fy ? `, FY${p.fy}` : ""})`).join(" · ")}<br>${f.sources.map((s) => `${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a>` : esc(s.name)} — ${esc(s.note)}${s.retrieved ? `, retrieved ${etT(s.retrieved)}` : ""}`).join("<br>")}</p>
+      </div>`;
+  }
+  if (typeof finLoad === "function") { const _fl = finLoad; finLoad = async function () { const r = await _fl.apply(this, arguments); try { diCard($("finSym").value, "finOut"); } catch {} return r; }; }
+  if (typeof dcfLoad === "function") { const _dl = dcfLoad; dcfLoad = async function () { const r = await _dl.apply(this, arguments); try { diCard($("dcfSym").value, "dcfOut"); } catch {} return r; }; }
+  if (S.tab === "health") window.hlOpen();
+})();
