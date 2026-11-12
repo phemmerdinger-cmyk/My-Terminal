@@ -489,8 +489,8 @@
   const COLORS = ["#ff2d95", "#ff2d95", "#ff4fa8", "#ff2d95", "#e11d74", "#ff2d95"];
   function bsChip(text, x, y) { const c = document.createElement("div"); c.className = "bs-chip"; c.textContent = text; c.style.left = Math.max(8, Math.min(innerWidth - 220, x)) + "px"; c.style.top = Math.max(60, y) + "px"; document.body.appendChild(c); setTimeout(() => c.remove(), bsMs(2600, 900)); }
   function bsPill(txt) { let p = document.getElementById("bsPill"); if (!p) { p = document.createElement("div"); p.id = "bsPill"; p.className = "bs-pill"; document.body.appendChild(p); } p.hidden = !txt; p.innerHTML = txt || ""; }
-  function figuresIn(e) { // leaf elements on screen that show a number
-    const out = []; for (const el of e.querySelectorAll("b, td, em, span, strong, h3, text, small")) { if (out.length >= 7) break; if (el.children.length > 1) continue; const t = (el.textContent || "").trim(); if (!t || t.length > 32 || !NUMLINE.test(" " + t + " ")) continue;
+  function figuresIn(e, max = 7) { // leaf elements on screen that show a number
+    const out = []; for (const el of e.querySelectorAll("b, td, em, span, strong, h3, text, small")) { if (out.length >= max) break; if (el.children.length > 1) continue; const t = (el.textContent || "").trim(); if (!t || t.length > 32 || !NUMLINE.test(" " + t + " ")) continue;
       const r = el.getBoundingClientRect(); if (r.width < 4 || r.bottom < 60 || r.top > innerHeight - 20 || r.right < 0 || r.left > innerWidth) continue; if (out.some((o) => o.contains(el) || el.contains(o))) continue; out.push(el); }
     return out; }
   window.spiderScan = async function () {
@@ -499,21 +499,37 @@
     if (typeof startResearch === "function") startResearch(t).then((id) => { SCAN.job = id ? FOL.jobLabel : null; });
     const T = scanTargets(t), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, say2 = (x) => { if (BS.cap) BS.cap.textContent = x; };
     if (reduce) { T.forEach((e) => scanCollect(e)); return scanFinish(); }
-    bsInit(); SCAN.figs = 0; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>0 figures</span> · 0 of ${T.length} sections`); say2(`Spider deployed · examining ${pageLabel(t)} at 2× speed`);
+    bsInit(); SCAN.figs = 0; const shuffle = null; void shuffle; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>0 figures</span> · 0 of ${T.length} sections`); say2(`Spider deployed · examining ${pageLabel(t)} at 2× speed`);
     await bsGo(Math.min(innerWidth * 0.2, 260), innerHeight / 2, 1200);
-    for (const [k, e] of T.entries()) { if (!SCAN.on) break;
+    // investigate each section: walk across it in several stops, lasering the figures nearest each stop one by one
+    const zap = (el, color, delay, main) => { const q = el.getBoundingClientRect(), p = { x: q.left + q.width / 2, y: q.top + q.height / 2 }, now = performance.now();
+      BS.lasers.push({ to: p, c: color, t0: now + delay, life: bsMs(1000, 180), w: main ? 2.6 : 1.7 }); BS.pulses.push({ p, c: color, t0: now + delay + 60 });
+      setTimeout(() => { el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 3200); }, delay); };
+    const visit = async (e, k, title, pass2) => {
       try { e.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await bsWait(60); const r = e.getBoundingClientRect(), sc = BS.sp.scale, title = titleOf(e) || `section ${k + 1}`;
-      say2(`Examining ${title}`);
-      await bsGo(Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r.left + r.width * (0.25 + (k % 3) * 0.2))), Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r.top + Math.min(r.height * 0.45, 220))), bsMs(1600, 400));
-      if (!SCAN.on) break;
-      scanCollect(e); const figs = figuresIn(e), now = performance.now(), color = COLORS[k % COLORS.length];
-      (figs.length ? figs : [e]).forEach((el, j) => { const q = el.getBoundingClientRect(), p = { x: q.left + q.width / 2, y: q.top + q.height / 2 };
-        BS.lasers.push({ to: p, c: j ? "#a78bfa" : color, t0: now + j * bsMs(120, 10), life: bsMs(900, 150), w: j ? 1.6 : 2.6 }); BS.pulses.push({ p, c: color, t0: now + j * 60 + 60 });
-        el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 2600); });
-      SCAN.figs = (SCAN.figs || 0) + figs.length; bsChip(title, r.left + 8, r.top - 6); bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
-      const f = SCAN.found[SCAN.found.length - 1]; say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120));
-      await bsWait(bsMs(1100, 250) + figs.length * bsMs(120, 10)); }
+      await bsWait(80); const r = e.getBoundingClientRect(), sc = BS.sp.scale, figs = figuresIn(e, pass2 ? 10 : 14), stops = r.width > 900 ? 3 : r.width > 500 ? 2 : 1, color = COLORS[k % COLORS.length];
+      if (!pass2) bsChip(title, r.left + 8, r.top - 6);
+      for (let st = 0; st < stops && SCAN.on; st++) {
+        const fx = (st + 0.5) / stops, x = Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r.left + r.width * fx)), y = Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r.top + Math.min(r.height * (0.35 + 0.2 * (st % 2)), 240)));
+        say2(`${pass2 ? "Cross-checking" : "Investigating"} ${title}${stops > 1 ? ` · part ${st + 1}/${stops}` : ""}`);
+        await bsGo(x, y, bsMs(1800, 450)); if (!SCAN.on) return;
+        const mine = figs.filter((el) => { const q = el.getBoundingClientRect(), cx = q.left + q.width / 2; return cx >= r.left + (r.width * st) / stops - 4 && cx <= r.left + (r.width * (st + 1)) / stops + 4; });
+        (mine.length ? mine : st === 0 && !figs.length ? [e] : []).forEach((el, j) => zap(el, j ? "#ff4fa8" : color, j * bsMs(200, 30), !j));
+        SCAN.figs = (SCAN.figs || 0) + (pass2 ? 0 : mine.length);
+        await bsWait(bsMs(1100, 280) + mine.length * bsMs(200, 30));
+      }
+    };
+    const T0 = performance.now();
+    for (const [k, e] of T.entries()) { if (!SCAN.on) break;
+      const title = titleOf(e) || `section ${k + 1}`; await visit(e, k, title, false); if (!SCAN.on) break;
+      scanCollect(e); const f = SCAN.found[SCAN.found.length - 1];
+      bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
+      say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120)); await bsWait(bsMs(500, 120)); }
+    // second pass: go back over the richest sections and cross-check before writing anything
+    const rich = SCAN.found.map((f, i) => [i, f.facts.length]).sort((x, y) => y[1] - x[1]).slice(0, 2).filter((x) => x[1] > 0);
+    for (const [i] of rich) { if (!SCAN.on) break; const e = T[i]; if (!e) continue; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · cross-checking`); await visit(e, i, titleOf(e) || `section ${i + 1}`, true); }
+    // never rush the report: keep investigating until at least ~30 s have passed
+    while (SCAN.on && performance.now() - T0 < 30000 && T.length) { const i = Math.floor(Math.random() * T.length); await visit(T[i], i, titleOf(T[i]) || `section ${i + 1}`, true); }
     if (SCAN.on) { say2("Writing the report"); await bsGo(-160 * BS.sp.scale, innerHeight / 2, 1500); }
     bsHide(); bsPill(""); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "";
     if (SCAN.on) scanFinish(); else { SCAN.on = false; if (btn) btn.classList.remove("on"); }
