@@ -119,3 +119,21 @@
 .ql-ai li .ql-tag{margin-right:8px}
 .ql-ai li.interp{border-color:rgba(167,139,250,.25)}
 .ql-foot{font:11px var(--mono);color:var(--dim);margin:6px 0 30px;line-height:1.6}
+/* risk universe v2 */
+.ql-uni{grid-template-columns:minmax(0,1fr) 330px}
+.ql-cv{height:560px;background:radial-gradient(ellipse at 50% 45%,rgba(77,163,255,.09),transparent 60%),radial-gradient(ellipse at 50% 120%,rgba(94,234,212,.08),transparent 55%),#05080c}
+@media (max-width:760px){.ql-cv{height:380px}}
+.ql-det{max-height:560px}
+.ql-scen{position:absolute;right:12px;top:12px;max-width:360px;background:rgba(6,10,14,.86);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;font:11.5px/1.55 var(--mono);color:var(--muted);backdrop-filter:blur(6px)}
+.ql-scen b{color:var(--text)}
+.ql-cvhint{position:absolute;right:12px;bottom:10px;font:10px var(--mono);color:var(--dim)}
+.ql-cdots{display:flex;gap:5px}.ql-cdots b{width:10px;height:10px;border-radius:50%;display:inline-block}
+.ql-gauge{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;margin-bottom:6px}
+.ql-gauge div:first-child{display:flex;flex-direction:column}.ql-gauge b{font:600 26px var(--mono);color:#5eead4;line-height:1}.ql-gauge span{font-size:11px;color:var(--muted)}
+.ql-gbar{height:8px;border-radius:4px;background:var(--panel);overflow:hidden}.ql-gbar i{display:block;height:100%;background:linear-gradient(90deg,#4da3ff,#5eead4)}
+.ql-gauge em{grid-column:2;font-style:normal;font-size:10.5px;color:var(--dim)}
+.ql-cvr{display:grid;grid-template-columns:52px 1fr 64px 34px;gap:8px;align-items:center;font:11.5px var(--mono);margin:3px 0}
+.ql-cvr div{height:6px;background:var(--panel);border-radius:3px;overflow:hidden}.ql-cvr i{display:block;height:100%}
+.ql-cvr b{text-align:right;font-weight:500}.ql-cvr em{font-style:normal;color:var(--dim);text-align:right}
+.ql-nb{font-size:12px;color:var(--muted);line-height:1.8;margin:4px 0}
+#qlDetB:not(:empty){border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px}

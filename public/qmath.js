@@ -79,12 +79,17 @@
   }
 
   // ------------------------------------------------------------------ eigen / MDS / clustering
-  function eigSym(A, k) { // top-k eigenpairs of a symmetric matrix by power iteration with deflation
-    const n = A.length; let M = A.map((r) => [...r]); const out = [];
-    for (let e = 0; e < Math.min(k, n); e++) { let v = Array.from({ length: n }, (_, i) => Math.sin(i * 7.3 + e * 1.9 + 1)), lam = 0;
-      for (let it = 0; it < 400; it++) { const w = mv(M, v), nrm = Math.sqrt(dot(w, w)); if (nrm < 1e-12) { lam = 0; break; } const nv = w.map((x) => x / nrm); const diff = Math.sqrt(sum(nv.map((x, i) => (x - v[i]) ** 2))); v = nv; lam = dot(v, mv(M, v)); if (diff < 1e-10) break; }
-      out.push({ value: lam, vector: v }); M = M.map((r, i) => r.map((x, j) => x - lam * v[i] * v[j])); }
-    return out; }
+  function eigSym(A, k) { // eigenpairs of a symmetric matrix by cyclic Jacobi rotations (robust to repeated eigenvalues); top k by value
+    const n = A.length, a = A.map((r) => [...r]), V = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (i === j ? 1 : 0)));
+    for (let sweep = 0; sweep < 100; sweep++) {
+      let off = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i][j] * a[i][j]; if (off < 1e-22) break;
+      for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) { if (Math.abs(a[p][q]) < 1e-300) continue;
+        const th = (a[q][q] - a[p][p]) / (2 * a[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), sn = t * c;
+        for (let r = 0; r < n; r++) { const x = a[r][p], y = a[r][q]; a[r][p] = c * x - sn * y; a[r][q] = sn * x + c * y; }
+        for (let r = 0; r < n; r++) { const x = a[p][r], y = a[q][r]; a[p][r] = c * x - sn * y; a[q][r] = sn * x + c * y; }
+        for (let r = 0; r < n; r++) { const x = V[r][p], y = V[r][q]; V[r][p] = c * x - sn * y; V[r][q] = sn * x + c * y; } } }
+    return Array.from({ length: n }, (_, i) => ({ value: a[i][i], vector: V.map((r) => r[i]) })).sort((x, y) => y.value - x.value).slice(0, Math.min(k, n));
+  }
   // Classical multidimensional scaling of a correlation matrix: distance d_ij = √(2(1 − ρ_ij)), so assets that move
   // together sit close together. Returns k-dimensional coordinates.
   function mds(Cor, k = 3) {
@@ -175,7 +180,25 @@
   }
   function regimes(px, credit, step = 5) { const out = []; for (let i = 275; i < px.length; i += step) out.push({ i, ...regimeAt(px, i, credit) }); if (px.length > 275 && (px.length - 1 - 275) % step) out.push({ i: px.length - 1, ...regimeAt(px, px.length - 1, credit) }); return out; }
 
-  return { DAYS, mean, sd, quantile, returns, align, annRet, annVol, cagr, sharpe, sortino, maxDrawdown, drawdownSeries, varHist, esHist, varNormal, invNorm,
+  // ------------------------------------------------------------------ network & risk anatomy
+  // Minimum spanning tree of the correlation distance d = √(2(1 − ρ)) (Mantegna 1999, "Hierarchical structure in
+  // financial markets"): the n − 1 strongest links that connect every holding without loops. Prim's algorithm.
+  function mst(Cor) { const n = Cor.length, D = (i, j) => Math.sqrt(Math.max(0, 2 * (1 - Cor[i][j]))), inT = new Array(n).fill(false), best = new Array(n).fill(Infinity), par = new Array(n).fill(-1), edges = []; if (!n) return edges; best[0] = 0;
+    for (let it = 0; it < n; it++) { let u = -1; for (let i = 0; i < n; i++) if (!inT[i] && (u < 0 || best[i] < best[u])) u = i; inT[u] = true; if (par[u] >= 0) edges.push({ a: par[u], b: u, d: best[u], rho: Cor[par[u]][u] });
+      for (let v = 0; v < n; v++) if (!inT[v] && D(u, v) < best[v]) { best[v] = D(u, v); par[v] = u; } }
+    return edges; }
+  // Principal components of a covariance matrix: eigenvalues (descending) and the share of total variance each explains.
+  function pca(C) { const E = eigSym(C, C.length).filter((e) => e.value > 1e-14), tot = E.reduce((a, e) => a + e.value, 0); return E.map((e) => ({ value: e.value, share: e.value / tot, vector: e.vector })); }
+  // Effective number of bets (Meucci 2009): split portfolio variance into uncorrelated principal-component bets,
+  // p_k = (e_k·w)² λ_k / σ², then ENB = exp(−Σ p_k ln p_k). 1 = a single bet; n = n fully independent equal bets.
+  function enb(w, C) { const P = pca(C), v = pVar(w, C); if (!(v > 0)) return { enb: NaN, p: [] }; const p = P.map((e) => (dot(e.vector, w) ** 2 * e.value) / v); const s = p.reduce((a, b) => a + b, 0), q = p.map((x) => x / s);
+    return { enb: Math.exp(-q.reduce((a, x) => a + (x > 0 ? x * Math.log(x) : 0), 0)), p: q, pcs: P }; }
+  // Volatility if every pairwise correlation became rho (a "correlation spike"), keeping each asset's own volatility.
+  function stressVol(w, C, rho) { const s = C.map((r, i) => Math.sqrt(Math.max(0, r[i]))); let v = 0; for (let i = 0; i < w.length; i++) for (let j = 0; j < w.length; j++) v += w[i] * w[j] * s[i] * s[j] * (i === j ? 1 : rho); return Math.sqrt(Math.max(0, v)); }
+  // Parametric component VaR: CVaR_i = z · w_i (Σw)_i / σ_p; the components sum exactly to the portfolio VaR z·σ_p.
+  function componentVaR(w, C, c = 0.95) { const z = invNorm(c), Cw = mv(C, w), sp = Math.sqrt(dot(w, Cw)); return w.map((x, i) => (sp > 0 ? (z * x * Cw[i]) / sp : 0)); }
+
+  return { mst, pca, enb, stressVol, componentVaR, DAYS, mean, sd, quantile, returns, align, annRet, annVol, cagr, sharpe, sortino, maxDrawdown, drawdownSeries, varHist, esHist, varNormal, invNorm,
     covariance, correlation, beta, covMatrix, corrMatrix, rollingCorr, dot, pVar, normalize, riskContrib, portReturns, diversification,
     solve, inverse, ols, eigSym, mds, cluster, project, optimize, riskParity, turnover, tradeCost, mulberry32, gauss, monteCarlo, regimeAt, regimes, sma };
 });

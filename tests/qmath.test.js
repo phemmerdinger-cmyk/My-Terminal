@@ -117,3 +117,23 @@ test("align intersects dates and prefers adjusted closes", () => {
   const A = M.align({ X: { t: [86400, 172800, 259200], close: [10, 11, 12], adj: [5, 5.5, 6] }, Y: { t: [172800, 259200], close: [1, 2] } });
   assert.deepEqual(A.dates, [172800, 259200]); assert.deepEqual(A.px.X, [5.5, 6]); assert.deepEqual(A.px.Y, [1, 2]);
 });
+
+test("minimum spanning tree links the strongest correlations without loops", () => {
+  const K = [[1, 0.9, 0.1, 0.2], [0.9, 1, 0.3, 0.1], [0.1, 0.3, 1, 0.8], [0.2, 0.1, 0.8, 1]];
+  const E = M.mst(K); assert.equal(E.length, 3);
+  const has = (a, b) => E.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+  assert.ok(has(0, 1) && has(2, 3) && has(1, 2)); // 0.9, 0.8, then the strongest bridge 0.3
+});
+
+test("PCA shares sum to one; effective number of bets matches known cases", () => {
+  const C = [[0.04, 0, 0], [0, 0.04, 0], [0, 0, 0.04]], w = [1 / 3, 1 / 3, 1 / 3];
+  const P = M.pca([[0.04, 0.03], [0.03, 0.04]]); near(P.reduce((a, p) => a + p.share, 0), 1); near(P[0].value, 0.07, 1e-9);
+  near(M.enb(w, C).enb, 3, 1e-6); // three independent equal-risk bets
+  const one = [[0.04, 0.04], [0.04, 0.04]]; near(M.enb([0.5, 0.5], one).enb, 1, 1e-6); // perfectly correlated = one bet
+});
+
+test("correlation-spike volatility and component VaR", () => {
+  const C = [[0.04, 0], [0, 0.09]], w = [0.5, 0.5];
+  near(M.stressVol(w, C, 0), Math.sqrt(M.pVar(w, C))); near(M.stressVol(w, C, 1), 0.5 * 0.2 + 0.5 * 0.3);
+  const cv = M.componentVaR(w, C, 0.95); near(cv[0] + cv[1], M.invNorm(0.95) * Math.sqrt(M.pVar(w, C)), 1e-12);
+});

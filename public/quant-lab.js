@@ -8,7 +8,7 @@
   "use strict";
   const M = window.QMATH, Q = window.QUANT;
   if (!M || !Q) return;
-  const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "3d", color: "vol", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
+  const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "net", color: "cluster", scen: "none", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
   const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Quant research assistant"]];
   const FACTORS = [["MKT", "Market", "SPY minus cash"], ["SIZE", "Size (small caps)", "IWM − SPY"], ["VALUE", "Value", "IWD − IWF (value minus growth)"], ["MOM", "Momentum", "MTUM − SPY"], ["QUAL", "Quality", "QUAL − SPY"], ["LOWVOL", "Low volatility", "USMV − SPY"]];
   const PROXIES = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "HYG", "IEF"];
@@ -137,65 +137,159 @@
       <h4>AI Trader (paper)</h4><p>${ap ? `${apV != null ? `Paper equity ${usd(apV)} · ` : ""}${(ap.positions || []).length} open paper positions${ap.lastScan && ap.lastScan.riskOff ? " · currently <b>risk-off</b>" : ""}. Simulated only.` : "Not reachable right now."}</p></div></div>`;
   }
 
-  // ---------------------------------------------------------------- 2. 3D portfolio risk universe
-  const COLOR = { vol: ["Volatility", (a) => a.vol, pct], ret1y: ["1-year return", (a) => a.ret1y, sgn], rc: ["Risk contribution", (a) => a.rc, pct], sharpe: ["Sharpe", (a) => a.sharpe, num], beta: ["Beta", (a) => a.beta, num] };
+  // ---------------------------------------------------------------- 2. portfolio risk universe
+  // Three views of the same risk model. Network: 3D classical MDS of correlations, holdings linked by their
+  // minimum spanning tree (Mantegna 1999), clusters from average linkage, a ring on every node = its share of
+  // portfolio risk. Risk budget: where the money is (inner ring) against where the risk is (outer ring).
+  // Risk vs return: volatility against 1-year return. Scenarios re-colour every view with stressed numbers.
+  const CLC = ["#5eead4", "#4da3ff", "#facc15", "#f472b6", "#a78bfa", "#fb923c", "#34d399", "#f87171", "#93c5fd", "#fde68a"];
+  const COLOR = { cluster: ["Cluster", null, null], vol: ["Volatility", (a) => a.vol, pct], rc: ["Risk share", (a) => a.rc, pct], ret1y: ["1-year return", (a) => a.ret1y, sgn], beta: ["Beta", (a) => a.beta, num], sharpe: ["Sharpe", (a) => a.sharpe, num] };
+  const SCEN = { none: "Normal", crash: "Market −20%", spike: "Correlation spike", worst: "Worst day" };
   function ramp(t) { t = Math.max(0, Math.min(1, t)); const stops = [[77, 163, 255], [94, 234, 212], [250, 204, 21], [246, 70, 93]], k = Math.min(2, Math.floor(t * 3)), f = t * 3 - k, a = stops[k], c = stops[k + 1]; return `rgb(${a.map((x, i) => Math.round(x + (c[i] - x) * f)).join(",")})`; }
+  const rgba = (hex, a) => { if (hex.startsWith("rgb(")) return hex.replace("rgb(", "rgba(").replace(")", `,${a})`); const v = parseInt(hex.slice(1), 16); return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`; };
   async function renderUni(b) {
     const n = b.have.length, P = M.mds(b.Cor, 3), m = Math.max(1e-9, ...P.flat().map(Math.abs)); b.pos = P.map((p) => p.map((x) => x / m));
     for (const a of b.assets) a.sector = await (typeof sectorOf === "function" ? Promise.resolve(sectorOf(a.sym)).catch(() => "Other") : "Other");
-    const secs = [...new Set(b.assets.map((a) => a.sector || "Other"))].sort();
-    $("qb-uni").innerHTML = `<div class="ql-ctl"><div class="ql-seg" id="qlView"><button data-v="3d" class="on">3D correlation map</button><button data-v="rr">Risk vs return</button></div>
-      <label>Color by <select class="field" id="qlColor">${Object.entries(COLOR).map(([k, [nm]]) => `<option value="${k}">${nm}</option>`).join("")}</select></label>
-      <label>Sector <select class="field" id="qlSector"><option value="">All sectors</option>${secs.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label><span class="tw-muted ql-hint">Drag to rotate · scroll to zoom · click a holding</span></div>
-      <div class="ql-uni"><div class="ql-cv"><canvas id="qlCv"></canvas><div class="ql-tip" id="qlTip" hidden></div><div class="ql-scale" id="qlScale"></div></div><div class="ql-det" id="qlDet"><p class="tw-muted">Click a holding to see its risk numbers, THE WEB's research on it and SEC fundamentals.</p></div></div>
-      ${note(`Layout: classical multidimensional scaling of the correlation matrix (distance = √(2(1 − ρ))), so holdings that move together sit together. Node size = portfolio weight. Lines connect pairs with |ρ| ≥ 0.6 (cyan = move together, orange = move opposite). ${n < 3 ? "With fewer than three holdings the map is flat." : ""}`)}`;
-    $("qlView").onclick = (e) => { const v = e.target.dataset.v; if (!v) return; QL.view = v; $("qlView").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.v === v)); };
+    // risk anatomy
+    const cl = M.cluster(b.Cor, 0.6); b.cl = new Array(n).fill(0); cl.clusters.forEach((g, k) => g.forEach((i) => (b.cl[i] = k)));
+    b.tree = n > 1 ? M.mst(b.Cor) : []; b.nbr = Array.from({ length: n }, () => []); b.tree.forEach((e) => { b.nbr[e.a].push(e.b); b.nbr[e.b].push(e.a); });
+    const E = M.enb(b.w, b.C), sp = Math.sqrt(M.pVar(b.w, b.C)), Cw = b.C.map((r) => M.dot(r, b.w)), cv = M.componentVaR(b.w, b.C);
+    b.an = { enb: E.enb, p: E.p, pcs: E.pcs, cvar: cv.map((x) => x * b.value), varP: cv.reduce((x, y) => x + y, 0) * b.value, mcr: Cw.map((x) => (sp > 0 ? (x / sp) * Math.sqrt(M.DAYS) : 0)), effRisk: 1 / b.assets.reduce((x, a) => x + a.rc * a.rc, 0), dr: M.diversification(b.w, b.C).ratio };
+    b.assets.forEach((a, i) => { a.cvar = b.an.cvar[i]; a.mcr = b.an.mcr[i]; a.cluster = b.cl[i]; });
+    // stress scenarios (all computed, none assumed beyond what's stated)
+    const crash = b.assets.map((a) => a.value * (isFinite(a.beta) ? a.beta : 1) * -0.2);
+    const sv = (rho) => M.stressVol(b.w, b.C, rho) * Math.sqrt(M.DAYS), s = b.C.map((r, i) => Math.sqrt(r[i])), Cs = b.C.map((r, i) => r.map((v, j) => (i === j ? v : s[i] * s[j] * 0.9)));
+    let wk = 0; b.pr.forEach((x, k) => { if (x < b.pr[wk]) wk = k; });
+    b.scen = { crash: { pnl: crash, total: crash.reduce((x, y) => x + y, 0) }, spike: { vol0: b.stats.vol, vol1: sv(0.9), var0: M.invNorm(0.95) * sp * b.value, var1: M.invNorm(0.95) * Math.sqrt(M.pVar(b.w, Cs)) * b.value, rc: M.riskContrib(b.w, Cs) },
+      worst: { date: b.dates[wk], ret: b.pr[wk], pnl: b.assets.map((a, i) => a.value * b.R[i][wk]), total: b.pr[wk] * b.value } };
+    const secs = [...new Set(b.assets.map((a) => a.sector || "Other"))].sort(), seg = (id, items, on) => `<div class="ql-seg" id="${id}">${items.map(([k, t]) => `<button data-v="${k}" class="${k === on ? "on" : ""}">${t}</button>`).join("")}</div>`;
+    $("qb-uni").innerHTML = `<div class="ql-ctl">${seg("qlView", [["net", "Correlation network"], ["budget", "Risk budget"], ["rr", "Risk vs return"]], QL.view)}${seg("qlScenB", Object.entries(SCEN), QL.scen || "none")}
+      <label>Color <select class="field" id="qlColor">${Object.entries(COLOR).map(([k, [nm]]) => `<option value="${k}" ${k === QL.color ? "selected" : ""}>${nm}</option>`).join("")}</select></label>
+      <label>Sector <select class="field" id="qlSector"><option value="">All</option>${secs.map((x) => `<option>${esc(x)}</option>`).join("")}</select></label></div>
+      <div class="ql-uni"><div class="ql-cv"><canvas id="qlCv"></canvas><div class="ql-tip" id="qlTip" hidden></div><div class="ql-scale" id="qlScale"></div><div class="ql-scen" id="qlScen"></div><div class="ql-cvhint">drag · scroll · click</div></div>
+      <div class="ql-det"><div id="qlDetB"></div><div id="qlAnat">${anatomy(b)}</div></div></div>
+      ${note(`<b>Network:</b> holdings placed by classical multidimensional scaling of the correlation matrix (distance √(2(1 − ρ))) and connected by its minimum spanning tree — the ${Math.max(0, n - 1)} strongest links that join everything without loops (Mantegna, 1999). Flow along a link speeds up with correlation. Halos are correlation clusters (average linkage). Node size = weight; the ring = share of portfolio risk, amber where risk outruns capital. <b>Effective bets</b> is Meucci's (2009) entropy of the portfolio's variance across uncorrelated principal components. <b>Component VaR</b> splits the parametric 1-day 95% VaR exactly across holdings. Scenarios: market −20% scaled by each holding's beta; every pairwise correlation set to 0.9 with volatilities unchanged; and the worst actual day in the window replayed.`)}`;
+    const segWire = (id, key, after) => ($(id).onclick = (e) => { const v = e.target.dataset.v; if (!v) return; QL[key] = v; $(id).querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.v === v)); after && after(); });
+    if (!["net", "budget", "rr"].includes(QL.view)) QL.view = "net"; if (!COLOR[QL.color]) QL.color = "cluster"; QL.scen = QL.scen || "none";
+    segWire("qlView", "view"); segWire("qlScenB", "scen", () => scenText(b));
     $("qlColor").onchange = (e) => (QL.color = e.target.value); $("qlSector").onchange = (e) => (QL.sector = e.target.value);
-    universe(b);
+    $("qlView").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.v === QL.view));
+    scenText(b); universe(b);
+  }
+  function anatomy(b) {
+    const A = b.an, n = b.have.length, pcs = (A.pcs || []).slice(0, Math.min(6, n)), mx = Math.max(...pcs.map((p) => p.share), ...A.p.slice(0, 6), 0.01);
+    const scree = `<svg viewBox="0 0 260 96" class="ql-svg">${pcs.map((p, k) => `<rect x="${8 + k * 42}" y="${80 - (p.share / mx) * 66}" width="16" height="${(p.share / mx) * 66}" fill="rgba(148,163,184,.45)"><title>PC${k + 1}: ${pct(p.share)} of total variance</title></rect><rect x="${25 + k * 42}" y="${80 - ((A.p[k] || 0) / mx) * 66}" width="16" height="${((A.p[k] || 0) / mx) * 66}" fill="#5eead4"><title>PC${k + 1}: ${pct(A.p[k] || 0)} of your portfolio's variance</title></rect><text x="${24 + k * 42}" y="93" text-anchor="middle" class="ql-ax">PC${k + 1}</text>`).join("")}</svg>`;
+    const top = [...b.assets].sort((x, y) => y.cvar - x.cvar).slice(0, 6), cmax = Math.max(...top.map((a) => a.cvar), 1);
+    return `<h4>Risk anatomy</h4><div class="ql-gauge"><div><b>${num(A.enb, 1)}</b><span>effective bets</span></div><div class="ql-gbar"><i style="width:${Math.min(100, (A.enb / n) * 100).toFixed(0)}%"></i></div><em>of ${n} holdings · Meucci ENB</em></div>
+      <div class="ql-mini">${kpi("Market mode", pct(pcs[0] ? pcs[0].share : NaN, 0), "PC1 share of variance")}${kpi("Risk holdings", num(A.effRisk, 1), "1 / Σ risk share²")}${kpi("Diversification", num(A.dr), "Σwσ / σp")}${kpi("1-day VaR 95%", usd(A.varP), "parametric")}</div>
+      <h4>Principal components</h4>${scree}${legend([["rgba(148,163,184,.6)", "share of all variance"], ["#5eead4", "share of your portfolio's variance"]])}
+      <h4>Component VaR (1-day, 95%)</h4>${top.map((a) => `<div class="ql-cvr"><span>${esc(a.sym)}</span><div><i style="width:${((a.cvar / cmax) * 100).toFixed(0)}%;background:${a.rc > a.w * 1.3 ? "#facc15" : "#5eead4"}"></i></div><b>${usd(a.cvar)}</b><em>${pct(a.cvar / A.varP, 0)}</em></div>`).join("")}`;
+  }
+  function scenText(b) {
+    const e = $("qlScen"); if (!e) return; const S0 = b.scen, k = QL.scen;
+    if (k === "crash") { const i = S0.crash.pnl.indexOf(Math.min(...S0.crash.pnl)); e.innerHTML = `<b>Market −20%</b> (each holding moves β × −20%)<br>Portfolio <span class="down">${usd(S0.crash.total)} (${sgn(S0.crash.total / b.value)})</span> · biggest hit ${esc(b.have[i])} ${usd(S0.crash.pnl[i])}`; }
+    else if (k === "spike") e.innerHTML = `<b>Correlation spike</b> (every ρ → 0.9, as in a panic)<br>Volatility ${pct(S0.spike.vol0)} → <span class="down">${pct(S0.spike.vol1)}</span> · 1-day VaR ${usd(S0.spike.var0)} → <span class="down">${usd(S0.spike.var1)}</span>`;
+    else if (k === "worst") { const i = S0.worst.pnl.indexOf(Math.min(...S0.worst.pnl)); e.innerHTML = `<b>Worst day in the window</b> · ${day(S0.worst.date)}<br>Portfolio <span class="down">${sgn(S0.worst.ret)} (${usd(S0.worst.total)})</span> · worst holding ${esc(b.have[i])} ${usd(S0.worst.pnl[i])}`; }
+    else e.innerHTML = `<b>${num(b.an.enb, 1)} effective bets</b> across ${b.have.length} holdings · ${b.tree.length} spanning links · ${new Set(b.cl).size} clusters`;
   }
   function universe(b) {
-    const cv = $("qlCv"), ctx = cv.getContext("2d"); let drag = null, proj = [];
+    const cv = $("qlCv"), ctx = cv.getContext("2d"), n = b.have.length; let drag = null, proj = [], hitBudget = null;
     const size = () => { const r = cv.parentElement.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); cv.width = r.width * d; cv.height = r.height * d; cv.style.width = r.width + "px"; cv.style.height = r.height + "px"; QL.cvD = d; };
     size(); if (QL.onResize) removeEventListener("resize", QL.onResize); QL.onResize = size; addEventListener("resize", size);
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; if (reduce) QL.rot.auto = false;
-    cv.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, moved: false, ...QL.rot }; cv.setPointerCapture(e.pointerId); QL.rot.auto = false; };
+    QL.cam = QL.cam || { x: 0, y: 0, z: 0, tx: 0, ty: 0, tz: 0 }; QL.sel = null;
+    const rnd = M.mulberry32(11), stars = Array.from({ length: 160 }, () => { const u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, r = 2.2 + rnd() * 1.6; return [Math.sqrt(1 - u * u) * Math.cos(th) * r, u * r, Math.sqrt(1 - u * u) * Math.sin(th) * r, 0.3 + rnd() * 0.7]; });
+    const pnlOf = (i) => (QL.scen === "crash" ? b.scen.crash.pnl[i] : QL.scen === "worst" ? b.scen.worst.pnl[i] : null), rcOf = (i) => (QL.scen === "spike" ? b.scen.spike.rc[i] : b.assets[i].rc);
+    const colOf = (i, lo, hi) => { const pl = pnlOf(i); if (pl != null) { const mx = Math.max(1, ...b.assets.map((_, k) => Math.abs(pnlOf(k)))); const t = pl / mx; return t < 0 ? `rgb(${Math.round(120 + 126 * -t)},${Math.round(90 - 20 * -t)},${Math.round(100 - 7 * -t)})` : "rgb(15,191,125)"; }
+      if (QL.color === "cluster") return CLC[b.cl[i] % CLC.length]; const v = COLOR[QL.color][1](b.assets[i]); return isFinite(v) ? ramp((v - lo) / (hi - lo || 1)) : "#64748b"; };
+    cv.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, moved: false, yaw: QL.rot.yaw, pitch: QL.rot.pitch }; cv.setPointerCapture(e.pointerId); };
     cv.onpointermove = (e) => { const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-      if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true; QL.rot.yaw = drag.yaw + dx * 0.008; QL.rot.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + dy * 0.008)); }
-      let best = -1, bd = 1e9; proj.forEach((p, i) => { const d = Math.hypot(p.x - mx, p.y - my); if (d < p.r + 4 && d < bd) { bd = d; best = i; } }); QL.hover = best;
-      const tip = $("qlTip"); if (best >= 0) { const a = b.assets[best]; tip.hidden = false; tip.style.left = mx + 14 + "px"; tip.style.top = my + 10 + "px"; tip.innerHTML = `<b>${esc(a.sym)}</b> · ${pct(a.w)} weight<br>Vol ${pct(a.vol)} · 1y ${sgn(a.ret1y)} · risk ${pct(a.rc)}`; } else tip.hidden = true; };
-    cv.onpointerup = (e) => { if (drag && !drag.moved && QL.hover >= 0) detail(b, QL.hover); drag = null; };
+      if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) { drag.moved = true; QL.rot.auto = false; } if (QL.view === "net") { QL.rot.yaw = drag.yaw + dx * 0.008; QL.rot.pitch = Math.max(-1.3, Math.min(1.3, drag.pitch + dy * 0.008)); } }
+      let best = -1;
+      if (QL.view === "budget" && hitBudget) best = hitBudget(mx, my);
+      else { let bd = 1e9; proj.forEach((p, i) => { const d = Math.hypot(p.x - mx, p.y - my); if (d < p.r + 6 && d < bd) { bd = d; best = i; } }); }
+      QL.hover = best; const tip = $("qlTip");
+      if (best >= 0) { const a = b.assets[best], nb = b.nbr[best].map((j) => [b.have[j], b.Cor[best][j]]).sort((x, y) => y[1] - x[1])[0], pl = pnlOf(best);
+        tip.hidden = false; tip.style.left = Math.min(r.width - 230, mx + 14) + "px"; tip.style.top = my + 12 + "px";
+        tip.innerHTML = `<b>${esc(a.sym)}</b> <span style="color:${CLC[a.cluster % CLC.length]}">● cluster ${a.cluster + 1}</span><br>weight ${pct(a.w)} · risk ${pct(rcOf(best))}<br>component VaR ${usd(a.cvar)} · MCR ${pct(a.mcr)}${nb ? `<br>closest link ${esc(nb[0])} ρ ${num(nb[1])}` : ""}${pl != null ? `<br>scenario <span class="${cls(pl)}">${usd(pl)}</span>` : ""}`; }
+      else tip.hidden = true; };
+    cv.onpointerup = () => { if (drag && !drag.moved && QL.hover >= 0) { QL.sel = QL.hover; const p = b.pos[QL.sel]; Object.assign(QL.cam, { tx: p[0], ty: p[1], tz: p[2] || 0 }); QL.rot.zoom = Math.max(QL.rot.zoom, 1.35); detail(b, QL.sel); } else if (drag && !drag.moved && QL.hover < 0 && QL.sel != null) { QL.sel = null; Object.assign(QL.cam, { tx: 0, ty: 0, tz: 0 }); QL.rot.zoom = 1; $("qlDetB").innerHTML = ""; } drag = null; };
     cv.onpointerleave = () => { QL.hover = -1; $("qlTip").hidden = true; };
-    cv.onwheel = (e) => { e.preventDefault(); QL.rot.zoom = Math.max(0.5, Math.min(2.5, QL.rot.zoom * (e.deltaY > 0 ? 0.92 : 1.08))); };
-    const draw = () => {
+    cv.onwheel = (e) => { e.preventDefault(); QL.rot.zoom = Math.max(0.5, Math.min(3, QL.rot.zoom * (e.deltaY > 0 ? 0.92 : 1.08))); };
+    const label = (txt, x, y, col, bold) => { ctx.font = `${bold ? "600 " : ""}11px ui-monospace,SFMono-Regular,monospace`; ctx.textAlign = "center"; ctx.fillStyle = "rgba(6,10,14,.75)"; const w = ctx.measureText(txt).width + 8; ctx.fillRect(x - w / 2, y - 10, w, 14); ctx.fillStyle = col; ctx.fillText(txt, x, y + 1); };
+    const vis = (i) => !QL.sector || b.assets[i].sector === QL.sector;
+    let last = 0;
+    const draw = (t) => {
       if (!document.body.contains(cv)) return; QL.raf = requestAnimationFrame(draw);
-      if (S.tab !== "quant" || document.hidden) return;
+      if (S.tab !== "quant" || document.hidden) return; const dt = Math.min(0.05, (t - (last || t)) / 1000); last = t;
       const d = QL.cvD, W = cv.width / d, H = cv.height / d; ctx.setTransform(d, 0, 0, d, 0, 0); ctx.clearRect(0, 0, W, H);
-      if (QL.rot.auto) QL.rot.yaw += 0.0025;
-      const [cn, fmt] = [COLOR[QL.color][1], COLOR[QL.color][2]], vals = b.assets.map(cn).filter(isFinite), lo = Math.min(...vals), hi = Math.max(...vals);
-      const cy = Math.cos(QL.rot.yaw), sy = Math.sin(QL.rot.yaw), cp = Math.cos(QL.rot.pitch), sp = Math.sin(QL.rot.pitch), S0 = Math.min(W, H) * 0.36 * QL.rot.zoom;
-      if (QL.view === "3d") proj = b.pos.map((p) => { const x = p[0] * cy - (p[2] || 0) * sy, z0 = p[0] * sy + (p[2] || 0) * cy, y = p[1] * cp - z0 * sp, z = p[1] * sp + z0 * cp, f = 3 / (3 + z); return { x: W / 2 + x * S0 * f, y: H / 2 + y * S0 * f, z, f }; });
-      else { const vs = b.assets.map((a) => a.vol), rs = b.assets.map((a) => a.ret1y), v0 = Math.min(...vs), v1 = Math.max(...vs) || 1, r0 = Math.min(0, ...rs), r1 = Math.max(...rs, 0.01), L = 56, Bm = 34;
-        ctx.strokeStyle = "rgba(148,163,184,.25)"; ctx.fillStyle = "rgba(148,163,184,.8)"; ctx.font = "11px ui-monospace,monospace"; ctx.beginPath(); ctx.moveTo(L, 10); ctx.lineTo(L, H - Bm); ctx.lineTo(W - 10, H - Bm); ctx.stroke();
-        ctx.fillText("Volatility →", W - 90, H - 12); ctx.save(); ctx.translate(14, 90); ctx.rotate(-Math.PI / 2); ctx.fillText("1-year return →", 0, 0); ctx.restore();
-        const X = (v) => L + 20 + ((v - v0) / (v1 - v0 || 1)) * (W - L - 50), Y = (r) => H - Bm - 16 - ((r - r0) / (r1 - r0 || 1)) * (H - Bm - 40);
-        if (r0 < 0) { ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(L, Y(0)); ctx.lineTo(W - 10, Y(0)); ctx.stroke(); ctx.setLineDash([]); }
-        proj = b.assets.map((a) => ({ x: X(a.vol), y: Y(a.ret1y), z: 0, f: 1 })); }
-      proj.forEach((p, i) => (p.r = (5 + Math.sqrt(b.assets[i].w) * 34) * p.f));
-      const vis = (i) => !QL.sector || b.assets[i].sector === QL.sector;
-      if (QL.view === "3d") for (let i = 0; i < proj.length; i++) for (let j = i + 1; j < proj.length; j++) { const r = b.Cor[i][j]; if (Math.abs(r) < 0.6) continue; const dim = !vis(i) || !vis(j);
-        ctx.strokeStyle = r > 0 ? `rgba(94,234,212,${dim ? 0.06 : (Math.abs(r) - 0.5) * 0.9})` : `rgba(251,146,60,${dim ? 0.06 : (Math.abs(r) - 0.5) * 0.9})`; ctx.lineWidth = 1 + (Math.abs(r) - 0.6) * 4; ctx.beginPath(); ctx.moveTo(proj[i].x, proj[i].y); ctx.lineTo(proj[j].x, proj[j].y); ctx.stroke(); }
-      [...proj.keys()].sort((a, c) => proj[c].z - proj[a].z).forEach((i) => { const p = proj[i], a = b.assets[i], v = cn(a), col = isFinite(v) ? ramp((v - lo) / (hi - lo || 1)) : "#64748b", dim = !vis(i);
-        ctx.globalAlpha = dim ? 0.15 : 1; const g = ctx.createRadialGradient(p.x - p.r * 0.3, p.y - p.r * 0.3, 1, p.x, p.y, p.r); g.addColorStop(0, "#fff"); g.addColorStop(0.25, col); g.addColorStop(1, "rgba(10,14,20,.9)");
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); if (i === QL.hover || (QL.sel === i)) { ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = 2; ctx.stroke(); }
-        ctx.fillStyle = "#e2e8f0"; ctx.font = `${Math.round(10 + p.f * 2)}px ui-monospace,monospace`; ctx.textAlign = "center"; ctx.fillText(a.sym, p.x, p.y - p.r - 5); ctx.globalAlpha = 1; });
-      const sk = QL.color + lo + hi; if (QL.scaleKey !== sk) { QL.scaleKey = sk; $("qlScale").innerHTML = `<span>${COLOR[QL.color][0]}</span><i></i><em>${fmt(lo)}</em><em>${fmt(hi)}</em>`; }
+      const vals = b.assets.map((a) => (COLOR[QL.color][1] ? COLOR[QL.color][1](a) : 0)).filter(isFinite), lo = Math.min(...vals), hi = Math.max(...vals);
+      const hov = QL.hover, near = hov >= 0 ? new Set([hov, ...b.nbr[hov]]) : null, dim = (i) => (!vis(i) ? 0.12 : near && !near.has(i) ? 0.28 : 1);
+      if (QL.view === "net") {
+        if (QL.rot.auto && !reduce) QL.rot.yaw += dt * 0.12; const c = QL.cam; for (const k of ["x", "y", "z"]) c[k] += (c["t" + k] - c[k]) * Math.min(1, dt * 4);
+        const cy = Math.cos(QL.rot.yaw), sy = Math.sin(QL.rot.yaw), cp = Math.cos(QL.rot.pitch), sp = Math.sin(QL.rot.pitch), S0 = Math.min(W, H) * 0.34 * QL.rot.zoom;
+        const P3 = (x, y, z) => { x -= c.x; y -= c.y; z -= c.z; const X = x * cy - z * sy, Z0 = x * sy + z * cy, Y = y * cp - Z0 * sp, Z = y * sp + Z0 * cp, f = 3.2 / (3.2 + Z); return { x: W / 2 + X * S0 * f, y: H / 2 + Y * S0 * f, z: Z, f }; };
+        for (const s of stars) { const p = P3(s[0], s[1], s[2]); if (p.z < -3) continue; ctx.fillStyle = `rgba(148,197,255,${(s[3] * 0.35 * Math.min(1, p.f)).toFixed(3)})`; ctx.fillRect(p.x, p.y, 1.2 * p.f, 1.2 * p.f); }
+        ctx.lineWidth = 1; for (const rr of [0.55, 1.05, 1.55]) { ctx.strokeStyle = `rgba(94,234,212,${rr === 1.05 ? 0.10 : 0.06})`; ctx.beginPath(); for (let k = 0; k <= 64; k++) { const a = (k / 64) * Math.PI * 2, p = P3(Math.cos(a) * rr, 1.25, Math.sin(a) * rr); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.stroke(); }
+        proj = b.pos.map((p) => P3(p[0], p[1], p[2] || 0)); proj.forEach((p, i) => (p.r = (6 + Math.sqrt(b.assets[i].w) * 30) * p.f));
+        // cluster halos
+        const groups = {}; b.cl.forEach((k, i) => (groups[k] = groups[k] || []).push(i));
+        for (const [k, g] of Object.entries(groups)) { if (g.length < 2) continue; const gx = g.reduce((a, i) => a + proj[i].x, 0) / g.length, gy = g.reduce((a, i) => a + proj[i].y, 0) / g.length, rad = Math.max(...g.map((i) => Math.hypot(proj[i].x - gx, proj[i].y - gy) + proj[i].r)) + 26;
+          const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, rad), col = CLC[k % CLC.length]; gr.addColorStop(0, rgba(col, 0.13)); gr.addColorStop(0.7, rgba(col, 0.05)); gr.addColorStop(1, rgba(col, 0)); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(gx, gy, rad, 0, Math.PI * 2); ctx.fill(); }
+        // spanning-tree links with flowing particles
+        for (const e of b.tree) { const A = proj[e.a], B = proj[e.b], on = hov >= 0 && (e.a === hov || e.b === hov), al = Math.min(dim(e.a), dim(e.b)) * (on ? 1 : 0.75), r = Math.max(0, e.rho), col = e.rho >= 0 ? "94,234,212" : "251,146,60";
+          const g = ctx.createLinearGradient(A.x, A.y, B.x, B.y); g.addColorStop(0, `rgba(${col},${(0.15 + 0.5 * r) * al})`); g.addColorStop(0.5, `rgba(${col},${(0.3 + 0.6 * r) * al})`); g.addColorStop(1, `rgba(${col},${(0.15 + 0.5 * r) * al})`);
+          ctx.strokeStyle = g; ctx.lineWidth = (0.8 + Math.abs(e.rho) * 3.2) * (on ? 1.6 : 1); ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+          if (!reduce) for (let k = 0; k < 3; k++) { const ph = ((t / 1000) * (0.12 + 0.45 * Math.abs(e.rho)) + k / 3) % 1, x = A.x + (B.x - A.x) * ph, y = A.y + (B.y - A.y) * ph; ctx.fillStyle = `rgba(${col},${0.9 * al})`; ctx.beginPath(); ctx.arc(x, y, 1.6 + Math.abs(e.rho), 0, Math.PI * 2); ctx.fill(); } }
+        // strong correlations outside the tree, faint and dashed
+        ctx.setLineDash([3, 5]); for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { if (Math.abs(b.Cor[i][j]) < 0.7 || b.nbr[i].includes(j)) continue; ctx.strokeStyle = `rgba(148,163,184,${0.18 * Math.min(dim(i), dim(j))})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(proj[i].x, proj[i].y); ctx.lineTo(proj[j].x, proj[j].y); ctx.stroke(); } ctx.setLineDash([]);
+        const rmax = Math.max(...b.assets.map((_, i) => rcOf(i)), 1e-9);
+        [...proj.keys()].sort((x, y) => proj[y].z - proj[x].z).forEach((i) => { const p = proj[i], a = b.assets[i], col = colOf(i, lo, hi); ctx.globalAlpha = dim(i);
+          const glow = ctx.createRadialGradient(p.x, p.y, p.r * 0.6, p.x, p.y, p.r * 2.4); glow.addColorStop(0, rgba(col, 0.35)); glow.addColorStop(1, rgba(col, 0)); ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.4, 0, Math.PI * 2); ctx.fill();
+          const g = ctx.createRadialGradient(p.x - p.r * 0.35, p.y - p.r * 0.4, p.r * 0.1, p.x, p.y, p.r); g.addColorStop(0, "#ffffff"); g.addColorStop(0.3, col); g.addColorStop(1, "rgba(8,12,18,.95)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+          const rc = rcOf(i), over = rc > a.w * 1.3; ctx.strokeStyle = "rgba(148,163,184,.18)"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = over ? "#facc15" : "#e2e8f0"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 5, -Math.PI / 2, -Math.PI / 2 + (rc / rmax) * Math.PI * 2); ctx.stroke();
+          if (QL.sel === i) { ctx.strokeStyle = `rgba(94,234,212,${0.5 + 0.4 * Math.sin(t / 250)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + 11 + 2 * Math.sin(t / 250), 0, Math.PI * 2); ctx.stroke(); }
+          const pl = pnlOf(i); label(pl != null ? `${a.sym} ${usd(pl)}` : `${a.sym} ${pct(a.w, 0)}`, p.x, p.y - p.r - 12, "#e2e8f0", i === hov); ctx.globalAlpha = 1; });
+        hitBudget = null;
+      } else if (QL.view === "budget") {
+        const cx = W / 2, cy0 = H / 2 + 6, R = Math.min(W, H) * 0.42, r1 = R * 0.5, r2 = R * 0.78, t1 = R * 0.1, t2 = R * 0.14;
+        const ord = [...b.assets.keys()].sort((x, y) => rcOf(y) - rcOf(x)), arcs = []; let aw = -Math.PI / 2, ar = -Math.PI / 2;
+        for (const i of ord) { const w = b.assets[i].w * Math.PI * 2, rr = Math.max(0, rcOf(i)) * Math.PI * 2; arcs.push({ i, w0: aw, w1: aw + w, r0: ar, r1: ar + rr }); aw += w; ar += rr; }
+        const sector = (rad, th, a0, a1, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(cx, cy0, rad + th, a0, a1); ctx.arc(cx, cy0, rad, a1, a0, true); ctx.closePath(); ctx.fill(); };
+        const pt = (rad, a) => [cx + Math.cos(a) * rad, cy0 + Math.sin(a) * rad];
+        for (const A of arcs) { const col = colOf(A.i, lo, hi), al = dim(A.i), g = 0.004;
+          ctx.fillStyle = rgba(col, (hov === A.i ? 0.32 : 0.09) * al); ctx.beginPath(); ctx.moveTo(...pt(r1 + t1, A.w0 + g)); ctx.arc(cx, cy0, r1 + t1, A.w0 + g, A.w1 - g);
+          const e1 = pt(r2, A.r1 - g), c1 = pt((r1 + r2) / 2 + t1, A.w1), c2 = pt((r1 + r2) / 2, A.r1); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], e1[0], e1[1]); ctx.arc(cx, cy0, r2, A.r1 - g, A.r0 + g, true);
+          const s0 = pt(r1 + t1, A.w0 + g), d1 = pt((r1 + r2) / 2, A.r0), d2 = pt((r1 + r2) / 2 + t1, A.w0); ctx.bezierCurveTo(d1[0], d1[1], d2[0], d2[1], s0[0], s0[1]); ctx.fill();
+          ctx.globalAlpha = al; sector(r1, t1, A.w0 + g, A.w1 - g, col); sector(r2, t2, A.r0 + g, A.r1 - g, col); ctx.globalAlpha = 1;
+          const a = b.assets[A.i], mid = (A.r0 + A.r1) / 2; if (rcOf(A.i) > 0.035 || A.i === hov) { const [lx, ly] = pt(r2 + t2 + 18, mid); ctx.textAlign = lx < cx ? "right" : "left"; ctx.font = "600 11px ui-monospace,monospace"; ctx.fillStyle = "#e2e8f0"; ctx.fillText(a.sym, lx, ly); ctx.font = "10px ui-monospace,monospace"; ctx.fillStyle = rcOf(A.i) > a.w * 1.3 ? "#facc15" : "#94a3b8"; ctx.fillText(`${pct(rcOf(A.i), 0)} risk · ${pct(a.w, 0)} $`, lx, ly + 13); } }
+        ctx.textAlign = "center"; ctx.fillStyle = "#e2e8f0"; ctx.font = "600 34px ui-monospace,monospace"; ctx.fillText(num(b.an.enb, 1), cx, cy0 + 4); ctx.font = "11px ui-monospace,monospace"; ctx.fillStyle = "#94a3b8"; ctx.fillText(`effective bets of ${n}`, cx, cy0 + 22);
+        ctx.font = "10px ui-monospace,monospace"; ctx.fillStyle = "#64748b"; ctx.fillText("inner ring = money · outer ring = risk" + (QL.scen === "spike" ? " (spike)" : ""), cx, cy0 + 40);
+        hitBudget = (mx, my) => { const dx = mx - cx, dy = my - cy0, rr = Math.hypot(dx, dy); let a = Math.atan2(dy, dx); if (a < -Math.PI / 2) a += Math.PI * 2; const A = rr >= r1 && rr <= r1 + t1 ? arcs.find((x) => a >= x.w0 && a < x.w1) : rr >= r2 && rr <= r2 + t2 ? arcs.find((x) => a >= x.r0 && a < x.r1) : null; return A ? A.i : -1; };
+        proj = [];
+      } else {
+        const vs = b.assets.map((a) => a.vol), rs = b.assets.map((a) => a.ret1y), v0 = 0, v1 = Math.max(...vs) * 1.15 || 1, r0 = Math.min(0, ...rs) * 1.15, r1 = Math.max(0.01, ...rs) * 1.15, L = 58, B = 36, T = 20;
+        const X = (v) => L + ((v - v0) / (v1 - v0)) * (W - L - 20), Y = (r) => H - B - ((r - r0) / (r1 - r0)) * (H - B - T);
+        ctx.strokeStyle = "rgba(148,163,184,.12)"; ctx.fillStyle = "#64748b"; ctx.font = "10px ui-monospace,monospace"; ctx.textAlign = "right";
+        for (let k = 0; k <= 4; k++) { const r = r0 + (k / 4) * (r1 - r0); ctx.beginPath(); ctx.moveTo(L, Y(r)); ctx.lineTo(W - 20, Y(r)); ctx.stroke(); ctx.fillText(pct(r, 0), L - 6, Y(r) + 3); }
+        ctx.textAlign = "center"; for (let k = 0; k <= 4; k++) { const v = v0 + (k / 4) * (v1 - v0); ctx.fillText(pct(v, 0), X(v), H - B + 14); } ctx.fillText("volatility (annualized) →", W / 2, H - 6);
+        // iso-Sharpe lines through the risk-free rate
+        ctx.setLineDash([4, 4]); for (const sr of [0.5, 1, 2]) { ctx.strokeStyle = "rgba(94,234,212,.16)"; ctx.beginPath(); ctx.moveTo(X(0), Y(b.rf)); ctx.lineTo(X(v1), Y(b.rf + sr * v1)); ctx.stroke(); const yy = Y(Math.min(r1, b.rf + sr * v1)); ctx.fillStyle = "rgba(94,234,212,.5)"; ctx.fillText(`Sharpe ${sr}`, Math.min(W - 50, X(Math.min(v1, (r1 - b.rf) / sr))) - 6, yy + 12); } ctx.setLineDash([]);
+        const pv = b.stats.vol, prt = b.stats.ret1y; ctx.strokeStyle = "#f472b6"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(pv), Y(prt), 9, 0, Math.PI * 2); ctx.stroke(); label("PORTFOLIO", X(pv), Y(prt) - 16, "#f472b6", true);
+        proj = b.assets.map((a) => ({ x: X(a.vol), y: Y(a.ret1y), z: 0, f: 1, r: 5 + Math.sqrt(a.w) * 26 }));
+        proj.forEach((p, i) => { const col = colOf(i, lo, hi); ctx.globalAlpha = dim(i); const g = ctx.createRadialGradient(p.x - p.r * 0.3, p.y - p.r * 0.3, 1, p.x, p.y, p.r); g.addColorStop(0, "#fff"); g.addColorStop(0.3, col); g.addColorStop(1, "rgba(8,12,18,.9)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); label(b.assets[i].sym, p.x, p.y - p.r - 10, "#e2e8f0", i === hov); ctx.globalAlpha = 1; });
+        hitBudget = null;
+      }
+      const sk = QL.view + QL.color + QL.scen + lo + hi; if (QL.scaleKey !== sk) { QL.scaleKey = sk; const sc = $("qlScale");
+        sc.innerHTML = QL.scen === "crash" || QL.scen === "worst" ? `<span>Scenario P&amp;L</span><i style="background:linear-gradient(90deg,#f6465d,#78505a,#0fbf7d)"></i>` : QL.color === "cluster" ? `<span>Clusters</span><div class="ql-cdots">${[...new Set(b.cl)].map((k) => `<b style="background:${CLC[k % CLC.length]}"></b>`).join("")}</div>` : `<span>${COLOR[QL.color][0]}</span><i></i><em>${COLOR[QL.color][2](lo)}</em><em>${COLOR[QL.color][2](hi)}</em>`; }
     };
-    cancelAnimationFrame(QL.raf); draw();
+    cancelAnimationFrame(QL.raf); QL.raf = requestAnimationFrame(draw);
   }
   async function detail(b, i) {
-    QL.sel = i; const a = b.assets[i], el = $("qlDet");
-    el.innerHTML = `<h3>${esc(a.sym)} <small class="tw-muted">${esc(a.sector || "")}</small></h3><div class="ql-mini">${kpi("Weight", pct(a.w))}${kpi("Value", usd(a.value))}${kpi("Risk share", pct(a.rc))}${kpi("Volatility", pct(a.vol))}${kpi("1-year", sgn(a.ret1y), "", cls(a.ret1y))}${kpi("Beta", num(a.beta))}</div>
-      <div class="ql-btns"><button class="btn ghost" data-go="dcf">Open DCF →</button><button class="btn ghost" data-go="fin">Financials →</button><button class="btn ghost" data-go="research">Research →</button></div>
+    QL.sel = i; const a = b.assets[i], el = $("qlDetB"), nb = b.nbr[i].map((j) => `<span class="ql-tag">${esc(b.have[j])} ρ ${num(b.Cor[i][j])}</span>`).join(" ");
+    el.innerHTML = `<h3>${esc(a.sym)} <small class="tw-muted">${esc(a.sector || "")}</small></h3><div class="ql-mini">${kpi("Weight", pct(a.w))}${kpi("Value", usd(a.value))}${kpi("Risk share", pct(a.rc))}${kpi("Volatility", pct(a.vol))}${kpi("1-year", sgn(a.ret1y), "", cls(a.ret1y))}${kpi("Beta", num(a.beta))}${kpi("Component VaR", usd(a.cvar), "1-day 95%")}${kpi("Marginal risk", pct(a.mcr), "∂σ/∂w")}</div>
+      ${nb ? `<p class="ql-nb">Linked in the spanning tree to ${nb}</p>` : ""}<div class="ql-btns"><button class="btn ghost" data-go="dcf">Open DCF →</button><button class="btn ghost" data-go="fin">Financials →</button><button class="btn ghost" data-go="research">Research →</button></div>
       <h4>THE WEB's research</h4><div id="qlDW" class="tw-muted">Loading…</div><h4>SEC fundamentals</h4><div id="qlDS" class="tw-muted">Loading…</div>`;
     el.querySelectorAll("[data-go]").forEach((x) => (x.onclick = () => { const t = x.dataset.go; setTab(t); setTimeout(() => { try { if (t === "dcf") { $("dcfSym").value = a.sym; dcfLoad(); } else if (t === "fin") { $("finSym").value = a.sym; finLoad(); } else if (typeof openQuote === "function") openQuote(a.sym); } catch {} }, 60); }));
     api(`/api/web/discoveries?symbols=${encodeURIComponent(a.sym)}&limit=3`).then((j) => { $("qlDW").innerHTML = (j.items || []).length ? (j.items || []).map((d) => `<p class="ql-disc"><b>${esc(d.headline)}</b><br><span class="tw-muted">${esc(d.cat || "")} · ${new Date(d.u || d.t).toLocaleDateString()}</span></p>`).join("") : "No findings on this holding yet."; }).catch(() => ($("qlDW").textContent = "THE WEB is only available when signed in."));
