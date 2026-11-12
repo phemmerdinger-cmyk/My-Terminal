@@ -512,37 +512,37 @@
     if (reduce) { ALL.forEach((e) => scanCollect(e)); return scanFinish(); }
     bsInit(); SCAN.figs = 0; const shuffle = null; void shuffle; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>0 figures</span> · 0 of ${T.length} sections`); say2(`Spider deployed · examining ${pageLabel(t)} at 2× speed`);
     await bsGo(Math.min(innerWidth * 0.2, 260), innerHeight / 2, 1200);
-    // investigate each section: walk across it in several stops, lasering the figures nearest each stop one by one
-    const zap = (el, color, delay, main) => { const q = el.getBoundingClientRect(), p = { x: q.left + q.width / 2, y: q.top + q.height / 2 }, now = performance.now();
-      BS.lasers.push({ to: p, c: color, t0: now + delay, life: bsMs(1000, 180), w: main ? 2.6 : 1.7 }); BS.pulses.push({ p, c: color, t0: now + delay + 60 });
-      setTimeout(() => { el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 3200); }, delay); };
-    const visit = async (e, k, title, pass2) => {
-      try { e.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await bsWait(80); const r = e.getBoundingClientRect(), sc = BS.sp.scale, figs = SCAN.deep ? [...e.querySelectorAll("h3 a, h5 a, .np-art h3, .np-brief h5, li.item")].filter((el) => { const q = el.getBoundingClientRect(); return q.width > 4 && q.bottom > 60 && q.top < innerHeight - 20; }).slice(0, pass2 ? 8 : 14) : figuresIn(e, pass2 ? 6 : 10), stops = r.width > 900 ? 2 : 1, color = COLORS[k % COLORS.length];
-      if (!pass2) bsChip(title, r.left + 8, r.top - 6);
-      for (let st = 0; st < stops && SCAN.on; st++) {
-        const fx = (st + 0.5) / stops, x = Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r.left + r.width * fx)), y = Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r.top + Math.min(r.height * (0.35 + 0.2 * (st % 2)), 240)));
-        say2(`${pass2 ? "Cross-checking" : "Investigating"} ${title}${stops > 1 ? ` · part ${st + 1}/${stops}` : ""}`);
-        await bsGo(x, y, bsMs(1800, 450)); if (!SCAN.on) return;
-        const mine = figs.filter((el) => { const q = el.getBoundingClientRect(), cx = q.left + q.width / 2; return cx >= r.left + (r.width * st) / stops - 4 && cx <= r.left + (r.width * (st + 1)) / stops + 4; });
-        (mine.length ? mine : st === 0 && !figs.length ? [e] : []).forEach((el, j) => zap(el, j ? "#ff4fa8" : color, j * bsMs(120, 20), !j));
-        SCAN.figs = (SCAN.figs || 0) + (pass2 ? 0 : mine.length);
-        await bsWait(bsMs(650, 160) + mine.length * bsMs(120, 20));
-      }
-    };
-    const T0 = performance.now();
-    for (const [k, e] of T.entries()) { if (!SCAN.on) break;
-      const title = titleOf(e) || `section ${k + 1}`; await visit(e, k, title, false); if (!SCAN.on) break;
+    // crawl to every piece of information it reads: hop from figure to figure (headline to headline on News),
+    // scrolling the page along, lasering each one on arrival. Every section gets visited; ~70 hops keep it brisk.
+    const zap = (el, color, main) => { const q = el.getBoundingClientRect(), p = { x: q.left + Math.min(q.width / 2, 120), y: q.top + q.height / 2 }, now = performance.now();
+      BS.lasers.push({ to: p, c: color, t0: now, life: bsMs(800, 160), w: main ? 2.6 : 1.8 }); BS.pulses.push({ p, c: color, t0: now + 40 });
+      el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 2600); };
+    const itemsIn = (e) => SCAN.deep ? [...e.querySelectorAll(".np-art h3, .np-brief h5, li.item, .feed > li, article")].filter((el, i, arr) => !arr.some((o) => o !== el && o.contains(el)))
+      : [...e.querySelectorAll("b, td, em, span, strong, h3, text, small")].filter((el) => { if (el.children.length > 1) return false; const t = (el.textContent || "").trim(); return t && t.length <= 32 && NUMLINE.test(" " + t + " ") && el.getBoundingClientRect().width > 3; });
+    const BUDGET = 70, per = Math.max(2, Math.floor(BUDGET / Math.max(1, ALL.length))), sc = BS.sp.scale;
+    const pickEven = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_, i) => arr[Math.round((i * (arr.length - 1)) / (n - 1 || 1))]);
+    let readN = 0, hl = SCAN.deep ? SCAN.deep.items.length : 0;
+    for (const [k, e] of ALL.entries()) { if (!SCAN.on) break;
+      const title = titleOf(e) || `section ${k + 1}`, color = COLORS[k % COLORS.length];
+      try { e.scrollIntoView({ block: "center", behavior: "instant" }); } catch {} await bsWait(40);
+      const r0 = e.getBoundingClientRect(); bsChip(title, r0.left + 8, r0.top - 6); say2(`Crawling to ${title}`);
+      const items = pickEven(itemsIn(e), SCAN.deep ? Math.max(per, 18) : per);
+      if (!items.length) { await bsGo(Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r0.left + r0.width / 2)), Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r0.top + Math.min(r0.height / 2, 200))), bsMs(900, 220)); if (SCAN.on) zap(e, color, true); await bsWait(bsMs(500, 120)); }
+      for (const [j, el] of items.entries()) { if (!SCAN.on) break;
+        let q = el.getBoundingClientRect(); if (q.top < 120 || q.bottom > innerHeight - 90) { try { el.scrollIntoView({ block: "center", behavior: "instant" }); } catch {} await bsWait(30); q = el.getBoundingClientRect(); }
+        // the spider stands just beside what it's reading, legs over it
+        const x = Math.max(90 * sc, Math.min(innerWidth - 90 * sc, q.left + Math.min(q.width, 240) + 60 * sc)), y = Math.max(150 * sc, Math.min(innerHeight - 140 * sc, q.top + q.height / 2 - 34 * sc));
+        const txt = (el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 70);
+        say2(`${SCAN.deep ? "Reading" : "Reading " + title + ":"} ${txt}`);
+        await bsGo(x, y, bsMs(650, 160)); if (!SCAN.on) break;
+        zap(el, j ? "#ff4fa8" : color, !j); readN++; SCAN.figs = (SCAN.figs || 0) + (SCAN.deep ? 0 : 1);
+        bsPill(SCAN.deep ? `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${Math.min(hl, Math.round((hl * (k * items.length + j + 1)) / Math.max(1, ALL.length * items.length)))} of ${hl} headlines read</span>` : `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · section ${k + 1} of ${ALL.length}`);
+        await bsWait(bsMs(220, 50)); }
       scanCollect(e); const f = SCAN.found[SCAN.found.length - 1];
-      bsPill(SCAN.deep ? `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${Math.round((SCAN.deep.items.length * (k + 1)) / T.length)} of ${SCAN.deep.items.length} headlines read</span>` : `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
-      say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120)); await bsWait(bsMs(250, 60)); }
-    // second pass: go back over the richest sections and cross-check before writing anything
-    const rich = SCAN.found.map((f, i) => [i, f.facts.length]).sort((x, y) => y[1] - x[1]).slice(0, 1).filter((x) => x[1] > 0);
-    for (const [i] of rich) { if (!SCAN.on) break; const e = T[i]; if (!e) continue; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · cross-checking`); await visit(e, i, titleOf(e) || `section ${i + 1}`, true); }
-    // a short floor so tiny pages still get a proper look (~16 s)
-    while (SCAN.on && performance.now() - T0 < 16000 && T.length) { const i = Math.floor(Math.random() * T.length); await visit(T[i], i, titleOf(T[i]) || `section ${i + 1}`, true); }
+      if (!SCAN.deep) say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120)); }
+    if (SCAN.deep && SCAN.on) bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${hl} of ${hl} headlines read</span>`);
     // everything on the page gets read, including the sections the tour didn't stop at
-    if (SCAN.on) { const seen = new Set(T); for (const e of ALL) if (!seen.has(e)) scanCollect(e); if (SCAN.deep) say2(`Read all ${SCAN.deep.items.length} headlines from ${SCAN.deep.span}`); }
+    if (SCAN.on) { if (SCAN.deep) say2(`Read all ${SCAN.deep.items.length} headlines from ${SCAN.deep.span}`); }
     if (SCAN.on) { say2("Writing the report"); await bsGo(-160 * BS.sp.scale, innerHeight / 2, 1500); }
     bsHide(); bsPill(""); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "";
     if (SCAN.on) scanFinish(); else { SCAN.on = false; if (btn) btn.classList.remove("on"); }
