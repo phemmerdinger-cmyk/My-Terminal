@@ -60,8 +60,11 @@ test("index.html can't be fetched directly around the login", async () => {
   assert.equal((await get("/index.html")).status, 302);
   assert.equal((await get("/../server.js")).status === 200, false);
 });
-test("Claude is off by default ($0)", async () => {
-  const j = await (await get("/api/health")).json(); assert.equal(j.claudeDailyLimit, 0);
+test("Claude spending is capped by a dollar budget (default $4, $1/day) and needs the password", async () => {
+  const j = await (await get("/api/health")).json();
+  assert.ok(j.claudeBudget, "budget reported"); assert.equal(j.claudeBudget.budget, 4); assert.equal(j.claudeBudget.dailyCap, 1);
+  assert.ok(j.claudeBudget.left <= j.claudeBudget.budget);
+  const r = await fetch(BASE + "/api/ask", { redirect: "manual", method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); assert.ok([302, 401, 403].includes(r.status), "visitors can't spend credits: " + r.status);
 });
 test("the data-integrity status is public and honest when sources are unreachable", async () => {
   const r = await get("/api/pub/integrity/status"); assert.equal(r.status, 200);
