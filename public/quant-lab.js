@@ -9,7 +9,7 @@
   const M = window.QMATH, Q = window.QUANT;
   if (!M || !Q) return;
   let wireHoverLater = false; const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "net", color: "cluster", scen: "none", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
-  const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Quant research assistant"]];
+  const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Signal board"]];
   const FACTORS = [["MKT", "Market", "SPY minus cash"], ["SIZE", "Size (small caps)", "IWM − SPY"], ["VALUE", "Value", "IWD − IWF (value minus growth)"], ["MOM", "Momentum", "MTUM − SPY"], ["QUAL", "Quality", "QUAL − SPY"], ["LOWVOL", "Low volatility", "USMV − SPY"]];
   const PROXIES = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "HYG", "IEF"];
   const SAMPLE = [["SPY", 0.4], ["QQQ", 0.2], ["AGG", 0.2], ["GLD", 0.1], ["IWM", 0.1]];
@@ -151,18 +151,53 @@
   const kpi = (k, v, sub, c) => `<div class="ql-kpi"><span>${k}</span><b class="${c || ""}">${v}</b>${sub ? `<em>${sub}</em>` : ""}</div>`;
   const note = (t) => `<details class="ql-m"><summary>ⓘ method</summary><p>${t}</p></details>`;
 
+  // ---------------------------------------------------------------- shared visual helpers
+  const roll = (a, n, f) => a.map((_, i) => (i + 1 < n ? null : f(a.slice(i + 1 - n, i + 1))));
+  const cum = (r) => { const e = [1]; for (const x of r) e.push(e[e.length - 1] * (1 + x)); return e; };
+  function spark(v, c = "#5eead4", w = 120, h = 30) { const a = v.filter((x) => x != null && isFinite(x)); if (a.length < 2) return ""; const lo = Math.min(...a), hi = Math.max(...a) || lo + 1, n = v.length;
+    let d = "", pen = false; v.forEach((x, i) => { if (x == null || !isFinite(x)) { pen = false; return; } d += (pen ? "L" : "M") + ((i / (n - 1)) * w).toFixed(1) + "," + (h - 2 - ((x - lo) / (hi - lo || 1)) * (h - 4)).toFixed(1); pen = true; });
+    return `<svg viewBox="0 0 ${w} ${h}" class="ql-spark" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${c}" stroke-width="1.4"/></svg>`; }
+  const tile = (k, v, sp, c, sub) => `<div class="ql-tile"><span>${k}</span><b class="${c || ""}">${v}</b>${sub ? `<em>${sub}</em>` : ""}${sp || ""}</div>`;
+  const segH = (id, items, on) => `<div class="ql-seg" id="${id}">${items.map(([k, t]) => `<button data-v="${k}" class="${k === on ? "on" : ""}">${t}</button>`).join("")}</div>`;
+  const segOn = (id, fn) => { const el = $(id); el.onclick = (e) => { const v = e.target.dataset.v; if (!v) return; el.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.v === v)); fn(v); }; };
+  const PAL = ["#5eead4", "#4da3ff", "#facc15", "#f472b6", "#a78bfa", "#fb923c", "#34d399", "#f87171", "#93c5fd", "#fde68a", "#c4b5fd", "#67e8f9"];
+
   // ---------------------------------------------------------------- 1. command center
   async function renderCC(b) {
-    const s = b.stats, top = [...b.assets].sort((a, c) => c.rc - a.rc)[0];
-    let ap = null; try { ap = await api("/api/autopilot"); } catch {}
-    const apEq = ap && ap.equity && ap.equity.length ? ap.equity[ap.equity.length - 1] : null, apV = apEq == null ? null : typeof apEq === "number" ? apEq : (apEq.v ?? apEq.value ?? apEq[1] ?? null);
-    b.ap = ap;
-    $("qb-cc").innerHTML = `<div class="ql-src">${esc(b.P.name)} · ${b.have.length} holdings analysed${b.missing.length ? ` · <span class="down">no history for ${esc(b.missing.join(", "))}</span>` : ""} · ${num(s.years, 1)} years of daily returns at today's weights</div>
-      <div class="ql-kpis">${kpi("Portfolio value", usd(s.value), b.P.sample ? "sample $10,000" : "shares × last close")}${kpi("1-year return", sgn(s.ret1y), "today's weights, held", cls(s.ret1y))}${kpi("Volatility", pct(s.vol), "annualized")}${kpi("Sharpe", num(s.sharpe), `rf ${pct(b.rf, 2)}`)}${kpi("Sortino", num(s.sortino))}${kpi("Max drawdown", pct(-s.mdd), "3-year window", "down")}
-      ${kpi("Beta vs S&P 500", num(s.beta), "SPY")}${kpi("1-day VaR 95%", usd(s.var95 * s.value), pct(s.var95, 2) + " historical")}${kpi("1-day ES 95%", usd(s.es95 * s.value), pct(s.es95, 2) + " avg tail loss")}${kpi("Market regime", '<span id="qlRegK">…</span>')}${kpi("Simulation", '<span id="qlMcK">queued</span>')}${kpi("Data freshness", day(b.lastT), b.stale ? `${Math.floor(b.ageD)} days old` : "latest daily close", b.stale ? "down" : "")}</div>
-      <div class="ql-two"><div>${lineSVG([{ v: b.eq.map((x) => x - 1), c: "#5eead4" }], { dates: b.eqDates, zero: true, h: 180 })}${legend([["#5eead4", "Growth of today's portfolio over the window (hypothetical: assumes today's weights all along)"]])}</div>
-      <div class="ql-side"><h4>Largest risk source</h4><p><b>${esc(top.sym)}</b> carries <b>${pct(top.rc)}</b> of portfolio risk with ${pct(top.w)} of the money.</p>
-      <h4>AI Trader (paper)</h4><p>${ap ? `${apV != null ? `Paper equity ${usd(apV)} · ` : ""}${(ap.positions || []).length} open paper positions${ap.lastScan && ap.lastScan.riskOff ? " · currently <b>risk-off</b>" : ""}. Simulated only.` : "Not reachable right now."}</p></div></div>`;
+    const s = b.stats, pr = b.pr, sp = b.spR, n = pr.length, rfD = b.rf / M.DAYS, D = b.eqDates;
+    const peq = b.eq, seq = cum(sp), dd = M.drawdownSeries(peq), sdd = M.drawdownSeries(seq);
+    const rv = roll(pr, 63, (x) => M.annVol(x)), srv = roll(sp, 63, (x) => M.annVol(x)), rs = roll(pr, 126, (x) => M.sharpe(x, b.rf)), ssr = roll(sp, 126, (x) => M.sharpe(x, b.rf));
+    const rb = pr.map((_, i) => (i + 1 < 126 ? null : M.beta(pr.slice(i - 125, i + 1), sp.slice(i - 125, i + 1)))), rvar = roll(pr, 252, (x) => M.varHist(x)), r1 = roll(pr, 252, (x) => x.reduce((a, y) => a * (1 + y), 1) - 1);
+    let ap = null; try { ap = await api("/api/autopilot"); } catch {} b.ap = ap;
+    const pad = (a) => [null, ...a]; // daily-return series start one day after the equity series
+    b.cc = { D, peq, seq, dd, sdd, rv: pad(rv), srv: pad(srv), rs: pad(rs), ssr: pad(ssr) };
+    const top = [...b.assets].sort((x, y) => y.rc - x.rc).slice(0, 6), mx = Math.max(...top.map((a) => Math.max(a.rc, a.w)), 0.01);
+    $("qb-cc").innerHTML = `<div class="ql-src">${esc(b.P.name)} · ${b.have.length} holdings · ${num(s.years, 1)}y daily${b.missing.length ? ` · <span class="down">excluded: ${esc(b.missing.join(", "))}</span>` : ""}</div>
+      <div class="ql-tiles">${tile("Value", usd(s.value), spark(peq.slice(-252)))}${tile("1Y return", sgn(s.ret1y), spark(r1.slice(-500), "#34d399"), cls(s.ret1y))}${tile("Volatility", pct(s.vol), spark(rv.slice(-500), "#facc15"))}${tile("Sharpe", num(s.sharpe), spark(rs.slice(-500), "#4da3ff"))}
+        ${tile("Sortino", num(s.sortino))}${tile("Max DD", pct(-s.mdd), spark(dd.slice(-500), "#f6465d"), "down")}${tile("Beta", num(s.beta), spark(rb.slice(-500), "#a78bfa"))}${tile("VaR 95%", usd(s.var95 * s.value), spark(rvar.slice(-500), "#fb923c"), "", pct(s.var95, 2))}
+        ${tile("ES 95%", usd(s.es95 * s.value), "", "", pct(s.es95, 2))}${tile("Regime", '<span id="qlRegK">…</span>')}${tile("Simulation", '<span id="qlMcK">queued</span>')}${tile("Data", day(b.lastT), "", b.stale ? "down" : "", b.stale ? Math.floor(b.ageD) + "d old" : "latest close")}</div>
+      <div class="ql-two"><div>${segH("qlCcV", [["g", "Growth"], ["dd", "Drawdown"], ["v", "Volatility"], ["s", "Sharpe"], ["h", "Distribution"]], "g")}<div id="qlCcC"></div></div>
+      <div class="ql-side"><h4>Risk vs capital</h4>${top.map((a) => `<div class="ql-rv"><span>${esc(a.sym)}</span><div><i class="w" style="width:${(a.w / mx) * 100}%"></i><i class="r" style="width:${(a.rc / mx) * 100}%"></i></div><em>${pct(a.rc, 0)}</em></div>`).join("")}${legend([["#64748b", "capital"], ["#5eead4", "risk"]])}
+      ${ap ? `<h4>AI Trader · paper</h4><div class="ql-tiles sm">${tile("Positions", String((ap.positions || []).length))}${tile("Mode", ap.lastScan && ap.lastScan.riskOff ? '<span class="down">risk-off</span>' : '<span class="up">risk-on</span>')}</div>` : ""}</div></div>`;
+    const draw = (v) => { const el = $("qlCcC");
+      if (v === "g") el.innerHTML = lineSVG([{ v: peq.map((x) => x - 1), c: "#5eead4", name: "Portfolio", sw: 2 }, { v: seq.map((x) => x - 1), c: "#94a3b8", name: "S&P 500", dash: true }], { dates: D, zero: true, h: 240 });
+      else if (v === "dd") el.innerHTML = lineSVG([{ v: dd, c: "#f6465d", name: "Portfolio", sw: 1.8 }, { v: sdd, c: "#94a3b8", name: "S&P 500", dash: true }], { dates: D, zero: true, h: 240, band: [{ lo: dd.map(() => 0), hi: dd, c: "rgba(246,70,93,.15)" }] });
+      else if (v === "v") el.innerHTML = lineSVG([{ v: b.cc.rv, c: "#facc15", name: "Portfolio 63d vol", sw: 1.8 }, { v: b.cc.srv, c: "#94a3b8", name: "S&P 500", dash: true }], { dates: D, h: 240 });
+      else if (v === "s") el.innerHTML = lineSVG([{ v: b.cc.rs, c: "#4da3ff", name: "Portfolio 6m Sharpe", sw: 1.8, fmt: (x) => num(x) }, { v: b.cc.ssr, c: "#94a3b8", name: "S&P 500", dash: true, fmt: (x) => num(x) }], { dates: D, h: 240, zero: true, fmtY: (x) => num(x, 1) });
+      else el.innerHTML = histo(pr, s); };
+    segOn("qlCcV", draw); draw("g");
+  }
+  // daily-return distribution with a fitted normal curve and the VaR / ES lines
+  function histo(r, s) {
+    const W = 760, H = 240, L = 40, B = 26, lo = M.quantile(r, 0.002), hi = M.quantile(r, 0.998), k = 48, bw = (hi - lo) / k, bins = new Array(k).fill(0);
+    for (const x of r) { const i = Math.floor((x - lo) / bw); if (i >= 0 && i < k) bins[i]++; }
+    const mx = Math.max(...bins), m = M.mean(r), sd = M.sd(r), X = (v) => L + ((v - lo) / (hi - lo)) * (W - L - 10), Y = (c) => H - B - (c / mx) * (H - B - 12), norm = (x) => (r.length * bw * Math.exp(-((x - m) ** 2) / (2 * sd * sd))) / (sd * Math.sqrt(2 * Math.PI));
+    const bars = bins.map((c, i) => { const x0 = lo + i * bw; return `<rect x="${X(x0) + 0.5}" y="${Y(c)}" width="${Math.max(1, X(x0 + bw) - X(x0) - 1)}" height="${H - B - Y(c)}" fill="${x0 + bw <= -s.var95 ? "#f6465d" : "#4da3ff"}" opacity=".75"><title>${pct(x0, 2)} to ${pct(x0 + bw, 2)}: ${c} days</title></rect>`; }).join("");
+    let d = ""; for (let i = 0; i <= 120; i++) { const x = lo + ((hi - lo) * i) / 120; d += (i ? "L" : "M") + X(x).toFixed(1) + "," + Math.max(4, Y(norm(x))).toFixed(1); }
+    const vl = (v, c, t) => `<line x1="${X(v)}" x2="${X(v)}" y1="8" y2="${H - B}" stroke="${c}" stroke-dasharray="4 3"/><text x="${X(v) + 4}" y="18" class="ql-ax" style="fill:${c}">${t}</text>`;
+    const sk = M.mean(r.map((x) => ((x - m) / sd) ** 3)), ku = M.mean(r.map((x) => ((x - m) / sd) ** 4)) - 3;
+    return `<svg viewBox="0 0 ${W} ${H}" class="ql-svg">${bars}<path d="${d}" fill="none" stroke="#e2e8f0" stroke-width="1.4" opacity=".8"/>${vl(-s.var95, "#fb923c", "VaR 95%")}${vl(-s.es95, "#f6465d", "ES")}${[lo, 0, hi].map((v) => `<text x="${X(v)}" y="${H - 8}" text-anchor="middle" class="ql-ax">${pct(v, 1)}</text>`).join("")}</svg>
+      <div class="ql-tiles sm">${tile("Skew", num(sk))}${tile("Excess kurtosis", num(ku), "", ku > 1 ? "down" : "")}${tile("Worst day", pct(Math.min(...r), 2), "", "down")}${tile("Best day", pct(Math.max(...r), 2), "", "up")}</div>`;
   }
 
   // ---------------------------------------------------------------- 2. portfolio risk universe
@@ -327,80 +362,98 @@
 
   // ---------------------------------------------------------------- 6. correlation lab
   async function renderCor(b) {
-    const n = b.have.length; if (n < 2) { setSt("cor", "UNAVAILABLE", "Needs at least two holdings"); $("qb-cor").innerHTML = `<div class="fx-empty">Correlations need at least two holdings.</div>`; return "na"; }
-    const cl = M.cluster(b.Cor, 0.5), ord = cl.order, dv = M.diversification(b.w, b.C), pairs = []; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) pairs.push(b.Cor[i][j]);
-    const avg = M.mean(pairs), cs = Math.max(14, Math.min(34, 520 / n)), Wd = 70 + cs * n, Hd = 70 + cs * n;
-    const col = (r) => (r >= 0 ? `rgba(94,234,212,${(0.12 + r * 0.85).toFixed(2)})` : `rgba(251,146,60,${(0.12 - r * 0.85).toFixed(2)})`);
-    const cells = ord.map((i, y) => ord.map((j, x) => `<rect x="${70 + x * cs}" y="${70 + y * cs}" width="${cs - 1}" height="${cs - 1}" fill="${col(b.Cor[i][j])}" data-i="${i}" data-j="${j}" class="ql-cell"><title>${b.have[i]} / ${b.have[j]}: ${b.Cor[i][j].toFixed(2)}</title></rect>${cs >= 26 ? `<text x="${70 + x * cs + cs / 2}" y="${70 + y * cs + cs / 2 + 3}" class="ql-cvt" style="fill:${Math.abs(b.Cor[i][j]) > 0.55 ? "#0b1117" : "#cbd5e1"}">${Math.abs(b.Cor[i][j]) < 0.05 ? "0" : b.Cor[i][j].toFixed(1)}</text>` : ""}`).join("")).join("");
-    const lab = ord.map((i, k) => `<text x="64" y="${70 + k * cs + cs / 2 + 3}" text-anchor="end" class="ql-ax">${b.have[i]}</text><text transform="translate(${70 + k * cs + cs / 2},64) rotate(-50)" class="ql-ax">${b.have[i]}</text>`).join("");
-    const groups = cl.clusters.filter((g) => g.length > 1).map((g) => g.map((i) => b.have[i]).join(" · "));
+    const n = b.have.length; if (n < 2) { setSt("cor", "UNAVAILABLE", "Needs at least two holdings"); $("qb-cor").innerHTML = `<div class="fx-empty">Needs two or more holdings.</div>`; return "na"; }
+    const dv = M.diversification(b.w, b.C), avgS = (K) => { const p = []; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) p.push(K[i][j]); return M.mean(p); };
+    const avgRoll = b.R[0].map((_, e) => { if (e + 1 < 63) return null; const K = M.corrMatrix(b.R.map((r) => r.slice(e - 62, e + 1))); return avgS(K); });
     let worst = [0, 1, -2]; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (b.Cor[i][j] > worst[2]) worst = [i, j, b.Cor[i][j]];
-    b.corr = { avg, dv, groups, top: worst };
-    $("qb-cor").innerHTML = `<div class="ql-two"><div class="ql-heat"><svg viewBox="0 0 ${Wd} ${Hd}" class="ql-svg" style="max-width:${Math.round(Wd * 1.25)}px">${lab}${cells}</svg>${note("Daily-return correlations over the window, re-ordered by average-linkage clustering so similar holdings sit together. Click any cell for the pair's rolling correlation.")}</div>
-      <div class="ql-side"><div class="ql-mini">${kpi("Avg pairwise ρ", num(avg))}${kpi("Diversification ratio", num(dv.ratio), "Σwσ / σp")}${kpi("Effective holdings", num(dv.effectiveN, 1), "1 / Σw²")}${kpi("Most similar pair", `${b.have[worst[0]]}/${b.have[worst[1]]}`, "ρ " + num(worst[2]))}</div>
-      <h4>Clusters (ρ-distance &lt; 0.5)</h4><p>${groups.length ? groups.map((g) => `<span class="ql-tag">${esc(g)}</span>`).join(" ") : "No tight clusters — holdings behave fairly independently."}</p><div id="qlPair"></div></div></div>`;
-    const pair = (i, j) => { const rc = M.rollingCorr(b.R[i], b.R[j], 63); $("qlPair").innerHTML = `<h4>${b.have[i]} vs ${b.have[j]} — rolling 63-day correlation</h4>${lineSVG([{ v: rc, c: "#4da3ff" }], { dates: b.dates, h: 150, fmtY: (v) => v.toFixed(1), zero: true })}<p class="tw-muted">Full-window correlation ${num(b.Cor[i][j])}; range over time ${num(Math.min(...rc.filter((x) => x != null)))} to ${num(Math.max(...rc.filter((x) => x != null)))}.</p>`; };
-    $("qb-cor").querySelector("svg").onclick = (e) => { const t = e.target.closest(".ql-cell"); if (t && t.dataset.i !== t.dataset.j) pair(+t.dataset.i, +t.dataset.j); };
-    pair(worst[0], worst[1]);
+    b.corr = { avg: avgS(b.Cor), dv, top: worst, groups: M.cluster(b.Cor, 0.5).clusters.filter((g) => g.length > 1).map((g) => g.map((i) => b.have[i]).join(" · ")) };
+    $("qb-cor").innerHTML = `<div class="ql-ctl">${segH("qlCw", [["63", "3M"], ["252", "1Y"], ["all", "3Y"]], "all")}</div>
+      <div class="ql-two"><div id="qlHeat" class="ql-heat"></div><div class="ql-side"><div class="ql-tiles sm" id="qlCorT"></div><h4>Average correlation · rolling 3M</h4>${lineSVG([{ v: avgRoll, c: "#a78bfa", name: "Avg ρ", fmt: (x) => num(x) }], { dates: b.dates, h: 120, fmtY: (v) => v.toFixed(1), zero: true })}<div id="qlPair"></div></div></div>`;
+    const pair = (i, j) => { const rc = M.rollingCorr(b.R[i], b.R[j], 63); $("qlPair").innerHTML = `<h4>${b.have[i]} × ${b.have[j]} · rolling 3M</h4>${lineSVG([{ v: rc, c: "#4da3ff", name: "ρ", fmt: (x) => num(x) }], { dates: b.dates, h: 120, fmtY: (v) => v.toFixed(1), zero: true })}`; };
+    const heat = (win) => { const K = win === "all" ? b.Cor : M.corrMatrix(b.R.map((r) => r.slice(-+win))), ord = M.cluster(K, 0.5).order, cs = Math.max(16, Math.min(40, 560 / n)), Wd = 74 + cs * n;
+      const col = (r) => (r >= 0 ? `rgba(94,234,212,${(0.08 + r * 0.9).toFixed(2)})` : `rgba(251,146,60,${(0.08 - r * 0.9).toFixed(2)})`);
+      const cells = ord.map((i, y) => ord.map((j, x) => `<rect x="${74 + x * cs}" y="${74 + y * cs}" width="${cs - 1.5}" height="${cs - 1.5}" rx="2" fill="${col(K[i][j])}" data-i="${i}" data-j="${j}" data-x="${x}" data-y="${y}" class="ql-cell"><title>${b.have[i]} × ${b.have[j]}  ρ ${K[i][j].toFixed(2)}</title></rect>${cs >= 28 ? `<text x="${74 + x * cs + cs / 2}" y="${74 + y * cs + cs / 2 + 3}" class="ql-cvt" style="fill:${Math.abs(K[i][j]) > 0.55 ? "#0b1117" : "#cbd5e1"}">${Math.abs(K[i][j]) < 0.05 ? "0" : K[i][j].toFixed(1)}</text>` : ""}`).join("")).join("");
+      const lab = ord.map((i, k) => `<text x="68" y="${74 + k * cs + cs / 2 + 3}" text-anchor="end" class="ql-ax" data-r="${k}">${b.have[i]}</text><text transform="translate(${74 + k * cs + cs / 2},68) rotate(-55)" class="ql-ax" data-c="${k}">${b.have[i]}</text>`).join("");
+      $("qlHeat").innerHTML = `<svg viewBox="0 0 ${Wd} ${Wd}" class="ql-svg" style="max-width:${Math.round(Wd * 1.2)}px"><rect id="qlHr" x="74" y="0" width="${cs * n}" height="${cs}" fill="none" stroke="#e2e8f0" stroke-width="1" opacity="0"/><rect id="qlHc" x="0" y="74" width="${cs}" height="${cs * n}" fill="none" stroke="#e2e8f0" stroke-width="1" opacity="0"/>${lab}${cells}</svg>`;
+      const sv = $("qlHeat").querySelector("svg");
+      sv.onmousemove = (e) => { const t = e.target.closest(".ql-cell"); const hr = $("qlHr"), hc = $("qlHc"); if (!t) { hr.setAttribute("opacity", 0); hc.setAttribute("opacity", 0); return; } hr.setAttribute("y", 74 + t.dataset.y * cs); hr.setAttribute("opacity", 0.6); hc.setAttribute("x", 74 + t.dataset.x * cs); hc.setAttribute("opacity", 0.6); };
+      sv.onclick = (e) => { const t = e.target.closest(".ql-cell"); if (t && t.dataset.i !== t.dataset.j) pair(+t.dataset.i, +t.dataset.j); };
+      $("qlCorT").innerHTML = `${tile("Avg ρ", num(avgS(K)))}${tile("Diversification", num(dv.ratio))}${tile("Effective N", num(dv.effectiveN, 1))}${tile("Top pair", `${b.have[worst[0]]}/${b.have[worst[1]]}`, "", "", "ρ " + num(worst[2]))}`; };
+    segOn("qlCw", heat); heat("all"); pair(worst[0], worst[1]);
   }
 
   // ---------------------------------------------------------------- 5. factor exposure (ETF proxies, OLS)
   async function renderFx(b) {
-    const need = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV"], have = need.filter((s) => b.out[s]);
-    const A = M.align({ ...Object.fromEntries(b.have.map((s) => [s, b.out[s]])), ...Object.fromEntries(have.map((s) => [s, b.out[s]])) });
-    const N = Math.min(A.dates.length - 1, 756), r = (s) => M.returns(A.px[s]).slice(-N), rfD = b.rf / M.DAYS;
-    const pr = M.portReturns(b.have.map(r), b.w), y = pr.map((x) => x - rfD), F = [];
-    const add = (k, ok, col) => { if (ok) F.push([k, col]); };
-    add("MKT", have.includes("SPY"), r("SPY").map((x) => x - rfD)); add("SIZE", have.includes("IWM"), have.includes("IWM") && r("IWM").map((x, i) => x - r("SPY")[i]));
-    add("VALUE", have.includes("IWD") && have.includes("IWF"), have.includes("IWD") && have.includes("IWF") && r("IWD").map((x, i) => x - r("IWF")[i]));
-    add("MOM", have.includes("MTUM"), have.includes("MTUM") && r("MTUM").map((x, i) => x - r("SPY")[i])); add("QUAL", have.includes("QUAL"), have.includes("QUAL") && r("QUAL").map((x, i) => x - r("SPY")[i])); add("LOWVOL", have.includes("USMV"), have.includes("USMV") && r("USMV").map((x, i) => x - r("SPY")[i]));
-    const fit = M.ols(y, F.map((f) => f[1])); if (!fit) throw new Error("The factor regression couldn't be solved (the factor series are collinear).");
-    const roll = F.map(() => []), rd = []; for (let e = 126; e <= y.length; e += 10) { const f = M.ols(y.slice(e - 126, e), F.map((x) => x[1].slice(e - 126, e))); if (f) { f.betas.forEach((v, k) => roll[k].push(v)); rd.push(A.dates.slice(-N)[e - 1]); } }
-    const C = ["#5eead4", "#4da3ff", "#facc15", "#f472b6", "#a78bfa", "#fb923c"];
-    b.fx = { fit, names: F.map((f) => f[0]) };
-    const row = (k, i) => { const meta = FACTORS.find((f) => f[0] === k), v = fit.betas[i], t = fit.t[i + 1]; return `<tr><td><b>${meta[1]}</b><br><span class="tw-muted">${meta[2]}</span></td><td class="${cls(v)}">${num(v)}</td><td>${num(t, 1)}</td><td>${Math.abs(t) >= 2 ? '<span class="ql-tag ok">significant</span>' : '<span class="ql-tag">weak</span>'}</td><td><div class="ql-hb"><i style="${v >= 0 ? `left:50%;width:${Math.min(50, Math.abs(v) * 40)}%` : `right:50%;width:${Math.min(50, Math.abs(v) * 40)}%`};background:${v >= 0 ? "#5eead4" : "#fb923c"}"></i></div></td></tr>`; };
-    $("qb-fx").innerHTML = `<div class="ql-two"><div><table class="ql-tbl"><thead><tr><th>Factor (ETF proxy)</th><th>Exposure β</th><th>t-stat</th><th></th><th></th></tr></thead><tbody>${F.map((f, i) => row(f[0], i)).join("")}</tbody></table>
-      <p class="tw-muted">R² ${pct(fit.r2)} · annual alpha ${sgn(fit.alpha * M.DAYS, 2)} (t ${num(fit.t[0], 1)}) · ${fit.n} days${b.failedProxy.length ? ` · missing proxies: ${esc(b.failedProxy.join(", "))}` : ""}</p></div>
-      <div><h4>Rolling 6-month exposures</h4>${lineSVG(roll.map((v, k) => ({ v, c: C[k] })), { dates: rd, h: 190, fmtY: (v) => v.toFixed(1), zero: true })}${legend(F.map((f, k) => [C[k], FACTORS.find((x) => x[0] === f[0])[1]]))}</div></div>
-      ${note("Method: ordinary least squares of the portfolio's daily excess return on long-short ETF return spreads (free proxies for the academic Fama-French / AQR factors, which are not available as free daily data here). Exposures are relative: a size β of 0.3 means the portfolio behaves like it holds 30% extra small-caps-minus-large-caps. The ETF spreads overlap, so individual betas can shift when factors are added or removed; t-stats above 2 are conventionally treated as significant.")}`;
+    const need = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV"].filter((s) => b.out[s]);
+    const A = M.align({ ...Object.fromEntries(b.have.map((s) => [s, b.out[s]])), ...Object.fromEntries(need.map((s) => [s, b.out[s]])) });
+    const N = Math.min(A.dates.length - 1, 756), R = {}; for (const s of [...new Set([...b.have, ...need])]) R[s] = M.returns(A.px[s]).slice(-N);
+    const rfD = b.rf / M.DAYS, y = M.portReturns(b.have.map((s) => R[s]), b.w).map((x) => x - rfD), dif = (a, c) => R[a].map((x, i) => x - R[c][i]), F = [];
+    if (R.SPY) F.push(["MKT", R.SPY.map((x) => x - rfD)]); if (R.IWM && R.SPY) F.push(["SIZE", dif("IWM", "SPY")]); if (R.IWD && R.IWF) F.push(["VALUE", dif("IWD", "IWF")]);
+    if (R.MTUM && R.SPY) F.push(["MOM", dif("MTUM", "SPY")]); if (R.QUAL && R.SPY) F.push(["QUAL", dif("QUAL", "SPY")]); if (R.USMV && R.SPY) F.push(["LOWVOL", dif("USMV", "SPY")]);
+    let use = F, fit = M.ols(y, use.map((f) => f[1]));
+    while (!fit && use.length > 1) { use = use.slice(0, -1); fit = M.ols(y, use.map((f) => f[1])); } // drop factors until the regression is solvable
+    if (!fit) throw new Error("Factor regression could not be solved with the available proxies.");
+    const roll = use.map(() => []), rd = []; for (let e = 126; e <= y.length; e += 5) { const f = M.ols(y.slice(e - 126, e), use.map((x) => x[1].slice(e - 126, e))); roll.forEach((r, k) => r.push(f ? f.betas[k] : null)); rd.push(A.dates.slice(-N)[e - 1]); }
+    b.fx = { fit, names: use.map((f) => f[0]) };
+    const nm = (k) => FACTORS.find((f) => f[0] === k)[1], W = 520, rowH = 34, H = 30 + rowH * use.length, lo = Math.min(-0.5, ...fit.betas.map((v, i) => v - 1.96 * fit.se[i + 1])), hi = Math.max(1.2, ...fit.betas.map((v, i) => v + 1.96 * fit.se[i + 1])), X = (v) => 130 + ((v - lo) / (hi - lo)) * (W - 150);
+    const rows = use.map(([k], i) => { const v = fit.betas[i], se = fit.se[i + 1], t = fit.t[i + 1], yy = 22 + i * rowH, sig = Math.abs(t) >= 2, c = PAL[i % PAL.length];
+      return `<g><title>${nm(k)}  β ${num(v)}  95% CI ${num(v - 1.96 * se)} to ${num(v + 1.96 * se)}  t ${num(t, 1)}</title><text x="122" y="${yy + 4}" text-anchor="end" class="ql-ax" style="fill:#cbd5e1">${nm(k)}</text><line x1="${X(v - 1.96 * se)}" x2="${X(v + 1.96 * se)}" y1="${yy}" y2="${yy}" stroke="${c}" stroke-width="2" opacity=".6"/><rect x="${Math.min(X(0), X(v))}" y="${yy - 7}" width="${Math.abs(X(v) - X(0))}" height="14" rx="3" fill="${c}" opacity="${sig ? 0.55 : 0.18}"/><circle cx="${X(v)}" cy="${yy}" r="5" fill="${sig ? c : "#0b1016"}" stroke="${c}" stroke-width="2"/><text x="${W - 4}" y="${yy + 4}" text-anchor="end" class="ql-ax" style="fill:${sig ? "#e2e8f0" : "#64748b"}">${num(v)}${sig ? " ★" : ""}</text></g>`; }).join("");
+    const axis = [lo, 0, 1, hi].filter((v, i, a) => a.indexOf(v) === i && v >= lo && v <= hi).map((v) => `<line x1="${X(v)}" x2="${X(v)}" y1="8" y2="${H - 10}" class="${v === 0 ? "ql-zero" : "ql-grid"}"/><text x="${X(v)}" y="${H}" text-anchor="middle" class="ql-ax">${num(v, 1)}</text>`).join("");
+    $("qb-fx").innerHTML = `<div class="ql-tiles sm">${tile("R²", pct(fit.r2, 0), `<div class="ql-gbar"><i style="width:${(fit.r2 * 100).toFixed(0)}%"></i></div>`)}${tile("Alpha / yr", sgn(fit.alpha * M.DAYS, 1), "", cls(fit.alpha), "t " + num(fit.t[0], 1))}${tile("Days", String(fit.n))}${tile("Factors", String(use.length))}</div>
+      <div class="ql-two"><div><svg viewBox="0 0 ${W} ${H + 6}" class="ql-svg">${axis}${rows}</svg>${legend([["#94a3b8", "β with 95% interval · ★ = |t| ≥ 2"]])}</div>
+      <div>${lineSVG(roll.map((v, k) => ({ v, c: PAL[k % PAL.length], name: nm(use[k][0]), fmt: (x) => num(x) })), { dates: rd, h: 220, fmtY: (v) => v.toFixed(1), zero: true })}${legend(use.map((f, k) => [PAL[k % PAL.length], nm(f[0])]))}</div></div>
+      ${note("OLS of daily excess portfolio returns on long–short ETF spreads: market (SPY − cash), size (IWM − SPY), value (IWD − IWF), momentum (MTUM − SPY), quality (QUAL − SPY), low volatility (USMV − SPY). Whiskers are ±1.96 standard errors; rolling lines use 126-day windows every 5 days. Spreads overlap, so loadings move when factors are added or dropped.")}`;
   }
 
-  // ---------------------------------------------------------------- 7. optimization
+  // ---------------------------------------------------------------- 7. optimization (interactive frontier)
   async function renderOpt(b) {
-    const n = b.have.length; if (n < 2) { setSt("opt", "UNAVAILABLE", "Needs at least two holdings"); $("qb-opt").innerHTML = `<div class="fx-empty">Optimization needs at least two holdings.</div>`; return "na"; }
-    const hi = Math.min(1, Math.max(0.25, 1.5 / n)), histMu = b.R.map((r) => M.mean(r) * M.DAYS), capm = b.assets.map((a) => a.mu), mu = histMu.map((h, i) => 0.5 * h + 0.5 * capm[i]);
-    const o = M.optimize(mu, b.Cann, { lo: 0, hi, rf: b.rf }), cur = { w: b.w, ret: M.dot(b.w, mu), vol: Math.sqrt(M.pVar(b.w, b.Cann)) }; cur.sharpe = (cur.ret - b.rf) / cur.vol;
-    const half = Math.floor(b.R[0].length / 2), seg = (a, z) => { const R = b.R.map((r) => r.slice(a, z)), C = M.covMatrix(R).map((r) => r.map((x) => x * M.DAYS)), m = R.map((r, i) => 0.5 * M.mean(r) * M.DAYS + 0.5 * capm[i]); return M.optimize(m, C, { lo: 0, hi, rf: b.rf }); };
-    const o1 = seg(0, half), o2 = seg(half, b.R[0].length), BPS = 10;
-    const P = [["Current", cur, null], ["Minimum variance", o.minVar, "minVar"], ["Maximum Sharpe", o.maxSharpe, "maxSharpe"], ["Risk parity", o.riskParity, "riskParity"], ["Equal weight", o.equal, "equal"]];
-    const unstable = (k) => (k ? M.turnover(o1[k].w, o2[k].w) : 0);
-    b.opt = { o, cur, hi, unstable: Object.fromEntries(P.filter((p) => p[2]).map((p) => [p[2], unstable(p[2])])) };
-    const fr = o.frontier, vs = [...fr.map((f) => f.vol), cur.vol, ...b.assets.map((a) => a.vol)], rs = [...fr.map((f) => f.ret), cur.ret, ...mu], W = 520, H = 260, L = 50, B = 30;
-    const v0 = Math.min(...vs) * 0.9, v1 = Math.max(...vs) * 1.05, r0 = Math.min(...rs, 0), r1 = Math.max(...rs) * 1.1, X = (v) => L + ((v - v0) / (v1 - v0)) * (W - L - 12), Y = (r) => H - B - ((r - r0) / (r1 - r0)) * (H - B - 12);
-    const pts = (P.slice(1).map(([nm, p], k) => `<circle cx="${X(p.vol)}" cy="${Y(p.ret)}" r="6" fill="${["#5eead4", "#facc15", "#a78bfa", "#94a3b8"][k]}"><title>${nm}</title></circle>`)).join("") + `<circle cx="${X(cur.vol)}" cy="${Y(cur.ret)}" r="7" fill="none" stroke="#f472b6" stroke-width="2.5"><title>Current portfolio</title></circle>` + b.assets.map((a, i) => `<text x="${X(a.vol)}" y="${Y(mu[i])}" class="ql-ax" text-anchor="middle">${a.sym}</text>`).join("");
-    const frontier = `<svg viewBox="0 0 ${W} ${H}" class="ql-svg"><line x1="${L}" y1="${H - B}" x2="${W}" y2="${H - B}" class="ql-grid"/><line x1="${L}" y1="0" x2="${L}" y2="${H - B}" class="ql-grid"/><path d="M${fr.map((f) => `${X(f.vol)},${Y(f.ret)}`).join("L")}" class="ql-line" style="stroke:#4da3ff;stroke-width:2"/>${pts}<text x="${W - 4}" y="${H - 8}" text-anchor="end" class="ql-ax">volatility → ${pct(v1, 0)}</text><text x="${L - 4}" y="12" text-anchor="end" class="ql-ax">${pct(r1, 0)}</text><text x="${L - 4}" y="${H - B}" text-anchor="end" class="ql-ax">${pct(r0, 0)}</text></svg>`;
-    $("qb-opt").innerHTML = `<div class="ql-scroll"><table class="ql-tbl"><thead><tr><th>Portfolio</th><th>Exp. return</th><th>Volatility</th><th>Sharpe</th><th>Turnover vs now</th><th>Est. cost</th><th>Stability</th>${b.have.map((s) => `<th>${s}</th>`).join("")}</tr></thead><tbody>
-      ${P.map(([nm, p, k]) => { const to = k ? M.turnover(b.w, p.w) : 0, u = unstable(k); return `<tr class="${k ? "" : "cur"}"><td><b>${nm}</b></td><td>${pct(p.ret)}</td><td>${pct(p.vol)}</td><td>${num(p.sharpe)}</td><td>${k ? pct(to) : "—"}</td><td>${k ? usd(M.tradeCost(b.w, p.w, b.value, BPS)) : "—"}</td><td>${k ? (u > 0.3 ? `<span class="ql-tag warn" title="Weights from the first and second half of the window differ by ${pct(u)}">unstable ${pct(u, 0)}</span>` : `<span class="ql-tag ok">stable ${pct(u, 0)}</span>`) : ""}</td>${p.w.map((x, i) => `<td class="${k && Math.abs(x - b.w[i]) > 0.05 ? (x > b.w[i] ? "up" : "down") : ""}">${pct(x, 0)}</td>`).join("")}</tr>`; }).join("")}</tbody></table></div>
-      <div class="ql-two"><div>${frontier}${legend([["#4da3ff", "Efficient frontier"], ["#5eead4", "Min variance"], ["#facc15", "Max Sharpe"], ["#a78bfa", "Risk parity"], ["#94a3b8", "Equal"], ["#f472b6", "Current"]])}</div>
-      <div>${note(`Constraints applied automatically: long-only, each holding between 0% and ${pct(hi, 0)}, fully invested. Expected returns are a 50/50 blend of each holding's historical return and its CAPM return (risk-free + β × ${pct(ERP, 0)} equity premium) — historical means alone are too noisy to optimize on. Covariances are the sample covariance of daily returns × 252. Costs assume ${BPS} bps per side. <b>Stability</b> re-runs each optimizer on the first and second half of the window; turnover above 30% between the two means the result is fragile and shouldn't be trusted much. These are research outputs, not instructions — nothing is rebalanced.`)}</div></div>`;
+    const n = b.have.length; if (n < 2) { setSt("opt", "UNAVAILABLE", "Needs at least two holdings"); $("qb-opt").innerHTML = `<div class="fx-empty">Needs two or more holdings.</div>`; return "na"; }
+    const histMu = b.R.map((r) => M.mean(r) * M.DAYS), capm = b.assets.map((a) => a.mu), mu = histMu.map((h, i) => 0.5 * h + 0.5 * capm[i]), BPS = 10;
+    const cur = { w: b.w, ret: M.dot(b.w, mu), vol: Math.sqrt(M.pVar(b.w, b.Cann)) }; cur.sharpe = (cur.ret - b.rf) / cur.vol;
+    const half = Math.floor(b.R[0].length / 2), segOpt = (a, z, hi) => { const R = b.R.map((r) => r.slice(a, z)), C = M.covMatrix(R).map((r) => r.map((x) => x * M.DAYS)), m = R.map((r, i) => 0.5 * M.mean(r) * M.DAYS + 0.5 * capm[i]); return M.optimize(m, C, { lo: 0, hi, rf: b.rf }); };
+    const KEYS = [["minVar", "Min variance", "#5eead4"], ["maxSharpe", "Max Sharpe", "#facc15"], ["riskParity", "Risk parity", "#a78bfa"], ["equal", "Equal weight", "#94a3b8"]];
+    const hi0 = Math.min(1, Math.max(0.25, 1.5 / n)), minCap = Math.ceil((100 / n) * 1.0001);
+    $("qb-opt").innerHTML = `<div class="ql-ctl"><label class="ql-rng">Max weight <input type="range" id="qlCap" min="${minCap}" max="100" value="${Math.round(hi0 * 100)}"><b id="qlCapV">${Math.round(hi0 * 100)}%</b></label>${segH("qlPick", [["cur", "Current"], ...KEYS.map(([k, t]) => [k, t])], "maxSharpe")}</div>
+      <div class="ql-two"><div id="qlFront"></div><div class="ql-side"><div class="ql-tiles sm" id="qlOptT"></div><h4>Weights</h4><div id="qlWbars"></div></div></div>${note(`Long-only, fully invested, each holding capped by the slider. Expected returns: 50% historical mean + 50% CAPM (rf + β × ${pct(ERP, 0)}). Covariance: sample daily × 252. Costs: ${BPS} bps per side. Stability = turnover between the same optimizer run on each half of the window (over 30% = fragile).`)}`;
+    let state = { pick: "maxSharpe", hover: null };
+    const run = () => { const hi = +$("qlCap").value / 100; $("qlCapV").textContent = Math.round(hi * 100) + "%"; let o, o1, o2; try { o = M.optimize(mu, b.Cann, { lo: 0, hi, rf: b.rf }); o1 = segOpt(0, half, hi); o2 = segOpt(half, b.R[0].length, hi); } catch (e) { $("qlFront").innerHTML = `<div class="fx-empty">${esc(e.message)}</div>`; return; }
+      const stab = Object.fromEntries(KEYS.map(([k]) => [k, M.turnover(o1[k].w, o2[k].w)])); b.opt = { o, cur, hi, unstable: stab }; state.o = o; state.stab = stab; drawF(); side(); };
+    const W = 560, H = 300, L = 52, B = 34;
+    const drawF = () => { const o = state.o, fr = o.frontier, vs = [...fr.map((f) => f.vol), cur.vol, ...b.assets.map((a) => a.vol)], rs = [...fr.map((f) => f.ret), cur.ret, ...mu];
+      const v0 = Math.min(...vs) * 0.85, v1 = Math.max(...vs) * 1.08, r0 = Math.min(...rs, b.rf) - 0.01, r1 = Math.max(...rs) * 1.12, X = (v) => L + ((v - v0) / (v1 - v0)) * (W - L - 14), Y = (r) => H - B - ((r - r0) / (r1 - r0)) * (H - B - 14);
+      const ms = o.maxSharpe, cml = `<line x1="${X(0 > v0 ? 0 : v0)}" y1="${Y(b.rf + ms.sharpe * Math.max(0, v0))}" x2="${X(v1)}" y2="${Y(b.rf + ms.sharpe * v1)}" stroke="#facc15" stroke-dasharray="5 4" opacity=".45"/>`;
+      const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => { const r = r0 + f * (r1 - r0), v = v0 + f * (v1 - v0); return `<line x1="${L}" x2="${W - 14}" y1="${Y(r)}" y2="${Y(r)}" class="ql-grid"/><text x="${L - 6}" y="${Y(r) + 3}" text-anchor="end" class="ql-ax">${pct(r, 0)}</text><text x="${X(v)}" y="${H - B + 16}" text-anchor="middle" class="ql-ax">${pct(v, 0)}</text>`; }).join("");
+      const assets = b.assets.map((a, i) => `<circle cx="${X(a.vol)}" cy="${Y(mu[i])}" r="3" fill="#64748b"/><text x="${X(a.vol) + 5}" y="${Y(mu[i]) + 3}" class="ql-ax">${a.sym}</text>`).join("");
+      const path = `<path d="M${fr.map((f) => `${X(f.vol)},${Y(f.ret)}`).join("L")}" fill="none" stroke="#4da3ff" stroke-width="2.4"/>`;
+      const dots = fr.map((f, k) => `<circle cx="${X(f.vol)}" cy="${Y(f.ret)}" r="7" fill="transparent" data-f="${k}" class="ql-fp"/>`).join("");
+      const P = KEYS.map(([k, t, c]) => `<circle cx="${X(o[k].vol)}" cy="${Y(o[k].ret)}" r="${state.pick === k ? 9 : 6.5}" fill="${c}" stroke="#05080c" stroke-width="2" data-k="${k}" class="ql-fp"><title>${t}</title></circle>`).join("") + `<circle cx="${X(cur.vol)}" cy="${Y(cur.ret)}" r="${state.pick === "cur" ? 10 : 7.5}" fill="none" stroke="#f472b6" stroke-width="2.5" data-k="cur" class="ql-fp"><title>Current</title></circle>`;
+      const hv = state.hover != null ? `<circle cx="${X(fr[state.hover].vol)}" cy="${Y(fr[state.hover].ret)}" r="5" fill="#e2e8f0"/>` : "";
+      $("qlFront").innerHTML = `<svg viewBox="0 0 ${W} ${H}" class="ql-svg" id="qlFsv">${grid}${cml}${path}${assets}${dots}${P}${hv}<text x="${W - 14}" y="${H - 4}" text-anchor="end" class="ql-ax">volatility →</text><text x="${L}" y="10" class="ql-ax">expected return ↑</text></svg>${legend([["#4da3ff", "Efficient frontier"], ["#facc15", "Capital market line"], ...KEYS.map(([, t, c]) => [c, t]), ["#f472b6", "Current"]])}`;
+      const sv = $("qlFsv"); sv.onmousemove = (e) => { const t = e.target.closest(".ql-fp"); const f = t && t.dataset.f != null ? +t.dataset.f : null; if (f !== state.hover) { state.hover = f; side(); } };
+      sv.onclick = (e) => { const t = e.target.closest(".ql-fp"); if (t && t.dataset.k) { state.pick = t.dataset.k; $("qlPick").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.v === state.pick)); drawF(); side(); } }; };
+    const side = () => { const o = state.o, p = state.hover != null ? o.frontier[state.hover] : state.pick === "cur" ? cur : o[state.pick], lab = state.hover != null ? "Frontier point" : state.pick === "cur" ? "Current" : KEYS.find((k) => k[0] === state.pick)[1], to = M.turnover(b.w, p.w), st = state.pick !== "cur" && state.hover == null ? state.stab[state.pick] : null;
+      $("qlOptT").innerHTML = `${tile("Return", pct(p.ret))}${tile("Volatility", pct(p.vol))}${tile("Sharpe", num((p.ret - b.rf) / p.vol))}${tile("Turnover", pct(to), "", "", usd(M.tradeCost(b.w, p.w, b.value, BPS)) + " cost")}${st != null ? tile("Stability", st > 0.3 ? "fragile" : "stable", "", st > 0.3 ? "down" : "up", pct(st, 0) + " drift") : ""}`;
+      const ord = [...b.have.keys()].sort((x, y) => b.w[y] - b.w[x]), bar = (w, t) => `<div class="ql-wb"><span>${t}</span><div>${ord.map((i) => (w[i] > 0.004 ? `<i style="width:${(w[i] * 100).toFixed(2)}%;background:${PAL[i % PAL.length]}" title="${b.have[i]} ${pct(w[i], 1)}"></i>` : "")).join("")}</div></div>`;
+      $("qlWbars").innerHTML = bar(b.w, "Now") + bar(p.w, lab) + `<div class="ql-wkey">${ord.map((i) => `<span><i style="background:${PAL[i % PAL.length]}"></i>${b.have[i]} <b class="${p.w[i] - b.w[i] > 0.02 ? "up" : p.w[i] - b.w[i] < -0.02 ? "down" : ""}">${pct(p.w[i], 0)}</b></span>`).join("")}</div>`; };
+    $("qlCap").oninput = run; segOn("qlPick", (v) => { state.pick = v; state.hover = null; drawF(); side(); }); run();
   }
 
   // ---------------------------------------------------------------- 8. market regime
   async function renderReg(b) {
     const A = M.align({ SPY: b.out.SPY, ...(b.out.HYG && b.out.IEF ? { HYG: b.out.HYG, IEF: b.out.IEF } : {}) }), px = A.px.SPY, credit = A.px.HYG ? A.px.HYG.map((v, i) => v / A.px.IEF[i]) : null;
-    const tl = M.regimes(px, credit, 5); if (!tl.length) throw new Error("Not enough SPY history for regime detection (needs about 13 months).");
+    const tl = M.regimes(px, credit, 5); if (!tl.length) throw new Error("Not enough SPY history for regime detection.");
     const now = tl[tl.length - 1], C = { "Risk-on trend": "#0fbf7d", "Choppy / late-cycle": "#facc15", Correction: "#fb923c", "Risk-off / high volatility": "#f6465d" };
     b.regime = now; const k = $("qlRegK"); if (k) k.innerHTML = `<span style="color:${C[now.label]}">${esc(now.label)}</span>`;
-    const t0 = tl[0].i, t1 = tl[tl.length - 1].i, x = (i) => ((i - t0) / Math.max(1, t1 - t0)) * 100;
-    const strip = tl.map((r, k) => `<i style="left:${x(r.i)}%;width:${(k < tl.length - 1 ? x(tl[k + 1].i) - x(r.i) : 0.6) + 0.05}%;background:${C[r.label]}" title="${day(A.dates[r.i])}: ${r.label}"></i>`).join("");
-    const ind = now.ind, row = (n, v, ok, why) => `<tr><td>${n}</td><td>${v}</td><td>${ok == null ? "—" : ok ? '<span class="ql-tag ok">supportive</span>' : '<span class="ql-tag warn">warning</span>'}</td><td class="tw-muted">${why}</td></tr>`;
-    $("qb-reg").innerHTML = `<div class="ql-regnow" style="border-color:${C[now.label]}"><b style="color:${C[now.label]}">${esc(now.label)}</b><span>as of ${day(A.dates[now.i])} · score ${num(now.score, 1)}</span></div>
-      ${lineSVG([{ v: px.slice(t0), c: "#e2e8f0", sw: 1.3 }], { dates: A.dates.slice(t0), h: 170, fmtY: (v) => "$" + v.toFixed(0), log: true })}<div class="ql-strip">${strip}</div>${legend(Object.entries(C).map(([n, c]) => [c, n]))}
-      <table class="ql-tbl"><thead><tr><th>Indicator (S&P 500 via SPY)</th><th>Now</th><th></th><th>Rule</th></tr></thead><tbody>
-      ${row("Price vs 200-day average", ind.aboveTrend ? "above" : "below", ind.aboveTrend, "Long-term trend")}${row("50-day vs 200-day average", ind.goldenCross ? "50 above 200" : "50 below 200", ind.goldenCross, "Medium-term trend")}
-      ${row("21-day realized volatility", `${pct(ind.vol)} (1y median ${pct(ind.volMedian)})`, !ind.volHigh, "Warning above 1.4× its 1-year median")}${row("Drawdown from 52-week high", pct(ind.drawdown), ind.drawdown > -0.1, "Correction below −10%, risk-off below −20%")}
-      ${row("Credit (HYG/IEF, 3-month)", ind.credit == null ? "unavailable" : sgn(ind.credit), ind.credit == null ? null : ind.credit > 0, "High-yield bonds outperforming Treasuries = healthy risk appetite")}</tbody></table>
-      ${note("Rules, checked weekly: Risk-off if the drawdown is beyond −20% or volatility is high while price is below its 200-day average; Correction if below the 200-day or down more than 10%; Risk-on if above the 200-day with the 50-day above the 200-day and normal volatility; otherwise Choppy. Transparent and deliberately simple — regimes are only obvious in hindsight, and this does not predict the next move.")}`;
+    const t0 = tl[0].i, P = px.slice(t0), D = A.dates.slice(t0), s200 = P.map((_, i) => M.sma(px, 200, i + t0)), s50 = P.map((_, i) => M.sma(px, 50, i + t0));
+    const bg = tl.map((r, j) => ({ i0: r.i - t0, i1: (j < tl.length - 1 ? tl[j + 1].i : px.length - 1) - t0, c: C[r.label], o: 0.13 }));
+    const ind = now.ind, series = tl.map((r) => r.ind), g = (v, lo, hi, good) => { const t = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); return `<div class="ql-gbar"><i style="width:${(t * 100).toFixed(0)}%;background:${good ? "#0fbf7d" : "#f6465d"}"></i></div>`; };
+    $("qb-reg").innerHTML = `<div class="ql-regnow" style="border-color:${C[now.label]}"><b style="color:${C[now.label]}">${esc(now.label)}</b><span>${day(A.dates[now.i])} · score ${num(now.score, 1)}</span></div>
+      ${lineSVG([{ v: P, c: "#e2e8f0", name: "S&P 500", sw: 1.5, fmt: (x) => "$" + x.toFixed(2) }, { v: s50, c: "#4da3ff", name: "50-day", sw: 1.1, fmt: (x) => "$" + x.toFixed(2) }, { v: s200, c: "#facc15", name: "200-day", sw: 1.1, fmt: (x) => "$" + x.toFixed(2) }], { dates: D, h: 260, fmtY: (v) => "$" + v.toFixed(0), log: true, bg })}
+      ${legend(Object.entries(C).map(([n, c]) => [c, n]))}
+      <div class="ql-tiles">${tile("Trend", ind.aboveTrend ? "above 200d" : "below 200d", g(P[P.length - 1] / s200[s200.length - 1] - 1, -0.1, 0.1, ind.aboveTrend), ind.aboveTrend ? "up" : "down")}${tile("50 / 200", ind.goldenCross ? "golden" : "death", "", ind.goldenCross ? "up" : "down")}
+        ${tile("Realized vol", pct(ind.vol), spark(series.map((x) => x.vol), "#facc15"), ind.volHigh ? "down" : "", "median " + pct(ind.volMedian))}${tile("Drawdown", pct(ind.drawdown), spark(series.map((x) => x.drawdown), "#f6465d"), ind.drawdown < -0.1 ? "down" : "")}
+        ${tile("Credit 3M", ind.credit == null ? "—" : sgn(ind.credit), spark(series.map((x) => x.credit), "#a78bfa"), ind.credit == null ? "" : cls(ind.credit), "HYG / IEF")}</div>
+      ${note("Weekly rules: Risk-off if drawdown < −20% or volatility > 1.4× its 1-year median while below the 200-day; Correction if below the 200-day or down > 10%; Risk-on if above the 200-day, 50 > 200 and volatility normal; otherwise Choppy.")}`;
   }
 
   // ---------------------------------------------------------------- 3. strategy tournament + replay
@@ -409,91 +462,103 @@
     const series = Object.fromEntries([...new Set([...U, "SPY"])].map((s) => [s, { t: b.out[s].t, close: b.out[s].close, adj: b.out[s].adj }]));
     const wts = Object.fromEntries(U.map((s, i) => [s, b.w[i] * 100]));
     const base = { universe: U, benchmark: "SPY", from, to, initial: Math.round(b.value), costs: { commissionBps: 0, spreadBps: 5, slippageBps: 2 }, limits: { maxWeight: 1, minCash: 0 }, rf: b.rf, series };
-    const entries = [["rebalance", { freq: "quarterly" }, wts, "Your weights, rebalanced quarterly"], ["buyhold", {}, wts, "Your weights, never rebalanced"], ["riskparity", {}, null, "Risk parity (inverse volatility)"]];
-    if (n >= 2) entries.push(["momentum", { top }, null, `Momentum: top ${top}`], ["multifactor", { top }, null, `Multi-factor: top ${top}`]);
-    entries.push(["smacross", {}, null, "Trend filter (50/200-day)"]);
+    const entries = [["rebalance", { freq: "quarterly" }, wts, "Rebalanced"], ["buyhold", {}, wts, "Buy & hold"], ["riskparity", {}, null, "Risk parity"]];
+    if (n >= 2) entries.push(["momentum", { top }, null, `Momentum ${top}`], ["multifactor", { top }, null, `Multi-factor ${top}`]); entries.push(["smacross", {}, null, "Trend 50/200"]);
     const rows = [];
     for (const [k, params, weights, label] of entries) { await tick(); try { const r = Q.run({ ...base, strategy: k, params, weights }); const cut = Math.floor(r.dates.length * 0.7);
-      const ins = Q.metrics(r.dates.slice(0, cut + 1), r.equity.slice(0, cut + 1), r.bench.slice(0, cut + 1), b.rf), oos = Q.metrics(r.dates.slice(cut), r.equity.slice(cut), r.bench.slice(cut), b.rf);
-      rows.push({ k, label, r, ins, oos, cut }); } catch (e) { rows.push({ k, label, err: e.message }); } }
+      rows.push({ k, label, r, cut, ins: Q.metrics(r.dates.slice(0, cut + 1), r.equity.slice(0, cut + 1), r.bench.slice(0, cut + 1), b.rf), oos: Q.metrics(r.dates.slice(cut), r.equity.slice(cut), r.bench.slice(cut), b.rf) }); } catch (e) { rows.push({ k, label, err: e.message }); } }
     const ok = rows.filter((x) => !x.err); if (!ok.length) throw new Error("No strategy could be simulated on this portfolio.");
-    const rank = (key) => { const s = [...ok].sort((a, c) => (c[key].sharpe ?? -9) - (a[key].sharpe ?? -9)); s.forEach((x, i) => (x[key + "Rank"] = i + 1)); };
-    rank("ins"); rank("oos"); ok.sort((a, c) => (c.oos.sharpe ?? -9) - (a.oos.sharpe ?? -9)); const win = ok[0];
+    const rank = (key) => [...ok].sort((a, c) => (c[key].sharpe ?? -9) - (a[key].sharpe ?? -9)).forEach((x, i) => (x[key + "Rank"] = i + 1)); rank("ins"); rank("oos");
+    ok.sort((a, c) => (c.oos.sharpe ?? -9) - (a.oos.sharpe ?? -9)); const win = ok[0]; ok.forEach((x, i) => (x.c = PAL[i % PAL.length]));
     let tuned = null; if (n >= 2) { await tick(); try { tuned = Q.optimize({ ...base, strategy: "momentum", params: {} }); } catch {} }
-    b.bt = { rows: ok, win, tuned, failed: rows.filter((x) => x.err) };
-    const cutDate = day(win.r.dates[win.cut]);
-    $("qb-bt").innerHTML = `<div class="qb-banner">Backtested — hypothetical results on ${day(from)} → ${day(to)} with 5 bps spread + 2 bps slippage, next-day execution and adjusted prices. The engine ranks strategies on the <b>last 30%</b> of the window (${cutDate} onward) and flags any whose early ranking doesn't hold up later.</div>
-      <div class="ql-scroll"><table class="ql-tbl"><thead><tr><th>#</th><th>Strategy (auto-selected)</th><th>CAGR</th><th>Sharpe — first 70%</th><th>Sharpe — last 30%</th><th>Max DD</th><th>Trades</th><th>Check</th></tr></thead><tbody>
-      ${ok.map((x, i) => `<tr class="${i === 0 ? "cur" : ""}"><td>${i + 1}</td><td><b>${esc(x.label)}</b></td><td class="${cls(x.r.metrics.cagr)}">${sgn(x.r.metrics.cagr)}</td><td>${num(x.ins.sharpe)} <span class="tw-muted">#${x.insRank}</span></td><td><b>${num(x.oos.sharpe)}</b> <span class="tw-muted">#${x.oosRank}</span></td><td class="down">${pct(x.r.metrics.maxDrawdown)}</td><td>${x.r.metrics.trades}</td><td>${x.insRank <= 2 && x.oosRank - x.insRank >= 2 ? '<span class="ql-tag warn">faded out-of-sample</span>' : x.oos.sharpe != null && x.ins.sharpe != null && x.oos.sharpe < 0 && x.ins.sharpe > 0.5 ? '<span class="ql-tag warn">broke down</span>' : '<span class="ql-tag ok">consistent</span>'}</td></tr>`).join("")}
-      <tr class="tw-muted"><td></td><td>S&P 500 (SPY) benchmark</td><td>${sgn(win.r.benchMetrics.cagr)}</td><td colspan="5"></td></tr></tbody></table></div>
-      ${tuned ? `<p class="tw-muted">Parameter tuning check (momentum): best lookback/top chosen on ${day(tuned.inSample.from)}–${day(tuned.inSample.to)} had Sharpe ${num(tuned.inSample.metrics.sharpe)}; on the unseen remainder it scored <b>${num(tuned.outOfSample.metrics.sharpe)}</b>. ${tuned.outOfSample.metrics.sharpe < tuned.inSample.metrics.sharpe * 0.5 ? "Most of the tuned edge disappeared — classic overfitting." : "The tuned edge mostly held."}</p>` : ""}
-      <h4>Replay: ${esc(win.label)} vs S&P 500</h4><div class="ql-replay"><button class="btn ghost" id="qlPlay">▶ Play</button><input type="range" id="qlScrub" min="10" max="${win.r.dates.length - 1}" value="${win.r.dates.length - 1}"><span id="qlRDate" class="tw-muted"></span></div>
-      <div id="qlReplay"></div><div id="qlRTrades" class="ql-rtr"></div>`;
-    replay(win.r);
+    b.bt = { rows: ok, win, tuned };
+    const cut = win.cut, D = win.r.dates, bgO = [{ i0: cut, i1: D.length - 1, c: "#4da3ff", o: 0.07 }];
+    const sh = ok.flatMap((x) => [x.ins.sharpe, x.oos.sharpe]).filter(isFinite), lo = Math.min(-0.5, ...sh), hi = Math.max(1, ...sh), W = 520, rowH = 30, H = 34 + rowH * ok.length, X = (v) => 120 + ((v - lo) / (hi - lo)) * (W - 160);
+    const dumb = ok.map((x, i) => { const y = 26 + i * rowH, fade = x.insRank <= 2 && x.oosRank - x.insRank >= 2;
+      return `<g><title>${x.label}: in-sample Sharpe ${num(x.ins.sharpe)} (#${x.insRank}) → out-of-sample ${num(x.oos.sharpe)} (#${x.oosRank}) · CAGR ${sgn(x.r.metrics.cagr)} · max DD ${pct(x.r.metrics.maxDrawdown)}</title><text x="112" y="${y + 4}" text-anchor="end" class="ql-ax" style="fill:${x.c}">${esc(x.label)}</text><line x1="${X(x.ins.sharpe)}" x2="${X(x.oos.sharpe)}" y1="${y}" y2="${y}" stroke="${fade ? "#f6465d" : "#64748b"}" stroke-width="2"/><circle cx="${X(x.ins.sharpe)}" cy="${y}" r="4.5" fill="#0b1016" stroke="#94a3b8" stroke-width="1.5"/><circle cx="${X(x.oos.sharpe)}" cy="${y}" r="5.5" fill="${x.c}"/><text x="${W - 4}" y="${y + 4}" text-anchor="end" class="ql-ax" style="fill:${fade ? "#f6465d" : "#cbd5e1"}">${num(x.oos.sharpe)}${fade ? " ↓" : ""}</text></g>`; }).join("");
+    const ax = [lo, 0, hi].map((v) => `<line x1="${X(v)}" x2="${X(v)}" y1="10" y2="${H - 14}" class="${v === 0 ? "ql-zero" : "ql-grid"}"/><text x="${X(v)}" y="${H - 2}" text-anchor="middle" class="ql-ax">${num(v, 1)}</text>`).join("");
+    $("qb-bt").innerHTML = `<div class="ql-ctl">${segH("qlBtV", [["all", "All strategies"], ["dd", "Drawdowns"], ["rp", "Replay"]], "all")}<span class="ql-chipline">5 bps spread · 2 bps slip · next-day fills · shaded = out-of-sample</span></div>
+      <div class="ql-two"><div id="qlBtC"></div><div class="ql-side"><h4>Sharpe · in-sample ○ → out-of-sample ●</h4><svg viewBox="0 0 ${W} ${H}" class="ql-svg">${ax}${dumb}</svg>
+      ${tuned ? `<div class="ql-tiles sm">${tile("Tuned IS", num(tuned.inSample.metrics.sharpe))}${tile("Tuned OOS", num(tuned.outOfSample.metrics.sharpe), "", tuned.outOfSample.metrics.sharpe < tuned.inSample.metrics.sharpe * 0.5 ? "down" : "up", tuned.outOfSample.metrics.sharpe < tuned.inSample.metrics.sharpe * 0.5 ? "overfit" : "held")}</div>` : ""}</div></div>`;
+    const draw = (v) => { const el = $("qlBtC");
+      if (v === "all") el.innerHTML = lineSVG([...ok.map((x) => ({ v: x.r.equity, c: x.c, name: x.label, sw: x === win ? 2.2 : 1.2, op: x === win ? 1 : 0.75, fmt: (y) => usd(y) })), { v: win.r.bench, c: "#94a3b8", name: "S&P 500", dash: true, fmt: (y) => usd(y) }], { dates: D, h: 280, fmtY: (y) => big(y), bg: bgO }) + legend([...ok.map((x) => [x.c, x.label]), ["#94a3b8", "S&P 500"]]);
+      else if (v === "dd") el.innerHTML = lineSVG(ok.map((x) => ({ v: M.drawdownSeries(x.r.equity), c: x.c, name: x.label, sw: x === win ? 2 : 1.1 })), { dates: D, h: 280, zero: true, bg: bgO }) + legend(ok.map((x) => [x.c, x.label]));
+      else { el.innerHTML = `<div class="ql-replay"><button class="btn ghost" id="qlPlay">▶</button><input type="range" id="qlScrub" min="10" max="${win.r.dates.length - 1}" value="${win.r.dates.length - 1}"><span id="qlRDate" class="tw-muted"></span></div><div id="qlReplay"></div><div id="qlRTrades" class="ql-rtr"></div>`; replay(win.r); } };
+    segOn("qlBtV", draw); draw("all");
   }
   function replay(r) {
     const tIdx = new Map(r.dates.map((t, i) => [t, i])), marks = r.trades.map((t) => ({ i: tIdx.get(t.t), side: t.side, t })).filter((m) => m.i != null);
     const draw = (k) => { const cut = (a) => a.map((v, i) => (i <= k ? v : null)); const mk = marks.filter((m) => m.i <= k).slice(-80).map((m) => ({ i: m.i, v: r.equity[m.i], side: m.side, title: `${day(m.t.t)} ${m.side} ${m.t.sym} ${usd(m.t.value)}` }));
-      $("qlReplay").innerHTML = lineSVG([{ v: cut(r.bench), c: "#94a3b8", sw: 1.2, dash: true }, { v: cut(r.equity), c: "#5eead4", sw: 1.8 }], { dates: r.dates, h: 220, fmtY: (v) => usd(v), markers: mk }) + legend([["#5eead4", "Strategy"], ["#94a3b8", "S&P 500"], ["#0fbf7d", "Buy"], ["#f6465d", "Sell"]]);
-      $("qlRDate").textContent = `${day(r.dates[k])} · strategy ${usd(r.equity[k])} vs S&P ${usd(r.bench[k])}`;
-      const recent = marks.filter((m) => m.i <= k).slice(-4).reverse(); $("qlRTrades").innerHTML = recent.map((m) => `<span class="${m.side === "BUY" ? "up" : "down"}">${day(m.t.t)} ${m.side} ${esc(m.t.sym)} ${usd(m.t.value)}</span>`).join(""); };
+      $("qlReplay").innerHTML = lineSVG([{ v: cut(r.bench), c: "#94a3b8", sw: 1.2, dash: true, name: "S&P 500", fmt: (y) => usd(y) }, { v: cut(r.equity), c: "#5eead4", sw: 2, name: "Strategy", fmt: (y) => usd(y) }], { dates: r.dates, h: 250, fmtY: (v) => big(v), markers: mk });
+      $("qlRDate").textContent = `${day(r.dates[k])} · ${usd(r.equity[k])} vs ${usd(r.bench[k])}`;
+      $("qlRTrades").innerHTML = marks.filter((m) => m.i <= k).slice(-4).reverse().map((m) => `<span class="${m.side === "BUY" ? "up" : "down"}">${day(m.t.t)} ${m.side} ${esc(m.t.sym)} ${usd(m.t.value)}</span>`).join(""); };
     const sc = $("qlScrub"); sc.oninput = () => draw(+sc.value); draw(+sc.value);
-    $("qlPlay").onclick = () => { if (QL.play) { clearInterval(QL.play); QL.play = null; $("qlPlay").textContent = "▶ Play"; return; } let k = +sc.value >= r.dates.length - 1 ? 10 : +sc.value; $("qlPlay").textContent = "❚❚ Pause";
-      QL.play = setInterval(() => { k = Math.min(r.dates.length - 1, k + Math.max(1, Math.round(r.dates.length / 240))); sc.value = k; draw(k); if (k >= r.dates.length - 1 || S.tab !== "quant") { clearInterval(QL.play); QL.play = null; $("qlPlay").textContent = "▶ Play"; } }, 40); };
+    $("qlPlay").onclick = () => { if (QL.play) { clearInterval(QL.play); QL.play = null; $("qlPlay").textContent = "▶"; return; } let k = +sc.value >= r.dates.length - 1 ? 10 : +sc.value; $("qlPlay").textContent = "❚❚";
+      QL.play = setInterval(() => { k = Math.min(r.dates.length - 1, k + Math.max(1, Math.round(r.dates.length / 240))); sc.value = k; draw(k); if (k >= r.dates.length - 1 || S.tab !== "quant" || !$("qlPlay")) { clearInterval(QL.play); QL.play = null; if ($("qlPlay")) $("qlPlay").textContent = "▶"; } }, 40); };
   }
 
-  // ---------------------------------------------------------------- 4. Monte Carlo (Web Worker, seeded)
+  // ---------------------------------------------------------------- 4. Monte Carlo (Web Worker, seeded, interactive)
   function renderMC(b) {
-    const mu = b.rf + (isFinite(b.stats.beta) ? b.stats.beta : 1) * ERP, sigma = b.stats.vol, seed = +day(b.lastT).replace(/-/g, ""), spec = { start: b.value, mu, sigma, years: 10, paths: 5000, contrib: 0, seed, keep: 80 };
-    $("qb-mc").innerHTML = `<div class="ql-bar"><i id="qlMcBar" style="width:0%"></i></div><span class="tw-muted" id="qlMcTxt">Simulating 5,000 paths in a background worker…</span>`;
-    const mcK = $("qlMcK"); if (mcK) mcK.textContent = "running";
+    const beta = isFinite(b.stats.beta) ? b.stats.beta : 1, MODELS = { capm: b.rf + beta * ERP, hist: Math.max(-0.2, Math.min(0.4, b.stats.cagr)), cash: b.rf };
+    const seed = +day(b.lastT).replace(/-/g, ""); QL.mc = QL.mc || { years: 10, contrib: 0, paths: 5000, model: "capm" };
+    $("qb-mc").innerHTML = `<div class="ql-ctl"><label class="ql-rng">Horizon <input type="range" id="qlMy" min="1" max="30" value="${QL.mc.years}"><b id="qlMyV">${QL.mc.years}y</b></label>
+      <label class="ql-rng">Monthly add <input type="range" id="qlMc" min="0" max="5000" step="100" value="${QL.mc.contrib}"><b id="qlMcV">${usd(QL.mc.contrib)}</b></label>
+      ${segH("qlMm", [["capm", "CAPM " + pct(MODELS.capm, 1)], ["hist", "Historical " + pct(MODELS.hist, 1)], ["cash", "Cash " + pct(MODELS.cash, 1)]], QL.mc.model)}${segH("qlMp", [["1000", "1k"], ["5000", "5k"], ["20000", "20k"]], String(QL.mc.paths))}</div>
+      <div class="ql-bar"><i id="qlMcBar" style="width:0%"></i></div><div id="qlMcOut"></div>`;
+    let tm = null; const go = () => { clearTimeout(tm); tm = setTimeout(() => sim(b, { start: b.value, mu: MODELS[QL.mc.model], sigma: b.stats.vol, years: QL.mc.years, paths: QL.mc.paths, contrib: QL.mc.contrib, seed, keep: 60 }), 120); };
+    $("qlMy").oninput = (e) => { QL.mc.years = +e.target.value; $("qlMyV").textContent = QL.mc.years + "y"; go(); };
+    $("qlMc").oninput = (e) => { QL.mc.contrib = +e.target.value; $("qlMcV").textContent = usd(QL.mc.contrib); go(); };
+    segOn("qlMm", (v) => { QL.mc.model = v; go(); }); segOn("qlMp", (v) => { QL.mc.paths = +v; go(); });
+    return sim(b, { start: b.value, mu: MODELS[QL.mc.model], sigma: b.stats.vol, years: QL.mc.years, paths: QL.mc.paths, contrib: QL.mc.contrib, seed, keep: 60 });
+  }
+  function sim(b, spec) {
+    const mcK = $("qlMcK"); if (mcK) mcK.textContent = "running"; if (QL.mcW) { try { QL.mcW.terminate(); } catch {} QL.mcW = null; }
     return new Promise((resolve, reject) => {
-      const done = (res, ms) => { QL.ms.mcWorker = ms; b.mc = { res, spec }; if (mcK) mcK.textContent = `${res.paths.toLocaleString()} paths`; showMC(b, res, spec, ms); resolve(); };
-      let w; try { w = new Worker("/qmc-worker.js"); } catch { const t = performance.now(); return done(M.monteCarlo(spec), performance.now() - t); }
+      const done = (res, ms) => { QL.ms.mcWorker = ms; b.mc = { res, spec }; if (mcK) mcK.textContent = `${res.paths.toLocaleString()} paths`; const bar = $("qlMcBar"); if (bar) bar.style.width = "100%"; showMC(b, res, spec, ms); resolve(); };
+      let w; try { w = new Worker("/qmc-worker.js"); QL.mcW = w; } catch { const t = performance.now(); return done(M.monteCarlo(spec), performance.now() - t); }
       const to = setTimeout(() => { w.terminate(); const t = performance.now(); done(M.monteCarlo(spec), performance.now() - t); }, 20000);
-      w.onmessage = (e) => { const d = e.data; if (d.progress != null) { const bar = $("qlMcBar"); if (bar) bar.style.width = (d.progress * 100).toFixed(0) + "%"; } else if (d.done) { clearTimeout(to); w.terminate(); done(d.result, d.ms); } else if (d.error) { clearTimeout(to); w.terminate(); reject(new Error(d.error)); } };
+      w.onmessage = (e) => { const d = e.data; if (d.progress != null) { const bar = $("qlMcBar"); if (bar) bar.style.width = (d.progress * 100).toFixed(0) + "%"; } else if (d.done) { clearTimeout(to); w.terminate(); QL.mcW = null; done(d.result, d.ms); } else if (d.error) { clearTimeout(to); w.terminate(); reject(new Error(d.error)); } };
       w.onerror = () => { clearTimeout(to); w.terminate(); const t = performance.now(); done(M.monteCarlo(spec), performance.now() - t); };
       w.postMessage(spec);
     });
   }
   function showMC(b, r, spec, ms) {
-    const yrs = Array.from({ length: r.months + 1 }, (_, i) => i), maxH = Math.max(...r.hist.map((h) => h.n));
-    const hist = `<svg viewBox="0 0 300 150" class="ql-svg">${r.hist.map((h, i) => `<rect x="${i * 10}" y="${130 - (h.n / maxH) * 120}" width="9" height="${(h.n / maxH) * 120}" fill="${h.to < spec.start ? "#f6465d" : "#5eead4"}" opacity=".8"><title>${usd(h.from)}–${usd(h.to)}: ${h.n} paths</title></rect>`).join("")}<text x="0" y="146" class="ql-ax">${usd(r.hist[0].from)}</text><text x="300" y="146" text-anchor="end" class="ql-ax">${usd(r.hist[r.hist.length - 1].to)}</text></svg>`;
-    $("qb-mc").innerHTML = `<div class="ql-two"><div><div id="qlFan"></div>${legend([["rgba(94,234,212,.18)", "5th–95th percentile"], ["rgba(94,234,212,.35)", "25th–75th"], ["#5eead4", "Median"], ["rgba(148,163,184,.5)", "Sample paths"]])}</div>
-      <div class="ql-side"><div class="ql-mini">${kpi("Median in 10y", usd(r.terminal.p50))}${kpi("Bad case (5th pct)", usd(r.terminal.p5), "", "down")}${kpi("Good case (95th pct)", usd(r.terminal.p95), "", "up")}${kpi("P(end below start)", pct(r.probBelowStart), "after 10 years")}</div><h4>Ending values (log scale)</h4>${hist}</div></div>
-      ${note(`Model: geometric Brownian motion in monthly steps. Expected return ${pct(spec.mu)} = risk-free ${pct(b.rf, 2)} + portfolio β ${num(b.stats.beta)} × ${pct(ERP, 0)} equity premium (CAPM, not the recent past); volatility ${pct(spec.sigma)} = the portfolio's realized volatility. Seed ${spec.seed} (the date of the latest price), so the same day always gives the same result. ${r.paths.toLocaleString()} paths computed in ${ms.toFixed(0)} ms off the main thread. Real markets have fatter tails and changing volatility than this model; treat the 5th percentile as optimistic.`)}`;
-    // progressive reveal: sample paths draw in, then the bands
-    const band = (k) => [{ lo: r.bands.p5.slice(0, k), hi: r.bands.p95.slice(0, k), c: "rgba(94,234,212,.14)" }, { lo: r.bands.p25.slice(0, k), hi: r.bands.p75.slice(0, k), c: "rgba(94,234,212,.28)" }];
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; let k = reduce ? r.months + 1 : 2;
-    const frame = () => { const el = $("qlFan"); if (!el) return; const ser = r.sample.slice(0, 40).map((p) => ({ v: p.slice(0, k).concat(new Array(r.months + 1 - k).fill(null)), c: "rgba(148,163,184,.5)", sw: 0.6, op: 0.6 })); ser.push({ v: r.bands.p50.slice(0, k).concat(new Array(r.months + 1 - k).fill(null)), c: "#5eead4", sw: 2 });
-      el.innerHTML = lineSVG(ser, { h: 240, fmtY: (v) => big(v), band: band(k).map((x) => ({ ...x, lo: x.lo, hi: x.hi })), log: true }) + `<div class="ql-xl"><span>today</span><span>year 5</span><span>year 10</span></div>`; if (k <= r.months) { k = Math.min(r.months + 1, k + 4); requestAnimationFrame(frame); } };
-    frame(); void yrs;
+    const m = r.months, inv = Array.from({ length: m + 1 }, (_, i) => spec.start + spec.contrib * i), maxH = Math.max(...r.hist.map((h) => h.n)), dbl = r.sample.length ? null : null; void dbl;
+    const pDouble = r.hist.reduce((a, h) => a + (h.from >= spec.start * 2 ? h.n : 0), 0) / r.paths;
+    const hist = `<svg viewBox="0 0 300 140" class="ql-svg">${r.hist.map((h, i) => `<rect x="${i * 10}" y="${122 - (h.n / maxH) * 112}" width="9" height="${(h.n / maxH) * 112}" fill="${h.to < r.invested ? "#f6465d" : h.from >= spec.start * 2 ? "#34d399" : "#5eead4"}" opacity=".85"><title>${usd(h.from)}–${usd(h.to)} · ${h.n} paths</title></rect>`).join("")}<text x="0" y="137" class="ql-ax">${big(r.hist[0].from)}</text><text x="300" y="137" text-anchor="end" class="ql-ax">${big(r.hist[r.hist.length - 1].to)}</text></svg>`;
+    $("qlMcOut").innerHTML = `<div class="ql-two"><div id="qlFan"></div><div class="ql-side"><div class="ql-tiles sm">${tile("Median", big(r.terminal.p50))}${tile("5th pct", big(r.terminal.p5), "", "down")}${tile("95th pct", big(r.terminal.p95), "", "up")}${tile("P(loss)", pct(r.probBelowInvested), "", r.probBelowInvested > 0.2 ? "down" : "", "vs money put in")}${tile("P(2×)", pct(pDouble), "", "up")}${tile("Compute", ms.toFixed(0) + " ms", "", "", "worker · seed " + spec.seed)}</div><h4>Ending value distribution</h4>${hist}</div></div>
+      ${note(`Geometric Brownian motion, monthly steps: V ← (V + contribution) · exp((μ − σ²/2)/12 + σ/√12 · Z). μ = the chosen model, σ = realized portfolio volatility ${pct(spec.sigma)}. Seeded (${spec.seed}) so results are reproducible. Real returns have fatter tails, so the 5th percentile is optimistic.`)}`;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches; let k = reduce ? m + 1 : 2;
+    const xl = (i) => `month ${i} · year ${(i / 12).toFixed(1)}`;
+    const frame = () => { const el = $("qlFan"); if (!el) return; const cut = (a) => a.slice(0, k).concat(new Array(m + 1 - k).fill(null));
+      const ser = r.sample.slice(0, 40).map((p) => ({ v: cut(p), c: "rgba(148,163,184,.4)", sw: 0.5, op: 0.5 }));
+      ser.push({ v: cut(inv), c: "#f472b6", sw: 1.2, dash: true, name: "Money in", fmt: big }, { v: cut(r.bands.p95), c: "#34d399", sw: 0.8, name: "95th", fmt: big }, { v: cut(r.bands.p50), c: "#5eead4", sw: 2.2, name: "Median", fmt: big }, { v: cut(r.bands.p5), c: "#f6465d", sw: 0.8, name: "5th", fmt: big });
+      el.innerHTML = lineSVG(ser, { h: 270, fmtY: (v) => big(v), log: true, band: [{ lo: r.bands.p5.slice(0, k), hi: r.bands.p95.slice(0, k), c: "rgba(94,234,212,.10)" }, { lo: r.bands.p25.slice(0, k), hi: r.bands.p75.slice(0, k), c: "rgba(94,234,212,.22)" }] });
+      const sv = el.querySelector("svg[data-qc]"); if (sv) QC.g[sv.dataset.qc].xLabel = xl;
+      if (k <= m) { k = Math.min(m + 1, k + Math.max(3, Math.round(m / 40))); requestAnimationFrame(frame); } };
+    frame();
   }
 
-  // ---------------------------------------------------------------- 9. quant research assistant (rule-based, labelled)
+  // ---------------------------------------------------------------- 9. signal board (rule-based, no paid AI)
   async function renderAI(b) {
-    const out = [], C = (t) => out.push(["calc", t]), I = (t) => out.push(["interp", t]), s = b.stats, A = [...b.assets].sort((a, c) => c.rc - a.rc), top = A[0];
-    C(`Over the last ${num(s.years, 1)} years at today's weights the portfolio returned ${sgn(s.ret3y)} in total (${sgn(s.cagr)} a year) with ${pct(s.vol)} volatility, a Sharpe ratio of ${num(s.sharpe)} and a worst fall of ${pct(-s.mdd)}.`);
-    if (isFinite(s.beta)) { C(`Its beta to the S&P 500 is ${num(s.beta)}.`); I(s.beta > 1.15 ? `That means it tends to amplify market moves — a 10% S&P drop has historically meant roughly ${pct(s.beta * 0.1, 0)} for this portfolio.` : s.beta < 0.8 ? "It has been noticeably more defensive than the market." : "It has moved roughly in line with the market."); }
-    C(`On a typical bad day (95% VaR) it loses about ${usd(s.var95 * s.value)} (${pct(s.var95, 2)}); on the worst 5% of days the average loss is ${usd(s.es95 * s.value)}.`);
-    if (top && top.rc > top.w * 1.3 && top.rc > 0.2) { C(`${top.sym} is ${pct(top.w)} of the money but ${pct(top.rc)} of the risk.`); I(`Risk is more concentrated than the dollar weights suggest; ${top.sym}'s moves dominate how the whole portfolio behaves.`); }
-    if (b.corr) { C(`Average correlation between holdings is ${num(b.corr.avg)}; the diversification ratio is ${num(b.corr.dv.ratio)} and the portfolio behaves like ${num(b.corr.dv.effectiveN, 1)} equally weighted positions.`); if (b.corr.top[2] > 0.8) I(`${b.have[b.corr.top[0]]} and ${b.have[b.corr.top[1]]} (ρ ${num(b.corr.top[2])}) have moved almost as one — owning both adds little diversification.`); if (b.corr.avg < 0.3) I("Holdings move fairly independently, which is a genuine source of diversification."); }
-    if (b.fx) { const f = b.fx, sig = f.names.map((n, i) => [n, f.fit.betas[i], f.fit.t[i + 1]]).filter((x) => x[0] !== "MKT" && Math.abs(x[2]) >= 2 && Math.abs(x[1]) >= 0.1).sort((a, c) => Math.abs(c[1]) - Math.abs(a[1]));
-      C(`The six ETF factors explain ${pct(f.fit.r2, 0)} of daily moves.${sig.length ? " Statistically meaningful tilts: " + sig.map(([n, v]) => `${FACTORS.find((x) => x[0] === n)[1].toLowerCase()} ${num(v)}`).join(", ") + "." : " No style tilt beyond the market is both statistically significant (|t| ≥ 2) and economically meaningful (|β| ≥ 0.1)."}`);
-      if (sig.length) { const [n, v] = sig[0]; I({ MOM: v > 0 ? "The momentum tilt means the portfolio leans on recent winners; these tilts have historically suffered sharp reversals when market leadership changes." : "A negative momentum loading means it leans away from recent winners.", VALUE: v > 0 ? "A value tilt tends to help when rates rise and hurt in growth-led rallies." : "A growth tilt (negative value) tends to do well in growth-led rallies and poorly when rates jump.", SIZE: v > 0 ? "A small-cap tilt adds economic sensitivity." : "A large-cap tilt (negative size) has favored mega-caps.", QUAL: v > 0 ? "A quality tilt has historically held up better in downturns." : "Negative quality loading means it leans toward weaker balance sheets.", LOWVOL: v > 0 ? "A low-volatility tilt usually lags in strong rallies and protects in selloffs." : "Negative low-vol loading means the holdings are jumpier than the average stock." }[n]); } }
-    if (b.opt) { const o = b.opt, gain = o.o.maxSharpe.sharpe - o.cur.sharpe, ms = o.unstable.maxSharpe, mv = o.unstable.minVar;
-      C(`Under the stated assumptions, the max-Sharpe mix scores ${num(o.o.maxSharpe.sharpe)} vs ${num(o.cur.sharpe)} for current weights; minimum-variance would cut volatility to ${pct(o.o.minVar.vol)} from ${pct(o.cur.vol)}.`);
-      I(ms > 0.3 ? `The max-Sharpe weights changed by ${pct(ms, 0)} between the two halves of the window, so that "improvement" is mostly estimation noise. ${mv <= 0.3 ? "The minimum-variance mix is more stable and is the more trustworthy of the two." : ""}` : gain > 0.2 ? "The optimized weights were stable across both halves, which makes the improvement more credible — still an estimate, not a forecast." : "Current weights are already close to efficient under these assumptions."); }
-    if (b.regime) { C(`Market regime: ${b.regime.label} (S&P ${b.regime.ind.aboveTrend ? "above" : "below"} its 200-day average, ${pct(b.regime.ind.drawdown)} from its high, 21-day volatility ${pct(b.regime.ind.vol)}).`); I(b.regime.label === "Risk-on trend" ? "Trend conditions are supportive; historically the bigger risk in this regime is complacency about concentration." : b.regime.label === "Correction" || b.regime.label.startsWith("Risk-off") ? `Conditions are defensive. With a beta of ${num(s.beta)}, this portfolio would feel a continued decline ${s.beta > 1 ? "more" : "less"} than the index.` : "Signals are mixed; trend-following strategies tend to whipsaw in this kind of market."); }
-    if (b.bt) { const w = b.bt.win, fade = b.bt.rows.filter((x) => x.insRank <= 2 && x.oosRank - x.insRank >= 2); C(`Strategy tournament: "${w.label}" had the best Sharpe (${num(w.oos.sharpe)}) on the most recent 30% of the window.`); I(fade.length ? `${fade.map((x) => `"${x.label}"`).join(" and ")} looked best early but faded — a reminder that backtest leaders often don't stay leaders.` : "Rankings were fairly consistent between the early and late parts of the window, though a 3-year test is short."); }
-    if (b.mc) { const r = b.mc.res; C(`Monte Carlo (5,000 paths, CAPM return ${pct(b.mc.spec.mu)}): median ${usd(r.terminal.p50)} in 10 years, 5th percentile ${usd(r.terminal.p5)}, ${pct(r.probBelowStart)} chance of ending below today's value.`); }
-    if (b.ap && b.ap.positions) { const mine = new Set(b.have), ov = (b.ap.positions || []).map((p) => p.symbol || p.sym).filter((x) => mine.has(x)); C(`AI Trader's paper account holds ${(b.ap.positions || []).length} positions${ov.length ? `, ${ov.length} of which you also own (${ov.join(", ")})` : ""}.`); }
-    if (b.missing.length) C(`Excluded for lack of price history: ${b.missing.join(", ")}.`);
-    const checks = selfTest(b);
-    $("qb-ai").innerHTML = `<div class="ql-eng">Automated quant engine · rule-based analysis of the numbers above · no paid AI model · refreshed ${new Date().toLocaleTimeString()}</div>
-      <ul class="ql-ai">${out.map(([k, t]) => `<li class="${k}"><span class="ql-tag ${k === "calc" ? "ok" : "int"}">${k === "calc" ? "Calculated" : "Interpretation"}</span>${esc(t)}</li>`).join("")}</ul>
-      <p class="tw-muted">Self-check: ${checks.filter((c) => c[1]).length}/${checks.length} validation tests passed in your browser${checks.some((c) => !c[1]) ? " — failed: " + checks.filter((c) => !c[1]).map((c) => c[0]).join(", ") : ""}. Not investment advice; nothing here is traded.</p>`;
-    b.checks = checks;
+    const s = b.stats, A = [...b.assets].sort((x, y) => y.rc - x.rc), top = A[0], sig = [];
+    const add = (k, v, state, why, viz) => sig.push({ k, v, state, why, viz });
+    add("Risk-adjusted return", num(s.sharpe), s.sharpe > 1 ? "good" : s.sharpe > 0.4 ? "ok" : "bad", `Sharpe ${num(s.sharpe)} over ${num(s.years, 1)} years; above 1 is strong, below 0.4 is weak.`, spark((b.cc && b.cc.rs) || [], "#4da3ff"));
+    add("Drawdown", pct(-s.mdd), s.mdd < 0.15 ? "good" : s.mdd < 0.3 ? "ok" : "bad", `Worst peak-to-trough fall in the window.`, spark((b.cc && b.cc.dd) || [], "#f6465d"));
+    if (isFinite(s.beta)) add("Market sensitivity", "β " + num(s.beta), s.beta < 0.9 ? "good" : s.beta < 1.2 ? "ok" : "bad", s.beta > 1.15 ? `Amplifies market moves: a 10% S&P drop ≈ ${pct(s.beta * 0.1, 0)} here.` : s.beta < 0.8 ? "More defensive than the market." : "Moves roughly with the market.");
+    add("Concentration", `${top.sym} ${pct(top.rc, 0)}`, top.rc < 0.25 ? "good" : top.rc < 0.4 ? "ok" : "bad", `${top.sym} is ${pct(top.w)} of capital but ${pct(top.rc)} of risk.`, `<div class="ql-gbar"><i style="width:${(top.rc * 100).toFixed(0)}%;background:#facc15"></i></div>`);
+    if (b.an) add("Effective bets", `${num(b.an.enb, 1)} / ${b.have.length}`, b.an.enb / b.have.length > 0.6 ? "good" : b.an.enb / b.have.length > 0.35 ? "ok" : "bad", "Meucci's effective number of independent bets.", `<div class="ql-gbar"><i style="width:${Math.min(100, (b.an.enb / b.have.length) * 100).toFixed(0)}%"></i></div>`);
+    if (b.corr) add("Correlation", "ρ̄ " + num(b.corr.avg), b.corr.avg < 0.3 ? "good" : b.corr.avg < 0.6 ? "ok" : "bad", b.corr.top[2] > 0.8 ? `${b.have[b.corr.top[0]]} and ${b.have[b.corr.top[1]]} move almost as one (ρ ${num(b.corr.top[2])}).` : "Average pairwise correlation of daily returns.");
+    if (b.fx) { const f = b.fx, t = f.names.map((n, i) => [n, f.fit.betas[i], f.fit.t[i + 1]]).filter((x) => x[0] !== "MKT" && Math.abs(x[2]) >= 2 && Math.abs(x[1]) >= 0.1).sort((x, y) => Math.abs(y[1]) - Math.abs(x[1]))[0];
+      add("Style tilt", t ? `${FACTORS.find((x) => x[0] === t[0])[1]} ${num(t[1])}` : "none", t ? "ok" : "good", t ? `Statistically significant tilt (t ${num(t[2], 1)}); R² ${pct(f.fit.r2, 0)}.` : `No significant style tilt beyond the market; R² ${pct(f.fit.r2, 0)}.`); }
+    if (b.opt) { const o = b.opt, g = o.o.maxSharpe.sharpe - o.cur.sharpe, u = o.unstable.maxSharpe; add("Optimizer edge", (g >= 0 ? "+" : "") + num(g), u > 0.3 ? "bad" : g > 0.2 ? "ok" : "good", u > 0.3 ? `Max-Sharpe weights drift ${pct(u, 0)} between halves: the edge is mostly noise.` : g > 0.2 ? "A stable, meaningful Sharpe improvement exists under the stated assumptions." : "Current weights are already near-efficient."); }
+    if (b.regime) add("Regime", b.regime.label.split(" ")[0], b.regime.label.startsWith("Risk-on") ? "good" : b.regime.label.startsWith("Choppy") ? "ok" : "bad", `S&P ${b.regime.ind.aboveTrend ? "above" : "below"} its 200-day, ${pct(b.regime.ind.drawdown)} from its high.`);
+    if (b.bt) { const w = b.bt.win, fade = b.bt.rows.filter((x) => x.insRank <= 2 && x.oosRank - x.insRank >= 2); add("Best strategy OOS", w.label, fade.length ? "ok" : "good", `${w.label}: out-of-sample Sharpe ${num(w.oos.sharpe)}.${fade.length ? " " + fade.map((x) => x.label).join(", ") + " faded out-of-sample." : ""}`); }
+    if (b.mc) { const r = b.mc.res; add("10Y loss odds", pct(r.probBelowInvested), r.probBelowInvested < 0.1 ? "good" : r.probBelowInvested < 0.25 ? "ok" : "bad", `Monte Carlo: chance of ending below the money put in; median ${big(r.terminal.p50)}.`); }
+    if (b.ap && b.ap.positions) { const mine = new Set(b.have), ov = (b.ap.positions || []).map((p) => p.symbol || p.sym).filter((x) => mine.has(x)); add("AI Trader overlap", `${ov.length}/${(b.ap.positions || []).length}`, "ok", ov.length ? `Paper account also holds ${ov.join(", ")}.` : "No overlap with the paper account."); }
+    const checks = selfTest(b); b.checks = checks; const C = { good: "#0fbf7d", ok: "#facc15", bad: "#f6465d" };
+    $("qb-ai").innerHTML = `<div class="ql-sig">${sig.map((x) => `<div class="ql-sg ${x.state}" title="${esc(x.why)}"><i style="background:${C[x.state]}"></i><span>${esc(x.k)}</span><b>${esc(x.v)}</b>${x.viz || ""}<em>${esc(x.why)}</em></div>`).join("")}</div>
+      <div class="ql-eng">rule-based engine · no paid AI · <span class="${checks.every((c) => c[1]) ? "up" : "down"}">✓ ${checks.filter((c) => c[1]).length}/${checks.length} self-checks</span>${b.missing.length ? ` · excluded ${esc(b.missing.join(", "))}` : ""}</div>`;
   }
   function selfTest(b) {
     const near = (a, c, t = 1e-6) => Math.abs(a - c) < t, sw = (w) => near(w.reduce((x, y) => x + y, 0), 1);
