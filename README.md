@@ -80,6 +80,24 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## Quant › Quant Lab (fully automatic)
+
+Open **Quant → Quant Lab** and there is nothing to fill in: the engine loads your active portfolio (or a labelled sample
+portfolio if it's empty), pulls ~4 years of free daily adjusted closes through `/api/pub/hist`, and runs nine modules:
+
+1. **Command center** — value, 1-year return, volatility, Sharpe, Sortino, max drawdown, beta, 1-day VaR/ES (95%, historical), regime, simulation status, data freshness, AI Trader paper status.
+2. **3D portfolio risk universe** — classical MDS of the correlation matrix (distance √(2(1−ρ))); size = weight, color = volatility / return / risk share / Sharpe / beta; drag, zoom, hover, click, sector filter, risk-vs-return 2D view. Clicking a holding shows THE WEB's findings, SEC EDGAR fundamentals and links to DCF / Financials.
+3. **Strategy tournament & replay** — six strategies auto-selected for the portfolio, ranked on the last 30% of the window with a flag when early leaders fade; a momentum parameter-tuning check with true out-of-sample scoring; a replay timeline with trade markers.
+4. **Monte Carlo** — 5,000 seeded GBM paths in a Web Worker (`qmc-worker.js`); CAPM expected return, realized volatility; percentile fan, terminal histogram, probability of ending below today's value.
+5. **Factor exposure** — OLS on ETF long-short proxies (market, size, value, momentum, quality, low-vol) with t-stats, R², alpha and rolling 6-month betas.
+6. **Correlation lab** — clustered heatmap, click a pair for rolling 63-day correlation, diversification ratio, effective holdings.
+7. **Optimization** — minimum variance, maximum Sharpe, risk parity, equal weight; efficient frontier; long-only bounds; turnover and cost; a split-half stability flag. Research output only — nothing is rebalanced.
+8. **Market regime** — transparent rules on SPY trend, 50/200-day cross, realized volatility, drawdown and HYG/IEF credit; weekly timeline.
+9. **Quant research assistant** — a rule-based analyst over the computed numbers (no paid AI); every statement is tagged *Calculated* or *Interpretation*, plus an in-browser self-check.
+
+Each module shows a status chip (ONLINE / CALCULATING / STALE / UNAVAILABLE / ERROR) driven by real conditions (data age, missing
+history, too few holdings, errors). The math lives in `public/qmath.js` and is covered by `tests/qmath.test.js`.
+
 ## Quant › Backtest lab
 - **Strategies:** buy-and-hold, fixed-weight rebalancing, momentum, mean reversion, moving-average crossover, RSI, multi-factor (momentum + low volatility + trend), risk parity (inverse volatility), and custom rules (`rsi(14) < 30 and price > sma(200)`).
 - **Realism:** signals use data through each day's close and trade at the next day's close (no look-ahead); dividend- and split-adjusted prices; the benchmark's real trading calendar; commission, half the bid-ask spread and slippage on every trade; max position size and minimum cash; cash earns the risk-free rate (default = today's 13-week T-bill yield). Survivorship bias and other data limits are listed on every result.

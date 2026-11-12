@@ -250,7 +250,7 @@
   // When you open another section the spider walks over to it, starts the matching research job on the server
   // (one real request, rate-limited), crawls over the charts and tables on that page while the job runs, and
   // reports the job's actual result when the server finishes it.
-  const PAGE_JOB = { news: ["news_sweep"], data: ["market_pulse"], nyse: ["market_pulse"], analysis: ["market_pulse"], macro: ["macro_check"], portfolio: ["portfolio_scan"], risk: ["portfolio_scan"], aitrade: ["ai_trader_sync"], filings: ["filings_watch"] };
+  const PAGE_JOB = { quant: ["portfolio_scan"], news: ["news_sweep"], data: ["market_pulse"], nyse: ["market_pulse"], analysis: ["market_pulse"], macro: ["macro_check"], portfolio: ["portfolio_scan"], risk: ["portfolio_scan"], aitrade: ["ai_trader_sync"], filings: ["filings_watch"] };
   const FOL = { asked: {}, job: null, jobLabel: "", page: null };
   const pageLabel = (t) => { const g = typeof groupOf === "function" ? groupOf(t) : ""; const it = (NAV.find(([k]) => k === g) || [, []])[1].find(([k]) => k === t); return `${GNAME[g] || g} › ${it ? it[1] : t}`; };
   function symFor(t) { const v = t === "research" ? S.rq && S.rq.sym : t === "fin" ? ($("finSym") || {}).value : t === "dcf" ? ($("dcfSym") || {}).value : t === "filings" ? (typeof CR !== "undefined" && CR.sym) : null; const s = String(v || "").toUpperCase().trim(); return /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s) && !/[\^=]/.test(s) ? s : null; }
@@ -266,7 +266,7 @@
     const els = [...sec.querySelectorAll("svg, canvas, table, .card, .fx-card, .pf-card, .pfc, .an-card, .ny-pane, .apx, .mc-grid > *, .heat, .feed > *, .hm-frame, .kpis, .mood-card, .earn-card")];
     return els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 140 && r.height > 50 && r.bottom > 120 && r.top < innerHeight - 40 && !e.closest(".tw-mini") && !els.some((o) => o !== e && o.contains(e) && o.getBoundingClientRect().height < 700); }).slice(0, 14);
   }
-  const titleOf = (e) => { const h = e.querySelector("h1,h2,h3,h4,.h,th") || (e.previousElementSibling && /^H\d$/.test(e.previousElementSibling.tagName) ? e.previousElementSibling : null); return h ? h.textContent.trim().replace(/\s+/g, " ").slice(0, 46) : ""; };
+  const titleOf = (e) => { const h = e.querySelector("h1,h2,h3,h4,.h,th") || (e.previousElementSibling && /^H\d$/.test(e.previousElementSibling.tagName) ? e.previousElementSibling : null); return h ? h.textContent.trim().replace(/\s+/g, " ").replace(/^\d+\s*/, "").slice(0, 46) : ""; };
   function pageCycle() {
     const t = S.tab;
     if (FOL.found) { cmd({ wait: 4500, cap: FOL.found }); FOL.found = null; return; }
