@@ -1189,6 +1189,8 @@ nav.tabs button.on{border-bottom-color:var(--amber)}
 @keyframes sgPing{0%,6%{opacity:1}25%,100%{opacity:.7}}
 /* Claude on/off switch (top middle) */
 .cl-wrap{position:relative;margin:0 auto}
+.cl-bud{margin-left:6px;font:600 10.5px var(--mono);color:#5eead4;background:rgba(94,234,212,.1);border:1px solid rgba(94,234,212,.3);border-radius:999px;padding:1px 7px}.cl-bud.mid{color:#facc15;border-color:rgba(250,204,21,.35);background:rgba(250,204,21,.08)}.cl-bud.low{color:#f6465d;border-color:rgba(246,70,93,.4);background:rgba(246,70,93,.08)}
+.ab-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0}.ab-bar i{display:block;height:100%;background:linear-gradient(90deg,#5eead4,#facc15)}
 .cl-sw{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line2);border-radius:999px;padding:4px 12px 4px 5px;cursor:pointer;color:var(--text);font-size:13px}
 .cl-sw b{font-weight:700} .cl-sw em{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
 .cl-k{position:relative;width:36px;height:20px;border-radius:999px;background:#3a4250;transition:background .2s}
@@ -1616,7 +1618,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <div class="brand"><i></i><span class="b1">MARKET</span><span>DESK</span></div>
   <button class="cmd-btn" id="cmdBtn" title="Search any stock">⌕ <span class="lbl">Search stocks, ETFs, funds, crypto…</span><kbd>⌘K</kbd></button>
   <div class="cl-wrap">
-    <button type="button" class="cl-sw" id="clSwitch" title="Turn Claude on or off. Claude features need your password so visitors can't spend your credits."><span class="cl-k"><i></i></span><b>Claude</b><em id="clState">Off</em></button>
+    <button type="button" class="cl-sw" id="clSwitch" title="Turn Claude on or off. Claude features need your password so visitors can't spend your credits."><span class="cl-k"><i></i></span><b>Claude</b><em id="clState">Off</em><span class="cl-bud" id="clBud" hidden></span></button>
     <form class="cl-pop" id="clPop" hidden autocomplete="off">
       <div class="cl-ph">🔒 Turn Claude on</div>
       <p>Enter the password to use Claude. It switches back off when you close or reload the site.</p>
@@ -5688,6 +5690,8 @@ function crOpenSym(sym){ sym=normSym(sym); if(!sym) return; $("crSym").value=sym
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-10k]"); if(!b) return; e.preventDefault(); e.stopPropagation(); crOpenSym(b.dataset["10k"]); },true);
 function crOpen(){ const want=normSym($("crSym").value||"AAPL"); if(CR.sym!==want&&!CR.busy){ CR.busy=true; crLoad(want).finally(()=>CR.busy=false); } else crLoop(); }
 
+function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
+setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 { const fm=location.hash.match(/^#filings\/([A-Za-z0-9.\-]{1,10})(?:\/(fin|release|risk|insiders))?$/); if(fm){ $("crSym").value=fm[1].toUpperCase(); if(fm[2]){ CR.mode=fm[2]; crModeBar(); } }
   setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":fm?"filings":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news"); }
@@ -5726,12 +5730,16 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuo
 
 /* ---------- API balance (bottom right of Claude Predictor): your balance minus what this site has spent ---------- */
 const API={ledger:store.get("apiLedger",[]), bal:store.get("apiBalance",null)};
-function apiSpent(cost,path){ API.ledger.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:Date.now(),c:+cost.toFixed(6),k:/predict/.test(path)?"predict":"ask"}); API.ledger=API.ledger.slice(-3000); store.set("apiLedger",API.ledger); renderApiBal(); }
+function apiSpent(cost,path){ setTimeout(()=>{ if(typeof budgetPoll==="function") budgetPoll(); },800); API.ledger.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:Date.now(),c:+cost.toFixed(6),k:/predict/.test(path)?"predict":"ask"}); API.ledger=API.ledger.slice(-3000); store.set("apiLedger",API.ledger); renderApiBal(); }
 function renderApiBal(){
   const el=$("apiBal"); if(!el) return;
   const now=Date.now(), day0=new Date(new Date().toLocaleDateString("en-US",{timeZone:"America/New_York"})).getTime();
   const sum=f=>API.ledger.filter(f).reduce((a,x)=>a+x.c,0), money=v=>"$"+(v<10?v.toFixed(2):v.toFixed(2)).replace(/\B(?=(\d{3})+(?!\d))/g,",");
   const today=sum(x=>x.t>=day0), nToday=API.ledger.filter(x=>x.t>=day0).length, month=sum(x=>now-x.t<30*864e5);
+  const SB=S.claudeBudget; if(SB){ const tone2=SB.left<0.5?"low":SB.left<1.5?"mid":"ok", pc=Math.min(100,SB.spent/Math.max(0.01,SB.budget)*100);
+    el.innerHTML=`<div class="ab-k">✦ CLAUDE BUDGET</div><div class="ab-v ${tone2}">${money(SB.left)}<small> left of ${money(SB.budget)}</small></div><div class="ab-bar"><i style="width:${pc.toFixed(1)}%"></i></div><div class="ab-s">Exact cost of every call, tracked on the server · Claude stops at the budget</div>
+    <div class="ab-row"><span>Today</span><b>${money(SB.today)}</b><span>cap ${money(SB.dailyCap)}/day</span></div><div class="ab-row"><span>Spent so far</span><b>${money(SB.spent)}</b><span>${SB.calls} call${SB.calls===1?"":"s"}</span></div>
+    <div class="ab-act"><a href="https://platform.claude.com/settings/billing" target="_blank" rel="noopener">Anthropic billing ↗</a></div>`; return; }
   const b=API.bal, left=b?b.amount-sum(x=>x.t>b.setAt):null;
   const tone=left==null?"":left<2?"low":left<5?"mid":"ok";
   el.innerHTML=`<div class="ab-k">✦ CLAUDE API BALANCE</div>

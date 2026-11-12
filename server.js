@@ -744,11 +744,30 @@ function claudeGate(req, pw) {
 // Credit protection: the site is public, so every real call to Claude counts toward a daily cap
 // (CLAUDE_DAILY_LIMIT, default 60 ≈ $1/day worst case) and each visitor gets at most 20 Claude
 // requests per hour. Cached predictions (reused for 30 minutes) are free and don't count.
-const DAILY_LIMIT = Math.max(0, parseInt(process.env.CLAUDE_DAILY_LIMIT || "0", 10) || 0);
+// Budget: Claude spends real money, so every call is priced from the tokens Anthropic reports and added to a running
+// total that is saved on the server. CLAUDE_BUDGET_USD (default $4.00) is the hard ceiling; CLAUDE_DAILY_USD
+// (default $1.00) spreads it out. CLAUDE_DAILY_LIMIT=0 switches Claude off entirely.
+const DAILY_LIMIT = process.env.CLAUDE_DAILY_LIMIT === "0" ? 0 : Math.max(1, parseInt(process.env.CLAUDE_DAILY_LIMIT || "300", 10) || 300);
+const BUDGET_USD = Math.max(0, parseFloat(process.env.CLAUDE_BUDGET_USD || "4") || 0), DAILY_USD = Math.max(0.05, parseFloat(process.env.CLAUDE_DAILY_USD || "1") || 1);
+const SPEND_FILE = require("path").join(require("os").tmpdir(), "claude-spend-v1.json"), SPEND_KEY = "pft:claude:spend:v1";
+let SPEND = { total: 0, days: {}, calls: 0, since: Date.now() }, spendLoaded = false, spendSaveT = null;
+async function spendLoad() {
+  if (spendLoaded) return; spendLoaded = true;
+  try { const R = process.env.UPSTASH_REDIS_REST_URL, T = process.env.UPSTASH_REDIS_REST_TOKEN; if (R && T) { const j = await (await fetch(`${R}/get/${SPEND_KEY}`, { headers: { Authorization: `Bearer ${T}` }, signal: AbortSignal.timeout(8000) })).json(); if (j.result) { SPEND = { ...SPEND, ...JSON.parse(j.result) }; return; } } } catch {}
+  try { SPEND = { ...SPEND, ...JSON.parse(require("fs").readFileSync(SPEND_FILE, "utf8")) }; } catch {}
+}
+function spendSave() { clearTimeout(spendSaveT); spendSaveT = setTimeout(async () => { const body = JSON.stringify(SPEND); try { require("fs").writeFileSync(SPEND_FILE, body); } catch {}
+  try { const R = process.env.UPSTASH_REDIS_REST_URL, T = process.env.UPSTASH_REDIS_REST_TOKEN; if (R && T) await fetch(`${R}/set/${SPEND_KEY}`, { method: "POST", headers: { Authorization: `Bearer ${T}` }, body, signal: AbortSignal.timeout(8000) }); } catch {} }, 1500); }
+const spentToday = () => SPEND.days[etDayIso()] || 0;
+function etDayIso() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" }); }
+function budgetView() { return { budget: BUDGET_USD, spent: +SPEND.total.toFixed(4), left: +Math.max(0, BUDGET_USD - SPEND.total).toFixed(4), today: +spentToday().toFixed(4), dailyCap: DAILY_USD, calls: SPEND.calls, since: SPEND.since }; }
+spendLoad();
 const usage = { day: "", count: 0 };
 const etDay = () => new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" });
 function claudeUsed() { if (usage.day !== etDay()) { usage.day = etDay(); usage.count = 0; } return usage.count; }
 function spendOne() {
+  if (DAILY_LIMIT && BUDGET_USD - SPEND.total < 0.02) { const e = new Error(`Your $${BUDGET_USD.toFixed(2)} Claude budget is used up ($${SPEND.total.toFixed(2)} spent). Raise CLAUDE_BUDGET_USD in Render to keep going.`); e.code = "daily_limit"; throw e; }
+  if (DAILY_LIMIT && spentToday() >= DAILY_USD) { const e = new Error(`Today's Claude spending cap of $${DAILY_USD.toFixed(2)} is reached ($${(BUDGET_USD - SPEND.total).toFixed(2)} of your budget left). It resets at midnight Eastern.`); e.code = "daily_limit"; throw e; }
   if (claudeUsed() >= DAILY_LIMIT) {
     const e = new Error(DAILY_LIMIT ? `Daily Claude limit reached (${DAILY_LIMIT} requests). It resets at midnight Eastern, or raise CLAUDE_DAILY_LIMIT in Render.` : "Claude is turned off so the site costs $0. To turn it on, set CLAUDE_DAILY_LIMIT (for example 20) in Render's Environment settings.");
     e.code = "daily_limit"; throw e;
@@ -782,6 +801,8 @@ async function anthropic(apiKey, body) {
   const u = j.usage || {};
   const cost = ((u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) * 1.25 + (u.cache_read_input_tokens || 0) * 0.1) * PRICE_IN / 1e6 + (u.output_tokens || 0) * PRICE_OUT / 1e6;
   const st = costCtx.getStore(); if (st) st.cost += cost;
+  SPEND.total += cost; SPEND.calls++; const dk = etDayIso(); SPEND.days[dk] = (SPEND.days[dk] || 0) + cost;
+  for (const k of Object.keys(SPEND.days)) if (k < new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10)) delete SPEND.days[k]; spendSave();
   return j;
 }
 const PRICE_IN = +process.env.CLAUDE_PRICE_IN || 2, PRICE_OUT = +process.env.CLAUDE_PRICE_OUT || 10;
@@ -2994,7 +3015,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // pages: the real site is owner-only; /demo is the public recruiter view
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
