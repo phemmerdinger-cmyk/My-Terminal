@@ -2,7 +2,7 @@
    Everything shown comes from the server's real research (/api/web/*): the spider's trips into the Terminal's tabs follow
    the backend job log, and the summary text is the server's live summary built from collected data. */
 (function () {
-  if (typeof VIEW !== "undefined" && VIEW) return; // the public demo doesn't get THE WEB (it holds the owner's research)
+  if (typeof VIEW !== "undefined" && VIEW) { const b = document.getElementById("spBtn"); if (b) b.hidden = true; return; } // the public demo doesn't get THE WEB (it holds the owner's research)
   const W = { open: false, sumPoll: null, gPoll: null, viewing: null, poll: null, navPoll: null, st: null, stAt: 0, offline: false, brief: null, histOpen: false, hist: null,
     feed: { group: "all", mine: false, min: 0, q: "", sort: "latest", sig: "", seen: null }, graph: null, sel: null, chat: [], busy: false,
     ctxSent: "", ctxTimer: null, lastDisc: null, toastAt: 0, genAt: 0, pfAt: 0, pfSig: "", apAt: 0 };
@@ -444,13 +444,37 @@
     return ok.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).slice(0, max);
   }
   const NUMLINE = /(^|[\s(:·])[-+−]?\$?\d[\d,]*(\.\d+)?\s*(%|[KMBT]\b|x\b)?(?=$|[\s),·])/; // a standalone figure, not the "1" in "1-year"
-  function scanCollect(e) {
-    const title = (titleOf(e) || (e.querySelector("h1,h2,h3,h4,b,strong") || {}).textContent || "").trim().replace(/\s+/g, " ").replace(/^\d+\s*/, "").slice(0, 60) || "Untitled section";
-    const lines = String(e.innerText || "").split("\n").map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean), facts = [];
-    for (let i = 0; i < lines.length && facts.length < 6; i++) { const l = lines[i]; if (!NUMLINE.test(l) || l.length > 110) continue;
-      const bare = l.length <= 16 && !/[a-z]{4,}/i.test(l.replace(/[KMBT]$/, "")); const lab = bare && i > 0 && !NUMLINE.test(lines[i - 1]) ? lines[i - 1] : null; const f = lab ? `${lab}: ${l}` : l; if (!facts.includes(f) && f.length > 3) facts.push(f); }
-    SCAN.found.push({ title, facts, text: lines.join(" ").slice(0, 4000) });
+  // What the report says about each section: its real heading, then the figures with their labels — table rows read as
+  // "row: column value", tiles as "label: value" — never chart axis ticks, buttons or header rows. A section without
+  // figures contributes its key sentence instead.
+  const clean = (t) => String(t || "").replace(/\s+/g, " ").trim(), cleanT = (t) => clean(t).replace(/^\d{1,2}\s*(?=[A-Z])/, ""); // titles lose a module number, values keep their digits
+  const NUMV = /\d/, ISFIG = (v) => v.length <= 32 && !/^\d+[A-Za-z]/.test(v) && (/^[-+−±~]?\s?[$€£]?\s?\d/.test(v) || /^[βρσα]\s?[-+−]?\d/.test(v) || /^[A-Z]{1,5}(\/[A-Z]{1,5})?\s[-+−]?\$?\d/.test(v) || /^[-+−]?\d[\d,.]*\s?(%|[KMBT]|x|bps)?\s*(\/|of)\s*\d/.test(v)); // a value, not a label like "1Y return"
+  function sectionTitle(e) {
+    const own = e.querySelector(".ql-mh h2, h1, h2, h3, h4, legend, caption"); if (own && cleanT(own.textContent)) return cleanT(own.textContent).slice(0, 60);
+    let p = e; for (let i = 0; i < 6 && p; i++) { let sb = p.previousElementSibling; for (let k = 0; sb && k < 6; k++) { const h = /^H[1-4]$/.test(sb.tagName) ? sb : sb.querySelector && sb.querySelector("h1,h2,h3,h4"); if (h && cleanT(h.textContent)) return cleanT(h.textContent).slice(0, 60); sb = sb.previousElementSibling; } p = p.parentElement; }
+    return cleanT(titleOf(e)) || "Section";
   }
+  function factsOf(e) {
+    const out = [], push = (f) => { f = clean(f); if (f.length > 3 && f.length < 150 && !out.includes(f)) out.push(f); };
+    for (const tb of e.matches("table") ? [e] : [...e.querySelectorAll("table")]) {
+      const hd = [...tb.querySelectorAll("thead th")].map((th) => clean(th.textContent));
+      for (const tr of [...tb.querySelectorAll("tbody tr")].slice(0, 10)) { const td = [...tr.children].map((c) => clean(c.innerText || c.textContent)); if (td.length < 2) continue;
+        const vals = td.slice(1).map((v, i) => [hd[i + 1] || "", v]).filter(([, v]) => ISFIG(v)).slice(0, 3); if (vals.length) push(`${td[0].slice(0, 32)}: ${vals.map(([h, v]) => (h ? `${h} ${v}` : v)).join(" · ")}`); }
+      if (out.length >= 10) return out; }
+    for (const el of e.querySelectorAll("b, strong, em, span, small, dd, div, p")) {
+      if (out.length >= 10) break; if (el.children.length || el.closest("table, svg, button, select, label, .ql-seg, .ql-ctl, .ql-leg, .ql-m, .bs-chip")) continue;
+      const v = clean(el.textContent); if (!ISFIG(v)) continue;
+      let lab = ""; const sib = el.previousElementSibling; if (sib && !ISFIG(clean(sib.textContent)) && clean(sib.textContent)) lab = clean(sib.textContent);
+      if (!lab && el.parentElement) { const f = [...el.parentElement.children].find((c) => c !== el && clean(c.textContent) && !ISFIG(clean(c.textContent))); if (f) lab = clean(f.textContent); }
+      push(lab ? `${lab.slice(0, 40)}: ${v}` : v); }
+    if (!out.length) (e.innerText || "").split("\n").map(clean).filter((x) => x.length > 24 && x.length < 220 && !/^(symbol|name)\b/i.test(x) && (x.match(/[—…]/g) || []).length < 3 && !/loading|no quote/i.test(x)).slice(0, 2).forEach(push);
+    return out;
+  }
+  function scanCollect(e) {
+    const lines = String(e.innerText || "").split("\n").map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean);
+    SCAN.found.push({ title: sectionTitle(e), facts: factsOf(e), text: lines.join(" ").slice(0, 4000) });
+  }
+
   // The scan uses the ORIGINAL spider — the 10-K crawler's: two-segment legs with inverse kinematics and an alternating
   // gait, a laser from its mouth to every figure it reads, spark bursts where the beam lands — drawn huge across the
   // whole screen at the crawler's 2× speed.
@@ -590,7 +614,8 @@
       <h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       ${sum && sum.lines && sum.lines.length ? `<h4>Market context (THE WEB ${sum.live ? "live summary" : "latest summary"})</h4><ul class="sp-take">${sum.lines.slice(0, 3).map((l) => `<li>${esc(l.t)}</li>`).join("")}</ul>` : ""}
       ${disc.length ? `<h4>Research on those tickers</h4><ul class="sp-take">${disc.map((d) => `<li><b>${esc(d.headline)}</b></li>`).join("")}</ul>` : ""}
-      ${deepHtml}${DP ? "" : `<h4>Section by section</h4>`}${DP ? "" : F.map((f) => `<div class="sp-sec"><b>${esc(f.title)}</b>${f.facts.length ? `<ul>${f.facts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>No figures on screen.</p>`}</div>`).join("")}
+      ${deepHtml}${DP ? "" : `<h4>Section by section</h4>`}${DP ? "" : (() => { const m = new Map(); for (const f of F) { if (!f.facts.length) continue; const g = m.get(f.title) || []; for (const x of f.facts) if (!g.includes(x) && g.length < 12) g.push(x); m.set(f.title, g); }
+        return m.size ? [...m].map(([t2, fs]) => `<div class="sp-sec"><b>${esc(t2)}</b><ul>${fs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("") : `<p class="sp-foot">Nothing readable on this page yet — prices may still be loading.</p>`; })()}
       <p class="sp-foot">A rule-based summary of what the spider read on this page plus THE WEB's stored research. No paid AI; nothing is traded.</p></div>`;
     document.querySelectorAll(".sp-rep").forEach((x) => x.remove()); document.body.appendChild(el);
     const close = () => el.remove(); el.querySelector(".sp-x").onclick = close; el.onclick = (e) => { if (e.target === el) close(); }; document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k); } });
