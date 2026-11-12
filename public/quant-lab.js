@@ -8,7 +8,7 @@
   "use strict";
   const M = window.QMATH, Q = window.QUANT;
   if (!M || !Q) return;
-  const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "net", color: "cluster", scen: "none", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
+  let wireHoverLater = false; const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "net", color: "cluster", scen: "none", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
   const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Quant research assistant"]];
   const FACTORS = [["MKT", "Market", "SPY minus cash"], ["SIZE", "Size (small caps)", "IWM − SPY"], ["VALUE", "Value", "IWD − IWF (value minus growth)"], ["MOM", "Momentum", "MTUM − SPY"], ["QUAL", "Quality", "QUAL − SPY"], ["LOWVOL", "Low volatility", "USMV − SPY"]];
   const PROXIES = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "HYG", "IEF"];
@@ -33,21 +33,30 @@
 
   // ---------------------------------------------------------------- shared, de-duplicated history cache (also used by other pages)
   const HC = (window.QHIST = window.QHIST || new Map());
-  function hist(sym, from, to) { const k = `${sym}|${from}|${to}`; if (!HC.has(k)) { const p = api(`/api/pub/hist?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}&interval=1d`); HC.set(k, p); p.catch(() => HC.delete(k)); } return HC.get(k); }
-  async function loadAll(syms, from, to, onEach) { const out = {}, failed = [], todo = [...syms]; let n = 0;
+  // today's histories are also kept in this browser, so a revisit is instant (older days are cleaned up)
+  const LK = (k) => "qh2:" + k;
+  try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith("qh2:") && !k.endsWith("|" + new Date().toISOString().slice(0, 10))) localStorage.removeItem(k); } } catch {}
+  function hist(sym, from, to) { const k = `${sym}|${from}|${to}`; if (!HC.has(k)) {
+      let hit = null; try { const v = localStorage.getItem(LK(k)); if (v) hit = JSON.parse(v); } catch {}
+      const p = hit ? Promise.resolve(hit) : api(`/api/pub/hist?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}&interval=1d`).then((j) => { try { localStorage.setItem(LK(k), JSON.stringify({ t: j.t, close: j.close, adj: j.adj, name: j.name })); } catch {} return j; });
+      HC.set(k, p); p.catch(() => HC.delete(k)); } return HC.get(k); }
+  async function loadAll(syms, from, to, onEach) { const out = {}, todo = [...syms]; let n = 0, failed = [];
     const one = async () => { while (todo.length) { const s = todo.shift(); try { const j = await hist(s, from, to); if (j && j.t && j.t.length > 30) out[s] = j; else failed.push(s); } catch { failed.push(s); } onEach && onEach(++n, syms.length); } };
-    await Promise.all([one(), one(), one(), one()]); return { out, failed }; }
+    await Promise.all([one(), one(), one()]);
+    // free data sources rate-limit bursts: retry anything that failed once, one at a time, after a pause
+    if (failed.length) { const again = failed; failed = []; await new Promise((r) => setTimeout(r, 1500)); for (const s of again) { try { HC.delete(`${s}|${from}|${to}`); const j = await hist(s, from, to); if (j && j.t && j.t.length > 30) out[s] = j; else failed.push(s); } catch { failed.push(s); } } }
+    return { out, failed }; }
 
   // ---------------------------------------------------------------- shell
   function shell() {
     const el = $("tab-quant"); if (el.dataset.ready) return; el.dataset.ready = "1";
-    el.innerHTML = `<div class="fx-head"><div><div class="fx-kick">∑ QUANT · AUTOMATED</div><h1>Quant Lab</h1>
-      <p class="fx-sub">Open this page and the engine does the rest: it loads your active portfolio, pulls free daily price history, and runs risk, factor, correlation, optimization, Monte Carlo, regime and strategy analyses on its own. Every number is calculated from real adjusted prices; the written analysis is a rule-based engine over those numbers (no paid AI) and marks each statement as <b>Calculated</b> or <b>Interpretation</b>. Nothing here places or suggests real trades.</p></div>
+    wireHoverLater = true; el.innerHTML = `<div class="fx-head"><div><div class="fx-kick">∑ QUANT · AUTOMATED</div><h1>Quant Lab</h1>
+      <p class="fx-sub ql-tagline">Autonomous risk engine · real adjusted prices · no inputs · no trades</p></div>
       <div class="ql-hstat"><span id="qlOverall" class="ql-chip calc">CALCULATING</span><span id="qlFresh" class="tw-muted"></span><button class="btn ghost" type="button" id="qlRe" title="Recalculate with the latest prices">↻ Recalculate</button></div></div>
       <div id="qlProg" class="ql-prog"></div>
       ${MODS.map(([k, n], i) => `<section class="fx-card ql-mod" id="qm-${k}"><div class="ql-mh"><h2><span class="ql-n">${i + 1}</span>${n}</h2>${chip(k)}</div><div class="ql-body" id="qb-${k}"><div class="fx-empty"><span class="spin"></span> Waiting for data…</div></div></section>`).join("")}
       <div class="ql-foot" id="qlFoot"></div>`;
-    $("qlRe").onclick = () => run(true);
+    $("qlRe").onclick = () => run(true); wireHover();
   }
 
   // ---------------------------------------------------------------- the pipeline
@@ -68,11 +77,13 @@
       const t0 = performance.now();
       const { out, failed } = await loadAll(syms, from, to, (n, of) => { $("qlProg").innerHTML = `<div class="ql-bar"><i style="width:${((n / of) * 100).toFixed(0)}%"></i></div><span>Loading daily price history… ${n}/${of}</span>`; });
       QL.ms.load = performance.now() - t0; $("qlProg").innerHTML = "";
-      const have = held.filter((s) => out[s]); if (!have.length) throw new Error("No price history could be loaded for any holding" + (failed.length ? ` (${failed.join(", ")})` : "") + ".");
+      const spy0 = out.SPY ? out.SPY.t[0] : 0, short = held.filter((s) => out[s] && out[s].t.length < 260);
+      let have = held.filter((s) => out[s] && !short.includes(s)); if (!have.length && short.length) have = short.filter((s) => out[s].t.length > 60); void spy0;
+      if (!have.length) throw new Error("No price history could be loaded for any holding" + (failed.length ? ` (${failed.join(", ")})` : "") + ".");
       if (!out.SPY) throw new Error("Couldn't load SPY, which every module uses as the market benchmark.");
       const irx = out["^IRX"], rf = irx && irx.close.length ? Math.min(0.1, Math.max(0, irx.close[irx.close.length - 1] / 100)) : 0.04, rfSrc = irx ? "13-week T-bill yield (^IRX)" : "assumed 4.0% (T-bill yield unavailable)";
       const lastT = Math.max(...have.map((s) => out[s].t[out[s].t.length - 1])), ageD = (Date.now() / 1000 - lastT) / 86400, stale = ageD > 4;
-      const base = compute(P, have, out, rf, failed.filter((s) => held.includes(s)));
+      const base = compute(P, have, out, rf, [...failed.filter((s) => held.includes(s)), ...short.filter((s) => !have.includes(s)).map((s) => s + " (under 1 year of history)")]);
       Object.assign(base, { rf, rfSrc, lastT, stale, ageD, failedHeld: failed.filter((s) => held.includes(s)), failedProxy: failed.filter((s) => PROXIES.includes(s)) });
       QL.res = base; QL.at = Date.now();
       $("qlFresh").textContent = `Prices through ${day(lastT)}${stale ? ` · ${Math.floor(ageD)} days old` : ""} · risk-free ${pct(rf, 2)} (${rfSrc})`;
@@ -106,7 +117,8 @@
   }
 
   // ---------------------------------------------------------------- small SVG chart helpers
-  function lineSVG(series, { w = 760, h = 220, fmtY = (v) => pct(v, 0), dates, markers = [], zero = false, band, log = false } = {}) {
+  const QC = { n: 0, g: {} };
+  function lineSVG(series, opts = {}) { const { w = 760, h = 220, fmtY = (v) => pct(v, 0), dates, markers = [], zero = false, band, log = false } = opts;
     const all = series.flatMap((s) => s.v.filter((x) => x != null && isFinite(x))).concat(band ? band.flatMap((b) => [...b.lo, ...b.hi]) : []); if (!all.length) return "";
     const tf = log ? (v) => Math.log(Math.max(1e-9, v)) : (v) => v;
     let lo = Math.min(...all.map(tf)), hi = Math.max(...all.map(tf)); if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); } if (hi === lo) hi = lo + 1;
@@ -117,11 +129,27 @@
     const lines = series.map((s) => { let d = "", pen = false; s.v.forEach((v, i) => { if (v == null || !isFinite(v)) { pen = false; return; } d += (pen ? "L" : "M") + X(i).toFixed(1) + "," + Y(v).toFixed(1); pen = true; }); return `<path d="${d}" class="ql-line" style="stroke:${s.c};stroke-width:${s.sw || 1.6};${s.dash ? "stroke-dasharray:4 3" : ""};opacity:${s.op || 1}"/>`; }).join("");
     const mk = markers.map((m) => `<circle cx="${X(m.i)}" cy="${Y(m.v)}" r="3.2" class="ql-mk ${m.side === "BUY" ? "buy" : "sell"}"><title>${esc(m.title || "")}</title></circle>`).join("");
     const z = zero && lo < 0 && hi > 0 ? `<line x1="${L}" x2="${w - Rr}" y1="${Y(0)}" y2="${Y(0)}" class="ql-zero"/>` : "";
-    return `<svg viewBox="0 0 ${w} ${h}" class="ql-svg" preserveAspectRatio="none">${ticks}${z}${bands}${lines}${mk}${xt}</svg>`;
+    const id = "qc" + ++QC.n; QC.g[id] = { X, Y, n, w, h, L, Rr, T, B, series, dates, fmtY };
+    const bg = (opts.bg || []).map((r) => `<rect x="${X(r.i0)}" y="${T}" width="${Math.max(0.5, X(r.i1) - X(r.i0))}" height="${h - T - B}" fill="${r.c}" opacity="${r.o || 0.12}"/>`).join("");
+    return `<svg viewBox="0 0 ${w} ${h}" class="ql-svg" preserveAspectRatio="none" data-qc="${id}">${bg}${ticks}${z}${bands}${lines}${mk}${xt}<g class="ql-xh"></g></svg>`;
+  }
+
+  // crosshair + tooltip for every chart drawn by lineSVG
+  function wireHover() {
+    const root = $("tab-quant"); if (root.dataset.hov) return; root.dataset.hov = "1";
+    const tip = document.createElement("div"); tip.className = "ql-xt"; tip.hidden = true; document.body.appendChild(tip);
+    root.addEventListener("pointermove", (e) => { const sv = e.target.closest && e.target.closest("svg[data-qc]"); document.querySelectorAll("svg[data-qc] .ql-xh").forEach((g) => { if (!sv || g.parentNode !== sv) g.innerHTML = ""; }); if (!sv) { tip.hidden = true; return; }
+      const G = QC.g[sv.dataset.qc]; if (!G || !G.n) return; const r = sv.getBoundingClientRect(), vx = ((e.clientX - r.left) / r.width) * G.w, i = Math.max(0, Math.min(G.n - 1, Math.round(((vx - G.L) / (G.w - G.L - G.Rr)) * (G.n - 1))));
+      const vals = G.series.map((s) => ({ s, v: s.v[i] })).filter((x) => x.v != null && isFinite(x.v) && x.s.name);
+      sv.querySelector(".ql-xh").innerHTML = `<line x1="${G.X(i)}" x2="${G.X(i)}" y1="${G.T}" y2="${G.h - G.B}" class="ql-xl"/>` + vals.map((x) => `<circle cx="${G.X(i)}" cy="${G.Y(x.v)}" r="3.5" fill="${x.s.c}" stroke="#05080c" stroke-width="1.5"/>`).join("");
+      if (!vals.length && !G.dates) { tip.hidden = true; return; }
+      tip.hidden = false; tip.innerHTML = `${G.dates && G.dates[i] != null ? `<b>${day(G.dates[i])}</b>` : `<b>${G.xLabel ? G.xLabel(i) : "#" + i}</b>`}${vals.map((x) => `<div><i style="background:${x.s.c}"></i>${esc(x.s.name)}<span>${(x.s.fmt || G.fmtY)(x.v)}</span></div>`).join("")}`;
+      const tx = Math.min(innerWidth - 230, e.clientX + 16), ty = Math.min(innerHeight - tip.offsetHeight - 10, e.clientY + 12); tip.style.transform = `translate(${tx}px,${ty}px)`; });
+    root.addEventListener("pointerleave", () => { tip.hidden = true; });
   }
   const legend = (items) => `<div class="ql-leg">${items.map(([c, t]) => `<span><i style="background:${c}"></i>${esc(t)}</span>`).join("")}</div>`;
   const kpi = (k, v, sub, c) => `<div class="ql-kpi"><span>${k}</span><b class="${c || ""}">${v}</b>${sub ? `<em>${sub}</em>` : ""}</div>`;
-  const note = (t) => `<p class="ql-note">${t}</p>`;
+  const note = (t) => `<details class="ql-m"><summary>ⓘ method</summary><p>${t}</p></details>`;
 
   // ---------------------------------------------------------------- 1. command center
   async function renderCC(b) {

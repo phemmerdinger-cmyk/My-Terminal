@@ -2464,16 +2464,39 @@ setTimeout(async () => { for (const s of ["AAPL", "NVDA", "MSFT", "TSLA", "AMZN"
 // ---------------------------------------------------------------- long price history for backtests and stress tests
 // Daily or weekly closes plus Yahoo's dividend-and-split adjusted closes ("adj") between two dates.
 // Cached for 6 hours; the backtester and risk tools run their math in the browser.
+// Yahoo throttles bursts of long-history downloads from one IP, so they go through a small queue:
+// at most 2 at a time, spaced 150 ms apart.
+const YQ = { active: 0, wait: [], last: 0 };
+function yahooChartQueue(fn) {
+  return new Promise((resolve, reject) => {
+    const go = async () => { YQ.active++; const gap = Math.max(0, YQ.last + 150 - Date.now()); if (gap) await new Promise((ok) => setTimeout(ok, gap)); YQ.last = Date.now();
+      try { resolve(await fn()); } catch (e) { reject(e); } finally { YQ.active--; const n = YQ.wait.shift(); if (n) n(); } };
+    if (YQ.active < 2) go(); else YQ.wait.push(go);
+  });
+}
+// One canonical download per symbol per day (from Jan 1 of the requested start year to today), shared by every page
+// that asks for any slice of it; the requested window is cut from that copy.
 async function longHistory(sym, from, to, interval) {
+  const today = new Date().toISOString().slice(0, 10), iv = interval === "1wk" ? "1wk" : interval === "1mo" ? "1mo" : "1d";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to <= from) throw new Error("bad dates");
+  if (to < today) return fetchLongHistory(sym, from, to, interval); // a fixed past window: cache it as asked
+  const y = +from.slice(0, 4), canon = `${y - (y % 2)}-01-01`; // even years, so nearby start dates share one copy
+  const full = await fetchLongHistory(sym, canon, today, iv), lo = Date.parse(from + "T00:00:00Z") / 1000, hi = Date.parse(to + "T23:59:59Z") / 1000, keep = [];
+  full.t.forEach((t, i) => { if (t >= lo && t <= hi) keep.push(i); });
+  if (!keep.length) throw new Error("no history in that window");
+  return { ...full, t: keep.map((i) => full.t[i]), close: keep.map((i) => full.close[i]), adj: full.adj ? keep.map((i) => full.adj[i]) : null };
+}
+async function fetchLongHistory(sym, from, to, interval) {
   const p1 = Math.floor(Date.parse(from + "T00:00:00Z") / 1000), p2 = Math.floor(Date.parse(to + "T23:59:59Z") / 1000);
   if (!isFinite(p1) || !isFinite(p2) || p2 <= p1) throw new Error("bad dates");
   const iv = interval === "1wk" ? "1wk" : interval === "1mo" ? "1mo" : "1d";
   return cached(`lh:${sym}:${p1}:${p2}:${iv}`, 6 * 3600e3, async () => {
     let j = null, err;
-    for (const [i, host] of ["query1", "query2"].entries()) {
+    // alternate hosts and back off when Yahoo throttles a burst (429 / 5xx / timeouts)
+    for (const [i, host] of ["query1", "query2", "query1", "query2"].entries()) {
       try {
-        if (i) await new Promise((ok) => setTimeout(ok, 700));
-        j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=${iv}&events=div%2Csplit`, "application/json"));
+        if (i) await new Promise((ok) => setTimeout(ok, [0, 700, 2000, 4500][i]));
+        j = JSON.parse(await yahooChartQueue(() => get(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=${iv}&events=div%2Csplit`, "application/json")));
         if (j.chart && j.chart.result && j.chart.result[0]) break;
       } catch (e) { err = e; j = null; }
     }
