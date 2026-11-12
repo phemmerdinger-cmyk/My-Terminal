@@ -885,7 +885,8 @@ async function predict(sym, apiKey, fresh) {
       if (!q || q.error) throw new Error(`Couldn't find a quote for ${sym}`);
       const heads = news.items.filter((i) => i.tickers.includes(sym)).slice(0, 30)
         .map((i) => `- [${SOURCES[i.source].name}${i.time ? ", " + new Date(i.time).toISOString().slice(0, 10) : ""}] ${i.title}${i.summary ? " — " + i.summary.slice(0, 160) : ""}`).join("\n");
-      prompt = `Today is ${today}. Give your outlook for ${q.name} (${sym}).\n\nQUOTE\nPrice ${q.price} ${q.currency}, ${q.changePct?.toFixed(2)}% today, prev close ${q.prevClose}, day ${q.dayLow}-${q.dayHigh}, 52w ${q.low52}-${q.high52}, volume ${q.volume}\n\nTREND\n${h ? summarizeHistory(h) : "n/a"}\n\nLATEST ${sym} HEADLINES\n${heads || "(none found)"}\n\n${SHAPE}`;
+      const spiderCtx = SPIDER ? SPIDER.promptContext([sym]) : "";
+      prompt = `Today is ${today}. Give your outlook for ${q.name} (${sym}).${spiderCtx ? `\n\nSPIDER RESEARCH (stored findings from THE WEB; labels show fact vs interpretation)\n${spiderCtx}` : ""}\n\nQUOTE\nPrice ${q.price} ${q.currency}, ${q.changePct?.toFixed(2)}% today, prev close ${q.prevClose}, day ${q.dayLow}-${q.dayHigh}, 52w ${q.low52}-${q.high52}, volume ${q.volume}\n\nTREND\n${h ? summarizeHistory(h) : "n/a"}\n\nLATEST ${sym} HEADLINES\n${heads || "(none found)"}\n\n${SHAPE}`;
     }
     const out = shapePrediction(await askClaude(apiKey, prompt));
     const pq = (await getQuotes([isMarket ? "^GSPC" : sym])).quotes;
@@ -975,7 +976,7 @@ async function ask(apiKey, body) {
     : "(no holdings entered)";
   const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", dateStyle: "full" });
   const ctx = String(body.context || "").slice(0, 6000);
-  const prompt = `Today is ${today}.\n\n${ctx ? "WHAT I'M LOOKING AT ON MY DASHBOARD RIGHT NOW\n" + ctx + "\n\n" : ""}MARKET\n${idx.map(qline).join("\n")}\n\nWATCHED / HELD STOCKS\n${syms.map(qline).join("\n")}\n\nMY PORTFOLIO\n${port}\n\nLATEST HEADLINES\n${news.items.slice(0, 40).map((i) => `- [${SOURCES[i.source].name}] ${i.title}`).join("\n")}\n\nMY QUESTION\n${question}`;
+  const prompt = `Today is ${today}.\n\n${ctx ? "WHAT I'M LOOKING AT ON MY DASHBOARD RIGHT NOW\n" + ctx + "\n\n" : ""}MARKET\n${idx.map(qline).join("\n")}\n\nWATCHED / HELD STOCKS\n${syms.map(qline).join("\n")}\n\nMY PORTFOLIO\n${port}\n\n${SPIDER ? (() => { const c = SPIDER.promptContext(syms); return c ? "SPIDER RESEARCH (THE WEB)\n" + c + "\n\n" : ""; })() : ""}LATEST HEADLINES\n${news.items.slice(0, 40).map((i) => `- [${SOURCES[i.source].name}] ${i.title}`).join("\n")}\n\nMY QUESTION\n${question}`;
   return { ...(await askWithActions(apiKey, prompt)), model: MODEL, generated: Date.now() };
 }
 
@@ -1625,6 +1626,8 @@ async function apScore(live) {
     const e = x.earn, eAdj = !e ? 0 : e.kind === "beat" ? Math.min(0.2, 0.08 + e.surprise) : e.kind === "miss" ? -0.35 : 0;
     const hg = AP_HEALTH.get(x.sym); x.health = hg && hg.grade ? { grade: hg.grade, flags: hg.flags, fy: hg.fy } : null;
     x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj + (x.health ? AP_GRADE_ADJ[x.health.grade] || 0 : 0);
+    // THE WEB: research the bot doesn't already score (insider buying, earnings-release tone, sector news patterns), at most ±SPIDER_TRADER_WEIGHT
+    try { const sa = SPIDER && SPIDER_W > 0 ? SPIDER.traderAdjust(x.sym, SPIDER_W) : null; x.spider = sa && sa.adj ? { adj: sa.adj, note: sa.note } : null; if (x.spider) x.score += x.spider.adj; } catch { x.spider = null; }
   }
   out.sort((a, b) => b.score - a.score); out.forEach((x, i) => { x.rank = i + 1; apPx[x.sym] = x.px; apScoreOf[x.sym] = x.score; });
   apHealthJob(out.map((x) => x.sym)).catch(() => {}); // grade anything new in the background
@@ -1689,6 +1692,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (x.news >= 1 && x.headlines[0]) bits.push(`good news: “${x.headlines[0].slice(0, 90)}”`);
     if (x.adj != null) bits.push(`analysts ${x.adj >= 1 ? "strongly positive" : x.adj >= 0.5 ? "positive" : "mixed"}`);
     if (x.health) bits.push(`10-K health grade ${x.health.grade}`);
+    if (x.spider && x.spider.note) bits.push(x.spider.note.replace(/^Spider: /, "Spider research: "));
     bits.push(`${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months`);
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
     return `Ranked #${x.rank}: ` + bits.join(", ");
@@ -1720,7 +1724,7 @@ function apSummary(end, busted, spxNow) {
     trades: AP.trades.length, days: AP.equity.length, spxRet: AP.spx0 && spxNow ? +((spxNow / AP.spx0 - 1) * 100).toFixed(2) : null, busted };
 }
 function apSignals(sc) {
-  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null });
+  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null });
   return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
@@ -2576,6 +2580,82 @@ async function macroData() {
   });
 }
 
+// ---------------------------------------------------------------- THE WEB: the autonomous research Spider (web/)
+// Runs inside this server on a timer (no browser needed). It reads the same internal services the site uses — never
+// crawls this site's own pages — and stores its research in Upstash (if configured) or the server's temp folder.
+// It only READS the trading bots' state; it has no access to apTrade/dtOpen and never places trades.
+const { createSpider } = require("./web/spider.js");
+const { createStore: createWebStore } = require("./web/store.js");
+const SPIDER_W = Math.max(0, Math.min(0.15, process.env.SPIDER_TRADER_WEIGHT != null ? +process.env.SPIDER_TRADER_WEIGHT || 0 : 0.05));
+const SPIDER = process.env.SPIDER_OFF ? null : createSpider({
+  store: createWebStore({ url: UP_URL, token: UP_TOKEN }),
+  sp500List: SP500, holidays: NYSE_HOLIDAYS, earlyClose: NYSE_EARLY,
+  quotes: (syms) => getQuotes(syms),
+  history: (sym, range) => history(sym, range),
+  news: (tickers, range) => getNews(tickers, range),
+  trending: () => getTrending(),
+  smart: () => getSmart(),
+  sp500: () => sp500Snapshot(),
+  earnings: (syms) => earningsCalendar(syms),
+  earningsActuals: () => apEarnings(),
+  macro: () => macroData(),
+  filings: (syms) => latestFilings(syms),
+  release: (sym) => earningsRelease(sym),
+  insiders: (sym) => insiderScan(sym),
+  fundamentals: (sym) => secFundamentals(sym),
+  health: (y, p) => FINS.health(y, p),
+  analyst: (sym) => { const r = BB.ratings[String(sym).replace("-", ".")]; return r && r.n >= BB_MIN_N ? { adj: bbAdj(r), n: r.n } : null; },
+  trader: () => (apLoaded ? { positions: AP.positions, lastScan: AP.lastScan || null, plan: AP.plan || null, trades: (AP.trades || []).slice(0, 60), value: null } : null), // read-only view
+  tone: (title) => apTone(title),
+  matcher: (sym, name) => apMatcher(sym, name),
+  sourceName: (k) => (SOURCES[k] ? SOURCES[k].name : k),
+});
+if (SPIDER) SPIDER.start(15e3, process.env.SPIDER_FIRST_DELAY_MS ? +process.env.SPIDER_FIRST_DELAY_MS : 45e3);
+const webManual = { briefing: 0, run: [] };
+async function webRoute(req, res, u) {
+  if (!SPIDER) return send(res, 503, { error: "THE WEB is turned off (SPIDER_OFF is set)." });
+  await SPIDER.load();
+  const p = u.pathname.slice("/api/web/".length), qp = (k) => u.searchParams.get(k);
+  if (p === "status") return send(res, 200, SPIDER.status());
+  if (p === "context" && req.method === "POST") { let b = {}; try { b = await readBody(req); } catch { return send(res, 400, { error: "bad data" }); } return send(res, 200, SPIDER.setContext(b || {})); }
+  if (p === "discoveries") return send(res, 200, SPIDER.discoveries({ group: qp("group"), cat: qp("cat"), q: qp("q") ? String(qp("q")).slice(0, 60) : null, mine: qp("mine") === "1", ai: qp("ai") === "1", explore: qp("explore") === "1", min: +qp("min") || 0, since: +qp("since") || 0, symbols: parseList(qp("symbols"), 60), limit: +qp("limit") || 60, sort: qp("sort") }));
+  if (p === "discovery") { const d = SPIDER.getDiscovery(String(qp("id") || "")); return d ? send(res, 200, d) : send(res, 404, { error: "not found" }); }
+  if (p === "briefings") return send(res, 200, await SPIDER.briefings({ q: qp("q") ? String(qp("q")).slice(0, 60) : null, from: /^\d{4}-\d{2}-\d{2}$/.test(qp("from") || "") ? qp("from") : null, to: /^\d{4}-\d{2}-\d{2}$/.test(qp("to") || "") ? qp("to") : null, limit: Math.min(200, +qp("limit") || 60) }));
+  if (p === "briefing" && req.method === "GET") { const b = await SPIDER.briefing(String(qp("id") || "latest").slice(0, 60)); return b ? send(res, 200, b) : send(res, 404, { error: "No briefing yet." }); }
+  if (p === "briefing/generate" && req.method === "POST") {
+    if (Date.now() - webManual.briefing < 90e3) return send(res, 429, { error: "A briefing was just requested — give it a minute." });
+    webManual.briefing = Date.now();
+    const s = SPIDER.session(), slot = s.min < 12 * 60 ? "morning" : s.min < 16 * 60 + 10 ? "midday" : "close";
+    SPIDER.runNow("briefing", null, { slot, reason: "you pressed Generate briefing" }).catch(() => {});
+    return send(res, 202, { started: true, slot });
+  }
+  if (p === "graph") return send(res, 200, SPIDER.graph({ focus: qp("focus") ? String(qp("focus")).slice(0, 80) : null }));
+  if (p === "trader") return send(res, 200, { ...SPIDER.traderView(), weight: SPIDER_W, explain: SPIDER_W > 0 ? `Spider research nudges the swing bot's ranking score by at most ±${SPIDER_W.toFixed(2)} (scores run about 0–1), using only inputs the bot doesn't already score: insider buying, earnings-release tone and sector news patterns. Stops, news and trend rules still decide every trade, and the Spider itself never trades.` : "The Spider shares research with AI Trader for display only (SPIDER_TRADER_WEIGHT is 0, so it doesn't change the bot's scores)." });
+  if (p === "research") { const [s] = parseList(qp("symbol"), 1); if (!s) return send(res, 400, { error: "symbol required" }); return send(res, 200, SPIDER.packet(s)); }
+  if (p === "run" && req.method === "POST") {
+    let b = {}; try { b = await readBody(req); } catch {}
+    webManual.run = webManual.run.filter((t) => Date.now() - t < 10 * 60e3); if (webManual.run.length >= 12) return send(res, 429, { error: "Too many manual research requests — try again in a few minutes." });
+    const ALLOW = new Set(["company_snapshot", "investigate_mover", "fundamentals", "insiders", "earnings_release", "portfolio_scan", "market_pulse", "news_sweep", "policy_watch", "macro_check", "earnings_watch", "filings_watch", "explore", "ai_trader_sync"]);
+    const type = String(b.type || "company_snapshot"), [sym] = parseList(b.symbol, 1);
+    if (!ALLOW.has(type)) return send(res, 400, { error: "unknown research type" });
+    webManual.run.push(Date.now());
+    const j = SPIDER.enqueue(type, sym || null, { boost: 1, force: true, reason: "you asked for this research", manual: true });
+    return j ? send(res, 202, { queued: true, id: j.id, label: type }) : send(res, 400, { error: "Couldn't queue that (needs a valid symbol, or it's already running)." });
+  }
+  if (p === "ask" && req.method === "POST") {
+    let b = {}; try { b = await readBody(req); } catch {}
+    let claudeFn = null;
+    if (b.useClaude && process.env.ANTHROPIC_API_KEY) { // optional, spends credits: same password gate and caps as every other Claude feature
+      const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g);
+      if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached." });
+      claudeFn = async (prompt) => { const j = await anthropic(process.env.ANTHROPIC_API_KEY, { model: MODEL, max_tokens: 900, system: "You are a careful financial research assistant. Use only the evidence given. Cite as [n]. Never invent numbers.", messages: [{ role: "user", content: prompt }] }); return (j.content || []).filter((x) => x.type === "text").map((x) => x.text).join(""); };
+    }
+    try { return send(res, 200, await SPIDER.ask(String(b.question || "").slice(0, 600), { claude: claudeFn })); }
+    catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+  }
+  return send(res, 404, { error: "unknown THE WEB endpoint" });
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -2617,6 +2697,7 @@ async function handle(req, res) {
           return send(res, 200, { ok: true }, "application/json", { "Set-Cookie": `md_owner=${r.key}; Path=/; Max-Age=${180 * 86400}; HttpOnly; Secure; SameSite=Lax` });
         }
       }
+      if (u.pathname.startsWith("/api/web/")) return webRoute(req, res, u); // owner-only (not in PUBLIC_API)
       if (u.pathname === "/api/news") {
         const r = String(u.searchParams.get("range") || "");
         return send(res, 200, await getNews(parseList(u.searchParams.get("tickers"), 25), r in RANGE_DAYS ? r : ""));
@@ -2728,7 +2809,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined" });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // pages: the real site is owner-only; /demo is the public recruiter view
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
