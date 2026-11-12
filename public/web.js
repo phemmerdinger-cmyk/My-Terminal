@@ -98,16 +98,65 @@
     pop.style.left = Math.min(G.w - 250, p.x + 12) + "px"; pop.style.top = Math.min(G.h - 120, p.y + 12) + "px"; pop.hidden = false;
   }
 
-  // ---------------------------------------------------------------- the spider (screen space, so it can leave the web for the tabs)
+  // ---------------------------------------------------------------- the spider: an articulated, biomechanical crawler (screen space)
+  // Legs are recomputed every frame from a walking gait (two alternating groups of four, phase driven by the
+  // distance travelled); a full-screen canvas layer draws fading light trails, data particles and a scanning sweep.
+  let SIZE = innerWidth < 760 ? 64 : 96, HALF = SIZE / 2;
+  const LEGS = [[-1, -11, -58, 0], [-1, -4, -20, 1], [-1, 3, 18, 0], [-1, 10, 52, 1], [1, -11, -58, 1], [1, -4, -20, 0], [1, 3, 18, 1], [1, 10, 52, 0]]; // side, hip y, angle, gait group
+  // entrances: from the exact vertical middle of the left edge, partly outside the screen
+  const leftMid = () => ({ x: -SIZE * 0.55, y: innerHeight / 2 - HALF });
   function spiderEl() {
     if (SPD.el) return;
-    const legs = [[-1, -1, "la"], [-1, -0.35, "lb"], [-1, 0.35, "la"], [-1, 1, "lb"], [1, -1, "lb"], [1, -0.35, "la"], [1, 0.35, "lb"], [1, 1, "la"]].map(([sx, sy, g]) => `<g class="${g}"><path class="leg" d="M${15 + sx * 3} ${15 + sy * 3} Q${15 + sx * 9} ${15 + sy * 5 - 4} ${15 + sx * 13} ${15 + sy * 10 + 1}"/></g>`).join("");
-    SPD.el = document.createElement("div"); SPD.el.className = "tw-crawler"; SPD.el.innerHTML = `<svg viewBox="0 0 30 30" aria-hidden="true">${legs}<ellipse class="body" cx="15" cy="17" rx="4.6" ry="6"/><circle class="body" cx="15" cy="9.5" r="3"/><circle class="eye" cx="13.8" cy="8.6" r=".9"/><circle class="eye" cx="16.2" cy="8.6" r=".9"/></svg>`;
+    SPD.el = document.createElement("div"); SPD.el.className = "tw-crawler";
+    SPD.el.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs>
+      <radialGradient id="spAbd" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#5b6672"/><stop offset=".55" stop-color="#262d35"/><stop offset="1" stop-color="#0d1116"/></radialGradient>
+      <radialGradient id="spTh" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#6a7581"/><stop offset="1" stop-color="#151a20"/></radialGradient>
+      <radialGradient id="spEye"><stop offset="0" stop-color="#e8fffc"/><stop offset=".45" stop-color="#5eead4"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/></radialGradient></defs>
+      <g class="sp-legs">${LEGS.map((_, i) => `<path class="sp-leg" id="spL${i}"/><path class="sp-leg-core" id="spC${i}"/><circle class="sp-knee" id="spK${i}" r="1.6"/>`).join("")}</g>
+      <ellipse cx="50" cy="63" rx="13" ry="17" fill="url(#spAbd)" stroke="#3a4450" stroke-width=".8"/>
+      <path class="sp-acc" d="M50 49 L50 77 M43 56 Q50 60 57 56 M42 65 Q50 69 58 65 M44 73 Q50 76 56 73"/>
+      <ellipse cx="50" cy="45" rx="9" ry="8" fill="url(#spTh)" stroke="#3a4450" stroke-width=".8"/>
+      <path d="M44 38 Q50 30 56 38 L54 41 Q50 37 46 41 Z" fill="#1b2128" stroke="#5eead4" stroke-width=".6"/>
+      <circle class="sp-eye" cx="46.5" cy="38.5" r="2.4" fill="url(#spEye)"/><circle class="sp-eye" cx="53.5" cy="38.5" r="2.4" fill="url(#spEye)"/>
+      <circle class="sp-eye s" cx="44" cy="41" r="1.2" fill="url(#spEye)"/><circle class="sp-eye s" cx="56" cy="41" r="1.2" fill="url(#spEye)"/>
+      <circle class="sp-core" cx="50" cy="63" r="2.2"/></svg>`;
     SPD.cap = document.createElement("div"); SPD.cap.className = "twb-cap";
-        document.body.append(SPD.el, SPD.cap);
-    const m = document.querySelector("main"), o = m ? m.getBoundingClientRect() : { left: 40, top: 120 }; SPD.x = o.left + 20; SPD.y = o.top + 20;
+    SPD.fx = document.createElement("canvas"); SPD.fx.className = "twb-fx";
+    document.body.append(SPD.fx, SPD.el, SPD.cap);
+    SPD.legs = LEGS.map((_, i) => [SPD.el.querySelector("#spL" + i), SPD.el.querySelector("#spC" + i), SPD.el.querySelector("#spK" + i)]);
+    SPD.trail = []; SPD.parts = []; SPD.phase = 0; SPD.frameT = []; SPD.lowFx = false; SPD.idleT = 0; SPD.pauseUntil = 0;
+    const p = leftMid(); SPD.x = p.x; SPD.y = p.y; SPD.head = 0;
+    addEventListener("resize", () => { SIZE = innerWidth < 760 ? 64 : 96; HALF = SIZE / 2; SPD.el.style.width = SPD.el.style.height = SIZE + "px"; fxSize(); });
+    SPD.el.style.width = SPD.el.style.height = SIZE + "px"; fxSize();
+    // pause completely when the browser tab is hidden
+    document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelAnimationFrame(SPD.raf); SPD.on = false; } else if (SPD.wanted) startSpider(); });
   }
-  const SIZE = 48, HALF = SIZE / 2;
+  function fxSize() { const d = Math.min(1.5, devicePixelRatio || 1); SPD.fx.width = innerWidth * d; SPD.fx.height = innerHeight * d; SPD.fx.style.width = innerWidth + "px"; SPD.fx.style.height = innerHeight + "px"; SPD.fxD = d; }
+  // gait: each foot swings forward and back along the body; during the lifted half of its cycle the leg pulls in
+  function drawLegs(moving) {
+    for (let i = 0; i < LEGS.length; i++) {
+      const [side, hy, deg, grp] = LEGS[i], ph = SPD.phase + (grp ? Math.PI : 0), sw = moving ? Math.sin(ph) : Math.sin(SPD.idleT * 1.3 + i) * 0.12, lift = moving ? Math.max(0, Math.cos(ph)) : 0;
+      const hx = 50 + side * 8, hyy = 45 + hy * 0.9, a = (deg * Math.PI) / 180, L = 34 - lift * 5;
+      const fx = hx + side * Math.cos(a) * L, fy = hyy + Math.sin(a) * L + sw * 7;
+      const mx = (hx + fx) / 2, my = (hyy + fy) / 2;
+      const kx = mx + side * (6 + lift * 3), ky = my - 7 - lift * 4;
+      const d = `M${hx.toFixed(1)} ${hyy.toFixed(1)} L${kx.toFixed(1)} ${ky.toFixed(1)} L${fx.toFixed(1)} ${fy.toFixed(1)}`;
+      const [pa, cr, kn] = SPD.legs[i]; pa.setAttribute("d", d); cr.setAttribute("d", d); kn.setAttribute("cx", kx.toFixed(1)); kn.setAttribute("cy", ky.toFixed(1));
+    }
+  }
+  function drawFx(t, dt, moving, scanning) {
+    const c = SPD.fx.getContext("2d"), d = SPD.fxD, cx = SPD.x + HALF, cy = SPD.y + HALF;
+    c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, innerWidth, innerHeight);
+    if (SPD.lowFx || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (moving) { SPD.trail.push({ x: cx, y: cy, t }); if (Math.random() < 0.6 && SPD.parts.length < 60) { const a = SPD.head + Math.PI + (Math.random() - 0.5) * 1.2, v = 20 + Math.random() * 40; SPD.parts.push({ x: cx - Math.cos(SPD.head) * HALF * 0.5, y: cy - Math.sin(SPD.head) * HALF * 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.9 }); } }
+    SPD.trail = SPD.trail.filter((q) => t - q.t < 900);
+    for (let k = 1; k < SPD.trail.length; k++) { const p = SPD.trail[k], q = SPD.trail[k - 1], al = 1 - (t - p.t) / 900; c.strokeStyle = `rgba(94,234,212,${(al * 0.35).toFixed(3)})`; c.lineWidth = 1 + al * 2.5; c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(p.x, p.y); c.stroke(); }
+    for (const p of SPD.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; }
+    SPD.parts = SPD.parts.filter((p) => p.life > 0);
+    for (const p of SPD.parts) { c.fillStyle = `rgba(${p.life > 0.5 ? "125,249,255" : "77,163,255"},${(p.life * 0.8).toFixed(3)})`; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
+    if (scanning) { const r = HALF * 1.25, a0 = (t / 380) % (Math.PI * 2); c.strokeStyle = "rgba(94,234,212,.55)"; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, r, a0, a0 + 1.1); c.stroke();
+      const g = (t % 1200) / 1200; c.strokeStyle = `rgba(77,163,255,${(0.4 * (1 - g)).toFixed(3)})`; c.beginPath(); c.arc(cx, cy, HALF * (0.6 + g * 1.2), 0, Math.PI * 2); c.stroke(); }
+  }
   const scr = (p) => { const o = $("twb").getBoundingClientRect(); return { x: o.left + p.x - HALF, y: o.top + p.y - HALF }; };
   const jf = (s, k) => () => scr(J(s, k));
   // path along the web: around ring k from spoke s1 to s2 (shorter way), then along spoke s2 to ring k2
@@ -118,21 +167,20 @@
     return pts;
   }
   const say = (t) => { SPD.capText = t; };
-  // the screen corner closest to a point, just outside the visible area
-  const cornerNear = (p) => ({ x: p.x < innerWidth / 2 ? -SIZE - 8 : innerWidth + 8, y: p.y < innerHeight / 2 ? -SIZE - 8 : innerHeight + 8 });
   function cmd(c) { SPD.q.push(c); }
   function crawl(s2, k2, cap, speed) { const from = { ...SPD.at }; cmd({ pts: () => webPath(from, s2, k2), speed: speed || 150, cap, end: () => (SPD.at = { s: s2, k: k2 }) }); SPD.at = { s: s2, k: k2 }; }
   function planVisit(v) { // v = { page, text, lines:[indexes] }
     const [grp, pageName] = PAGE[v.page] || ["markets", "Overview"], spokes = GSPOKES[grp], s = spokes[Math.floor(spokes.length / 2)];
     crawl(s, RINGS, `Heading to ${GNAME[grp]} › ${pageName}`);
-    const anchor = jf(s, RINGS), out = () => cornerNear(anchor());
+    const anchor = jf(s, RINGS), out = () => leftMid();
     cmd({ pts: () => [out], speed: 420, cap: `Heading into ${GNAME[grp]} › ${pageName}` });
     cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}` });
     cmd({ pts: () => [anchor], speed: 420, cap: "Climbing back into the web" });
     const mine = G.nodes.filter((n) => groupOfNode(n) === grp).sort((a, b) => a.k - b.k || (b.importance || 0) - (a.importance || 0));
     const wanted = (v.lines || []).flatMap((i) => (SUM.target[i] ? G.nodes.filter((n) => n.label.length > 1 && new RegExp(`\\b${n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(SUM.target[i].t)) : []));
     const picks = [...new Set([...wanted, ...mine])].slice(0, 2);
-    for (const n of picks) { crawl(n.s, n.k, `Picking up ${n.label}`); cmd({ wait: 900, cap: `Picked: ${n.label}${n.sub ? " · " + n.sub : ""}`, node: n.id }); }
+    const VERB = { filings: "Scanning SEC filings", fin: "Comparing financial statements", research: "Researching", portfolio: "Reviewing portfolio companies", risk: "Reviewing portfolio risk", macro: "Checking macroeconomic releases", news: "Examining market news", data: "Monitoring market developments", nyse: "Monitoring market developments", analysis: "Monitoring market developments", aitrade: "Syncing research with AI Trader" };
+    for (const n of picks) { crawl(n.s, n.k, `${VERB[v.page] || "Researching"}: ${n.label}`); cmd({ wait: 1100, cap: `${VERB[v.page] || "Inspecting"}: ${n.label}${n.sub ? " · " + n.sub : ""}`, node: n.id }); }
     crawl(SPD.at.s, 0, "Crawling into the center");
     cmd({ pts: () => { const r = $("twbHub").getBoundingClientRect(); return [() => ({ x: r.left + 10, y: r.top - HALF })]; }, speed: 160, cap: "Writing the summary" });
     cmd({ write: v.lines || null, cap: "Writing the summary" });
@@ -148,7 +196,7 @@
       cmd({ pts: () => { const r = $("twbHub").getBoundingClientRect(); return [() => ({ x: r.left + 10, y: r.top - HALF })]; }, speed: 160, cap: "Writing the summary" });
       cmd({ write: null, cap: "Writing the summary" }); cmd({ pts: () => [jf(SPD.at.s, 0)], speed: 160, cap: "" }); return;
     }
-    const st = W.st; cmd({ wait: 1500, cap: st && st.running ? `Server is working: ${st.running.label}` : "", rest: true });
+    const st = W.st; cmd({ wait: 1500, cap: st && st.running ? `Server is working: ${st.running.label}` : "Idle — no research job running", rest: true });
   }
   function step(t) {
     if (!SPD.on) return; SPD.raf = requestAnimationFrame(step);
@@ -157,23 +205,39 @@
     if (!SPD.cur) { if (!SPD.q.length) (W.open ? nextCycle() : pageCycle()); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
     const c = SPD.cur, busy = W.st && W.st.state !== "idle" && W.st.state !== "error", mult = busy ? 1.35 : 1;
     let moving = false;
-    if (c.jump) { const p = c.jump(); SPD.x = p.x; SPD.y = p.y; SPD.cur = null; }
+    if (c.jump) { const p = c.jump(); SPD.x = p.x; SPD.y = p.y; SPD.head = 0; SPD.trail = []; SPD.cur = null; }
     else if (c.pts) {
       const pts = c.pts().map((f) => f()); c.i = c.i || 0;
       if (reduce) { const p = pts[pts.length - 1]; SPD.x = p.x; SPD.y = p.y; c.i = pts.length; }
-      let budget = (c.speed || 150) * mult * dt;
-      while (budget > 0 && c.i < pts.length) { const p = pts[c.i], dx = p.x - SPD.x, dy = p.y - SPD.y, d = Math.hypot(dx, dy); if (d < 0.5) { c.i++; continue; } const m = Math.min(d, budget); SPD.x += (dx / d) * m; SPD.y += (dy / d) * m; SPD.ang = Math.atan2(dy, dx) * 180 / Math.PI + 90; budget -= m; moving = true; }
+      // organic steering: the heading turns toward the next waypoint at a limited rate, speed breathes a little,
+      // and the spider slows while turning — so it curves into nodes instead of snapping between them
+      if (!reduce && c.i < pts.length) {
+        if (SPD.pauseUntil > t) { SPD.head += Math.sin(t / 90) * 0.01; }
+        else {
+          const p = pts[c.i], dx = p.x - SPD.x, dy = p.y - SPD.y, d = Math.hypot(dx, dy), want = Math.atan2(dy, dx);
+          let diff = Math.atan2(Math.sin(want - SPD.head), Math.cos(want - SPD.head)); const turn = (d < 50 ? 12 : 5.5) * dt;
+          SPD.head += Math.max(-turn, Math.min(turn, diff)); diff = Math.atan2(Math.sin(want - SPD.head), Math.cos(want - SPD.head));
+          const v = (c.speed || 150) * mult * (0.82 + 0.18 * Math.sin(t / 470 + c.t0)) * (0.3 + 0.7 * Math.max(0, Math.cos(diff)));
+          const m = Math.min(d, v * dt); SPD.x += Math.cos(SPD.head) * m; SPD.y += Math.sin(SPD.head) * m; SPD.phase += m / (SIZE * 0.16); moving = m > 0.05;
+          c.el = (c.el || 0) + dt;
+          if (d < Math.max(6, v * dt * 1.5) || c.el > 12) { if (d < 30) { SPD.x = p.x; SPD.y = p.y; } c.i++; c.el = 0; if (c.i < pts.length && Math.random() < 0.12) SPD.pauseUntil = t + 250 + Math.random() * 500; } // occasional pause to look around
+        }
+      }
       if (c.i >= pts.length) { if (c.end) c.end(); SPD.cur = null; }
-    } else if (c.wait != null) { if (t - c.t0 >= (reduce ? 200 : c.wait)) SPD.cur = null; }
+    } else if (c.wait != null) { if (c.node) SPD.head += Math.sin(t / 260) * 0.012; if (t - c.t0 >= (reduce ? 200 : c.wait)) SPD.cur = null; }
     else if (c.write) {
       if (c.done) SPD.cur = null;
       const k = document.querySelector("#twbLines .caret");
       if (k) { const r = k.getBoundingClientRect(), tx = r.right + 2, ty = r.top - HALF - 6, dx = tx - SPD.x, dy = ty - SPD.y, d = Math.hypot(dx, dy);
-        if (d > 1) { const m = Math.min(d, 520 * dt); SPD.x += (dx / d) * m; SPD.y += (dy / d) * m; SPD.ang = 180; moving = true; } }
+        if (d > 1) { const m = Math.min(d, 520 * dt); SPD.x += (dx / d) * m; SPD.y += (dy / d) * m; SPD.head = Math.PI; SPD.phase += m / (SIZE * 0.16); moving = true; } }
     }
     else SPD.cur = null;
-    SPD.el.style.transform = `translate(${SPD.x.toFixed(1)}px,${SPD.y.toFixed(1)}px) rotate(${SPD.ang.toFixed(0)}deg)`;
-    SPD.el.style.setProperty("--gait", busy ? ".14s" : ".22s");
+    SPD.idleT = t / 1000;
+    SPD.el.style.transform = `translate(${SPD.x.toFixed(1)}px,${SPD.y.toFixed(1)}px)`;
+    SPD.el.firstElementChild.style.transform = `rotate(${((SPD.head * 180) / Math.PI + 90).toFixed(1)}deg)`;
+    drawLegs(moving); drawFx(t, dt, moving, !!(c && c.wait != null && c.node));
+    // adaptive quality: drop the trail and particles if frames are slow (< ~35 fps over 120 frames)
+    SPD.frameT.push(dt); if (SPD.frameT.length > 120) SPD.frameT.shift(); if (SPD.frameT.length === 120) SPD.lowFx = SPD.frameT.reduce((x, y) => x + y, 0) / 120 > 1 / 35;
     SPD.el.classList.toggle("stopped", !moving && !(c && c.write));
     SPD.el.classList.toggle("resting", !!(c && c.rest));
     SPD.el.classList.toggle("offline", !!W.offline);
@@ -207,7 +271,7 @@
     const t = S.tab;
     if (FOL.found) { cmd({ wait: 4500, cap: FOL.found }); FOL.found = null; return; }
     const live = (W.st && W.st.running) || (FOL.job && FOL.watching);
-    if (!live) { cmd({ wait: 1500, cap: "", rest: true }); return; } // nothing running: rest
+    if (!live) { cmd({ wait: 1500, cap: "Idle — no research job running", rest: true }); return; } // nothing running: rest
     const T = targetsOn(t); if (!T.length) { cmd({ wait: 1500, cap: W.st && W.st.running ? `Server is working: ${W.st.running.label}` : "" }); return; }
     const e = T[Math.floor(Math.random() * T.length)], fx = 0.15 + Math.random() * 0.7, title = titleOf(e);
     cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top - HALF + 6 }; }], speed: 220, cap: title ? `Reading ${title}` : `Reading ${pageLabel(t)}` });
@@ -216,9 +280,9 @@
   function onTab(t) {
     if (!SPD.el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     SPD.q = []; SPD.cur = null; FOL.page = t;
-    if (t === "web") { cmd({ jump: () => cornerNear(jf(SPD.at.s, RINGS)()) }); cmd({ pts: () => [jf(SPD.at.s, RINGS)], speed: 520, cap: "Climbing back into the web" }); return; }
+    if (t === "web") { cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 260, cap: "Crawling into the web", end: () => (SPD.at = { s: 12, k: RINGS }) }); return; }
     const first = () => { const T = targetsOn(t), e = T[0]; if (!e) return { x: innerWidth / 2 - HALF, y: innerHeight / 2 - HALF }; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width - SIZE, 40), y: r.top - HALF + 6 }; };
-    cmd({ jump: () => cornerNear(first()) }); cmd({ pts: () => [first], speed: 520, cap: `Climbing into ${pageLabel(t)}` });
+    cmd({ jump: leftMid }); cmd({ pts: () => [() => ({ x: Math.min(innerWidth * 0.25, 240), y: innerHeight / 2 - HALF }), first], speed: 320, cap: `Crawling into ${pageLabel(t)}` });
     startResearch(t).then((id) => { if (id) SPD.capText = `Started research: ${FOL.jobLabel}`; });
   }
   const _setTab = setTab; setTab = function () { const r = _setTab.apply(this, arguments); try { onTab(S.tab); } catch {} return r; };
@@ -333,14 +397,15 @@
 
   // ---------------------------------------------------------------- open / close
   window.webOpen = function () {
-    shell(); W.open = true; layoutWeb(); startSpider();
+    shell(); W.open = true; layoutWeb(); const firstIn = !SPD.el; startSpider();
+    if (firstIn) { SPD.at = { s: 12, k: RINGS }; cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 240, cap: "Crawling into the web" }); }
     loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
     clearInterval(W.poll); W.poll = setInterval(() => { if (!document.hidden) loadStatus(); }, 5000);
     clearInterval(W.sumPoll); W.sumPoll = setInterval(() => { if (!document.hidden) loadSummary(); }, SUM.meta && !SUM.meta.live ? 300e3 : 30e3);
     clearInterval(W.gPoll); W.gPoll = setInterval(() => { if (!document.hidden) loadGraph(); }, 120e3);
   };
   window.webClose = function () { W.open = false; clearInterval(W.poll); clearInterval(W.sumPoll); clearInterval(W.gPoll); };
-  function startSpider() { spiderEl(); if (SPD.on) return; SPD.on = true; SPD.last = 0; SPD.raf = requestAnimationFrame(step); }
+  function startSpider() { spiderEl(); SPD.wanted = true; if (SPD.on || document.hidden) return; SPD.on = true; SPD.last = 0; SPD.raf = requestAnimationFrame(step); }
   setTimeout(() => { startSpider(); if (S.tab !== "web") onTab(S.tab); }, 1500); // the spider lives on every page
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);

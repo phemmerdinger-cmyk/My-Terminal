@@ -235,25 +235,26 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .tw-mini .row{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
 #webApCard{margin-top:16px}
 
-/* the crawling Spider: walks the edges of THE WEB page; its speed and color follow the real backend job state */
-.tw-crawler{position:fixed;left:0;top:0;width:48px;height:48px;z-index:40;pointer-events:none;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
-.tw-crawler svg{width:100%;height:100%;overflow:visible}
-.tw-crawler .leg{stroke:var(--tw-c);stroke-width:1.8;stroke-linecap:round;fill:none;transform-box:fill-box}
-.tw-crawler .la{transform-origin:15px 15px;animation:twGaitA var(--gait,.5s) ease-in-out infinite alternate}
-.tw-crawler .lb{transform-origin:15px 15px;animation:twGaitB var(--gait,.5s) ease-in-out infinite alternate}
-.tw-crawler .body{fill:#0d1a1f;stroke:var(--tw-c);stroke-width:1.6}
-.tw-crawler .eye{fill:var(--tw-c)}
-.tw-crawler.idle{filter:drop-shadow(0 0 3px rgba(94,234,212,.3))}
-.tw-crawler.idle .leg,.tw-crawler.idle .body{stroke:#4fb3a3}
-.tw-crawler.error .leg,.tw-crawler.error .body,.tw-crawler.offline .leg,.tw-crawler.offline .body{stroke:var(--down)}
-.tw-crawler.error .eye,.tw-crawler.offline .eye{fill:var(--down)}
-.tw-crawler.error,.tw-crawler.offline{filter:drop-shadow(0 0 6px rgba(246,70,93,.5))}
-.tw-crawler.stopped .la,.tw-crawler.stopped .lb{animation-play-state:paused}
-.tw-crawler .tip{position:absolute;left:34px;top:2px;white-space:nowrap;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.92);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;opacity:0;pointer-events:none;transition:opacity .15s}
-.tw-crawler:hover .tip{opacity:1}
-@keyframes twGaitA{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
-@keyframes twGaitB{from{transform:rotate(14deg)}to{transform:rotate(-14deg)}}
-@media (prefers-reduced-motion:reduce){.tw-crawler .la,.tw-crawler .lb{animation:none}}
+/* the crawling Spider: a graphite, biomechanical crawler with cyan accents. Legs are drawn per frame by web.js
+   (a real alternating gait); the wrapper only translates, the svg rotates to the heading. */
+.tw-crawler{position:fixed;left:0;top:0;width:96px;height:96px;z-index:40;pointer-events:none;will-change:transform;filter:drop-shadow(0 6px 8px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(94,234,212,.35))}
+.tw-crawler svg{width:100%;height:100%;overflow:visible;will-change:transform}
+.tw-crawler .sp-leg{stroke:#2b333c;stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.tw-crawler .sp-leg-core{stroke:#5eead4;stroke-width:.9;stroke-linecap:round;stroke-linejoin:round;fill:none;opacity:.75}
+.tw-crawler .sp-knee{fill:#0d1116;stroke:#4da3ff;stroke-width:.8}
+.tw-crawler .sp-acc{stroke:#5eead4;stroke-width:.8;fill:none;opacity:.7}
+.tw-crawler .sp-eye{filter:drop-shadow(0 0 2px #5eead4);animation:twEye 3.2s ease-in-out infinite}
+.tw-crawler .sp-eye.s{opacity:.8}
+.tw-crawler .sp-core{fill:#22d3ee;filter:drop-shadow(0 0 3px #22d3ee);animation:twCore 2.4s ease-in-out infinite}
+.tw-crawler.resting .sp-core{animation-duration:5s;opacity:.5}
+.tw-crawler.resting{filter:drop-shadow(0 6px 8px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(94,234,212,.2))}
+.tw-crawler.offline .sp-leg-core,.tw-crawler.offline .sp-acc{stroke:var(--down)}
+.tw-crawler.offline .sp-core{fill:var(--down)}
+.twb-fx{position:fixed;left:0;top:0;z-index:39;pointer-events:none}
+@keyframes twEye{0%,92%,100%{opacity:1}95%{opacity:.25}}
+@keyframes twCore{0%,100%{opacity:.55}50%{opacity:1}}
+@media (max-width:760px){.tw-crawler{width:64px;height:64px}}
+@media (prefers-reduced-motion:reduce){.tw-crawler .sp-eye,.tw-crawler .sp-core{animation:none}.twb-fx{display:none}}
 
 /* ===== THE WEB page: one huge web with the summary inside it ===== */
 .tw{max-width:none}
