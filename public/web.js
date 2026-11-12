@@ -56,7 +56,7 @@
     root.innerHTML = `<div class="twb" id="twb"><svg class="twb-web" id="twbSvg"></svg><div class="twb-tools" id="twbTools"></div><div class="twb-legend" id="twbLegend"></div><div class="twb-tip" id="twbTip" hidden></div><div class="twb-hub" id="twbHub"><div class="twb-k" id="twbK">THE WEB · MARKET SUMMARY</div><div class="twb-lines" id="twbLines"><p class="twb-wait">The spider is gathering the first summary…</p></div><div class="twb-foot" id="twbFoot"></div></div><div class="twb-pop" id="twbPop" hidden></div></div>
       <div class="tw-modal" id="twModal" hidden><div class="tw-mbox" id="twMbox"></div></div>`;
     $("twModal").onclick = (e) => { if (e.target.id === "twModal" || e.target.closest(".x")) closeModal(); };
-    $("twb").addEventListener("click", (e) => { const st = e.target.closest(".twb-s"); if (st && typeof openQuote === "function") return openQuote(st.dataset.sym); const n = e.target.closest(".twb-n"); if (n) return showPop(n.dataset.id); if (!e.target.closest(".twb-pop")) $("twbPop").hidden = true; });
+    $("twb").addEventListener("click", (e) => { const st = e.target.closest(".twb-s"); if (st) { if (window.TWX && TWX.intel) return TWX.intel(st.dataset.sym); if (typeof openQuote === "function") return openQuote(st.dataset.sym); } const n = e.target.closest(".twb-n"); if (n) return showPop(n.dataset.id); if (!e.target.closest(".twb-pop")) $("twbPop").hidden = true; });
     $("twbPop").addEventListener("click", (e) => { const g = e.target.closest("[data-twgo]"); if (g) return go(g.dataset.twgo); const d = e.target.closest("[data-twd]"); if (d) { e.preventDefault(); openDisc(d.dataset.twd); } });
     addEventListener("resize", () => { if (W.open) { layoutWeb(); drawWeb(); } });
   }
@@ -109,6 +109,7 @@
     svg.querySelectorAll("[data-spoke]").forEach((e) => e.setAttribute("d", spokeD(+e.dataset.spoke)));
     svg.querySelectorAll("[data-ring]").forEach((e) => e.setAttribute("d", ringD(+e.dataset.ring)));
     svg.querySelectorAll("[data-sl]").forEach((e) => { const sl = W.slotList[+e.dataset.sl]; if (!sl) return; const p = slotXY(sl); e.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`); });
+    (W.kg || []).forEach((e, i) => { const el = document.getElementById("kg" + i); if (el) el.setAttribute("d", kgD(e)); });
     svg.querySelectorAll("[data-js]").forEach((e) => { const p = J(+e.dataset.js, +e.dataset.jk); if (e.tagName === "circle") { e.setAttribute("cx", p.x.toFixed(1)); e.setAttribute("cy", p.y.toFixed(1)); } else e.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`); });
   }
   function rotLoop(t) {
@@ -116,7 +117,7 @@
     const svg = $("twbSvg"); if (!svg || !W.open || document.hidden) return;
     const paused = !ROT.on || CAM.k > 1.01 || svg.classList.contains("hov") || svg.classList.contains("grab") || (typeof SCAN !== "undefined" && SCAN.on) || matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (paused || !dt) return;
-    ROT.a = (ROT.a + dt * 0.0116) % (Math.PI * 2);
+    const sp = ROT.speed == null ? 1 : ROT.speed; if (!sp) return; ROT.a = (ROT.a + dt * 0.0116 * sp) % (Math.PI * 2);
     if (t - ROT.lastMove < 33) return; ROT.lastMove = t; reposition(); // ~30 fps is plenty for a slow spin
     // a spider resting on the web rides along with its junction
     const c = SPD.cur; if (SPD.el && SPD.at && (!c || (c.wait != null && (c.node || c.rest)))) { const q = scr(J(SPD.at.s, SPD.at.k)); SPD.x += (q.x - SPD.x) * 0.5; SPD.y += (q.y - SPD.y) * 0.5; }
@@ -140,8 +141,45 @@
       <linearGradient id="twSilk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0fbff" stop-opacity="0"/><stop offset=".5" stop-color="#e0fbff" stop-opacity=".9"/><stop offset="1" stop-color="#e0fbff" stop-opacity="0"/></linearGradient>
       <filter id="twGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       <rect class="twb-bgr" x="0" y="0" width="${G.w}" height="${G.h}" fill="url(#twBg)"/>
-      <g id="twbCam" transform="${camT()}"><g class="twb-strands">${st}</g><g class="twb-dew">${dew}</g><g id="twbLinks"></g>${fillWeb()}${nodes}</g>`;
-    svg.classList.toggle("z2", CAM.k >= 1.8); svg.classList.toggle("z3", CAM.k >= 3); applyFilters();
+      <g id="twbCam" transform="${camT()}"><g class="twb-strands">${st}</g><g class="twb-dew">${dew}</g><g id="twbKG"></g><g id="twbLinks"></g>${fillWeb()}${nodes}</g>`;
+    svg.classList.toggle("z2", CAM.k >= 1.8); svg.classList.toggle("z3", CAM.k >= 3); applyFilters(); buildKG();
+  }
+  // ---- knowledge graph: real relationships drawn as glowing links, with information pulses travelling along them
+  // sector ↔ its largest companies on the web · holding ↔ its sector · portfolio ↔ holdings · economic indicator ↔ the
+  // sectors it moves · research finding ↔ its company
+  const MACRO_SECTORS = { "interest rates": ["Financials", "Real Estate", "Utilities"], "yield curve": ["Financials", "Real Estate"], bonds: ["Utilities", "Real Estate"], "crude oil": ["Energy", "Industrials"], "us dollar": ["Materials", "Industrials"], inflation: ["Consumer Staples", "Consumer Discretionary"], "labor market": ["Industrials", "Consumer Discretionary"], "economic growth": ["Industrials", "Financials", "Consumer Discretionary"] };
+  const SEC_ALIAS = { "information technology": "Information Technology", technology: "Information Technology", "health care": "Health Care", financials: "Financials", "consumer discretionary": "Consumer Discretionary", "communication services": "Communication Services", industrials: "Industrials", "consumer staples": "Consumer Staples", energy: "Energy", utilities: "Utilities", "real estate": "Real Estate", materials: "Materials" };
+  function buildKG() {
+    const g = $("twbKG"); if (!g) return; W.kg = [];
+    const nodeP = (n) => () => J(n.s, n.k), stockP = (sym) => () => placeXY(sym), secNode = {}, mine = myStocks(), q = (W.snap && W.snap.quotes) || {};
+    for (const n of G.nodes) { const sec = SEC_ALIAS[String(n.label || "").toLowerCase()]; if (sec) secNode[sec] = n; }
+    const capOf = (x) => (q[x] && q[x][3]) || 0, add = (a, b, c, kind, ids, why) => W.kg.push({ a, b, c, kind, ids: ids.map((x) => { const m = /^[a-z]+:([A-Z][A-Z0-9.\-]*)$/.exec(String(x)); return m && W.place && W.place[m[1]] != null ? m[1] : String(x); }), why });
+    for (const [sec, n] of Object.entries(secNode)) Object.keys(W.place || {}).filter((x) => W.sec && W.sec[x] === sec).sort((x, y) => capOf(y) - capOf(x)).slice(0, 5).forEach((x) => add(nodeP(n), stockP(x), SC[sec] || "#4da3ff", "sector", [n.id, x]));
+    const pf = G.nodes.find((n) => n.type === "portfolio");
+    for (const n of G.nodes) { const lab = String(n.label || ""), up = lab.toUpperCase();
+      if (mine.has(up) || n.type === "holding") { const sec = W.sec && W.sec[up]; if (sec && secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#a78bfa", "holding", [n.id, secNode[sec].id]); if (pf && pf !== n) add(nodeP(pf), nodeP(n), "#f5c518", "portfolio", [pf.id, n.id]); }
+      const ms = MACRO_SECTORS[lab.toLowerCase()]; if (ms) for (const sec of ms) if (secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#22d3ee", "macro", [n.id, secNode[sec].id]);
+      if (n.type === "discovery" && n.sym && W.place && W.place[n.sym] != null) add(nodeP(n), stockP(n.sym), "#5eead4", "finding", [n.id, n.sym]); }
+    // the server's own relationship graph (holdings, correlations, sector sensitivity, earnings events, findings), with its reasons
+    const byId = new Map(G.nodes.map((n) => [n.id, n])), posOf = (id) => { const n = byId.get(id); if (n) return nodeP(n); const m = /^[a-z]+:([A-Z][A-Z0-9.\-]*)$/.exec(id); return m && W.place && W.place[m[1]] != null ? stockP(m[1]) : null; };
+    const EC = { holds: "#f5c518", correlation: "#a78bfa", sensitivity: "#22d3ee", event: "#fb923c", trader: "#ff6fae", industry: "#7c6bb8", sector: "#4da3ff" };
+    for (const e of ((W.graph && W.graph.edges) || []).slice(0, 140)) { const a = posOf(e.a || e.from || e.source), b = posOf(e.b || e.to || e.target); if (a && b) add(a, b, EC[e.type] || "#5eead4", e.type || "link", [e.a || e.from || e.source, e.b || e.to || e.target], e.why); }
+    for (const x of mine) if (W.place && W.place[x] != null) { const sec = W.sec && W.sec[x]; if (sec && secNode[sec]) add(stockP(x), nodeP(secNode[sec]), "#f5c518", "holding", [x, secNode[sec].id]); }
+    const low = document.documentElement.classList.contains("tw-low");
+    g.innerHTML = W.kg.map((e, i) => `<path id="kg${i}" class="kg ${esc(e.kind)}" data-a="${esc(e.ids[0])}" data-b="${esc(e.ids[1])}" stroke="${e.c}" d="${kgD(e)}">${e.why ? `<title>${esc(e.why)}</title>` : ""}</path>${low ? "" : `<circle class="kgp" r="1.9" fill="${e.c}"><animateMotion dur="${(3.2 + (i % 7) * 0.7).toFixed(1)}s" begin="-${((i * 0.37) % 4).toFixed(2)}s" repeatCount="indefinite"><mpath href="#kg${i}"/></animateMotion></circle>`}`).join("");
+  }
+  function kgD(e) { const a = e.a(), b = e.b(); if (!a || !b) return "M0 0"; const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, cx = mx + (G.cx - mx) * 0.28, cy = my + (G.cy - my) * 0.28; return `M${a.x.toFixed(1)} ${a.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`; }
+  // search: tickers, company names, sectors, indicators and research nodes; matches and their links light up
+  function searchWeb(text) {
+    const svg = $("twbSvg"), t = String(text || "").trim().toLowerCase(); svg.querySelectorAll(".q").forEach((e) => e.classList.remove("q")); svg.classList.remove("kgq"); if (!t) return 0;
+    const hits = new Set();
+    for (const sym of Object.keys(W.place || {})) if (sym.toLowerCase() === t || (t.length >= 3 && String((W.nm && W.nm[sym]) || "").toLowerCase().includes(t)) || (t.length >= 3 && String((W.sec && W.sec[sym]) || "").toLowerCase().includes(t))) hits.add(sym);
+    for (const n of G.nodes) if (String(n.label || "").toLowerCase().includes(t)) hits.add(n.id);
+    if (!hits.size) return 0; svg.classList.add("kgq");
+    for (const h of hits) svg.querySelectorAll(`[data-sym="${CSS.escape(h)}"],[data-id="${CSS.escape(h)}"]`).forEach((e) => e.classList.add("q"));
+    svg.querySelectorAll(".kg").forEach((p) => { if (hits.has(p.dataset.a) || hits.has(p.dataset.b)) { p.classList.add("q"); for (const id of [p.dataset.a, p.dataset.b]) svg.querySelectorAll(`[data-sym="${CSS.escape(id)}"],[data-id="${CSS.escape(id)}"]`).forEach((e) => e.classList.add("q")); } });
+    const first = [...hits][0]; if (W.place[first] != null && hits.size === 1) focusSym(first);
+    return hits.size;
   }
   function fillWeb() {
     if (!W.sp500) { if (!W.sp500Loading) { W.sp500Loading = true; fetch("/sp500.json").then((r) => r.json()).then((j) => { W.sp500 = j.rows || []; if (W.open) drawWeb(); }).catch(() => { W.sp500 = []; }); } }
@@ -189,7 +227,8 @@
     $("twbMine").onclick = () => { VIEWS.mine = !VIEWS.mine; toolbar(); applyFilters(); };
     $("twbReset").onclick = () => setCam(1, 0, 0, true);
     $("twbRot").onclick = () => { ROT.on = !ROT.on; try { localStorage.setItem("tw_rot", ROT.on ? "1" : "0"); } catch {} toolbar(); };
-    $("twbFind").onkeydown = (e) => { if (e.key !== "Enter") return; const v = e.target.value.trim().toUpperCase(); if (!v) return; if (!focusSym(v)) { e.target.classList.add("bad"); setTimeout(() => e.target.classList.remove("bad"), 900); } };
+    $("twbFind").placeholder = "Search ticker, company, sector…";
+    $("twbFind").onkeydown = (e) => { if (e.key === "Escape") { e.target.value = ""; searchWeb(""); return; } if (e.key !== "Enter") return; const v = e.target.value.trim(); if (!v) { searchWeb(""); return; } if (!searchWeb(v) && !focusSym(v.toUpperCase())) { e.target.classList.add("bad"); setTimeout(() => e.target.classList.remove("bad"), 900); } };
     lg.onclick = (e) => { const b = e.target.closest("[data-sec]"); if (!b) return; VIEWS.sector = VIEWS.sector === b.dataset.sec ? "" : b.dataset.sec; toolbar(); applyFilters(); };
   }
   // ---- hover: a card + threads to the stock's sector
@@ -775,6 +814,7 @@
   window.webClose = function () { W.open = false; clearInterval(W.snapPoll); clearInterval(W.poll); clearInterval(W.sumPoll); clearInterval(W.gPoll); };
   function startSpider() { spiderEl(); SPD.wanted = true; if (SPD.on || document.hidden) return; SPD.on = true; SPD.last = 0; SPD.raf = requestAnimationFrame(step); }
 
+  window.TWX = { W, G, J, CAM, ROT, VIEWS, SPD, SC, SHORT, setCam, focusSym, placeXY, myStocks, drawWeb, toolbar, applyFilters, searchWeb, loadSnap, moveCol, esc, since, rest: () => SPD };
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);
   W.navPoll = setInterval(() => { if (!W.open && !document.hidden) loadStatus(); }, 8000);
