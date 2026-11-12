@@ -104,11 +104,11 @@
     const legs = [[-1, -1, "la"], [-1, -0.35, "lb"], [-1, 0.35, "la"], [-1, 1, "lb"], [1, -1, "lb"], [1, -0.35, "la"], [1, 0.35, "lb"], [1, 1, "la"]].map(([sx, sy, g]) => `<g class="${g}"><path class="leg" d="M${15 + sx * 3} ${15 + sy * 3} Q${15 + sx * 9} ${15 + sy * 5 - 4} ${15 + sx * 13} ${15 + sy * 10 + 1}"/></g>`).join("");
     SPD.el = document.createElement("div"); SPD.el.className = "tw-crawler"; SPD.el.innerHTML = `<svg viewBox="0 0 30 30" aria-hidden="true">${legs}<ellipse class="body" cx="15" cy="17" rx="4.6" ry="6"/><circle class="body" cx="15" cy="9.5" r="3"/><circle class="eye" cx="13.8" cy="8.6" r=".9"/><circle class="eye" cx="16.2" cy="8.6" r=".9"/></svg>`;
     SPD.cap = document.createElement("div"); SPD.cap.className = "twb-cap";
-    SPD.thread = document.createElementNS("http://www.w3.org/2000/svg", "svg"); SPD.thread.setAttribute("class", "twb-thread"); SPD.thread.innerHTML = '<line id="twbThr"/>';
-    document.body.append(SPD.thread, SPD.el, SPD.cap);
-    const o = $("twb").getBoundingClientRect(), p = J(0, RINGS); SPD.x = o.left + p.x; SPD.y = o.top + p.y;
+        document.body.append(SPD.el, SPD.cap);
+    const m = document.querySelector("main"), o = m ? m.getBoundingClientRect() : { left: 40, top: 120 }; SPD.x = o.left + 20; SPD.y = o.top + 20;
   }
-  const scr = (p) => { const o = $("twb").getBoundingClientRect(); return { x: o.left + p.x, y: o.top + p.y }; };
+  const SIZE = 48, HALF = SIZE / 2;
+  const scr = (p) => { const o = $("twb").getBoundingClientRect(); return { x: o.left + p.x - HALF, y: o.top + p.y - HALF }; };
   const jf = (s, k) => () => scr(J(s, k));
   // path along the web: around ring k from spoke s1 to s2 (shorter way), then along spoke s2 to ring k2
   function webPath(from, s2, k2) {
@@ -123,16 +123,16 @@
   function planVisit(v) { // v = { page, text, lines:[indexes] }
     const [grp, pageName] = PAGE[v.page] || ["markets", "Overview"], spokes = GSPOKES[grp], s = spokes[Math.floor(spokes.length / 2)];
     crawl(s, RINGS, `Heading to ${GNAME[grp]} › ${pageName}`);
-    const anchor = jf(s, RINGS), tab = () => { const b = document.querySelector(`#tabs [data-group="${grp}"]`); if (!b) return anchor(); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2 - 15, y: r.top + r.height / 2 - 15 }; };
-    cmd({ pts: () => [tab], speed: 420, cap: `Climbing into ${GNAME[grp]} › ${pageName}`, thread: anchor });
-    cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}`, thread: anchor });
-    cmd({ pts: () => [anchor], speed: 420, cap: "Back down to the web", thread: anchor });
+    const anchor = jf(s, RINGS), tab = () => { const b = document.querySelector(`#tabs [data-group="${grp}"]`); if (!b) return anchor(); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2 - HALF, y: r.top + r.height / 2 - HALF }; };
+    cmd({ pts: () => [tab], speed: 420, cap: `Climbing into ${GNAME[grp]} › ${pageName}` });
+    cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}` });
+    cmd({ pts: () => [anchor], speed: 420, cap: "Back down to the web" });
     const mine = G.nodes.filter((n) => groupOfNode(n) === grp).sort((a, b) => a.k - b.k || (b.importance || 0) - (a.importance || 0));
     const wanted = (v.lines || []).flatMap((i) => (SUM.target[i] ? G.nodes.filter((n) => n.label.length > 1 && new RegExp(`\\b${n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(SUM.target[i].t)) : []));
     const picks = [...new Set([...wanted, ...mine])].slice(0, 2);
     for (const n of picks) { crawl(n.s, n.k, `Picking up ${n.label}`); cmd({ wait: 900, cap: `Picked: ${n.label}${n.sub ? " · " + n.sub : ""}`, node: n.id }); }
     crawl(SPD.at.s, 0, "Crawling into the center");
-    cmd({ pts: () => { const r = $("twbHub").getBoundingClientRect(); return [() => ({ x: r.left + 10, y: r.top - 18 })]; }, speed: 160, cap: "Writing the summary" });
+    cmd({ pts: () => { const r = $("twbHub").getBoundingClientRect(); return [() => ({ x: r.left + 10, y: r.top - HALF })]; }, speed: 160, cap: "Writing the summary" });
     cmd({ write: v.lines || null, cap: "Writing the summary" });
     cmd({ pts: () => [jf(SPD.at.s, 0)], speed: 160, cap: "" });
   }
@@ -152,10 +152,10 @@
     else cmd({ wait: 2000, cap: "" });
   }
   function step(t) {
-    if (!W.open) return; SPD.raf = requestAnimationFrame(step);
+    if (!SPD.on) return; SPD.raf = requestAnimationFrame(step);
     const dt = Math.min(0.05, (t - (SPD.last || t)) / 1000); SPD.last = t;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!SPD.cur) { if (!SPD.q.length) nextCycle(); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
+    if (!SPD.cur) { if (!SPD.q.length) (W.open ? nextCycle() : pageCycle()); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
     const c = SPD.cur, busy = W.st && W.st.state !== "idle" && W.st.state !== "error", mult = busy ? 1.35 : 1;
     let moving = false;
     if (c.pts) {
@@ -168,7 +168,7 @@
     else if (c.write) {
       if (c.done) SPD.cur = null;
       const k = document.querySelector("#twbLines .caret");
-      if (k) { const r = k.getBoundingClientRect(), tx = r.right + 4, ty = r.top - 22, dx = tx - SPD.x, dy = ty - SPD.y, d = Math.hypot(dx, dy);
+      if (k) { const r = k.getBoundingClientRect(), tx = r.right + 2, ty = r.top - HALF - 6, dx = tx - SPD.x, dy = ty - SPD.y, d = Math.hypot(dx, dy);
         if (d > 1) { const m = Math.min(d, 520 * dt); SPD.x += (dx / d) * m; SPD.y += (dy / d) * m; SPD.ang = 180; moving = true; } }
     }
     else SPD.cur = null;
@@ -177,10 +177,48 @@
     SPD.el.classList.toggle("stopped", !moving && !(c && c.write));
     SPD.el.classList.toggle("offline", !!W.offline);
     SPD.cap.textContent = SPD.capText || ""; SPD.cap.style.display = SPD.capText ? "" : "none";
-    SPD.cap.style.transform = `translate(${Math.min(innerWidth - 300, SPD.x + 34).toFixed(0)}px,${(SPD.y + 4).toFixed(0)}px)`;
-    const thr = $("twbThr"), a = c && c.thread ? c.thread() : null;
-    if (a) { thr.setAttribute("x1", a.x + 15); thr.setAttribute("y1", a.y + 15); thr.setAttribute("x2", SPD.x + 15); thr.setAttribute("y2", SPD.y + 15); thr.style.display = ""; } else thr.style.display = "none";
+    SPD.cap.style.transform = `translate(${Math.min(innerWidth - 300, SPD.x + SIZE + 4).toFixed(0)}px,${(SPD.y + HALF - 10).toFixed(0)}px)`;
   }
+
+
+  // ---------------------------------------------------------------- following you around the Terminal
+  // When you open another section the spider walks over to it, starts the matching research job on the server
+  // (one real request, rate-limited), crawls over the charts and tables on that page while the job runs, and
+  // reports the job's actual result when the server finishes it.
+  const PAGE_JOB = { news: ["news_sweep"], data: ["market_pulse"], nyse: ["market_pulse"], analysis: ["market_pulse"], macro: ["macro_check"], portfolio: ["portfolio_scan"], risk: ["portfolio_scan"], aitrade: ["ai_trader_sync"], filings: ["filings_watch"] };
+  const FOL = { asked: {}, job: null, jobLabel: "", page: null };
+  const pageLabel = (t) => { const g = typeof groupOf === "function" ? groupOf(t) : ""; const it = (NAV.find(([k]) => k === g) || [, []])[1].find(([k]) => k === t); return `${GNAME[g] || g} › ${it ? it[1] : t}`; };
+  function symFor(t) { const v = t === "research" ? S.rq && S.rq.sym : t === "fin" ? ($("finSym") || {}).value : t === "dcf" ? ($("dcfSym") || {}).value : t === "filings" ? (typeof CR !== "undefined" && CR.sym) : null; const s = String(v || "").toUpperCase().trim(); return /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s) && !/[\^=]/.test(s) ? s : null; }
+  async function startResearch(t) {
+    const sym = symFor(t), type = sym ? (t === "research" ? "company_snapshot" : "fundamentals") : (PAGE_JOB[t] || [])[0]; if (!type) return null;
+    const key = type + ":" + (sym || ""); if (Date.now() - (FOL.asked[key] || 0) < 10 * 60e3) return FOL.job && FOL.jobKey === key ? FOL.job : null;
+    FOL.asked[key] = Date.now();
+    try { const r = await api("/api/web/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type, symbol: sym || undefined }) }); FOL.job = r.id; FOL.jobKey = key; FOL.jobLabel = sym ? `${sym}` : pageLabel(t); FOL.found = null; watchJob(); return r.id; } catch { return null; }
+  }
+  function watchJob() { clearInterval(FOL.timer); const t0 = Date.now(); FOL.timer = setInterval(async () => { if (Date.now() - t0 > 4 * 60e3) return clearInterval(FOL.timer); await loadStatus(); const j = W.st && (W.st.recent || []).find((x) => x.id === FOL.job); if (j && j.status !== "running") { clearInterval(FOL.timer); FOL.found = j.status === "done" ? `Found: ${j.result || "done"}` : `Research failed: ${j.error || ""}`; } }, 5000); }
+  function targetsOn(t) {
+    const sec = $("tab-" + t); if (!sec) return [];
+    const els = [...sec.querySelectorAll("svg, canvas, table, .card, .fx-card, .pf-card, .pfc, .an-card, .ny-pane, .apx, .mc-grid > *, .heat, .feed > *, .hm-frame, .kpis, .mood-card, .earn-card")];
+    return els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 140 && r.height > 50 && r.bottom > 120 && r.top < innerHeight - 40 && !e.closest(".tw-mini") && !els.some((o) => o !== e && o.contains(e) && o.getBoundingClientRect().height < 700); }).slice(0, 14);
+  }
+  const titleOf = (e) => { const h = e.querySelector("h1,h2,h3,h4,.h,th") || (e.previousElementSibling && /^H\d$/.test(e.previousElementSibling.tagName) ? e.previousElementSibling : null); return h ? h.textContent.trim().replace(/\s+/g, " ").slice(0, 46) : ""; };
+  function pageCycle() {
+    const t = S.tab;
+    if (FOL.found) { cmd({ wait: 4500, cap: FOL.found }); FOL.found = null; return; }
+    const T = targetsOn(t); if (!T.length) { cmd({ wait: 1500, cap: FOL.job ? `Researching ${FOL.jobLabel}…` : "" }); return; }
+    const e = T[Math.floor(Math.random() * T.length)], fx = 0.15 + Math.random() * 0.7, title = titleOf(e);
+    cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top - HALF + 6 }; }], speed: 220, cap: title ? `Reading ${title}` : `Reading ${pageLabel(t)}` });
+    cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * Math.min(0.95, fx + 0.12) - HALF, y: r.top + Math.min(r.height - HALF, 40) - HALF }; }], speed: 70, cap: FOL.job && !FOL.found ? `Researching ${FOL.jobLabel} on the server…` : title ? `Reading ${title}` : "" });
+  }
+  function onTab(t) {
+    if (!SPD.el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    SPD.q = []; SPD.cur = null; FOL.page = t;
+    if (t === "web") { cmd({ pts: () => [jf(SPD.at.s, RINGS)], speed: 650, cap: "Back to the web" }); return; }
+    const g = typeof groupOf === "function" ? groupOf(t) : null, b = g && document.querySelector(`#tabs [data-group="${g}"]`);
+    if (b) cmd({ pts: () => [() => { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2 - HALF, y: r.top + r.height / 2 - HALF }; }], speed: 700, cap: `Following you to ${pageLabel(t)}` });
+    startResearch(t).then((id) => { if (id) SPD.capText = `Started research: ${FOL.jobLabel}`; });
+  }
+  const _setTab = setTab; setTab = function () { const r = _setTab.apply(this, arguments); try { onTab(S.tab); } catch {} return r; };
 
   // ---------------------------------------------------------------- the summary inside the web
   async function loadSummary() {
@@ -292,14 +330,15 @@
 
   // ---------------------------------------------------------------- open / close
   window.webOpen = function () {
-    shell(); W.open = true; layoutWeb(); spiderEl(); SPD.el.style.display = SPD.cap.style.display = SPD.thread.style.display = "";
+    shell(); W.open = true; layoutWeb(); startSpider();
     loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
-    cancelAnimationFrame(SPD.raf); SPD.last = 0; SPD.raf = requestAnimationFrame(step);
     clearInterval(W.poll); W.poll = setInterval(() => { if (!document.hidden) loadStatus(); }, 5000);
     clearInterval(W.sumPoll); W.sumPoll = setInterval(() => { if (!document.hidden) loadSummary(); }, SUM.meta && !SUM.meta.live ? 300e3 : 30e3);
     clearInterval(W.gPoll); W.gPoll = setInterval(() => { if (!document.hidden) loadGraph(); }, 120e3);
   };
-  window.webClose = function () { W.open = false; clearInterval(W.poll); clearInterval(W.sumPoll); clearInterval(W.gPoll); cancelAnimationFrame(SPD.raf); if (SPD.el) SPD.el.style.display = SPD.cap.style.display = SPD.thread.style.display = "none"; };
+  window.webClose = function () { W.open = false; clearInterval(W.poll); clearInterval(W.sumPoll); clearInterval(W.gPoll); };
+  function startSpider() { spiderEl(); if (SPD.on) return; SPD.on = true; SPD.last = 0; SPD.raf = requestAnimationFrame(step); }
+  setTimeout(() => { startSpider(); if (S.tab !== "web") onTab(S.tab); }, 1500); // the spider lives on every page
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);
   W.navPoll = setInterval(() => { if (!W.open && !document.hidden) loadStatus(); }, 30e3);

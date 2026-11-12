@@ -236,7 +236,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 #webApCard{margin-top:16px}
 
 /* the crawling Spider: walks the edges of THE WEB page; its speed and color follow the real backend job state */
-.tw-crawler{position:fixed;left:0;top:0;width:30px;height:30px;z-index:40;pointer-events:none;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
+.tw-crawler{position:fixed;left:0;top:0;width:48px;height:48px;z-index:40;pointer-events:none;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
 .tw-crawler svg{width:100%;height:100%;overflow:visible}
 .tw-crawler .leg{stroke:var(--tw-c);stroke-width:1.8;stroke-linecap:round;fill:none;transform-box:fill-box}
 .tw-crawler .la{transform-origin:15px 15px;animation:twGaitA var(--gait,.5s) ease-in-out infinite alternate}
@@ -288,6 +288,4 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-foot .tw-btn{padding:3px 9px;font-size:11px}
 .twb-pop{position:absolute;z-index:5;width:240px;background:rgba(9,13,19,.96);border:1px solid var(--tw-l2);border-radius:10px;padding:10px 12px;font-size:12.5px}
 .twb-cap{position:fixed;left:0;top:0;z-index:41;max-width:300px;pointer-events:none;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.9);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.twb-thread{position:fixed;inset:0;width:100vw;height:100vh;z-index:39;pointer-events:none}
-.twb-thread line{stroke:rgba(200,250,245,.55);stroke-width:1;stroke-dasharray:2 2}
 @media (max-width:760px){.twb{height:calc(100vh - 210px)}.twb-hub{border-radius:18px}.twb-lines p{font-size:13px}}
