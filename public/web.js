@@ -38,7 +38,7 @@
   // research while the market is open and frozen as the day's final summary after the close.
   const PAGE = { data: ["markets", "Overview"], news: ["markets", "News"], nyse: ["markets", "Heatmap"], analysis: ["markets", "Analysis"], macro: ["markets", "Macro"],
     research: ["research", "Stock research"], fin: ["research", "Financials"], filings: ["research", "10-K crawler"], portfolio: ["portfolio", "My portfolio"], aitrade: ["ailab", "AI vs S&P 500"] };
-  const GNAME = { markets: "Markets", research: "Research", portfolio: "Portfolio", ailab: "AI Lab" };
+  const GNAME = { markets: "Markets", research: "Research", portfolio: "Portfolio", ailab: "AI Lab", quant: "Quant", web: "THE WEB" };
   const SPOKES = 16, RINGS = 6, GSPOKES = { markets: [13, 14, 15, 0, 1, 2], research: [3, 4, 5, 6], portfolio: [7, 8, 9], ailab: [10, 11, 12] };
   function pageOfJob(j) {
     const g = String(j.go || "").replace(/^#/, "").split("/")[0]; if (PAGE[g]) return g; if (/^q:/.test(j.go || "")) return "research";
@@ -199,8 +199,11 @@
     if (!SPD.on) return; SPD.raf = requestAnimationFrame(step);
     const dt = Math.min(0.05, (t - (SPD.last || t)) / 1000); SPD.last = t;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (!W.open) return hideSpider();
-    if (!SPD.cur) { if (!SPD.q.length) nextCycle(); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
+    if (!W.open && !SCAN.on) return hideSpider();
+    if (!SPD.cur) { if (!SPD.q.length) { if (SCAN.on) return; nextCycle(); } SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap);
+      if (c.scroll) { try { c.scroll.scrollIntoView({ block: "center", behavior: "instant" }); } catch {} SPD.cur = null; return; }
+      if (c.collect) scanCollect(c.collect);
+      if (c.finish) { SPD.cur = null; scanFinish(); return; } if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
     const c = SPD.cur, busy = W.st && W.st.state !== "idle" && W.st.state !== "error", mult = busy ? 1.35 : 1;
     let moving = false;
     if (c.jump) { const p = c.jump(); SPD.x = p.x; SPD.y = p.y; SPD.head = 0; SPD.trail = []; SPD.cur = null; }
@@ -233,7 +236,7 @@
     SPD.idleT = t / 1000;
     SPD.el.style.transform = `translate(${SPD.x.toFixed(1)}px,${SPD.y.toFixed(1)}px)`;
     SPD.el.firstElementChild.style.transform = `rotate(${((SPD.head * 180) / Math.PI + 90).toFixed(1)}deg)`;
-    drawLegs(moving); drawFx(t, dt, moving, !!(c && c.wait != null && c.node));
+    drawLegs(moving); drawFx(t, dt, moving, !!(c && c.wait != null && (c.node || c.collect)));
     // adaptive quality: drop the trail and particles if frames are slow (< ~35 fps over 120 frames)
     SPD.frameT.push(dt); if (SPD.frameT.length > 120) SPD.frameT.shift(); if (SPD.frameT.length === 120) SPD.lowFx = SPD.frameT.reduce((x, y) => x + y, 0) / 120 > 1 / 35;
     SPD.el.classList.toggle("stopped", !moving && !(c && c.write));
@@ -277,6 +280,7 @@
   }
   function hideSpider() { SPD.wanted = false; SPD.on = false; cancelAnimationFrame(SPD.raf); SPD.q = []; SPD.cur = null; if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = "none"; }
   function onTab(t) {
+    if (SCAN.on) { SCAN.on = false; SCAN.aborted = true; } // switching pages cancels a running scan
     if (t !== "web") return hideSpider(); // the spider stays on THE WEB page; the 10-K crawler has its own reader
     if (!SPD.el) return; for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = ""; startSpider();
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -395,6 +399,74 @@
   const _rp = renderPortfolio; renderPortfolio = function () { const r = _rp.apply(this, arguments); try { pfCard(); } catch {} return r; };
   const _ap = apLoadView; apLoadView = async function () { const r = await _ap.apply(this, arguments); try { apCard(); } catch {} return r; };
 
+
+
+  // ---------------------------------------------------------------- the Spider button: an on-demand 2x scan of the current page
+  // The spider enters from the middle of the left edge, scrolls through every section of the page you're on,
+  // inspects each one at double speed, records the figures it reads, starts the matching server research job,
+  // and finishes with a written report built from what it collected (rule-based, no paid AI).
+  const SCAN = { on: false, found: [], t0: 0, page: null };
+  function scanTargets(t) {
+    const sec = $("tab-" + t); if (!sec) return [];
+    const els = [...sec.querySelectorAll(".ql-mod, .fx-card, .card, .pfc, .pf-card, .an-card, .ny-pane, .apx, .kpis, .mood-card, .earn-card, .bt-card, .cr-side, .cr-doc, .twb, .feed > *, .heat, table, svg, canvas")];
+    const ok = els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 160 && r.height > 60 && e.offsetParent !== null && !els.some((o) => o !== e && o.contains(e) && o.getBoundingClientRect().height < 900); });
+    return ok.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).slice(0, 16);
+  }
+  const NUMLINE = /(^|[\s(:·])[-+−]?\$?\d[\d,]*(\.\d+)?\s*(%|[KMBT]\b|x\b)?(?=$|[\s),·])/; // a standalone figure, not the "1" in "1-year"
+  function scanCollect(e) {
+    const title = (titleOf(e) || (e.querySelector("h1,h2,h3,h4,b,strong") || {}).textContent || "").trim().replace(/\s+/g, " ").replace(/^\d+\s*/, "").slice(0, 60) || "Untitled section";
+    const lines = String(e.innerText || "").split("\n").map((l) => l.trim().replace(/\s+/g, " ")).filter(Boolean), facts = [];
+    for (let i = 0; i < lines.length && facts.length < 6; i++) { const l = lines[i]; if (!NUMLINE.test(l) || l.length > 110) continue;
+      const bare = l.length <= 16 && !/[a-z]{4,}/i.test(l.replace(/[KMBT]$/, "")); const lab = bare && i > 0 && !NUMLINE.test(lines[i - 1]) ? lines[i - 1] : null; const f = lab ? `${lab}: ${l}` : l; if (!facts.includes(f) && f.length > 3) facts.push(f); }
+    SCAN.found.push({ title, facts, text: lines.join(" ").slice(0, 4000) });
+  }
+  window.spiderScan = function () {
+    if (SCAN.on) return; spiderEl(); const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
+    for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = ""; SPD.q = []; SPD.cur = null; startSpider();
+    const T = scanTargets(t), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, X2 = 2; // double speed
+    cmd({ jump: leftMid }); cmd({ pts: () => [() => ({ x: Math.min(innerWidth * 0.22, 220), y: innerHeight / 2 - HALF })], speed: 320 * X2, cap: `Spider deployed: examining ${pageLabel(t)} at 2× speed` });
+    T.forEach((e, k) => { const title = titleOf(e) || `section ${k + 1}`, fx = 0.2 + ((k * 37) % 60) / 100;
+      cmd({ scroll: e });
+      cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top + Math.min(r.height / 2, 60) - HALF }; }], speed: 260 * X2, cap: `Examining ${title}` });
+      cmd({ wait: reduce ? 100 : 1300 / X2, collect: e, cap: `Reading ${title}` });
+      cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * Math.min(0.9, fx + 0.3) - HALF, y: r.top + Math.min(r.height - HALF, 120) - HALF }; }], speed: 160 * X2, cap: `Collecting figures from ${title}` }); });
+    if (!T.length) cmd({ wait: 600, cap: "Nothing to examine on this page yet" });
+    cmd({ pts: () => [leftMid], speed: 320 * X2, cap: "Writing the report" }); cmd({ finish: true });
+    if (typeof startResearch === "function") startResearch(t).then((id) => { SCAN.job = id ? FOL.jobLabel : null; });
+    const b = $("spBtn"); if (b) b.classList.add("on");
+  };
+  async function scanFinish() {
+    const page = SCAN.page, secs = ((performance.now() - SCAN.t0) / 1000).toFixed(1), F = SCAN.found; SCAN.on = false; const btn = $("spBtn"); if (btn) btn.classList.remove("on");
+    if (S.tab !== "web") hideSpider(); else { SPD.q = []; cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 260, cap: "Crawling into the web", end: () => (SPD.at = { s: 12, k: RINGS }) }); }
+    if (SCAN.aborted) return;
+    // ---- analysis of what was collected (all derived from the collected text)
+    const all = F.flatMap((f) => f.facts.map((x) => ({ s: f.title, x }))), pcts = [];
+    for (const f of F) for (const m of f.text.matchAll(/([+−-])\s?(\d+(?:\.\d+)?)%/g)) { const v = (m[1] === "+" ? 1 : -1) * +m[2]; const i = m.index, ctx = f.text.slice(Math.max(0, i - 40), i + m[0].length + 4).trim(); if (Math.abs(v) < 500) pcts.push({ v, s: f.title, ctx }); }
+    const up = pcts.filter((p) => p.v > 0).length, dn = pcts.filter((p) => p.v < 0).length, hi = pcts.reduce((a, p) => (!a || p.v > a.v ? p : a), null), lo = pcts.reduce((a, p) => (!a || p.v < a.v ? p : a), null);
+    const known = new Set([...(S.wl || []), ...((S.port || []).map((h) => h.symbol)), ...Object.keys(S.quotes || {})].map((x) => String(x).toUpperCase())), cnt = {};
+    for (const f of F) for (const m of f.text.matchAll(/\b[A-Z]{1,5}(?:\.[A-Z])?\b/g)) if (known.has(m[0])) cnt[m[0]] = (cnt[m[0]] || 0) + 1;
+    const tick = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const warns = F.flatMap((f) => (f.text.match(/[^.\n]{0,50}\b(STALE|ERROR|UNAVAILABLE|failed|red flag|faded out-of-sample|broke down)\b[^.\n]{0,30}/g) || []).map((w) => ({ s: f.title, w: w.trim() }))).slice(0, 4);
+    let sum = null, disc = []; try { sum = await api("/api/web/summary"); } catch {}
+    if (tick.length) try { disc = ((await api(`/api/web/discoveries?symbols=${encodeURIComponent(tick.slice(0, 4).map((x) => x[0]).join(","))}&limit=4`)).items || []); } catch {}
+    const take = [];
+    take.push(`Examined ${F.length} section${F.length === 1 ? "" : "s"} of ${pageLabel(page)} and recorded ${all.length} figures in ${secs} s.`);
+    if (pcts.length) take.push(`Of ${pcts.length} signed percentages on the page, ${up} were positive and ${dn} negative${up + dn ? ` — the page reads ${up > dn * 1.5 ? "mostly positive" : dn > up * 1.5 ? "mostly negative" : "mixed"}` : ""}.`);
+    if (hi && hi.v > 0) take.push(`Largest gain seen: ${hi.v > 0 ? "+" : ""}${hi.v}% (${hi.s}: “${hi.ctx}”).`);
+    if (lo && lo.v < 0) take.push(`Largest decline seen: ${lo.v}% (${lo.s}: “${lo.ctx}”).`);
+    if (tick.length) take.push(`Most-mentioned tickers: ${tick.map(([k, n]) => `${k} (${n})`).join(", ")}.`);
+    for (const w of warns) take.push(`Flag in ${w.s}: “${w.w}”.`);
+    if (SCAN.job) take.push(`Started a server research job for ${SCAN.job}; its findings will appear in THE WEB.`);
+    const el = document.createElement("div"); el.className = "sp-rep"; el.innerHTML = `<div class="sp-rep-in" role="dialog" aria-label="Spider report">
+      <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>What the spider found</h3><small>${new Date().toLocaleTimeString()} · ${F.length} sections · ${all.length} figures · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
+      <h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      ${sum && sum.lines && sum.lines.length ? `<h4>Market context (THE WEB ${sum.live ? "live summary" : "latest summary"})</h4><ul class="sp-take">${sum.lines.slice(0, 3).map((l) => `<li>${esc(l.t)}</li>`).join("")}</ul>` : ""}
+      ${disc.length ? `<h4>Research on those tickers</h4><ul class="sp-take">${disc.map((d) => `<li><b>${esc(d.headline)}</b></li>`).join("")}</ul>` : ""}
+      <h4>Section by section</h4>${F.map((f) => `<div class="sp-sec"><b>${esc(f.title)}</b>${f.facts.length ? `<ul>${f.facts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>No figures on screen.</p>`}</div>`).join("")}
+      <p class="sp-foot">A rule-based summary of what the spider read on this page plus THE WEB's stored research. No paid AI; nothing is traded.</p></div>`;
+    document.querySelectorAll(".sp-rep").forEach((x) => x.remove()); document.body.appendChild(el);
+    const close = () => el.remove(); el.querySelector(".sp-x").onclick = close; el.onclick = (e) => { if (e.target === el) close(); }; document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k); } });
+  }
 
   // ---------------------------------------------------------------- open / close
   window.webOpen = function () {

@@ -291,3 +291,22 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-cap{position:fixed;left:0;top:0;z-index:41;max-width:300px;pointer-events:none;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.9);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:760px){.twb{height:calc(100vh - 210px)}.twb-hub{border-radius:18px}.twb-lines p{font-size:13px}}
 .tw-crawler.resting{opacity:.75;filter:drop-shadow(0 0 3px rgba(94,234,212,.25))}
+
+/* Spider button + report */
+.sp-btn{display:inline-flex;align-items:center;gap:6px;font-weight:600;border:1px solid rgba(94,234,212,.45)!important;color:#5eead4!important;background:rgba(94,234,212,.08)!important}
+.sp-btn:hover{background:rgba(94,234,212,.16)!important}
+.sp-btn.on{animation:spBtn 1s ease-in-out infinite}
+@keyframes spBtn{50%{box-shadow:0 0 0 4px rgba(94,234,212,.18)}}
+.sp-rep{position:fixed;inset:0;z-index:60;background:rgba(2,6,10,.55);display:flex;justify-content:flex-end;backdrop-filter:blur(2px)}
+.sp-rep-in{width:min(560px,100%);height:100%;overflow:auto;background:#0b1016;border-left:1px solid rgba(94,234,212,.3);padding:20px 22px;box-shadow:-20px 0 60px rgba(0,0,0,.5);animation:spIn .25s ease-out}
+@keyframes spIn{from{transform:translateX(40px);opacity:0}}
+.sp-rep-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sp-k{font:600 11px var(--mono);letter-spacing:.08em;color:#5eead4}
+.sp-rep h3{margin:4px 0}.sp-rep small{color:var(--dim);font-size:12px}
+.sp-rep h4{margin:18px 0 6px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.sp-x{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:8px;width:30px;height:30px;cursor:pointer}
+.sp-take{margin:0;padding-left:18px;font-size:13.5px;line-height:1.55}.sp-take li{margin:4px 0}
+.sp-sec{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;font-size:12.5px}
+.sp-sec ul{margin:4px 0 0;padding-left:16px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}.sp-sec p{margin:4px 0 0;color:var(--dim)}
+.sp-foot{font-size:11px;color:var(--dim);margin-top:16px}
+@media (max-width:760px){.sp-btn{padding:4px 8px}}
