@@ -236,7 +236,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 #webApCard{margin-top:16px}
 
 /* the crawling Spider: walks the edges of THE WEB page; its speed and color follow the real backend job state */
-.tw-crawler{position:fixed;left:0;top:0;width:30px;height:30px;z-index:40;cursor:pointer;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
+.tw-crawler{position:fixed;left:0;top:0;width:30px;height:30px;z-index:40;pointer-events:none;will-change:transform;filter:drop-shadow(0 0 6px rgba(94,234,212,.55))}
 .tw-crawler svg{width:100%;height:100%;overflow:visible}
 .tw-crawler .leg{stroke:var(--tw-c);stroke-width:1.8;stroke-linecap:round;fill:none;transform-box:fill-box}
 .tw-crawler .la{transform-origin:15px 15px;animation:twGaitA var(--gait,.5s) ease-in-out infinite alternate}
@@ -254,3 +254,40 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 @keyframes twGaitA{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
 @keyframes twGaitB{from{transform:rotate(14deg)}to{transform:rotate(-14deg)}}
 @media (prefers-reduced-motion:reduce){.tw-crawler .la,.tw-crawler .lb{animation:none}}
+
+/* ===== THE WEB page: one huge web with the summary inside it ===== */
+.tw{max-width:none}
+.twb{position:relative;height:calc(100vh - 150px);min-height:560px;border-radius:16px;overflow:hidden;border:1px solid var(--tw-l);
+  background:radial-gradient(ellipse 50% 50% at 50% 50%,rgba(94,234,212,.06),transparent 70%),radial-gradient(ellipse 90% 90% at 50% 50%,rgba(167,139,250,.05),transparent 75%),#04070b}
+.twb::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px)}
+.twb-web{position:absolute;inset:0;width:100%;height:100%}
+.twb-web .spoke{stroke:rgba(190,235,240,.16);stroke-width:1}
+.twb-web .ring{fill:none;stroke:rgba(190,235,240,.13);stroke-width:1}
+.twb-web .hubring{stroke:rgba(94,234,212,.35);stroke-width:1.4;filter:drop-shadow(0 0 6px rgba(94,234,212,.35))}
+.twb-n{cursor:pointer;outline:none}
+.twb-n .hit{fill:transparent}
+.twb-n .halo{opacity:.16;filter:blur(3px)}
+.twb-n .core{stroke:rgba(255,255,255,.6);stroke-width:.6}
+.twb-n text{fill:rgba(205,220,228,.7);font:9px var(--mono);pointer-events:none;opacity:0;transition:opacity .2s}
+.twb-n.lab text{opacity:.85}
+.twb-n:hover text,.twb-n:focus-visible text,.twb-n.pick text{opacity:1;fill:#fff}
+.twb-n:hover .halo,.twb-n:focus-visible .halo{opacity:.5}
+.twb-n.pick .halo{opacity:.9;animation:twPick 1.2s ease-out}
+.twb-n:focus-visible .core{stroke:#fff;stroke-width:1.4}
+@keyframes twPick{0%{transform:scale(.5)}40%{transform:scale(2.2)}100%{transform:scale(1)}}
+.twb-hub{position:absolute;display:flex;flex-direction:column;gap:8px;padding:20px 26px 14px;border-radius:44% / 30%;background:radial-gradient(ellipse at 50% 40%,rgba(10,22,28,.94),rgba(5,9,13,.9));
+  box-shadow:0 0 0 1px rgba(94,234,212,.25),0 0 50px rgba(94,234,212,.12),inset 0 0 40px rgba(94,234,212,.05);overflow:hidden}
+.twb-k{font:11px var(--mono);letter-spacing:.24em;color:var(--tw-c);text-align:center;padding-top:6px}
+.twb-lines{flex:1;min-height:0;overflow:auto;padding:8px 5%;display:flex;flex-direction:column;gap:5px;justify-content:safe center;-webkit-mask-image:linear-gradient(transparent,#000 10px,#000 calc(100% - 10px),transparent);mask-image:linear-gradient(transparent,#000 10px,#000 calc(100% - 10px),transparent)}
+.twb-lines p{margin:0;font-size:13.5px;line-height:1.45;color:var(--text);transition:color .3s}
+.twb-lines p.todo{color:var(--dim)} .twb-lines p.stale{color:var(--muted)}
+.twb-lines p.typing{color:#d8fffa}
+.twb-lines .caret{display:inline-block;width:7px;height:14px;margin-left:2px;background:var(--tw-c);vertical-align:-2px;animation:twPulse .8s infinite}
+.twb-wait{color:var(--dim)!important;text-align:center}
+.twb-foot{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;align-items:center;font-size:11px;color:var(--muted);text-align:center;padding:0 8% 4px}
+.twb-foot .tw-btn{padding:3px 9px;font-size:11px}
+.twb-pop{position:absolute;z-index:5;width:240px;background:rgba(9,13,19,.96);border:1px solid var(--tw-l2);border-radius:10px;padding:10px 12px;font-size:12.5px}
+.twb-cap{position:fixed;left:0;top:0;z-index:41;max-width:300px;pointer-events:none;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.9);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.twb-thread{position:fixed;inset:0;width:100vw;height:100vh;z-index:39;pointer-events:none}
+.twb-thread line{stroke:rgba(200,250,245,.55);stroke-width:1;stroke-dasharray:2 2}
+@media (max-width:760px){.twb{height:calc(100vh - 210px)}.twb-hub{border-radius:18px}.twb-lines p{font-size:13px}}

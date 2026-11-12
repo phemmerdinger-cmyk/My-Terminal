@@ -2629,6 +2629,7 @@ async function webRoute(req, res, u) {
     SPIDER.runNow("briefing", null, { slot, reason: "you pressed Generate briefing" }).catch(() => {});
     return send(res, 202, { started: true, slot });
   }
+  if (p === "summary") return send(res, 200, await SPIDER.liveSummary());
   if (p === "graph") return send(res, 200, SPIDER.graph({ focus: qp("focus") ? String(qp("focus")).slice(0, 80) : null }));
   if (p === "trader") return send(res, 200, { ...SPIDER.traderView(), weight: SPIDER_W, explain: SPIDER_W > 0 ? `Spider research nudges the swing bot's ranking score by at most ±${SPIDER_W.toFixed(2)} (scores run about 0–1), using only inputs the bot doesn't already score: insider buying, earnings-release tone and sector news patterns. Stops, news and trend rules still decide every trade, and the Spider itself never trades.` : "The Spider shares research with AI Trader for display only (SPIDER_TRADER_WEIGHT is 0, so it doesn't change the bot's scores)." });
   if (p === "research") { const [s] = parseList(qp("symbol"), 1); if (!s) return send(res, 400, { error: "symbol required" }); return send(res, 200, SPIDER.packet(s)); }

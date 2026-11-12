@@ -79,8 +79,8 @@ const RELIABILITY = { sec: 1, fred: 1, fed: 1, bls: 1, treasury: 1, exchange: 0.
 // ttl: minutes between runs [market open, market closed]; null = event-driven only
 const JOBS = {
   portfolio_scan: { label: "Analyzing portfolio exposure", area: "Portfolio", go: "#portfolio", ttl: [15, 180], timeout: 90, rel: "internal" },
-  market_pulse: { label: "Investigating market & sector performance", area: "Markets › Overview & Heatmap", go: "#data", ttl: [10, 90], timeout: 75, rel: "exchange" },
-  news_sweep: { label: "Comparing market sentiment across news sources", area: "Markets › News", go: "#news", ttl: [10, 45], timeout: 90, rel: "news" },
+  market_pulse: { label: "Investigating market & sector performance", area: "Markets › Overview & Heatmap", go: "#data", ttl: [3, 90], timeout: 75, rel: "exchange" },
+  news_sweep: { label: "Comparing market sentiment across news sources", area: "Markets › News", go: "#news", ttl: [8, 45], timeout: 90, rel: "news" },
   policy_watch: { label: "Monitoring Fed, Treasury, SEC & BLS releases", area: "Markets › Macro", go: "#macro", ttl: [30, 60], timeout: 90, rel: "fed" },
   macro_check: { label: "Monitoring economic releases", area: "Markets › Macro", go: "#macro", ttl: [360, 360], timeout: 150, rel: "fred" },
   earnings_watch: { label: "Checking company earnings", area: "Markets › Upcoming earnings", go: "#data", ttl: [120, 240], timeout: 120, rel: "calendar" },
@@ -1101,10 +1101,34 @@ function createSpider(deps) {
     if (o.q) { const re = new RegExp(String(o.q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"); L = L.filter((b) => re.test(b.headline) || re.test(b.keywords || "") || (b.tickers || []).some((t) => re.test(t)) || re.test(b.day)); }
     return { total: L.length, items: L.slice(0, o.limit || 60) };
   }
+  // Live summary for THE WEB page: rebuilt from the latest research while the market is open (cached 45 s);
+  // once the market closes it is frozen as that day's final summary.
+  let LIVE = null;
+  const AREA_RULES = [[/flagged risk/i, "filings"], [/S&P 500|members/i, "data"], [/\bled \(|\blagged \(/i, "nyse"], [/theme|top story/i, "news"], [/Next catalyst|reports /i, "data"]];
+  function summaryLines(doc) {
+    const pfNames = ((ST.exposure || {}).pfs || []).map((p) => p.name);
+    const lines = doc.exec.map((t) => ({ t, area: pfNames.some((n) => t.includes(n)) ? "portfolio" : (AREA_RULES.find(([re]) => re.test(t)) || [, "data"])[1] }));
+    const sec = (k) => (doc.sections.find((x) => x.key === k) || { items: [] }).items;
+    const eco = sec("economic")[0]; if (eco) lines.push({ t: `Economy: ${eco.text.replace(/\.$/, "")}.`, area: "macro" });
+    const ai = sec("ai")[0]; if (ai) lines.push({ t: `AI Trader: ${ai.text.replace(/^Market mode: /, "mode ").replace(/\.$/, "")}.`, area: "aitrade" });
+    return lines;
+  }
+  async function liveSummary() {
+    await load(); const s = session();
+    if (s.open) {
+      if (LIVE && LIVE.live && now() - LIVE.at < 45e3) return LIVE;
+      const doc = buildBriefing({ slot: "live", slots: { ...SLOTS, live: { label: "Live", title: "Live market summary" } }, session: s, dataDay: s.day, ST, DISC, trader: traderState(), now: now(), sectorOf, nameOf, held: held(), tracked: tracked(), MACRO_LINKS, manual: false });
+      return (LIVE = { at: now(), live: true, day: s.day, generatedAt: doc.generatedAt, freshness: doc.freshness, lines: summaryLines(doc), title: "Live market summary" });
+    }
+    const b = BIDX[0] ? await store.get("b:" + BIDX[0].id) : null;
+    if (LIVE && !LIVE.live && b && LIVE.id === b.id) return LIVE;
+    if (!b) return { at: now(), live: false, day: s.day, lines: [], title: "Market summary", empty: true, phase: s.phase };
+    return (LIVE = { id: b.id, at: now(), live: false, day: b.day, generatedAt: b.generatedAt, freshness: b.freshness, lines: summaryLines(b), title: `Final summary · ${b.dataDay || b.day}`, phase: s.phase });
+  }
   async function briefing(id) { await load(); if (id === "latest") id = (BIDX[0] || {}).id; return id ? store.get("b:" + id) : null; }
 
   const self = {
-    load, save, start, stop, tick, runNow, enqueue, setContext, status, discoveries, getDiscovery, briefings, briefing, packet, signal, traderAdjust, traderView, promptContext, session, marketOpen,
+    load, save, start, stop, tick, runNow, liveSummary, enqueue, setContext, status, discoveries, getDiscovery, briefings, briefing, packet, signal, traderAdjust, traderView, promptContext, session, marketOpen,
     graph: (o) => require("./intel").graph({ ST, DISC, SP, sectorOf, industryOf, nameOf, held: held(), tracked: tracked(), traderHeld: traderHeld(), MACRO_LINKS, now: now(), ...o }),
     ask: (question, opts = {}) => require("./intel").ask({ question, spider: self, ST, DISC, BIDX, SP, sectorOf, nameOf, held: held(), tracked: tracked(), now: now(), ...opts }),
     onEvent: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
