@@ -32,7 +32,7 @@ test("the demo is public, compressed and sends security headers", async () => {
   assert.match(await r.text(), /Market Desk|MARKET/i);
 });
 test("private APIs are blocked for visitors, public data APIs are open", async () => {
-  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health"]) {
+  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health", "/api/quanttrader/run"]) {
     const r = await get(p); assert.equal(r.status, 401, p); assert.equal((await r.json()).code, "private");
   }
   assert.equal((await get("/api/health")).status, 200);

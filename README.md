@@ -80,6 +80,16 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## Quant Trader (third paper bot)
+
+**AI Lab → AI vs S&P 500 → 📐 Quant trader** is a systematic paper-trading bot built on the Quant Lab's math (`quant-trader.js`,
+tested in `tests/quanttrader.test.js`). Once per trading day after the close it reads the market regime (S&P trend,
+50/200-day cross, realized volatility, drawdown, HYG/IEF credit), which sets the equity share (100 / 70 / 40 / 10%);
+ranks 38 liquid stocks and sector ETFs on 12-1 month momentum, 3-month momentum and low volatility; buys the top 8 above
+their 200-day average; sizes them by risk parity (≤ 20% each) with a risk-parity defensive sleeve (IEF, TLT, GLD);
+scales the book to a 15% volatility target with the rest in T-bills (BIL); and trades only changes above 1.5% at the
+daily close, paying 5 bps per side. Starts with $10,000. Paper money only.
+
 ## The Spider button
 
 The **🕷 Spider** button in the top bar sends THE WEB's spider onto whatever page you're on. It enters from the middle of the

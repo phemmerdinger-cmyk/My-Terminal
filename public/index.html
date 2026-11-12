@@ -900,7 +900,15 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .np-tot{padding:4px 14px 0 56px;font-size:12.5px;line-height:26px;color:var(--muted)}
 .np-tot b{color:var(--text);font-weight:600;margin-right:4px}
 @media (max-width:600px){.np-wrap{padding-left:12px}.notepad>summary,.np-empty,.np-tot{padding-left:14px}.notepad{background:color-mix(in srgb,#f5d76e 5%,var(--panel))}}
-.bot-sw{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 14px}
+.bot-sw{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 14px}
+@media (max-width:760px){.bot-sw{grid-template-columns:1fr}}
+.qt-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:0 0 14px}.qt-tiles.sm{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin:10px 0 0}
+.qt-t{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}.qt-t span{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}.qt-t b{font:600 15px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qt-t em{font-style:normal;font:10.5px var(--mono);color:var(--dim)}
+.qt-wb{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:center;font:11px var(--mono);margin:6px 0}.qt-wb div{display:flex;height:18px;border-radius:4px;overflow:hidden;background:var(--panel)}.qt-wb i{height:100%;border-right:1px solid var(--bg)}
+.qt-pos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;margin-top:10px;font:12px var(--mono)}.qt-pos div{display:grid;grid-template-columns:10px 1fr auto auto;gap:6px;align-items:center}.qt-pos i{width:8px;height:8px;border-radius:2px}.qt-pos span{color:var(--muted)}.qt-pos em{font-style:normal;min-width:44px;text-align:right}
+.qt-rg{display:grid;grid-template-columns:150px 1fr 40px;gap:10px;align-items:center;font:11.5px var(--mono);margin:6px 0;opacity:.5}.qt-rg.on{opacity:1}.qt-rg div{height:8px;background:var(--panel);border-radius:4px;overflow:hidden}.qt-rg i{display:block;height:100%}.qt-rg b{text-align:right}
+.qt-rank>div,.qt-rk-h{display:grid;grid-template-columns:90px 1fr 50px 64px 64px 44px 34px;gap:8px;align-items:center;font:11.5px var(--mono);padding:3px 0;border-bottom:1px solid var(--line)}.qt-rank>div{opacity:.6}.qt-rank>div.pk{opacity:1}.qt-rank span,.qt-rk-h span{text-align:right}.qt-rk-h{color:var(--dim);font-size:10px;border:0}
+.qt-sb{position:relative;height:8px;background:var(--panel);border-radius:4px}.qt-sb i{position:absolute;top:0;height:100%;border-radius:4px}.qt-sb:after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line2)}
 .bot-sw button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;cursor:pointer;color:var(--text)}
 .bot-sw button span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .bot-sw button b{font-family:var(--mono);font-size:20px;font-weight:500}
@@ -3684,14 +3692,16 @@ function botNotepad(){
   const since=t=>t?new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"";
   const group=(kind,d)=>{
     if(!d) return "";
-    const swing=kind==="swing", rows=d.positions.map(p=>swing
+    const swing=kind==="swing"||kind==="quant", quant=kind==="quant", rows=d.positions.map(p=>quant
+      ?{sym:p.sym,name:"",tag:`<span class="ap-tag safe">${(p.weight*100).toFixed(1)}%</span>`,inv:p.shares*p.cost,val:p.value,pnl:p.pnl,ret:p.price/p.cost-1,day:null,sh:p.shares,at:d.firstTrade,note:"target weight from the daily rebalance"}
+      :swing
       ?{sym:p.sym,name:p.name,tag:`<span class="ap-tag ${p.sleeve==="safe"?"safe":"risk"}">${p.sleeve==="safe"?"safe":"risk"}</span>`,inv:p.shares*p.cost,val:p.value,pnl:p.pnl,ret:p.pnlPct/100,day:p.dayPct,sh:p.shares,at:p.at,note:`stop $${p.stop.toFixed(2)}`}
       :{sym:p.sym,name:p.setup,tag:`<span class="ap-tag ${p.dir==="long"?"up":"down"}">${p.dir==="long"?"long":"short"}</span>`,inv:p.shares*p.entry,val:p.value,pnl:p.pnl,ret:p.pnl/(p.shares*p.entry),day:null,sh:p.shares,at:p.at,note:`stop $${p.stop.toFixed(2)} · target $${p.target.toFixed(2)} · ${p.R>=0?"+":""}${p.R.toFixed(2)}R`}).sort((a,b)=>b.val-a.val);
     const inv=rows.reduce((a,r)=>a+r.val,0), pnl=rows.reduce((a,r)=>a+r.pnl,0), cash=Math.max(0,swing?d.cash:d.value-d.positions.filter(p=>p.dir==="long").reduce((a,p)=>a+p.value,0));
     const w=d.value?Math.min(100,inv/d.value*100):0;
     const orders=!swing&&d.orders.length?`<div class="hd-orders">⏳ Working orders: ${d.orders.map(o=>`${o.dir==="long"?"buy":"short"} ${o.shares} <b>${esc(o.sym)}</b> @ $${o.price.toFixed(2)}`).join(" · ")}</div>`:"";
     return `<div class="hd-grp ${BOTS.sel===kind?"on":""}">
-      <div class="hd-gh" data-k="${kind}"><b>${swing?"🤖 Swing bot":"⚡ Day trader"}</b><span><span data-lv="gv">${$m(d.value)}</span> <small data-lv="gr" class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</small></span></div>
+      <div class="hd-gh" data-k="${kind}"><b>${quant?"📐 Quant trader":swing?"🤖 Swing bot":"⚡ Day trader"}</b><span><span data-lv="gv">${$m(d.value)}</span> <small data-lv="gr" class="${cls(d.value/d.startValue-1)}">${pct((d.value/d.startValue-1)*100)}</small></span></div>
       <div class="hd-alloc"><i style="width:${w.toFixed(1)}%"></i></div>
       <div class="hd-sum" data-k="${kind}"><span><b data-lv="inv">${$m(inv)}</b> invested</span><span><b>${$m(cash)}</b> cash</span><span>open P&amp;L <b data-lv="opl" class="${cls(pnl)}">${sgn(pnl)}</b></span></div>
       ${rows.length?rows.map(r=>`<div class="hd-row" data-k="${kind}" data-s="${esc(r.sym)}"><div class="hd-l"><b>${esc(r.sym)}</b> ${r.tag}<small>${esc(r.name||"")}</small></div>
@@ -3700,8 +3710,8 @@ function botNotepad(){
         <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
       :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now — it trades every minute from 9:31 AM to 3:59 PM ET."}</div>`}${orders}</div>`;
   };
-  const order=BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing]]:[["swing",BOTS.d.swing],["day",BOTS.d.day]];
-  const n=(BOTS.d.swing?BOTS.d.swing.positions.length:0)+(BOTS.d.day?BOTS.d.day.positions.length:0);
+  const order=BOTS.sel==="quant"?[["quant",BOTS.d.quant],["swing",BOTS.d.swing],["day",BOTS.d.day]]:BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing],["quant",BOTS.d.quant]]:[["swing",BOTS.d.swing],["day",BOTS.d.day],["quant",BOTS.d.quant]];
+  const n=["swing","day","quant"].reduce((a,k)=>a+(BOTS.d[k]?BOTS.d[k].positions.length:0),0);
   const keep=$("apNote").scrollTop;
   $("apNote").innerHTML=`<div class="hd-h"><h4>💼 What the AI is invested in</h4><small>${n} position${n===1?"":"s"} · updates every minute</small></div>${order.map(([k,d])=>group(k,d)).join("")}`;
   $("apNote").scrollTop=keep; liveApply(false);
@@ -3711,7 +3721,7 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$10,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, every stock every minute`,dy);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$10,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, every stock every minute`,dy)+card("quant","📐","Quant trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$10,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
   liveApply(false);
 }
 function dtRender(d){
@@ -3764,6 +3774,42 @@ function dtRender(d){
   apWirePerf(d);
   liveApply(false);
 }
+function qtRender(d){
+  const ret=d.value/d.startValue-1, spxV=d.spx0&&d.spxNow?d.startValue*d.spxNow/d.spx0:d.startValue, spxRet=spxV/d.startValue-1, lead=d.value-spxV, started=(d.trades||[]).some(t=>t.side==="BUY");
+  const L=d.latest||{}, RC={"Risk-on trend":"#0fbf7d","Choppy / late-cycle":"#facc15","Correction":"#fb923c","Risk-off / high volatility":"#f6465d"}, pc=x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%";
+  const PALQ=["#5eead4","#4da3ff","#facc15","#f472b6","#a78bfa","#fb923c","#34d399","#f87171","#93c5fd","#fde68a","#c4b5fd","#67e8f9","#fca5a5","#86efac"];
+  $("apVs").innerHTML=`<div class="ap-vs"><div class="ap-side ai ${lead>=0&&started?"lead":""}"><span>📐 Quant trader</span><b>${$m(d.value)}</b><small class="${cls(ret)}">${pct(ret*100)}</small></div>
+    <div class="ap-mid">${started?`<b class="${cls(lead)}">${lead>=0?"Quant leads":"S&amp;P leads"}</b><small>by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>first allocation pending</small>`}</div>
+    <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b>${$m(spxV)}</b><small class="${cls(spxRet)}">${pct(spxRet*100)}</small></div></div>
+    <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Quant trader</b> · <span class="ap-tag safe">systematic · paper money</span> ${esc(d.status||"")}</div>`;
+  const eq=d.equity||[], lab=eq.map(p=>p.d||new Date(p.t).toISOString().slice(0,10)), ser=[{v:eq.map(p=>p.v/d.startValue-1),c:"#5eead4",n:"Quant trader",area:true,up:"#0fbf7d",down:"#f6465d",ao:.18}];
+  if(eq.some(p=>p.s)&&d.spx0) ser.push({v:eq.map(p=>p.s?p.s/d.spx0-1:null),c:"#94a3b8",n:"S&P 500",dash:true,w:1.4});
+  const chart=eq.length>=2?apSvgChart("qtC",lab,ser,{zero:true,fmt:pc,h:220}).replace('<div class="apc" id="qtC">','<div class="apc" id="qtC" data-zero="1">'):`<div class="ap-empty" style="padding:24px 10px">The equity curve starts after its second daily decision.</div>`;
+  const pos=d.positions||[], tw=Object.entries(L.target||{}).sort((a,b)=>b[1]-a[1]), col={}; tw.forEach(([s],i)=>col[s]=PALQ[i%PALQ.length]); pos.forEach((p,i)=>{ if(!col[p.sym]) col[p.sym]=PALQ[(tw.length+i)%PALQ.length]; });
+  const bar=(pairs,label)=>`<div class="qt-wb"><span>${label}</span><div>${pairs.filter(([,w])=>w>0.003).map(([s,w])=>`<i style="width:${(w*100).toFixed(2)}%;background:${col[s]||"#64748b"}" title="${esc(s)} ${(w*100).toFixed(1)}%"></i>`).join("")}</div></div>`;
+  const tile=(k,v,sub,c)=>`<div class="qt-t"><span>${k}</span><b ${c?`style="color:${c}"`:""}>${v}</b>${sub?`<em>${sub}</em>`:""}</div>`;
+  const rk=L.ranked||[], smax=Math.max(1,...rk.map(x=>Math.abs(x.score)));
+  const split=d.rules&&d.rules.split||{};
+  $("apBox").innerHTML=`<div class="bt-card"><h4>Return vs the S&amp;P 500 <em>since the first allocation</em></h4>${chart}</div>
+  <div class="qt-tiles">${tile("Regime",esc(L.regime||"—"),L.score!=null?"score "+(+L.score).toFixed(1):"",RC[L.regime])}${tile("Equity sleeve",L.split!=null?Math.round(L.split*100)+"%":"—","set by regime")}${tile("Volatility",L.vol!=null?(L.vol*100).toFixed(1)+"%":"—",`target ${Math.round((d.rules?d.rules.volTarget:.15)*100)}%`+(L.scale<1?` · scaled ${Math.round(L.scale*100)}%`:""))}
+    ${tile("Effective bets",L.enb!=null?(+L.enb).toFixed(1):"—","Meucci ENB")}${tile("Holdings",String(pos.length),(L.trades!=null?L.trades+" trades last rebalance":""))}${tile("T-bills",L.target&&L.target.BIL?(L.target.BIL*100).toFixed(0)+"%":"0%","BIL · unused risk budget")}</div>
+  <div class="rk-two"><div class="bt-card"><h4>Allocation <em>target vs held</em></h4>${tw.length?bar(tw,"Target"):""}${pos.length?bar(pos.map(p=>[p.sym,p.weight]),"Held"):""}
+    <div class="qt-pos">${pos.map(p=>`<div><i style="background:${col[p.sym]}"></i><b>${esc(p.sym)}</b><span>${(p.weight*100).toFixed(1)}%</span><em class="${cls(p.pnl)}">${p.pnl>=0?"+":"−"}$${Math.abs(p.pnl).toFixed(0)}</em></div>`).join("")||'<div class="hd-empty">No positions yet.</div>'}</div></div>
+    <div class="bt-card"><h4>Regime → equity share</h4>${Object.entries(split).map(([k,v])=>`<div class="qt-rg ${k===L.regime?"on":""}"><span style="color:${RC[k]}">${esc(k)}</span><div><i style="width:${v*100}%;background:${RC[k]}"></i></div><b>${Math.round(v*100)}%</b></div>`).join("")}
+    ${L.ind?`<div class="qt-tiles sm">${tile("SPY vs 200d",L.ind.aboveTrend?"above":"below","",L.ind.aboveTrend?"#0fbf7d":"#f6465d")}${tile("21d vol",(L.ind.vol*100).toFixed(1)+"%","median "+(L.ind.volMedian*100).toFixed(1)+"%")}${tile("Drawdown",(L.ind.drawdown*100).toFixed(1)+"%")}${tile("Credit 3M",L.ind.credit==null?"—":pct(L.ind.credit*100))}</div>`:""}</div></div>
+  <div class="bt-card"><h4>Factor ranking <em>score = ½·12-1m momentum + ¼·3m momentum + ¼·low volatility (z-scores) · ● bought</em></h4><div class="qt-rank">${rk.map(x=>`<div class="${x.picked?"pk":""}"><b>${x.picked?"●":"○"} ${esc(x.s)}</b><div class="qt-sb"><i style="${x.score>=0?`left:50%;width:${Math.abs(x.score)/smax*50}%`:`right:50%;width:${Math.abs(x.score)/smax*50}%`};background:${x.score>=0?"#5eead4":"#fb923c"}"></i></div><span>${x.score.toFixed(2)}</span><span class="${cls(x.m12)}">${pct(x.m12*100)}</span><span class="${cls(x.m3)}">${pct(x.m3*100)}</span><span>${(x.vol*100).toFixed(0)}%</span><span class="${x.trend?"up":"down"}">${x.trend?"▲":"▼"}</span></div>`).join("")||'<div class="hd-empty">Ranking appears after the first decision.</div>'}</div>
+  ${rk.length?`<div class="qt-rk-h"><span></span><span></span><span>score</span><span>12-1m</span><span>3m</span><span>vol</span><span>200d</span></div>`:""}</div>`;
+  if(eq.length>=2) apWireChart("qtC",lab,ser,pc);
+  const ago=t=>new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+  $("apMore").innerHTML=`<details class="ap-hood"><summary>Under the hood <small>· trade log and rules</small></summary>
+  <div class="bt-card"><h4>Trade log <em>${(d.trades||[]).length} trades · newest first</em></h4>${(d.trades||[]).length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Value</th><th>New weight</th><th>Result</th></tr></thead><tbody>${d.trades.slice(0,200).map(t=>`<tr><td class="n">${ago(t.t)}</td><td><span class="sd ${t.side}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${(+t.shares).toFixed(2)}</td><td>$${(+t.price).toFixed(2)}</td><td>$${Math.round(t.value).toLocaleString()}</td><td>${(t.w*100).toFixed(1)}%</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(2):"—"}</td></tr>`).join("")}</tbody></table></div>`:'<div class="hd-empty">No trades yet.</div>'}</div>
+  <div class="bt-card"><h4>Rules <em>paper money only · built on the Quant Lab's math</em></h4><ul class="ap-rules">
+    <li><b>Once a day after the close</b> it reads the market regime from the S&amp;P 500 (trend, 50/200-day cross, realized volatility, drawdown) and credit (HYG vs IEF), which sets the equity share.</li>
+    <li><b>Selection:</b> ranks ${(d.rules&&d.rules.universe||[]).length} liquid stocks and sector ETFs on momentum and low volatility; buys the top ${d.rules?d.rules.top:8} that are above their 200-day average.</li>
+    <li><b>Sizing:</b> risk parity on 6 months of daily returns, max ${d.rules?Math.round(d.rules.maxW*100):20}% per name; the defensive sleeve (${esc((d.rules&&d.rules.defensive||[]).join(", "))}) is sized the same way.</li>
+    <li><b>Risk control:</b> the whole book is scaled to a ${d.rules?Math.round(d.rules.volTarget*100):15}% annual volatility target; unused risk sits in T-bills (BIL).</li>
+    <li><b>Trading:</b> only weight changes above ${d.rules?(d.rules.minTrade*100).toFixed(1):1.5}% are traded, at the latest daily close, paying ${d.rules?(d.rules.cost*1e4).toFixed(0):5} bps per side. Starts with $10,000.</li></ul></div></details>`;
+}
 async function apBackup(kind,d){
   if(window.__VISITOR) return false;
   const key=kind==="day"?"dtBackup1":"apBackup2", ep=kind==="day"?"/api/daytrader/restore":"/api/autopilot/restore";
@@ -3779,16 +3825,17 @@ async function apBackup(kind,d){
 }
 async function apLoadView(){
   if(!$("apBox")) return;
-  const [sw,dy]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader")]);
+  const [sw,dy,qq]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader"),api("/api/quanttrader")]);
+  if(qq.status==="fulfilled") BOTS.d.quant=qq.value;
   if(sw.status==="fulfilled"){ BOTS.d.swing=sw.value; if(await apBackup("swing",sw.value)) return apLoadView(); }
   if(dy.status==="fulfilled"){ BOTS.d.day=dy.value; if(await apBackup("day",dy.value)) return apLoadView(); }
   if(!BOTS.spx5&&[BOTS.d.swing,BOTS.d.day].some(x=>x&&!(x.trades||[]).some(t=>/^(BUY|SHORT)$/.test(t.side)))){ try{ BOTS.spx5=(await api("/api/history?symbol=%5EGSPC&range=5d&interval=15m")).candles; }catch{} }
   botSwitch(); botNotepad();
   const d=BOTS.d[BOTS.sel];
   if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
-  if(BOTS.sel==="day") dtRender(d); else apRender(d);
+  if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d);
 }
-$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else apRender(d); } else apLoadView(); };
+$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d); } else apLoadView(); };
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apLoadView(); },60_000);
 /* ---------- live money: a tiny snapshot every ~2.5 s, numbers updated in place (no re-render, no layout shift) ---------- */
 var LIVE={d:null,fail:0,timer:null,hist:{swing:[],day:[]},shown:{}};

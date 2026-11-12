@@ -712,7 +712,7 @@ if(!r.ok)throw new Error(j.error||"Wrong password.");try{localStorage.setItem("o
 catch(x){e.textContent=x.message;b.disabled=false;document.getElementById("p").select();}};</script></body></html>`;
 // API routes anyone may use (the demo needs public market data); everything else is owner-only
 const PUBLIC_API = new Set(["/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
-const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || ((u.pathname === "/api/autopilot" || u.pathname === "/api/daytrader") && req.method === "GET") || u.pathname.startsWith("/api/pub/");
+const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || ((u.pathname === "/api/autopilot" || u.pathname === "/api/daytrader" || u.pathname === "/api/quanttrader") && req.method === "GET") || u.pathname.startsWith("/api/pub/");
 // ---------------------------------------------------------------- abuse protection
 // Per-visitor request budget for the API (keeps outbound traffic low so the free plan is never suspended)
 const RL = new Map();
@@ -2074,6 +2074,73 @@ function dtRestore(doc) {
 }
 setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
 
+// ---------------------------------------------------------------- Quant Trader (third paper bot): systematic, uses the Quant Lab's math
+// Once per trading day after the close (and once right away when the account is new) it reads the regime, ranks the
+// universe on momentum and low volatility, sizes by risk parity, targets 15% volatility, and trades the differences
+// at the latest daily close (5 bps per side). Paper money only. Rules live in quant-trader.js.
+const QTC = require("./quant-trader.js"), QMS = require("./public/qmath.js");
+const QT_FILE = path.join(require("os").tmpdir(), "quanttrader-v1.json"), QT_KEY = "pft:quanttrader:v1";
+const qtFresh = () => ({ v: 1, start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
+let QT = qtFresh(), qtLoaded = false, qtBusy = false; const qtPx = {};
+async function qtLoad() {
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { QT = { ...qtFresh(), ...JSON.parse(j.result) }; qtLoaded = true; return; } } } catch {}
+  try { QT = { ...qtFresh(), ...JSON.parse(fs.readFileSync(QT_FILE, "utf8")) }; } catch {}
+  qtLoaded = true;
+}
+async function qtSave() {
+  QT.updated = Date.now(); const body = JSON.stringify(QT);
+  try { fs.writeFileSync(QT_FILE, body); } catch {}
+  if (UP_URL && UP_TOKEN) { try { await fetch(`${UP_URL}/set/${QT_KEY}`, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}` }, body, signal: AbortSignal.timeout(8000) }); } catch {} }
+}
+const qtValue = (px) => QT.cash + Object.entries(QT.positions).reduce((a, [s, p]) => a + p.shares * (px[s] || qtPx[s] || p.cost), 0);
+async function qtTick(force) {
+  if (qtBusy) return; qtBusy = true;
+  try {
+    if (!qtLoaded) await qtLoad();
+    const t = etParts(), weekday = !(t.wd === "Sat" || t.wd === "Sun"), fresh = !QT.trades.length;
+    if (!force && QT.lastDay === t.day) return;
+    if (!force && !fresh && !(weekday && t.min >= 16 * 60 + 10)) return; // daily decision after the close
+    const from = new Date(Date.now() - 2.2 * 365.25 * 864e5).toISOString().slice(0, 10), to = new Date().toISOString().slice(0, 10);
+    const syms = [...new Set([...QTC.QT_EQUITY, ...QTC.QT_DEFENSIVE, QTC.QT_CASH, ...QTC.QT_SIGNALS])], series = {};
+    await Promise.allSettled(syms.map(async (s) => { try { series[s] = await longHistory(s, from, to, "1d"); } catch {} }));
+    if (!series.SPY) throw new Error("SPY history unavailable");
+    const A = QMS.align(series), D = QTC.decide(A.px), prices = {};
+    for (const s of Object.keys(series)) { const c = series[s].close; prices[s] = c[c.length - 1]; qtPx[s] = prices[s]; }
+    const value = qtValue(prices), hold = Object.fromEntries(Object.entries(QT.positions).map(([s, p]) => [s, p.shares]));
+    const ords = QTC.orders(D.w, hold, prices, value), now = Date.now(), why = `${D.regime} · ${Math.round(D.split * 100)}% equity sleeve · vol ${(D.vol * 100).toFixed(1)}%`;
+    for (const o of ords) {
+      const p = QT.positions[o.sym] || { shares: 0, cost: o.price };
+      if (o.side === "SELL") { const sh = Math.min(o.shares, p.shares), val = sh * o.price, fee = val * QTC.QT_COST; QT.cash += val - fee; const pnl = (o.price - p.cost) * sh - fee; p.shares -= sh;
+        QT.trades.unshift({ t: now, side: "SELL", sym: o.sym, shares: +sh.toFixed(4), price: o.price, value: +val.toFixed(2), pnl: +pnl.toFixed(2), why, w: +o.to.toFixed(4) });
+        if (p.shares < 1e-6) delete QT.positions[o.sym]; else QT.positions[o.sym] = p; }
+      else { const val = Math.min(o.shares * o.price, QT.cash / (1 + QTC.QT_COST)); if (val < 1) continue; const sh = val / o.price, fee = val * QTC.QT_COST; QT.cash -= val + fee;
+        p.cost = (p.cost * p.shares + val) / (p.shares + sh); p.shares += sh; QT.positions[o.sym] = p;
+        QT.trades.unshift({ t: now, side: "BUY", sym: o.sym, shares: +sh.toFixed(4), price: o.price, value: +val.toFixed(2), why, w: +o.to.toFixed(4) }); }
+    }
+    QT.cash = Math.max(0, QT.cash); // rounding dust
+    QT.trades = QT.trades.slice(0, 1500);
+    if (!QT.firstTrade && ords.length) QT.firstTrade = now;
+    let spxP = null; try { const q = (await getQuotes(["^GSPC"])).quotes["^GSPC"]; if (q && q.price) spxP = q.price; } catch {}
+    const after = qtValue(prices); QT.equity.push({ t: now, d: t.day, v: +after.toFixed(2), s: spxP }); QT.equity = QT.equity.slice(-1500);
+    if (!QT.spx0 && spxP) QT.spx0 = spxP;
+    QT.decisions.unshift({ t: now, d: t.day, regime: D.regime, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: ords.length });
+    QT.decisions = QT.decisions.slice(0, 60); QT.lastDay = t.day; QT.lastError = null; await qtSave();
+  } catch (e) { QT.lastError = String(e.message || e); } finally { qtBusy = false; }
+}
+async function qtView() {
+  if (!qtLoaded) await qtLoad();
+  const syms = Object.keys(QT.positions); let q = {};
+  try { q = (await getQuotes([...syms, "^GSPC"])).quotes; } catch {}
+  for (const s of syms) if (q[s] && q[s].price) qtPx[s] = q[s].price;
+  const value = qtValue({}), positions = syms.map((s) => { const p = QT.positions[s], price = qtPx[s] || p.cost; return { sym: s, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, weight: (p.shares * price) / value }; }).sort((a, b) => b.value - a.value);
+  const t = etParts(), open = !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 570 && t.min < 960;
+  return { ...QT, kind: "quant", value, startValue: QTC.QT_START, spxNow: q["^GSPC"] && q["^GSPC"].price, positions, rawPositions: QT.positions, marketOpen: open, latest: QT.decisions[0] || null,
+    rules: { universe: QTC.QT_EQUITY, defensive: QTC.QT_DEFENSIVE, cash: QTC.QT_CASH, top: QTC.QT_TOP, maxW: QTC.QT_MAX_W, volTarget: QTC.QT_VOL_TARGET, minTrade: QTC.QT_MIN_TRADE, cost: QTC.QT_COST, split: QTC.SPLIT },
+    status: QT.lastError ? `Waiting for data: ${QT.lastError}` : QT.lastDay ? `Rebalances once a day after the close · last decision ${QT.lastDay}` : "Making its first allocation…" };
+}
+setTimeout(() => { qtTick(); setInterval(qtTick, process.env.AP_TEST ? 15000 : 10 * 60e3); }, process.env.AP_TEST ? 8000 : 90_000);
+
+
 // ---------------------------------------------------------------- live money (both bots, marked to market every few seconds)
 // While someone has the AI vs S&P page open, the server fetches live prices for every stock the bots hold — one batched
 // Yahoo request every 4 seconds — and the page polls this compact snapshot every ~2.5 seconds. Real-time Finnhub trades
@@ -2849,6 +2916,8 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());
+      if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
+      if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(true); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
       if (u.pathname === "/api/pub/botslive") return send(res, 200, botsLive());
       if (u.pathname === "/api/daytrader/restore" && req.method === "POST") { if (!dtLoaded) await dtLoad(); let doc = null; try { doc = await readBody(req); } catch {} return send(res, 200, dtRestore(doc)); }
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
