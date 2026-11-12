@@ -14,12 +14,12 @@ if(!o)document.documentElement.classList.add("viewonly");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Market Desk · Live market dashboard by Peter Hemmerdinger</title>
-<meta name="description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, portfolio backtesting, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
+<meta name="description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
 <meta name="author" content="Peter Hemmerdinger">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Market Desk">
 <meta property="og:title" content="Market Desk · Live market dashboard">
-<meta property="og:description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, portfolio backtesting, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
+<meta property="og:description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
 <meta property="og:image" content="https://my-terminal-28tq.onrender.com/og.png?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="627">
@@ -1639,7 +1639,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
 <div class="vo-hello" id="voHello"><div class="vo-in">
   <span class="vo-hi">👋 Welcome</span>
-  <p><b>Market Desk</b> is a live financial research terminal I built as a finance student at Bryant University. Try a <a href="#dcf" data-gotab="dcf">DCF valuation</a> built from SEC filings, <a href="#backtest" data-gotab="backtest">backtest a portfolio</a>, run a <a href="#risk" data-gotab="risk">stress test</a>, check the <a href="#macro" data-gotab="macro">economy</a>, or follow my <a href="#aitrade" data-gotab="aitrade">AI vs. S&amp;P 500 trading experiment</a>.</p>
+  <p><b>Market Desk</b> is a live financial research terminal I built as a finance student at Bryant University. Try a <a href="#dcf" data-gotab="dcf">DCF valuation</a> built from SEC filings, run a <a href="#risk" data-gotab="risk">stress test</a>, check the <a href="#macro" data-gotab="macro">economy</a>, or follow my <a href="#aitrade" data-gotab="aitrade">AI vs. S&amp;P 500 trading experiment</a>.</p>
   <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><button type="button" class="vo-x" id="voX" title="Hide">✕</button></div>
 </div></div>
 <div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-labelledby="voT">
@@ -1650,7 +1650,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <p>I built Market Desk to bring the information I use to follow the markets into a single dashboard, and to apply the concepts from my finance coursework to real, live data. My goal was to understand not just how a portfolio performs, but how much risk it takes to get there.</p>
   <div class="vo-feats">
     <div><b>Company fundamentals &amp; DCF</b><span>Six years of statements and ratios straight from SEC 10-K filings, and a five-year DCF with bull/base/bear cases, CAPM-based WACC and a sensitivity table.</span></div>
-    <div><b>Backtesting</b><span>Test any mix of stocks and ETFs against the S&amp;P 500 with dividend-adjusted prices: CAGR, volatility, Sharpe, drawdown, beta and alpha.</span></div>
     <div><b>Risk &amp; stress testing</b><span>Value at Risk, expected shortfall, correlations, concentration, and what 2008, 2020 and 2022 — or a hypothetical shock — would do to a portfolio.</span></div>
     <div><b>Macro dashboard</b><span>Fed funds, inflation, jobs, GDP, the yield curve and recession signals from FRED, the Treasury and the BLS.</span></div>
     <div><b>AI vs. S&amp;P 500 experiment</b><span>A $10,000 paper account traded all day by rules Claude designed (news, earnings, momentum, analyst ratings), measured against the index with full trade analytics.</span></div>
@@ -1661,7 +1660,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <p><b>Built with</b> Node.js and plain JavaScript (no frameworks), free public data (SEC EDGAR, FRED, U.S. Treasury, BLS, Yahoo Finance, Finnhub), hosted on Render's free plan, with AI coding assistance. It runs at $0 a month: AI features that would cost money are switched off.</p>
   </details>
   <div class="vo-stack"><span>Node.js</span><span>JavaScript</span><span>SEC EDGAR XBRL</span><span>FRED</span><span>Finnhub</span><span>Yahoo Finance data</span><span>Render</span></div>
-  <p class="vo-small">This is the public demo: market data is live, the sample portfolio is illustrative, and backtests and stress tests are hypothetical, not investment results.</p>
+  <p class="vo-small">This is the public demo: market data is live, the sample portfolio is illustrative, and stress tests are hypothetical, not investment results.</p>
   <div class="vo-acts"><a class="btn" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">Connect on LinkedIn ↗</a><button type="button" class="btn ghost" data-gotab="dcf" id="voGoHm">Try the DCF model</button></div>
 </div></div>
 
@@ -1833,27 +1832,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- PREDICTIONS -->
     <!-- WALL STREET: live market floor (S&P 500) -->
-    <section id="tab-backtest" class="pad fx" hidden>
-      <div class="fx-head"><div><div class="fx-kick">⏪ BACKTESTING</div><h1>Portfolio backtester</h1>
-        <p class="fx-sub">See how a mix of stocks and ETFs would have done in the past — growth, risk and drawdowns — compared with the S&amp;P 500. Hypothetical results from historical prices, not actual investment performance.</p></div></div>
-      <div class="bt-grid">
-        <div class="fx-card"><h3>Portfolio <em id="btWsum"></em></h3>
-          <div class="bt-presets" id="btPresets"></div>
-          <div id="btRows"></div>
-          <button class="btn ghost" type="button" id="btAdd" style="margin:6px 0 12px">+ Add holding</button>
-          <div class="bt-opts">
-            <label>Start<input type="date" id="btFrom" class="field"></label>
-            <label>End<input type="date" id="btTo" class="field"></label>
-            <label>Starting amount ($)<input type="number" id="btInit" class="field" value="10000" min="100" step="100"></label>
-            <label>Rebalance<select id="btReb" class="field"><option value="none">Never (buy &amp; hold)</option><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual" selected>Yearly</option></select></label>
-            <label>Risk-free rate for Sharpe (%)<input type="number" id="btRf" class="field" value="2" step="0.25"></label>
-            <label class="bt-chk"><input type="checkbox" id="btDiv" checked> Reinvest dividends (total return)</label>
-          </div>
-          <div class="bt-act"><button class="btn" type="button" id="btRun">Run backtest</button><button class="btn ghost" type="button" id="btSave">Save setup</button><select class="field" id="btLoad" style="max-width:180px"><option value="">Saved setups…</option></select></div>
-        </div>
-        <div id="btOut"><div class="fx-empty">Pick holdings and dates, then run the backtest.</div></div>
-      </div>
-    </section>
     <section id="tab-risk" class="pad fx" hidden>
       <div class="fx-head"><div><div class="fx-kick">🛡 RISK</div><h1>Risk &amp; stress testing</h1>
         <p class="fx-sub">How concentrated a portfolio is, how its holdings move together, how much it could lose on a bad day, and what past crises or hypothetical shocks would do to it. Estimates, not guarantees.</p></div></div>
@@ -2107,12 +2085,12 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","macro","research","fin","dcf","filings","portfolio","backtest","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web"];
+const TABS = ["news","data","macro","research","fin","dcf","filings","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
-  ["markets",[["data","Overview"],["news","News"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
+  ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
   ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["filings","10-K crawler"]]],
-  ["portfolio",[["portfolio","My portfolio"],["backtest","Backtest"],["risk","Risk & stress"]]],
+  ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
   ["web",[["web","Command center"]]],
 ];
@@ -2240,7 +2218,6 @@ function setTab(t){
   if(t==="aitrade"){ apLoadView(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="filings"){ crOpen(); }
-  if(t==="backtest"){ btInit(); if(!BT.ran){ BT.ran=true; btRun(); } }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
   if(t==="risk"){ rkInit(); if(!RK.ran&&$("rkSrc").value){ RK.ran=true; rkRun(); } }
@@ -3214,8 +3191,7 @@ async function sectorOf(sym){ if(ETF_SECTOR[sym]) return ETF_SECTOR[sym]; if(/-U
 const CRISES=[["2008 financial crisis","2007-10-09","2009-03-09"],["2020 COVID crash","2020-02-19","2020-03-23"],["2022 rate shock","2022-01-03","2022-10-12"]];
 function rkSources(){
   const list=[]; (S.pfs||[]).forEach(p=>{ if(p.holdings&&p.holdings.length) list.push([`pf:${p.id}`,`${VIEW?"Sample":"My"} portfolio: ${p.name}`]); });
-  if(BT.rows.some(r=>r[0])) list.push(["bt","Backtester holdings"]);
-  $("rkSrc").innerHTML=list.map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join("")||`<option value="">No portfolio yet — add holdings in Portfolio or the Backtester</option>`;
+  $("rkSrc").innerHTML=list.map(([v,n])=>`<option value="${esc(v)}">${esc(n)}</option>`).join("")||`<option value="">No portfolio yet — add holdings in Portfolio</option>`;
 }
 function alignRets(H,syms){
   const maps=syms.map(s=>new Map(H[s].t.map((t,i)=>[Math.floor(t/86400),(H[s].adj||H[s].close)[i]])));

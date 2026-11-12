@@ -22,7 +22,6 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts, and a **Risk & performance** panel (1-year return vs. the S&P 500, annualized volatility, Sharpe ratio, beta, max drawdown, best/worst day, plus the same for each holding). |
 | **Financials** (Research) | Up to six years of income statement, balance sheet, cash flow and ratios from SEC 10-K filings (EDGAR XBRL), with a side-by-side company comparison. |
 | **DCF valuation** (Research) | Five-year unlevered free cash flow model with bull/base/bear cases, CAPM WACC, terminal value, enterprise-to-equity bridge and a WACC × growth sensitivity table; every input labeled by source. |
-| **Backtest** (Portfolio) | Hypothetical portfolios vs. the S&P 500 with dividend-adjusted prices: CAGR, volatility, Sharpe, drawdown, beta, alpha, yearly returns, saved setups. |
 | **Risk & stress** (Portfolio) | VaR / expected shortfall, correlations, concentration, rate sensitivity, beta-scaled shocks and 2008 / 2020 / 2022 replays. |
 | **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
 | **AI vs. S&P 500** (AI Lab) | A rules-based $10,000 paper-trading bot (no API cost) racing the index, with trade analytics and test runs. |
