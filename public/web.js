@@ -66,7 +66,7 @@
     const hub = $("twbHub"), cw = G.narrow ? G.w * 0.92 : 2 * G.rx * G.hub * 0.84, ch = G.narrow ? G.h * 0.7 : 2 * G.ry * G.hub * 0.9;
     Object.assign(hub.style, { width: cw + "px", height: ch + "px", left: G.cx - cw / 2 + "px", top: G.cy - ch / 2 + "px" });
   }
-  const ang = (s) => -Math.PI / 2 + (s / SPOKES) * Math.PI * 2;
+  const ang = (s) => -Math.PI / 2 + (s / SPOKES) * Math.PI * 2 + ROT.a; // ROT.a spins the web inside its own outline
   const frac = (k) => G.hub + (1 - G.hub) * (k / RINGS);
   const J = (s, k) => ({ x: G.cx + Math.cos(ang(s)) * G.rx * frac(k), y: G.cy + Math.sin(ang(s)) * G.ry * frac(k) }); // junction, container px
   const sag = (a, b) => ({ x: G.cx + ((a.x + b.x) / 2 - G.cx) * 0.95, y: G.cy + ((a.y + b.y) / 2 - G.cy) * 0.95 });
@@ -87,9 +87,9 @@
   function myStocks() { const out = new Set(); for (const p of S.pfs || []) for (const h of p.holdings || []) if (h && h.symbol && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(h.symbol.toUpperCase())) out.add(h.symbol.toUpperCase()); return out; }
   function webSlots() { const out = [], used = new Set(G.nodes.map((n) => n.s + ":" + n.k));
     for (let k = 1; k <= RINGS; k++) for (let s = 0; s < SPOKES; s++) {
-      if (!used.has(s + ":" + k)) out.push({ ...J(s, k), s, k });
-      const a = J(s, k), b = J((s + 1) % SPOKES, k), c = sag(a, b); out.push({ x: 0.25 * a.x + 0.5 * c.x + 0.25 * b.x, y: 0.25 * a.y + 0.5 * c.y + 0.25 * b.y, s: s + 0.5, k }); // mid-segment
-      if (k < RINGS) out.push({ ...J(s, k + 0.5), s, k: k + 0.5 }); // between rings, on the spoke
+      if (!used.has(s + ":" + k)) out.push({ ...J(s, k), s, k, t: "j" });
+      const a = J(s, k), b = J((s + 1) % SPOKES, k), c = sag(a, b); out.push({ x: 0.25 * a.x + 0.5 * c.x + 0.25 * b.x, y: 0.25 * a.y + 0.5 * c.y + 0.25 * b.y, s, k, t: "m" }); // mid-segment
+      if (k < RINGS) out.push({ ...J(s, k + 0.5), s, k: k + 0.5, t: "j" }); // between rings, on the spoke
     }
     return out; }
   // ---------------------------------------------------------------- drawing: silk, dew, a market heat map, a camera
@@ -97,6 +97,30 @@
   // dots, colour is today's move (or sector), your holdings glow gold. Wheel zooms around the cursor, drag pans,
   // double-click resets; hovering a stock threads it to its sector and shows a card; the legend isolates a sector.
   const CAM = { k: 1, x: 0, y: 0 }, VIEWS = { mode: "move", sector: "", mine: false };
+  // the web spins slowly inside its outline (≈ one turn every 9 minutes): strands and every dot slide around the oval,
+  // labels stay upright, nothing is clipped. Each frame only moves existing elements (no redraw, no filters).
+  const ROT = { a: 0, on: (() => { try { return localStorage.getItem("tw_rot") !== "0"; } catch { return true; } })(), last: 0, lastMove: 0, raf: 0 };
+  const camT = () => `translate(${CAM.x.toFixed(1)},${CAM.y.toFixed(1)}) scale(${CAM.k.toFixed(3)})`;
+  const slotXY = (sl) => { if (sl.t === "m") { const a2 = J(sl.s, sl.k), b2 = J(sl.s + 1, sl.k), c2 = sag(a2, b2); return { x: 0.25 * a2.x + 0.5 * c2.x + 0.25 * b2.x, y: 0.25 * a2.y + 0.5 * c2.y + 0.25 * b2.y }; } return J(sl.s, sl.k); };
+  const ringD = (k) => { let d = ""; for (let sp = 0; sp < SPOKES; sp++) { const a2 = J(sp, k), b2 = J((sp + 1) % SPOKES, k), c2 = sag(a2, b2); d += `${sp ? "" : `M${a2.x.toFixed(1)} ${a2.y.toFixed(1)}`} Q${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${b2.x.toFixed(1)} ${b2.y.toFixed(1)}`; } return d; };
+  const spokeD = (sp) => { const a2 = J(sp, 0), b2 = J(sp, RINGS + 0.35); return `M${a2.x.toFixed(1)} ${a2.y.toFixed(1)}L${b2.x.toFixed(1)} ${b2.y.toFixed(1)}`; };
+  function reposition() {
+    const svg = $("twbSvg"); if (!svg) return;
+    svg.querySelectorAll("[data-spoke]").forEach((e) => e.setAttribute("d", spokeD(+e.dataset.spoke)));
+    svg.querySelectorAll("[data-ring]").forEach((e) => e.setAttribute("d", ringD(+e.dataset.ring)));
+    svg.querySelectorAll("[data-sl]").forEach((e) => { const sl = W.slotList[+e.dataset.sl]; if (!sl) return; const p = slotXY(sl); e.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`); });
+    svg.querySelectorAll("[data-js]").forEach((e) => { const p = J(+e.dataset.js, +e.dataset.jk); if (e.tagName === "circle") { e.setAttribute("cx", p.x.toFixed(1)); e.setAttribute("cy", p.y.toFixed(1)); } else e.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`); });
+  }
+  function rotLoop(t) {
+    ROT.raf = requestAnimationFrame(rotLoop); const dt = ROT.last ? Math.min(0.1, (t - ROT.last) / 1000) : 0; ROT.last = t;
+    const svg = $("twbSvg"); if (!svg || !W.open || document.hidden) return;
+    const paused = !ROT.on || CAM.k > 1.01 || svg.classList.contains("hov") || svg.classList.contains("grab") || (typeof SCAN !== "undefined" && SCAN.on) || matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (paused || !dt) return;
+    ROT.a = (ROT.a + dt * 0.0116) % (Math.PI * 2);
+    if (t - ROT.lastMove < 33) return; ROT.lastMove = t; reposition(); // ~30 fps is plenty for a slow spin
+    // a spider resting on the web rides along with its junction
+    const c = SPD.cur; if (SPD.el && SPD.at && (!c || (c.wait != null && (c.node || c.rest)))) { const q = scr(J(SPD.at.s, SPD.at.k)); SPD.x += (q.x - SPD.x) * 0.5; SPD.y += (q.y - SPD.y) * 0.5; }
+  }
   const SC = { "Information Technology": "#4da3ff", "Health Care": "#34d399", Financials: "#facc15", "Consumer Discretionary": "#f472b6", "Communication Services": "#a78bfa", Industrials: "#94a3b8", "Consumer Staples": "#fb923c", Energy: "#f87171", Utilities: "#67e8f9", "Real Estate": "#c4b5fd", Materials: "#fde68a" };
   const SHORT = { "Information Technology": "Tech", "Health Care": "Health", Financials: "Financials", "Consumer Discretionary": "Discretionary", "Communication Services": "Comms", Industrials: "Industrials", "Consumer Staples": "Staples", Energy: "Energy", Utilities: "Utilities", "Real Estate": "Real estate", Materials: "Materials" };
   function moveCol(p) { if (p == null || !isFinite(p)) return "#475569"; const t = Math.max(-1, Math.min(1, p / 3)); return t >= 0 ? `rgb(${Math.round(40 - 25 * t)},${Math.round(120 + 100 * t)},${Math.round(110 + 15 * t)})` : `rgb(${Math.round(150 + 100 * -t)},${Math.round(70 - 20 * -t)},${Math.round(90 - 10 * -t)})`; }
@@ -105,24 +129,24 @@
     const svg = $("twbSvg"); if (!svg || !G.w) return;
     svg.setAttribute("viewBox", `0 0 ${G.w} ${G.h}`);
     let st = "", dew = "";
-    for (let sp = 0; sp < SPOKES; sp++) { const a = J(sp, 0), b = J(sp, RINGS + 0.35), d = `M${a.x.toFixed(1)} ${a.y.toFixed(1)}L${b.x.toFixed(1)} ${b.y.toFixed(1)}`; st += `<path class="spoke" d="${d}"/><path class="shim" d="${d}" style="animation-delay:${(-sp * 0.37).toFixed(2)}s"/>`; }
-    for (let k = 0; k <= RINGS; k++) { let d = ""; for (let sp = 0; sp < SPOKES; sp++) { const a = J(sp, k), b = J((sp + 1) % SPOKES, k), c = sag(a, b); d += `${sp ? "" : `M${a.x.toFixed(1)} ${a.y.toFixed(1)}`} Q${c.x.toFixed(1)} ${c.y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`; if (k && (sp + k) % 3 === 0) dew += `<circle cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="1.6"/>`; }
-      st += `<path class="ring${k === 0 ? " hubring" : ""}" d="${d}"/>${k ? `<path class="shim r" d="${d}" style="animation-delay:${(-k * 0.9).toFixed(2)}s"/>` : ""}`; }
+    for (let sp = 0; sp < SPOKES; sp++) { const d = spokeD(sp); st += `<path class="spoke" data-spoke="${sp}" d="${d}"/><path class="shim" data-spoke="${sp}" d="${d}" style="animation-delay:${(-sp * 0.37).toFixed(2)}s"/>`; }
+    for (let k = 0; k <= RINGS; k++) { const d = ringD(k); for (let sp = 0; sp < SPOKES; sp++) if (k && (sp + k) % 3 === 0) { const a = J(sp, k); dew += `<circle data-js="${sp}" data-jk="${k}" cx="${a.x.toFixed(1)}" cy="${a.y.toFixed(1)}" r="1.6"/>`; }
+      st += `<path class="ring${k === 0 ? " hubring" : ""}" data-ring="${k}" d="${d}"/>${k ? `<path class="shim r" data-ring="${k}" d="${d}" style="animation-delay:${(-k * 0.9).toFixed(2)}s"/>` : ""}`; }
     const mineSet = myStocks(); let nodes = "";
     for (const n of G.nodes) { const p = J(n.s, n.k), c = ncol(n), lab = ["portfolio", "holding", "sector", "macro", "trader"].includes(n.type), mine = mineSet.has(String(n.label || "").toUpperCase());
-      if (mine) nodes += `<g class="twb-lit" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" pointer-events="none"><circle class="glow" r="16" style="fill:#f5c518"/><circle r="9" fill="none" stroke="#f5c518" stroke-width="1.4" opacity=".85"/></g>`;
-      nodes += `<g class="twb-n${lab || mine ? " lab" : ""}${mine ? " mine" : ""}" data-id="${esc(n.id)}" data-sym="${esc(String(n.label || "").toUpperCase())}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" tabindex="0" role="button" aria-label="${esc(n.type + ": " + n.label)}"><circle class="hit" r="12"/><circle class="halo" r="9" fill="${c}"/><circle class="core" r="${n.type === "portfolio" ? 4.5 : 3}" fill="${c}"/><text x="7" y="3">${esc(n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label)}</text><title>${esc(n.label + (n.sub ? " — " + n.sub : ""))}</title></g>`; }
+      if (mine) nodes += `<g class="twb-lit" data-js="${n.s}" data-jk="${n.k}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" pointer-events="none"><circle class="glow" r="16" style="fill:#f5c518"/><circle r="9" fill="none" stroke="#f5c518" stroke-width="1.4" opacity=".85"/></g>`;
+      nodes += `<g class="twb-n${lab || mine ? " lab" : ""}${mine ? " mine" : ""}" data-js="${n.s}" data-jk="${n.k}" data-id="${esc(n.id)}" data-sym="${esc(String(n.label || "").toUpperCase())}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" tabindex="0" role="button" aria-label="${esc(n.type + ": " + n.label)}"><circle class="hit" r="12"/><circle class="halo" r="9" fill="${c}"/><circle class="core" r="${n.type === "portfolio" ? 4.5 : 3}" fill="${c}"/><text x="7" y="3">${esc(n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label)}</text><title>${esc(n.label + (n.sub ? " — " + n.sub : ""))}</title></g>`; }
     svg.innerHTML = `<defs><radialGradient id="twBg" cx="50%" cy="50%" r="60%"><stop offset="0" stop-color="#0b1a22"/><stop offset=".55" stop-color="#070d13"/><stop offset="1" stop-color="#030508"/></radialGradient>
       <linearGradient id="twSilk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e0fbff" stop-opacity="0"/><stop offset=".5" stop-color="#e0fbff" stop-opacity=".9"/><stop offset="1" stop-color="#e0fbff" stop-opacity="0"/></linearGradient>
       <filter id="twGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
       <rect class="twb-bgr" x="0" y="0" width="${G.w}" height="${G.h}" fill="url(#twBg)"/>
-      <g id="twbCam" transform="translate(${CAM.x.toFixed(1)},${CAM.y.toFixed(1)}) scale(${CAM.k.toFixed(3)})"><g class="twb-strands">${st}</g><g class="twb-dew">${dew}</g><g id="twbLinks"></g>${fillWeb()}${nodes}</g>`;
+      <g id="twbCam" transform="${camT()}"><g class="twb-strands">${st}</g><g class="twb-dew">${dew}</g><g id="twbLinks"></g>${fillWeb()}${nodes}</g>`;
     svg.classList.toggle("z2", CAM.k >= 1.8); svg.classList.toggle("z3", CAM.k >= 3); applyFilters();
   }
   function fillWeb() {
     if (!W.sp500) { if (!W.sp500Loading) { W.sp500Loading = true; fetch("/sp500.json").then((r) => r.json()).then((j) => { W.sp500 = j.rows || []; if (W.open) drawWeb(); }).catch(() => { W.sp500 = []; }); } }
     if (!W.snap && !W.snapLoading) { W.snapLoading = true; loadSnap(true).finally(() => (W.snapLoading = false)); }
-    const slots = webSlots(); if (!slots.length) return "";
+    const slots = webSlots(); W.slotList = slots; if (!slots.length) return "";
     const mine = myStocks(), shown = new Set(G.nodes.map((n) => String(n.label || "").toUpperCase())), rows = W.sp500 || [], q = (W.snap && W.snap.quotes) || {};
     W.sec = Object.fromEntries(rows.map((r) => [r[0], r[2]])); W.nm = Object.fromEntries(rows.map((r) => [r[0], r[1]]));
     const capOf = (x) => (q[x] && q[x][3]) || 0, byCap = rows.map((r) => r[0]).sort((a2, b2) => capOf(b2) - capOf(a2));
@@ -133,20 +157,21 @@
     const free = slots.map((p, j) => j).filter((j) => !order[j]).sort((a2, b2) => slots[a2].k - slots[b2].k); free.forEach((j, i) => { if (i < all.length) order[j] = { sym: all[i], mine: false }; });
     const maxCap = Math.max(1, ...all.slice(0, 5).map(capOf)), movers = new Set(Object.entries(q).filter(([x, v]) => v[2] != null && Math.abs(v[2]) >= 3).map(([x]) => x)), big = new Set(all.slice(0, 24));
     W.place = {}; let out = "", lit = "";
-    slots.forEach((p, j) => { const o = order[j]; if (!o) return; const sym = o.sym, v = q[sym], pc = v ? v[2] : null, sec = W.sec[sym] || "", d = esc(sym); W.place[sym] = p;
-      if (o.mine) { lit += `<g class="twb-s mine" data-sym="${d}" data-sec="${esc(sec)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><circle class="glow" r="16"/><circle class="ring" r="7.5"/><circle class="dot" r="4"/><text y="-11">${d}</text>${pc != null ? `<text class="pc ${pc >= 0 ? "u" : "d"}" y="17">${pc >= 0 ? "+" : ""}${pc.toFixed(1)}%</text>` : ""}</g>`; return; }
+    slots.forEach((p, j) => { const o = order[j]; if (!o) return; const sym = o.sym, v = q[sym], pc = v ? v[2] : null, sec = W.sec[sym] || "", d = esc(sym); W.place[sym] = j;
+      if (o.mine) { lit += `<g class="twb-s mine" data-sl="${j}" data-sym="${d}" data-sec="${esc(sec)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><circle class="glow" r="16"/><circle class="ring" r="7.5"/><circle class="dot" r="4"/><text y="-11">${d}</text>${pc != null ? `<text class="pc ${pc >= 0 ? "u" : "d"}" y="17">${pc >= 0 ? "+" : ""}${pc.toFixed(1)}%</text>` : ""}</g>`; return; }
       const r = 1.5 + 4.2 * Math.sqrt(Math.min(1, capOf(sym) / maxCap)), lab = movers.has(sym) || big.has(sym) ? "on" : "z";
-      out += `<g class="twb-s" data-sym="${d}" data-sec="${esc(sec)}" data-pc="${pc == null ? "" : pc.toFixed(2)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><circle class="hit" r="${(r + 5).toFixed(1)}"/><circle class="dt" r="${r.toFixed(1)}" data-c-move="${moveCol(pc)}" data-c-sec="${SC[sec] || "#64748b"}" fill="${VIEWS.mode === "move" && W.snap ? moveCol(pc) : SC[sec] || "#64748b"}"/><text class="${lab}" y="${(-r - 2.5).toFixed(1)}">${d}</text></g>`; });
+      out += `<g class="twb-s" data-sl="${j}" data-sym="${d}" data-sec="${esc(sec)}" data-pc="${pc == null ? "" : pc.toFixed(2)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><circle class="hit" r="${(r + 5).toFixed(1)}"/><circle class="dt" r="${r.toFixed(1)}" data-c-move="${moveCol(pc)}" data-c-sec="${SC[sec] || "#64748b"}" fill="${VIEWS.mode === "move" && W.snap ? moveCol(pc) : SC[sec] || "#64748b"}"/><text class="${lab}" y="${(-r - 2.5).toFixed(1)}">${d}</text></g>`; });
     return `<g class="twb-fill">${out}</g><g class="twb-lit">${lit}</g>`;
   }
   // ---- camera
   function setCam(k, x, y, anim) { k = Math.max(1, Math.min(6, k)); const mx = G.w * (1 - k), my = G.h * (1 - k); x = Math.min(0, Math.max(mx, x)); y = Math.min(0, Math.max(my, y));
-    const cam = $("twbCam"), svg = $("twbSvg"); if (!cam) return; if (anim) { const k0 = CAM.k, x0 = CAM.x, y0 = CAM.y, t0 = performance.now(), D = 380; const f = (t) => { const u = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - u, 3); CAM.k = k0 + (k - k0) * e; CAM.x = x0 + (x - x0) * e; CAM.y = y0 + (y - y0) * e; cam.setAttribute("transform", `translate(${CAM.x.toFixed(1)},${CAM.y.toFixed(1)}) scale(${CAM.k.toFixed(3)})`); svg.classList.toggle("z2", CAM.k >= 1.8); svg.classList.toggle("z3", CAM.k >= 3); svg.style.setProperty("--zs", Math.pow(CAM.k, -0.82).toFixed(3)); if (u < 1) requestAnimationFrame(f); else camUi(); }; requestAnimationFrame(f); return; }
-    CAM.k = k; CAM.x = x; CAM.y = y; cam.setAttribute("transform", `translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${k.toFixed(3)})`); svg.classList.toggle("z2", k >= 1.8); svg.classList.toggle("z3", k >= 3); camUi(); }
+    const cam = $("twbCam"), svg = $("twbSvg"); if (!cam) return; if (anim) { const k0 = CAM.k, x0 = CAM.x, y0 = CAM.y, t0 = performance.now(), D = 380; const f = (t) => { const u = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - u, 3); CAM.k = k0 + (k - k0) * e; CAM.x = x0 + (x - x0) * e; CAM.y = y0 + (y - y0) * e; cam.setAttribute("transform", camT()); svg.classList.toggle("z2", CAM.k >= 1.8); svg.classList.toggle("z3", CAM.k >= 3); svg.style.setProperty("--zs", Math.pow(CAM.k, -0.82).toFixed(3)); if (u < 1) requestAnimationFrame(f); else camUi(); }; requestAnimationFrame(f); return; }
+    CAM.k = k; CAM.x = x; CAM.y = y; cam.setAttribute("transform", camT()); svg.classList.toggle("z2", k >= 1.8); svg.classList.toggle("z3", k >= 3); camUi(); }
   function camUi() { const r = $("twbReset"); if (r) r.hidden = CAM.k <= 1.01; const zoomed = CAM.k > 1.01;
     const svg = $("twbSvg"); if (svg) svg.style.setProperty("--zs", Math.pow(CAM.k, -0.82).toFixed(3)); // labels stay readable instead of ballooning
     const hub = $("twbHub"); if (hub) { hub.style.opacity = zoomed ? "0.08" : ""; hub.style.pointerEvents = zoomed ? "none" : ""; } if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.opacity = zoomed ? "0" : ""; } // the spider waits while you explore
-  function focusSym(sym) { const p = W.place[sym] || (G.nodes.find((n) => String(n.label).toUpperCase() === sym) && J(G.nodes.find((n) => String(n.label).toUpperCase() === sym).s, G.nodes.find((n) => String(n.label).toUpperCase() === sym).k)); if (!p) return false;
+  const placeXY = (sym) => (W.place[sym] != null && W.slotList[W.place[sym]] ? slotXY(W.slotList[W.place[sym]]) : null);
+  function focusSym(sym) { const p = placeXY(sym) || (G.nodes.find((n) => String(n.label).toUpperCase() === sym) && J(G.nodes.find((n) => String(n.label).toUpperCase() === sym).s, G.nodes.find((n) => String(n.label).toUpperCase() === sym).k)); if (!p) return false;
     const k = 3.2; setCam(k, G.w / 2 - p.x * k, G.h / 2 - p.y * k, true); setTimeout(() => { const el = $("twbSvg").querySelector(`[data-sym="${CSS.escape(sym)}"]`); if (el) { el.classList.remove("ping"); void el.getBBox(); el.classList.add("ping"); } }, 400); return true; }
   // ---- filters, legend, toolbar
   function applyFilters() { const svg = $("twbSvg"); if (!svg) return; const mine = myStocks();
@@ -158,20 +183,21 @@
     const secs = Object.keys(SC), secMove = (sc) => { const xs = Object.entries(q).filter(([x]) => W.sec && W.sec[x] === sc).map(([, v]) => [v[2], v[3] || 1]).filter(([p]) => p != null); const w = xs.reduce((a2, [, c]) => a2 + c, 0); return w ? xs.reduce((a2, [p, c]) => a2 + p * c, 0) / w : null; };
     tb.innerHTML = `<div class="twb-seg" id="twbMode"><button data-v="move" class="${VIEWS.mode === "move" ? "on" : ""}">Today's move</button><button data-v="sector" class="${VIEWS.mode === "sector" ? "on" : ""}">Sector</button></div>
       <button class="twb-chip ${VIEWS.mine ? "on" : ""}" id="twbMine">★ My holdings</button><input id="twbFind" class="twb-find" placeholder="Find ticker…" maxlength="8" autocomplete="off" spellcheck="false">
-      ${vals.length ? `<span class="twb-breadth"><b class="u">▲ ${up}</b><b class="d">▼ ${dn}</b><i><em style="width:${((up / Math.max(1, up + dn)) * 100).toFixed(1)}%"></em></i></span>` : ""}<button class="twb-chip" id="twbReset" ${CAM.k > 1.01 ? "" : "hidden"}>⤢ Reset view</button>`;
+      ${vals.length ? `<span class="twb-breadth"><b class="u">▲ ${up}</b><b class="d">▼ ${dn}</b><i><em style="width:${((up / Math.max(1, up + dn)) * 100).toFixed(1)}%"></em></i></span>` : ""}<button class="twb-chip ${ROT.on ? "on rot" : ""}" id="twbRot" title="Slowly rotate the web">⟳ Rotate</button><button class="twb-chip" id="twbReset" ${CAM.k > 1.01 ? "" : "hidden"}>⤢ Reset view</button>`;
     const lg = $("twbLegend"); lg.innerHTML = secs.map((sc) => { const m = secMove(sc); return `<button data-sec="${esc(sc)}" class="${VIEWS.sector === sc ? "on" : ""}"><i style="background:${SC[sc]}"></i>${SHORT[sc]}${m != null ? `<b class="${m >= 0 ? "u" : "d"}">${m >= 0 ? "+" : ""}${m.toFixed(1)}%</b>` : ""}</button>`; }).join("") + (VIEWS.mode === "move" ? `<span class="twb-ramp"><em>−3%</em><i></i><em>+3%</em></span>` : "");
     $("twbMode").onclick = (e) => { const v = e.target.dataset.v; if (!v) return; VIEWS.mode = v; toolbar(); applyFilters(); };
     $("twbMine").onclick = () => { VIEWS.mine = !VIEWS.mine; toolbar(); applyFilters(); };
     $("twbReset").onclick = () => setCam(1, 0, 0, true);
+    $("twbRot").onclick = () => { ROT.on = !ROT.on; try { localStorage.setItem("tw_rot", ROT.on ? "1" : "0"); } catch {} toolbar(); };
     $("twbFind").onkeydown = (e) => { if (e.key !== "Enter") return; const v = e.target.value.trim().toUpperCase(); if (!v) return; if (!focusSym(v)) { e.target.classList.add("bad"); setTimeout(() => e.target.classList.remove("bad"), 900); } };
     lg.onclick = (e) => { const b = e.target.closest("[data-sec]"); if (!b) return; VIEWS.sector = VIEWS.sector === b.dataset.sec ? "" : b.dataset.sec; toolbar(); applyFilters(); };
   }
   // ---- hover: a card + threads to the stock's sector
   function hoverStock(g, ev) {
     const svg = $("twbSvg"), links = $("twbLinks"), tip = $("twbTip"); if (!g) { svg.classList.remove("hov"); svg.querySelectorAll(".twb-s.rel,.twb-s.cur").forEach((x) => x.classList.remove("rel", "cur")); if (links) links.innerHTML = ""; tip.hidden = true; return; }
-    const sym = g.dataset.sym, sec = (W.sec && W.sec[sym]) || g.dataset.sec || "", q = (W.snap && W.snap.quotes && W.snap.quotes[sym]) || null, p0 = W.place[sym] || (() => { const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute("transform") || ""); return m ? { x: +m[1], y: +m[2] } : null; })();
+    const sym = g.dataset.sym, sec = (W.sec && W.sec[sym]) || g.dataset.sec || "", q = (W.snap && W.snap.quotes && W.snap.quotes[sym]) || null, p0 = placeXY(sym) || (() => { const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute("transform") || ""); return m ? { x: +m[1], y: +m[2] } : null; })();
     if (svg.dataset.hovSym !== sym) { svg.dataset.hovSym = sym; svg.classList.add("hov"); svg.querySelectorAll(".twb-s.rel,.twb-s.cur").forEach((x) => x.classList.remove("rel", "cur")); g.classList.add("cur");
-      const peers = Object.entries(W.place).filter(([x]) => x !== sym && W.sec && W.sec[x] === sec).sort((a2, b2) => (((W.snap && W.snap.quotes[b2[0]]) || [])[3] || 0) - (((W.snap && W.snap.quotes[a2[0]]) || [])[3] || 0)).slice(0, 14);
+      const peers = Object.keys(W.place).filter((x) => x !== sym && W.sec && W.sec[x] === sec).map((x) => [x, placeXY(x)]).sort((a2, b2) => (((W.snap && W.snap.quotes[b2[0]]) || [])[3] || 0) - (((W.snap && W.snap.quotes[a2[0]]) || [])[3] || 0)).slice(0, 14);
       const c = SC[sec] || "#5eead4"; links.innerHTML = p0 ? peers.map(([x, p], i) => { svg.querySelector(`.twb-s[data-sym="${CSS.escape(x)}"]`)?.classList.add("rel"); const mx = (p0.x + p.x) / 2, my = (p0.y + p.y) / 2, cx = mx + (G.cx - mx) * 0.35, cy = my + (G.cy - my) * 0.35; return `<path d="M${p0.x.toFixed(1)} ${p0.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)}" stroke="${c}" style="animation-delay:${i * 18}ms"/>`; }).join("") : ""; }
     const r = $("twb").getBoundingClientRect(), mine = myStocks().has(sym), pc = q ? q[2] : null;
     tip.hidden = false; tip.innerHTML = `<div class="tt-h"><b>${esc(sym)}</b>${mine ? '<span class="tt-mine">★ yours</span>' : ""}</div><div class="tt-n">${esc((W.nm && W.nm[sym]) || "")}</div><div class="tt-s"><i style="background:${SC[sec] || "#64748b"}"></i>${esc(sec || "—")}</div>
@@ -740,7 +766,7 @@
   window.webOpen = function () {
     shell(); W.open = true; layoutWeb(); const firstIn = !SPD.el; startSpider();
     if (firstIn) { SPD.at = { s: 12, k: RINGS }; cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 240, cap: "Crawling into the web" }); }
-    wireWeb(); toolbar(); loadSnap(); loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
+    wireWeb(); toolbar(); loadSnap(); if (!ROT.raf) ROT.raf = requestAnimationFrame(rotLoop); loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
     clearInterval(W.snapPoll); W.snapPoll = setInterval(() => { if (!document.hidden && W.open) loadSnap(); }, 60e3); // live heat map
     clearInterval(W.poll); W.poll = setInterval(() => { if (!document.hidden) loadStatus(); }, 5000);
     clearInterval(W.sumPoll); W.sumPoll = setInterval(() => { if (!document.hidden) loadSummary(); }, SUM.meta && !SUM.meta.live ? 300e3 : 30e3);

@@ -329,7 +329,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-lit .glow{fill:#f5c518;opacity:.22;filter:blur(5px);animation:twLit 2.4s ease-in-out infinite}
 .twb-lit .ring{fill:none;stroke:#f5c518;stroke-width:1.4;opacity:.85}
 .twb-lit .dot{fill:#fff6cc;filter:drop-shadow(0 0 4px #f5c518)}
-.twb-lit text{fill:#ffe27a;font:700 10.5px var(--mono);text-anchor:middle;paint-order:stroke;stroke:#05080c;stroke-width:3px;filter:drop-shadow(0 0 4px rgba(245,197,24,.6))}
+.twb-lit text{fill:#ffe27a;font:700 10.5px var(--mono);text-anchor:middle;paint-order:stroke;stroke:#05080c;stroke-width:3px}
 @keyframes twLit{50%{opacity:.5;transform:scale(1.25)}}
 @media (prefers-reduced-motion:reduce){.twb-lit .glow{animation:none}}
 .twb-n.mine text{fill:#ffe27a!important;font:700 10.5px var(--mono);opacity:1!important;paint-order:stroke;stroke:#05080c;stroke-width:3px}
@@ -343,12 +343,12 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-web{cursor:default;touch-action:none}.twb-web.grab{cursor:grabbing}
 .twb-web .spoke{stroke:rgba(190,235,240,.14);stroke-width:.9}
 .twb-web .ring{fill:none;stroke:rgba(190,235,240,.12);stroke-width:.9}
-.twb-web .shim{fill:none;stroke:rgba(224,251,255,.55);stroke-width:1.1;stroke-dasharray:1.5 220;stroke-linecap:round;animation:twShim 7s linear infinite;filter:drop-shadow(0 0 2px rgba(224,251,255,.8))}
+.twb-web .shim{fill:none;stroke:rgba(224,251,255,.75);stroke-width:1.6;stroke-dasharray:1.5 220;stroke-linecap:round;animation:twShim 7s linear infinite}
 .twb-web .shim.r{stroke-dasharray:2 420;animation-duration:11s}
 @keyframes twShim{to{stroke-dashoffset:-440}}
-.twb-dew circle{fill:rgba(224,251,255,.55);filter:drop-shadow(0 0 3px rgba(94,234,212,.9))}
+.twb-dew circle{fill:rgba(224,251,255,.6)}
 .twb-fill .twb-s .hit{fill:transparent}
-.twb-fill .twb-s .dt{stroke:rgba(0,0,0,.45);stroke-width:.6;transition:r .2s,opacity .25s;filter:drop-shadow(0 0 3px rgba(0,0,0,.5))}
+.twb-fill .twb-s .dt{stroke:rgba(0,0,0,.45);stroke-width:.6}
 .twb-fill text{fill:rgba(200,215,225,.55);font:600 7.5px var(--mono);text-anchor:middle;pointer-events:none;transition:opacity .25s}
 .twb-fill text.z{opacity:0}.twb-web.z2 .twb-fill text.z{opacity:.75}.twb-web.z3 .twb-fill text{font-size:6px}
 .twb-fill .twb-s:hover text,.twb-fill .twb-s.cur text,.twb-fill .twb-s.rel text{opacity:1!important;fill:#fff}
@@ -385,3 +385,5 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-lit text{font-size:calc(10.5px * var(--zs,1))!important;stroke-width:calc(3px * var(--zs,1))!important}.twb-lit .pc{font-size:calc(9px * var(--zs,1))!important}
 .twb-n text{font-size:calc(9px * var(--zs,1))!important}.twb-n.mine text{font-size:calc(10.5px * var(--zs,1))!important}
 .twb-web .twb-lit .glow,.twb-web .twb-lit .ring{transform:scale(var(--zs,1))}
+/* rotation: labels counter-rotate around their own dot so they stay upright */
+.twb-chip.rot{border-color:rgba(94,234,212,.5);color:#5eead4}
