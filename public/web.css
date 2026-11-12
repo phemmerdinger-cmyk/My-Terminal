@@ -334,3 +334,6 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 @media (prefers-reduced-motion:reduce){.twb-lit .glow{animation:none}}
 .twb-n.mine text{fill:#ffe27a!important;font:700 10.5px var(--mono);opacity:1!important;paint-order:stroke;stroke:#05080c;stroke-width:3px}
 .twb-n.mine .core{fill:#fff6cc!important;stroke:#f5c518}
+.sp-news{list-style:none;padding:0!important;margin:4px 0 0;font-family:inherit!important;font-size:12.5px!important;color:var(--text)!important}
+.sp-news li{display:grid;grid-template-columns:12px 1fr;gap:4px;margin:4px 0;line-height:1.4}.sp-news li i{font-style:normal;font-size:9px;color:var(--dim);padding-top:3px}
+.sp-news li i.up{color:#0fbf7d}.sp-news li i.down{color:#f6465d}.sp-news em{font-style:normal;color:var(--dim);font:10.5px var(--mono);grid-column:2}

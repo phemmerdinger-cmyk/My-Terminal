@@ -437,11 +437,11 @@
   // inspects each one at double speed, records the figures it reads, starts the matching server research job,
   // and finishes with a written report built from what it collected (rule-based, no paid AI).
   const SCAN = { on: false, found: [], t0: 0, page: null };
-  function scanTargets(t) {
+  function scanTargets(t, max = 16) {
     const sec = $("tab-" + t); if (!sec) return [];
     const els = [...sec.querySelectorAll(".ql-mod, .fx-card, .card, .pfc, .pf-card, .an-card, .ny-pane, .apx, .kpis, .mood-card, .earn-card, .bt-card, .cr-side, .cr-doc, .twb, .feed > *, .heat, table, svg, canvas")];
     const ok = els.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 160 && r.height > 60 && e.offsetParent !== null && !els.some((o) => o !== e && o.contains(e) && o.getBoundingClientRect().height < 900); });
-    return ok.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).slice(0, 16);
+    return ok.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top).slice(0, max);
   }
   const NUMLINE = /(^|[\s(:·])[-+−]?\$?\d[\d,]*(\.\d+)?\s*(%|[KMBT]\b|x\b)?(?=$|[\s),·])/; // a standalone figure, not the "1" in "1-year"
   function scanCollect(e) {
@@ -493,12 +493,23 @@
     const out = []; for (const el of e.querySelectorAll("b, td, em, span, strong, h3, text, small")) { if (out.length >= max) break; if (el.children.length > 1) continue; const t = (el.textContent || "").trim(); if (!t || t.length > 32 || !NUMLINE.test(" " + t + " ")) continue;
       const r = el.getBoundingClientRect(); if (r.width < 4 || r.bottom < 60 || r.top > innerHeight - 20 || r.right < 0 || r.left > innerWidth) continue; if (out.some((o) => o.contains(el) || el.contains(o))) continue; out.push(el); }
     return out; }
+  // Complete readers for pages whose content is a long list: the spider reads the data behind the page, not just what
+  // is scrolled into view. News: every headline published today (since midnight ET), whatever the filters hide.
+  function deepRead(t) {
+    if ((t === "news" || t === "analysis") && S.news && S.news.items) {
+      const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })), mid = Date.now() - (et.getHours() * 3600 + et.getMinutes() * 60 + et.getSeconds()) * 1000;
+      let items = S.news.items.filter((i) => (i.time || 0) >= mid), span = "today";
+      if (items.length < 10) { items = S.news.items.filter((i) => (i.time || 0) >= Date.now() - 24 * 3600e3); span = "the last 24 hours"; }
+      return { kind: "news", span, items: items.slice().sort((a, b) => (b.time || 0) - (a.time || 0)) };
+    }
+    return null;
+  }
   window.spiderScan = async function () {
     if (SCAN.on) return; const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
     const btn = $("spBtn"); if (btn) btn.classList.add("on"); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "hidden";
     if (typeof startResearch === "function") startResearch(t).then((id) => { SCAN.job = id ? FOL.jobLabel : null; });
-    const T = scanTargets(t), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, say2 = (x) => { if (BS.cap) BS.cap.textContent = x; };
-    if (reduce) { T.forEach((e) => scanCollect(e)); return scanFinish(); }
+    const ALL = scanTargets(t, 80), T = ALL.length <= 9 ? ALL : Array.from({ length: 9 }, (_, i) => ALL[Math.round((i * (ALL.length - 1)) / 8)]); SCAN.deep = deepRead(t); SCAN.all = ALL; const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, say2 = (x) => { if (BS.cap) BS.cap.textContent = x; };
+    if (reduce) { ALL.forEach((e) => scanCollect(e)); return scanFinish(); }
     bsInit(); SCAN.figs = 0; const shuffle = null; void shuffle; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>0 figures</span> · 0 of ${T.length} sections`); say2(`Spider deployed · examining ${pageLabel(t)} at 2× speed`);
     await bsGo(Math.min(innerWidth * 0.2, 260), innerHeight / 2, 1200);
     // investigate each section: walk across it in several stops, lasering the figures nearest each stop one by one
@@ -507,29 +518,31 @@
       setTimeout(() => { el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 3200); }, delay); };
     const visit = async (e, k, title, pass2) => {
       try { e.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
-      await bsWait(80); const r = e.getBoundingClientRect(), sc = BS.sp.scale, figs = figuresIn(e, pass2 ? 10 : 14), stops = r.width > 900 ? 3 : r.width > 500 ? 2 : 1, color = COLORS[k % COLORS.length];
+      await bsWait(80); const r = e.getBoundingClientRect(), sc = BS.sp.scale, figs = SCAN.deep ? [...e.querySelectorAll("h3 a, h5 a, .np-art h3, .np-brief h5, li.item")].filter((el) => { const q = el.getBoundingClientRect(); return q.width > 4 && q.bottom > 60 && q.top < innerHeight - 20; }).slice(0, pass2 ? 8 : 14) : figuresIn(e, pass2 ? 6 : 10), stops = r.width > 900 ? 2 : 1, color = COLORS[k % COLORS.length];
       if (!pass2) bsChip(title, r.left + 8, r.top - 6);
       for (let st = 0; st < stops && SCAN.on; st++) {
         const fx = (st + 0.5) / stops, x = Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r.left + r.width * fx)), y = Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r.top + Math.min(r.height * (0.35 + 0.2 * (st % 2)), 240)));
         say2(`${pass2 ? "Cross-checking" : "Investigating"} ${title}${stops > 1 ? ` · part ${st + 1}/${stops}` : ""}`);
         await bsGo(x, y, bsMs(1800, 450)); if (!SCAN.on) return;
         const mine = figs.filter((el) => { const q = el.getBoundingClientRect(), cx = q.left + q.width / 2; return cx >= r.left + (r.width * st) / stops - 4 && cx <= r.left + (r.width * (st + 1)) / stops + 4; });
-        (mine.length ? mine : st === 0 && !figs.length ? [e] : []).forEach((el, j) => zap(el, j ? "#ff4fa8" : color, j * bsMs(200, 30), !j));
+        (mine.length ? mine : st === 0 && !figs.length ? [e] : []).forEach((el, j) => zap(el, j ? "#ff4fa8" : color, j * bsMs(120, 20), !j));
         SCAN.figs = (SCAN.figs || 0) + (pass2 ? 0 : mine.length);
-        await bsWait(bsMs(1100, 280) + mine.length * bsMs(200, 30));
+        await bsWait(bsMs(650, 160) + mine.length * bsMs(120, 20));
       }
     };
     const T0 = performance.now();
     for (const [k, e] of T.entries()) { if (!SCAN.on) break;
       const title = titleOf(e) || `section ${k + 1}`; await visit(e, k, title, false); if (!SCAN.on) break;
       scanCollect(e); const f = SCAN.found[SCAN.found.length - 1];
-      bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
-      say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120)); await bsWait(bsMs(500, 120)); }
+      bsPill(SCAN.deep ? `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${Math.round((SCAN.deep.items.length * (k + 1)) / T.length)} of ${SCAN.deep.items.length} headlines read</span>` : `<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
+      say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120)); await bsWait(bsMs(250, 60)); }
     // second pass: go back over the richest sections and cross-check before writing anything
-    const rich = SCAN.found.map((f, i) => [i, f.facts.length]).sort((x, y) => y[1] - x[1]).slice(0, 2).filter((x) => x[1] > 0);
+    const rich = SCAN.found.map((f, i) => [i, f.facts.length]).sort((x, y) => y[1] - x[1]).slice(0, 1).filter((x) => x[1] > 0);
     for (const [i] of rich) { if (!SCAN.on) break; const e = T[i]; if (!e) continue; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · cross-checking`); await visit(e, i, titleOf(e) || `section ${i + 1}`, true); }
-    // never rush the report: keep investigating until at least ~30 s have passed
-    while (SCAN.on && performance.now() - T0 < 30000 && T.length) { const i = Math.floor(Math.random() * T.length); await visit(T[i], i, titleOf(T[i]) || `section ${i + 1}`, true); }
+    // a short floor so tiny pages still get a proper look (~16 s)
+    while (SCAN.on && performance.now() - T0 < 16000 && T.length) { const i = Math.floor(Math.random() * T.length); await visit(T[i], i, titleOf(T[i]) || `section ${i + 1}`, true); }
+    // everything on the page gets read, including the sections the tour didn't stop at
+    if (SCAN.on) { const seen = new Set(T); for (const e of ALL) if (!seen.has(e)) scanCollect(e); if (SCAN.deep) say2(`Read all ${SCAN.deep.items.length} headlines from ${SCAN.deep.span}`); }
     if (SCAN.on) { say2("Writing the report"); await bsGo(-160 * BS.sp.scale, innerHeight / 2, 1500); }
     bsHide(); bsPill(""); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "";
     if (SCAN.on) scanFinish(); else { SCAN.on = false; if (btn) btn.classList.remove("on"); }
@@ -547,8 +560,25 @@
     const warns = F.flatMap((f) => (f.text.match(/[^.\n]{0,50}\b(STALE|ERROR|UNAVAILABLE|failed|red flag|faded out-of-sample|broke down)\b[^.\n]{0,30}/g) || []).map((w) => ({ s: f.title, w: w.trim() }))).slice(0, 4);
     let sum = null, disc = []; try { sum = await api("/api/web/summary"); } catch {}
     if (tick.length) try { disc = ((await api(`/api/web/discoveries?symbols=${encodeURIComponent(tick.slice(0, 4).map((x) => x[0]).join(","))}&limit=4`)).items || []); } catch {}
-    const take = [];
-    take.push(`Examined ${F.length} section${F.length === 1 ? "" : "s"} of ${pageLabel(page)} and recorded ${all.length} figures in ${secs} s.`);
+    const take = [], DP = SCAN.deep; let deepHtml = "";
+    if (DP && DP.kind === "news") {
+      const it = DP.items, srcs = new Set(it.map((i) => i.source)), pos = it.filter((i) => i.mood > 0).length, neg = it.filter((i) => i.mood < 0).length, tk = {};
+      for (const i of it) for (const x of i.tickers || []) { tk[x] = tk[x] || { n: 0, m: 0 }; tk[x].n++; tk[x].m += Math.sign(i.mood || 0); }
+      const topT = Object.entries(tk).sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+      const STOP = new Set("the,and,for,with,from,that,this,after,over,into,about,amid,says,said,will,have,has,its,are,was,were,than,more,what,when,your,their,they,just,could,would,stock,stocks,shares,market,markets,new,how,why,who,report,reports,week,today,year,inc,corp".split(","));
+      const wc = {}; for (const i of it) for (const w of String(i.title || "").toLowerCase().match(/[a-z][a-z'-]{3,}/g) || []) if (!STOP.has(w)) wc[w] = (wc[w] || 0) + 1;
+      for (const x of Object.keys(tk)) delete wc[x.toLowerCase()];
+      const themes = Object.entries(wc).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      take.push(`Read all ${it.length} headlines from ${DP.span} across ${srcs.size} source${srcs.size === 1 ? "" : "s"} (${[...srcs].join(", ")}).`);
+      take.push(`Tone: ${pos} positive, ${neg} negative, ${it.length - pos - neg} neutral — the news flow reads ${pos > neg * 1.4 ? "positive" : neg > pos * 1.4 ? "negative" : "mixed"}.`);
+      if (topT.length) take.push(`Most-covered tickers: ${topT.map(([k, v]) => `${k} (${v.n}${v.m > 0 ? ", leaning positive" : v.m < 0 ? ", leaning negative" : ""})`).join(", ")}.`);
+      if (themes.length) take.push(`Recurring themes: ${themes.map(([w, n]) => `${w} (${n})`).join(", ")}.`);
+      const groups = {}; for (const i of it) { const g = (i.tickers && i.tickers[0]) || "Market-wide"; (groups[g] = groups[g] || []).push(i); }
+      const gs = Object.entries(groups).sort((a, b) => (a[0] === "Market-wide") - (b[0] === "Market-wide") || b[1].length - a[1].length);
+      const tm = (t) => new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      deepHtml = `<h4>Every headline read (${it.length})</h4>${gs.map(([g, xs]) => `<div class="sp-sec"><b>${esc(g)} · ${xs.length}</b><ul class="sp-news">${xs.map((i) => `<li><i class="${i.mood > 0 ? "up" : i.mood < 0 ? "down" : ""}">●</i>${esc(i.title)} <em>${esc(i.source || "")} · ${tm(i.time)}</em></li>`).join("")}</ul></div>`).join("")}`;
+    }
+    if (!DP) take.push(`Examined ${F.length} section${F.length === 1 ? "" : "s"} of ${pageLabel(page)} and recorded ${all.length} figures in ${secs} s.`);
     if (pcts.length) take.push(`Of ${pcts.length} signed percentages on the page, ${up} were positive and ${dn} negative${up + dn ? ` — the page reads ${up > dn * 1.5 ? "mostly positive" : dn > up * 1.5 ? "mostly negative" : "mixed"}` : ""}.`);
     if (hi && hi.v > 0) take.push(`Largest gain seen: ${hi.v > 0 ? "+" : ""}${hi.v}% (${hi.s}: “${hi.ctx}”).`);
     if (lo && lo.v < 0) take.push(`Largest decline seen: ${lo.v}% (${lo.s}: “${lo.ctx}”).`);
@@ -556,11 +586,11 @@
     for (const w of warns) take.push(`Flag in ${w.s}: “${w.w}”.`);
     if (SCAN.job) take.push(`Started a server research job for ${SCAN.job}; its findings will appear in THE WEB.`);
     const el = document.createElement("div"); el.className = "sp-rep"; el.innerHTML = `<div class="sp-rep-in" role="dialog" aria-label="Spider report">
-      <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>What the spider found</h3><small>${new Date().toLocaleTimeString()} · ${F.length} sections · ${all.length} figures · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
+      <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>What the spider found</h3><small>${new Date().toLocaleTimeString()} · ${DP ? `${DP.items.length} headlines` : `${F.length} sections · ${all.length} figures`} · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
       <h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
       ${sum && sum.lines && sum.lines.length ? `<h4>Market context (THE WEB ${sum.live ? "live summary" : "latest summary"})</h4><ul class="sp-take">${sum.lines.slice(0, 3).map((l) => `<li>${esc(l.t)}</li>`).join("")}</ul>` : ""}
       ${disc.length ? `<h4>Research on those tickers</h4><ul class="sp-take">${disc.map((d) => `<li><b>${esc(d.headline)}</b></li>`).join("")}</ul>` : ""}
-      <h4>Section by section</h4>${F.map((f) => `<div class="sp-sec"><b>${esc(f.title)}</b>${f.facts.length ? `<ul>${f.facts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>No figures on screen.</p>`}</div>`).join("")}
+      ${deepHtml}${DP ? "" : `<h4>Section by section</h4>`}${DP ? "" : F.map((f) => `<div class="sp-sec"><b>${esc(f.title)}</b>${f.facts.length ? `<ul>${f.facts.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p>No figures on screen.</p>`}</div>`).join("")}
       <p class="sp-foot">A rule-based summary of what the spider read on this page plus THE WEB's stored research. No paid AI; nothing is traded.</p></div>`;
     document.querySelectorAll(".sp-rep").forEach((x) => x.remove()); document.body.appendChild(el);
     const close = () => el.remove(); el.querySelector(".sp-x").onclick = close; el.onclick = (e) => { if (e.target === el) close(); }; document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k); } });
