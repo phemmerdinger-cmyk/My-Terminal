@@ -118,15 +118,17 @@
     return pts;
   }
   const say = (t) => { SPD.capText = t; };
+  // the screen corner closest to a point, just outside the visible area
+  const cornerNear = (p) => ({ x: p.x < innerWidth / 2 ? -SIZE - 8 : innerWidth + 8, y: p.y < innerHeight / 2 ? -SIZE - 8 : innerHeight + 8 });
   function cmd(c) { SPD.q.push(c); }
   function crawl(s2, k2, cap, speed) { const from = { ...SPD.at }; cmd({ pts: () => webPath(from, s2, k2), speed: speed || 150, cap, end: () => (SPD.at = { s: s2, k: k2 }) }); SPD.at = { s: s2, k: k2 }; }
   function planVisit(v) { // v = { page, text, lines:[indexes] }
     const [grp, pageName] = PAGE[v.page] || ["markets", "Overview"], spokes = GSPOKES[grp], s = spokes[Math.floor(spokes.length / 2)];
     crawl(s, RINGS, `Heading to ${GNAME[grp]} › ${pageName}`);
-    const anchor = jf(s, RINGS), tab = () => { const b = document.querySelector(`#tabs [data-group="${grp}"]`); if (!b) return anchor(); const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2 - HALF, y: r.top + r.height / 2 - HALF }; };
-    cmd({ pts: () => [tab], speed: 420, cap: `Climbing into ${GNAME[grp]} › ${pageName}` });
+    const anchor = jf(s, RINGS), out = () => cornerNear(anchor());
+    cmd({ pts: () => [out], speed: 420, cap: `Heading into ${GNAME[grp]} › ${pageName}` });
     cmd({ wait: 1700, cap: v.text ? `Reading ${pageName}: ${v.text}` : `Reading ${pageName}` });
-    cmd({ pts: () => [anchor], speed: 420, cap: "Back down to the web" });
+    cmd({ pts: () => [anchor], speed: 420, cap: "Climbing back into the web" });
     const mine = G.nodes.filter((n) => groupOfNode(n) === grp).sort((a, b) => a.k - b.k || (b.importance || 0) - (a.importance || 0));
     const wanted = (v.lines || []).flatMap((i) => (SUM.target[i] ? G.nodes.filter((n) => n.label.length > 1 && new RegExp(`\\b${n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(SUM.target[i].t)) : []));
     const picks = [...new Set([...wanted, ...mine])].slice(0, 2);
@@ -155,7 +157,8 @@
     if (!SPD.cur) { if (!SPD.q.length) (W.open ? nextCycle() : pageCycle()); SPD.cur = SPD.q.shift(); if (!SPD.cur) return; const c = SPD.cur; c.t0 = t; if (c.cap != null) say(c.cap); if (c.write) { writeLines(c.write).then(() => (c.done = true)); } if (c.node) { const e = document.querySelector(`.twb-n[data-id="${CSS.escape(c.node)}"]`); if (e) { e.classList.add("pick"); setTimeout(() => e.classList.remove("pick"), 1400); } } }
     const c = SPD.cur, busy = W.st && W.st.state !== "idle" && W.st.state !== "error", mult = busy ? 1.35 : 1;
     let moving = false;
-    if (c.pts) {
+    if (c.jump) { const p = c.jump(); SPD.x = p.x; SPD.y = p.y; SPD.cur = null; }
+    else if (c.pts) {
       const pts = c.pts().map((f) => f()); c.i = c.i || 0;
       if (reduce) { const p = pts[pts.length - 1]; SPD.x = p.x; SPD.y = p.y; c.i = pts.length; }
       let budget = (c.speed || 150) * mult * dt;
@@ -175,7 +178,7 @@
     SPD.el.classList.toggle("resting", !!(c && c.rest));
     SPD.el.classList.toggle("offline", !!W.offline);
     SPD.cap.textContent = SPD.capText || ""; SPD.cap.style.display = SPD.capText ? "" : "none";
-    SPD.cap.style.transform = `translate(${Math.min(innerWidth - 300, SPD.x + SIZE + 4).toFixed(0)}px,${(SPD.y + HALF - 10).toFixed(0)}px)`;
+    SPD.cap.style.transform = `translate(${Math.max(8, Math.min(innerWidth - 310, SPD.x + SIZE + 4)).toFixed(0)}px,${Math.max(8, Math.min(innerHeight - 30, SPD.y + HALF - 10)).toFixed(0)}px)`;
   }
 
 
@@ -213,9 +216,9 @@
   function onTab(t) {
     if (!SPD.el || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     SPD.q = []; SPD.cur = null; FOL.page = t;
-    if (t === "web") { cmd({ pts: () => [jf(SPD.at.s, RINGS)], speed: 650, cap: "Back to the web" }); return; }
-    const g = typeof groupOf === "function" ? groupOf(t) : null, b = g && document.querySelector(`#tabs [data-group="${g}"]`);
-    if (b) cmd({ pts: () => [() => { const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2 - HALF, y: r.top + r.height / 2 - HALF }; }], speed: 700, cap: `Following you to ${pageLabel(t)}` });
+    if (t === "web") { cmd({ jump: () => cornerNear(jf(SPD.at.s, RINGS)()) }); cmd({ pts: () => [jf(SPD.at.s, RINGS)], speed: 520, cap: "Climbing back into the web" }); return; }
+    const first = () => { const T = targetsOn(t), e = T[0]; if (!e) return { x: innerWidth / 2 - HALF, y: innerHeight / 2 - HALF }; const r = e.getBoundingClientRect(); return { x: r.left + Math.min(r.width - SIZE, 40), y: r.top - HALF + 6 }; };
+    cmd({ jump: () => cornerNear(first()) }); cmd({ pts: () => [first], speed: 520, cap: `Climbing into ${pageLabel(t)}` });
     startResearch(t).then((id) => { if (id) SPD.capText = `Started research: ${FOL.jobLabel}`; });
   }
   const _setTab = setTab; setTab = function () { const r = _setTab.apply(this, arguments); try { onTab(S.tab); } catch {} return r; };
