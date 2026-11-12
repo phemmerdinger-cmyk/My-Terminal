@@ -27,6 +27,7 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
 | **AI vs. S&P 500** (AI Lab) | A rules-based $10,000 paper-trading bot (no API cost) racing the index, with trade analytics and test runs. |
 | **Prediction accuracy** (AI Lab) | Grades saved Claude predictions with non-overlapping outcome bands, calibration and sample sizes. |
+| **🕸 THE WEB** | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, a brain-style intelligence network and an "Ask the Spider" chat with citations, and shares research with AI Trader. Rules-based and free. |
 | **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
 **Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".
@@ -80,6 +81,15 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## THE WEB — how the Spider works
+- **Where it runs:** inside `server.js` on a 15-second scheduler (`web/spider.js`). It reads the site's own data services directly (news feeds, quotes, S&P 500 snapshot, FRED macro, SEC EDGAR filings/8-Ks/Form 4s/XBRL, Finnhub's free earnings calendar, the Fed/SEC/Treasury/BLS feeds) — it never crawls this site's pages.
+- **What it decides:** a priority engine scores every job on portfolio relevance, market impact, freshness, source reliability, price move, upcoming catalysts, research gaps, existing coverage and AI Trader relevance, and re-ranks the queue every tick. Findings queue follow-ups (an 8-K → read the earnings release; a 6% move → look for the catalyst; several peers moving together → a sector pattern).
+- **Limits:** one job at a time, a hard time limit per job, at most 2 retries, 80 jobs an hour, a 60-job queue, follow-up chains at most 2 deep. SEC requests go through the existing polite queue.
+- **Memory:** discoveries are deduplicated by key, versioned when they change, linked to related findings and expire by category. Directional findings (an EPS beat, an insider buying cluster) record a hypothesis that is graded against the S&P 500 a week or two later — that grading is the only feedback loop; nothing else "learns".
+- **Honesty rules:** every fact has a source and time; interpretations, estimates and speculation are labeled; briefings say when prices are delayed, from the last close, or unavailable.
+- **AI Trader:** the swing bot gets a small research nudge (at most ±`SPIDER_TRADER_WEIGHT`, default 0.05, on a ~0–1 score) built only from inputs it doesn't already score — insider buying, earnings-release tone/guidance and sector news patterns. The Claude Predictor and Ask Claude also see the Spider's stored research. **The Spider never places or modifies trades.**
+- **Free hosting:** Render's free plan sleeps when idle; the existing GitHub Actions ping keeps it awake about 7 AM–11 PM ET, which covers all three briefings. Overnight the Spider pauses and catches up when the server wakes. For research memory to survive redeploys and sleeps, set the free Upstash variables below (otherwise it lives in the server's temp folder).
+
 ## Settings
 - `PORT`: default 3000
 - `ANTHROPIC_API_KEY`: turns on predictions and Ask Claude
@@ -88,6 +98,8 @@ Run the checks with `npm test`.
 - `SITE_PASSWORD`: replaces the built-in site password
 - `CLAUDE_DAILY_LIMIT`: Claude requests allowed per day (default 0 = off, so the site costs $0)
 - `SEC_USER_AGENT`: contact sent to the SEC with each request (their fair-access rules require one)
+- `SPIDER_TRADER_WEIGHT`: how much THE WEB's research can move the swing bot's ranking score (default 0.05, max 0.15; 0 = display only)
+- `SPIDER_OFF`: set to anything to turn THE WEB off
 - `CLAUDE_MODEL`: default `claude-sonnet-5-5` (set to `claude-opus-5-5` for deeper analysis)
 
 ## How the data works
