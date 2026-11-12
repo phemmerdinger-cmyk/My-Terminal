@@ -116,178 +116,6 @@ main{min-width:0}
 .wl .ch{font-size:11px;text-align:right}
 .wl .x{position:absolute;right:4px;top:4px;opacity:0;background:none;border:0;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 5px}
 .wl li:hover .x{opacity:1}
-.wl .x10k{position:absolute;right:26px;top:5px;opacity:0;background:var(--panel2);border:1px solid var(--line2);color:var(--amber);cursor:pointer;font:600 9.5px/1 "IBM Plex Mono",ui-monospace,monospace;padding:3px 4px;border-radius:3px}
-.wl li:hover .x10k,.wl li:focus-within .x10k{opacity:1}
-@media (hover:none){.wl .x10k{opacity:.85}}
-.np-tags .tg10k{color:var(--amber);border-color:rgba(255,158,27,.35);cursor:pointer}
-/* ---------- 10-K crawler: terminal look ---------- */
-.crx{--cr-m:"IBM Plex Mono",ui-monospace,Menlo,monospace;--cr-cyan:#38bdf8;--cr-mag:#f43f5e;--cr-amb:#ffb000;--cr-bg:#07090c;--cr-p:#0d1015;--cr-l:#1d232c}
-.crx .fx-sub{max-width:760px}
-.cr-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.cr-bar .field{width:150px;font-family:var(--cr-m);text-transform:uppercase}
-.cr-chips,.cr-lay,.cr-speed,.cr-jumps{display:inline-flex;gap:0;border:1px solid var(--cr-l);border-radius:4px;overflow:hidden;background:var(--cr-p)}
-.cr-chips button,.cr-lay button,.cr-speed button,.cr-jumps button,.crs-jump button{font:500 11.5px/1 var(--cr-m);color:var(--muted);background:none;border:0;border-right:1px solid var(--cr-l);padding:7px 9px;cursor:pointer;white-space:nowrap}
-.cr-chips button:last-child,.cr-lay button:last-child,.cr-speed button:last-child,.cr-jumps button:last-child{border-right:0}
-.cr-chips button:hover,.cr-lay button:hover,.cr-speed button:hover,.cr-jumps button:hover{color:var(--text);background:rgba(255,255,255,.04)}
-.cr-lay button.on,.cr-speed button.on{color:#0b0d10;background:var(--cr-amb)}
-.cr-src{font:11.5px var(--cr-m);margin-left:auto}.cr-src a{color:var(--cr-cyan)}
-.cr{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,3fr);gap:10px;margin-top:10px;align-items:start}
-.cr[data-layout="doc"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="doc"] .cr-side{display:none}
-.cr[data-layout="nums"]{grid-template-columns:minmax(0,1fr)}.cr[data-layout="nums"] .cr-docwrap{display:none}
-.cr[data-layout="nums"] .cr-side{max-height:none}
-.cr-main{min-width:0;display:flex;flex-direction:column;gap:8px}
-.fa-box{border:1px solid rgba(245,158,11,.55);border-radius:4px;background:linear-gradient(180deg,rgba(245,158,11,.08),transparent 70%),var(--cr-p);padding:10px 12px;margin:0 0 12px;font-family:var(--cr-m)}
-.fa-box[hidden]{display:none}
-.fa-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}.fa-h b{font-size:13px;color:var(--text)}.fa-h small{color:var(--muted);font-size:11.5px}
-.fa-all{margin-left:auto;font:11px var(--cr-m);color:var(--muted);background:none;border:1px solid var(--cr-l);border-radius:3px;padding:4px 8px;cursor:pointer}.fa-all:hover{color:var(--text)}
-.fa-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px}
-.fa-it{display:flex;align-items:center;gap:10px;text-align:left;background:var(--cr-bg);border:1px solid var(--cr-l);border-radius:4px;padding:8px 10px;cursor:pointer;color:var(--text);font:12px var(--cr-m);min-width:0}
-.fa-it:hover{border-color:#f59e0b}.fa-it>span:nth-child(2){flex:1;min-width:0}.fa-it small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.fa-it em{font-style:normal;font-size:10px;color:#f59e0b;margin-left:4px}.fa-it i{font-style:normal;color:#f59e0b;font-size:11px;white-space:nowrap}.fa-ic{font-size:18px}
-.fa-note{position:fixed;right:18px;bottom:18px;z-index:70;max-width:340px;background:var(--panel);border:1px solid #f59e0b;border-radius:6px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);display:flex;flex-direction:column;gap:6px;animation:crSumIn .3s ease-out}
-.fa-note b{font-size:13.5px}.fa-note small{color:var(--muted);font-size:12px}.fa-note div{display:flex;gap:8px;margin-top:4px}
-@media (max-width:700px){.fa-note{left:12px;right:12px;bottom:84px;max-width:none}}
-/* (tab alert dots removed: new filings still show in the alert box on the 10-K crawler page) */
-.cr-modes{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--cr-l);border-radius:4px;overflow:hidden;background:var(--cr-p);margin:0 0 10px;width:max-content;max-width:100%}
-.cr-modes button{font:600 12px/1 var(--cr-m);color:var(--muted);background:none;border:0;border-right:1px solid var(--cr-l);padding:10px 14px;cursor:pointer;white-space:nowrap}
-.cr-modes button:last-child{border-right:0}.cr-modes button:hover{color:var(--text)}
-.cr-modes button.on{background:#f59e0b;color:#111}
-@media (max-width:700px){.cr-modes{width:100%}.cr-modes button{flex:1 1 50%;padding:10px 6px;font-size:11.5px;border-bottom:1px solid var(--cr-l)}}
-.cr-zap{animation:crZap .9s ease-out}
-@keyframes crZap{0%{background:color-mix(in srgb,var(--zap,#38bdf8) 38%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--zap,#38bdf8) 70%,transparent)}100%{background:transparent;box-shadow:none}}
-.cr-turn{margin:14px 0;padding-left:12px;border-left:2px solid var(--cr-l)}.cr-turn.exec{border-left-color:#a78bfa}.cr-turn.outlook{border-left-color:#10b981}
-.cr-spk{font:700 11px var(--cr-m);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:inline-block}
-.cr-turn p{margin:0;line-height:1.75}
-.cr-sent{border-radius:2px;padding:1px 0;transition:background .3s}
-.cr-sent.bull.cr-done{background:rgba(16,185,129,.12);box-shadow:inset 0 -1px 0 rgba(16,185,129,.6)}
-.cr-sent.bear.cr-done{background:rgba(244,63,94,.12);box-shadow:inset 0 -1px 0 rgba(244,63,94,.6)}
-.cr-sent.guide.cr-done{background:rgba(16,185,129,.18);box-shadow:inset 0 -2px 0 #10b981}
-.cr-sent.mixed.cr-done{background:rgba(245,158,11,.12)}
-.cr-meter-bar{display:flex;height:10px;border-radius:3px;overflow:hidden;background:var(--cr-l)}.cr-meter-bar i{display:block;height:100%;transition:width .4s}.cr-meter-bar i.a{background:#10b981}.cr-meter-bar i.b{background:#f43f5e}
-.cr-meter-l{display:flex;justify-content:space-between;font:11.5px var(--cr-m);margin-top:5px}
-.crs-fine{font:10.5px/1.4 var(--cr-m);color:var(--dim);margin-top:5px}
-.crs-flag{font:11.5px var(--cr-m);color:#f43f5e;background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.35);border-radius:3px;padding:4px 7px;margin:0 6px 6px 0;cursor:pointer}.crs-flag b{color:var(--text)}
-.cr-gauge{display:flex;align-items:center;gap:10px}.cr-gauge>b{font:700 26px var(--cr-m);min-width:52px;text-align:right}
-.cr-gauge-bar{flex:1;height:10px;border-radius:3px;background:var(--cr-l);overflow:hidden;position:relative}.cr-gauge-bar i{display:block;height:100%;transition:width .5s}
-.cr-gauge-bar.two i{position:absolute;top:0}.cr-gauge-bar.two span{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
-.crs-land{display:block;width:100%;text-align:left;font:11.5px/1.45 var(--cr-m);color:var(--text);background:var(--cr-p);border:1px solid var(--cr-l);border-left:3px solid #f43f5e;border-radius:3px;padding:6px 8px;margin-bottom:6px;cursor:pointer}
-.crs-land.reworded{border-left-color:#f59e0b}.crs-land.removed{border-left-color:var(--dim);color:var(--muted)}
-.crs-land em{font-style:normal;font-size:9.5px;letter-spacing:.08em;margin-right:6px;color:#f43f5e}.crs-land.reworded em{color:#f59e0b}.crs-land.removed em{color:var(--dim)}
-.cr-rk{margin:8px 0;line-height:1.55}.cr-rk.same{color:var(--muted)}.cr-rk.same b{font-weight:500}
-.cr-rk em{font-style:normal;font:700 10px var(--cr-m);letter-spacing:.08em;padding:1px 5px;border-radius:3px;margin-right:4px}
-.cr-rk.new em{background:rgba(244,63,94,.18);color:#f43f5e}.cr-rk.reworded em{background:rgba(245,158,11,.18);color:#f59e0b}
-.cr-rk small{display:block;color:var(--dim);font-size:11px;margin-top:2px}.cr-rk.removed{color:var(--dim)}
-.cr-f4 td,.cr-f4 th{font-size:12px;white-space:nowrap}.cr-f4 tr.routine{opacity:.6}.cr-f4 a{color:var(--text)}
-.cr-plan{font-style:normal;font:600 9.5px var(--cr-m);color:#f59e0b;border:1px solid rgba(245,158,11,.5);border-radius:3px;padding:0 3px}
-.cr-sum{position:absolute;inset:6px 22px 6px 6px;z-index:5;overflow:auto;background:rgba(7,9,12,.97);border:1px solid #f59e0b;border-radius:4px;box-shadow:0 0 0 1px rgba(245,158,11,.15),0 0 28px rgba(245,158,11,.12);animation:crSumIn .35s ease-out}
-.cr-sum[hidden]{display:none}
-@keyframes crSumIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.cr-sum-in{padding:18px 20px;display:flex;flex-direction:column;gap:12px;font-family:var(--cr-m)}
-.cr-sum-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.cr-sum-k{font-size:10.5px;letter-spacing:.14em;color:#f59e0b}
-.cr-sum-h h3{margin:4px 0 2px;font-size:18px;color:var(--text)}.cr-sum-h small{color:var(--muted);font-size:11.5px}
-.cr-sum-x{background:none;border:1px solid var(--cr-l);color:var(--muted);border-radius:4px;width:30px;height:30px;cursor:pointer;flex:none}.cr-sum-x:hover{color:var(--text);border-color:#f59e0b}
-.cr-sum-lead{margin:0;font-size:14px;line-height:1.6;color:var(--text)}
-.cr-sum-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cr-sum-grid>*{min-width:0}
-.cr-sum-box{border:1px solid var(--cr-l);border-radius:4px;padding:10px 12px;background:var(--cr-p)}
-.cr-sum-box h5{margin:0 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.cr-sum-box h5 em{font-style:normal;text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400}
-.cr-sum-box>div{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--cr-l)}.cr-sum-box>div:last-child{border-bottom:0}
-.cr-sum-box>div span{color:var(--muted)}.cr-sum-box>div b{font-weight:600;color:var(--text);text-align:right;white-space:nowrap}.cr-sum-box b .up,.cr-sum-box b .down{font-weight:500;font-size:11.5px;margin-left:4px}
-.cr-sum-box ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;line-height:1.5;color:var(--text)}
-.cr-sum-box li.up::marker{color:var(--up)}.cr-sum-box li.down::marker{color:var(--down)}
-.cr-sum-box blockquote{margin:0 0 6px;padding:6px 10px;border-left:2px solid #f43f5e;font-size:12.5px;line-height:1.5;color:var(--text);background:rgba(244,63,94,.06)}
-.cr-grade{display:flex;align-items:center;gap:14px;border:1px solid var(--cr-l);border-radius:4px;padding:10px 14px;background:var(--cr-p)}
-.cr-grade>b{font:700 44px/1 var(--cr-m);width:62px;height:62px;display:grid;place-items:center;border-radius:4px;border:2px solid currentColor;flex:none}
-.cr-grade strong{display:block;font-size:14px;color:var(--text)}.cr-grade small{color:var(--muted);font-size:12px}
-.cr-grade.good>b{color:#21c37a;box-shadow:0 0 18px rgba(33,195,122,.25)}.cr-grade.mid>b{color:#f59e0b;box-shadow:0 0 18px rgba(245,158,11,.25)}.cr-grade.bad>b{color:#f43f5e;box-shadow:0 0 18px rgba(244,63,94,.25)}.cr-grade.na>b{color:var(--dim)}
-.cr-grade.sm{padding:8px;gap:10px;margin-bottom:8px}.cr-grade.sm>b{font-size:26px;width:40px;height:40px}.cr-grade.sm strong{font-size:12px}.cr-grade.sm small{font-size:10.5px}
-.crs-chk{display:flex;gap:8px;align-items:flex-start;font:12px/1.4 var(--cr-m);padding:3px 0;color:var(--text)}
-.crs-chk i{font-style:normal;font-weight:700;width:16px;height:16px;border-radius:3px;display:grid;place-items:center;font-size:10.5px;flex:none;margin-top:1px}
-.crs-chk.pass i{background:rgba(33,195,122,.16);color:#21c37a}.crs-chk.warn i{background:rgba(245,158,11,.18);color:#f59e0b}.crs-chk.fail i{background:rgba(244,63,94,.18);color:#f43f5e}
-.crs-chk em{font-style:normal;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#f43f5e;border:1px solid rgba(244,63,94,.5);border-radius:3px;padding:0 4px;margin-left:4px}
-.crs-chk small{display:block;color:var(--muted);font-size:11px}
-.cr-hgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}.cr-hgrid section{min-width:0;display:block}.cr-hgrid h6{margin:0 0 4px;font:600 10.5px var(--cr-m);letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
-.cr-sum-box .cr-hgrid,.cr-sum-box .cr-hgrid section,.cr-sum-box .crs-chk{border-bottom:0}.cr-sum-box .cr-hgrid{justify-content:initial;padding:0}.cr-sum-box .cr-hgrid section{display:block}
-.cr-sum-box>.cr-hgrid{display:grid;border-bottom:0;padding:0}.cr-sum-box>.cr-hgrid .crs-chk span{color:var(--text)}
-.cr-flags{border-color:rgba(244,63,94,.5)}
-.cr-sum-box>.crs-chk{justify-content:flex-start;border-bottom:0;padding:4px 0}.cr-sum-box>.crs-chk span{color:var(--text)}
-.cr-grade>b.long{font-size:28px;width:auto;min-width:62px;padding:0 8px}.cr-grade.sm>b.long{font-size:18px;min-width:40px}
-@media (max-width:700px){.cr-hgrid{grid-template-columns:1fr}.cr-grade>b{font-size:32px;width:48px;height:48px}}
-.cr-sum-act{display:flex;gap:8px;flex-wrap:wrap}
-.cr-sum-note{margin:0;font-size:11px;color:var(--dim)}
-@media (max-width:700px){.cr-sum{inset:4px 16px 4px 4px}.cr-sum-in{padding:12px}.cr-sum-grid{grid-template-columns:1fr}.cr-sum-h h3{font-size:15px}}
-.cr-docwrap{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 10px;gap:6px;background:var(--cr-bg);border:1px solid var(--cr-l);border-radius:4px;padding:6px}
-.cr-doc{position:relative;height:min(68vh,720px);overflow:auto;border-radius:3px;scrollbar-width:thin;overscroll-behavior:contain}
-.cr-page{position:relative;padding:22px 26px 60px;font:12.5px/1.55 var(--cr-m);color:#aeb6c4;background:linear-gradient(180deg,#0b0e13,#090b0f)}
-.cr-ov{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
-.cr-legs polyline{stroke:#ff2d95;stroke-width:2.3;filter:drop-shadow(0 0 3px rgba(255,45,149,.75))}
-.cr-legs .kn{fill:#ff2d95}.cr-legs .ft{fill:#facc15;filter:drop-shadow(0 0 3px rgba(250,204,21,.9))}
-.cr-body{fill:#07080b;stroke:#ff2d95;stroke-width:2.2;filter:drop-shadow(0 0 8px rgba(255,45,149,.7))}
-.cr-abd{fill:#121620;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 6px rgba(244,63,94,.8))}
-.cr-head{fill:#0d1118;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 5px rgba(56,189,248,.8))}
-.cr-loading{padding:40px 10px;text-align:center;color:var(--muted);font-family:var(--cr-m)}
-.cr-cover{text-align:center;border:1px solid var(--cr-l);padding:18px;margin-bottom:12px;line-height:1.6}
-.cr-cover>div:first-child{color:#e6eaf2;font-weight:600;letter-spacing:.04em}.cr-cover b{display:block;color:#fff;font-size:17px;margin:8px 0;letter-spacing:.1em}
-.cr-chk{font-size:11px;margin:6px 0}.cr-co{color:#fff;font-size:16px;font-weight:600;margin-top:8px}.cr-cover small{color:var(--dim);display:block}
-.cr-note{font-size:11px;color:var(--dim);border-left:2px solid var(--cr-amb);padding:4px 10px;margin:0 0 14px}.cr-note a{color:var(--cr-cyan)}
-.cr-part{margin:22px 0 4px;text-align:center;color:#e6eaf2;letter-spacing:.2em;font-size:12px}
-.cr-h3{font:600 13px var(--cr-m);color:#f1f4fa;margin:18px 0 8px;padding:3px 6px;border-radius:2px;display:inline-block;transition:background .3s,box-shadow .3s}
-.cr-page p{margin:0 0 9px}.cr-dim{color:var(--dim)}.cr-end{text-align:center;margin-top:22px}
-.cr-risk{margin:12px 0 4px!important;padding:3px 6px;border-radius:2px}.cr-risk b{color:#e6eaf2;font-weight:600}
-.cr-lines{display:grid;gap:5px;margin:0 6px 10px}.cr-lines i{display:block;height:5px;border-radius:2px;background:#1a202a}
-.cr-guide{padding:4px 7px;border-left:2px solid rgba(244,63,94,.4);border-radius:2px}
-.cr-unit{font-size:10.5px;color:var(--dim);margin:0 0 4px!important}
-.cr-tbl{width:100%;border-collapse:collapse;font:12px var(--cr-m);margin-bottom:8px}
-.cr-tbl th{font-weight:600;color:#cfd6e2;text-align:right;padding:4px 8px;border-bottom:1px solid #2a313c}.cr-tbl th small{display:block;font-weight:400;color:var(--dim);font-size:10px}
-.cr-tbl td{padding:4px 8px;border-bottom:1px dotted #1c222b;text-align:right;white-space:nowrap;color:#c3cad6}.cr-tbl td:first-child{text-align:left;white-space:normal;color:#aeb6c4}
-.cr-tbl td em{font-style:normal;font-size:9.5px;color:var(--cr-amb);border:1px solid rgba(255,176,0,.35);border-radius:2px;padding:0 3px;margin-left:4px}
-.cr-tbl td[data-metric]{border-radius:2px;transition:box-shadow .25s,background .25s,color .25s}
-.cr-hit{box-shadow:0 0 0 1.5px var(--cr-mag),0 0 14px rgba(244,63,94,.45)!important;background:rgba(244,63,94,.12)!important;color:#fff!important}
-.cr-done.cr-tbl td,.cr-tbl td.cr-done{color:#fff}.cr-h3.cr-done{background:rgba(56,189,248,.12);box-shadow:inset 2px 0 0 var(--cr-cyan)}
-.cr-risk.cr-done,.cr-guide.cr-done{background:rgba(244,63,94,.08)}
-.cr-pop{position:absolute;transform:translate(-50%,-100%);font:600 13px var(--cr-m);background:rgba(7,9,12,.92);border:1.5px solid;border-radius:3px;padding:2px 7px;pointer-events:none;z-index:3;animation:crPop 1.4s ease-out forwards;white-space:nowrap}
-@keyframes crPop{0%{opacity:0;transform:translate(-50%,-60%) scale(.7)}15%{opacity:1;transform:translate(-50%,-100%) scale(1.08)}70%{opacity:1}100%{opacity:0;transform:translate(-50%,-150%)}}
-.cr-fly{position:fixed;z-index:60;font:600 12px var(--cr-m);background:rgba(7,9,12,.92);border:1.5px solid;border-radius:3px;padding:2px 7px;pointer-events:none;transition:transform .6s cubic-bezier(.3,.7,.2,1),opacity .6s;white-space:nowrap}
-.cr-rail{position:relative;background:#11151b;border-radius:3px;cursor:pointer}
-.cr-fill{position:absolute;left:0;right:0;top:0;background:linear-gradient(180deg,var(--cr-cyan),var(--cr-mag));border-radius:3px;opacity:.7;transition:height .3s}
-.cr-rail button{position:absolute;left:-3px;width:16px;height:4px;border:0;border-radius:2px;background:var(--cr-amb);cursor:pointer;padding:0;transform:translateY(-50%)}
-.cr-prog{flex:1;min-width:120px;height:6px;border-radius:3px;background:var(--cr-l);overflow:hidden}.cr-prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#f59e0b);transition:width .35s ease;box-shadow:0 0 10px rgba(56,189,248,.5)}
-.cr-rail span{position:absolute;left:0;right:0;height:3px;background:#f59e0b;border-radius:2px}
-.cr-dock{background:var(--cr-p);border:1px solid var(--cr-l);border-radius:4px;padding:8px;display:flex;flex-direction:column;gap:8px;box-shadow:0 0 0 1px rgba(56,189,248,.06),0 -6px 18px rgba(0,0,0,.25)}
-.cr-dk-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.cr-ib{width:34px;height:30px;border:1px solid var(--cr-l);background:#0a0d12;color:var(--text);border-radius:3px;cursor:pointer;font-size:13px}
-.cr-ib:hover{border-color:var(--cr-cyan)}.cr-play{background:var(--cr-amb);color:#0b0d10;border-color:var(--cr-amb);font-weight:700}
-.cr-live{font:600 10.5px var(--cr-m);color:var(--dim);display:inline-flex;align-items:center;gap:5px;letter-spacing:.08em}
-.cr-live i{width:7px;height:7px;border-radius:50%;background:var(--dim)}.cr-live.on{color:#22c55e}.cr-live.on i{background:#22c55e;animation:lvPulse 1.6s infinite}
-.cr-jumps button{color:var(--cr-cyan)}
-.cr-skip{margin-left:auto;font:600 11.5px var(--cr-m);background:rgba(33,195,122,.12);color:#3ee09b;border:1px solid rgba(33,195,122,.4);border-radius:3px;padding:7px 10px;cursor:pointer}
-#crScrub{flex:1;min-width:140px;accent-color:var(--cr-amb)}
-.cr-status{font:11.5px var(--cr-m);color:var(--muted);max-width:52%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cr-side{background:var(--cr-p);border:1px solid var(--cr-l);border-radius:4px;max-height:calc(min(68vh,720px) + 120px);overflow:auto;font-family:var(--cr-m);scrollbar-width:thin}
-.crs-h{padding:10px 12px;border-bottom:1px solid var(--cr-l);position:sticky;top:0;background:var(--cr-p);z-index:1}
-.crs-h b{display:block;color:#fff;font-size:13px}.crs-h small{color:var(--dim);font-size:11px}
-.crs-count{font-size:11px;color:var(--muted);margin-top:4px}.crs-count b{display:inline;color:var(--cr-amb)}
-.crs-act{display:flex;gap:6px;margin-top:8px}.crs-act .btn{font:500 11px var(--cr-m);padding:5px 8px;border-radius:3px}
-.crs-jump{display:flex;flex-wrap:wrap;margin-top:6px;border:1px solid var(--cr-l);border-radius:3px;overflow:hidden}.crs-jump button{color:var(--cr-cyan);padding:5px 7px;font-size:10.5px}
-.crs-sec{padding:8px 12px;border-bottom:1px solid var(--cr-l)}
-.crs-sec h5{margin:0 0 6px;font:600 10.5px var(--cr-m);letter-spacing:.1em;text-transform:uppercase;color:#cfd6e2;display:flex;justify-content:space-between;gap:8px}
-.crs-sec h5 em{font-style:normal;font-weight:400;letter-spacing:0;text-transform:none;color:var(--dim);font-size:10px}
-.crs-go{cursor:pointer}.crs-go:hover{color:var(--cr-cyan)}
-.crs-row{display:grid;grid-template-columns:minmax(0,1fr) auto 54px;gap:8px;align-items:baseline;padding:3px 4px;border-radius:2px;font-size:11.5px;color:var(--dim);transition:background .4s}
-.crs-row span{min-width:0}.crs-row span small{display:block;color:var(--dim);font-size:9.5px}
-.crs-row b{font-weight:600;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
-.crs-row i{font-style:normal;text-align:right;font-size:10.5px}.crs-row i.up{color:var(--up)}.crs-row i.down{color:var(--down)}
-.crs-row.on{color:#c3cad6}.crs-row.on b{color:#fff}
-.crs-row.flash,#crsCalc.flash{animation:crsFlash 1s ease-out}
-@keyframes crsFlash{0%{background:rgba(244,63,94,.35);box-shadow:0 0 12px rgba(244,63,94,.5)}100%{background:transparent}}
-.crs-chip{display:inline-block;font-size:10.5px;color:#9be7ff;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:3px;padding:2px 6px;margin:0 4px 4px 0}
-.crs-q{font-size:11px;line-height:1.45;color:#c3cad6;border-left:2px solid var(--cr-mag);padding:3px 8px;margin-bottom:6px;background:rgba(244,63,94,.05)}
-.crs-q.up{border-color:var(--up);background:rgba(33,195,122,.06)}.crs-q.down{border-color:var(--down)}.crs-q.risk{border-color:var(--cr-amb);background:rgba(255,176,0,.05)}
-.crs-empty{font-size:11px;color:var(--dim)}
-@media (max-width:1000px){.cr{grid-template-columns:minmax(0,1fr)}.cr-side{max-height:none}.cr-status{max-width:100%}}
-@media (max-width:640px){.cr-page{padding:14px 12px 50px;font-size:11.5px}.cr-doc{height:58vh}.cr-tbl{font-size:10.5px}.cr-tbl td,.cr-tbl th{padding:3px 4px}.cr-src{margin-left:0;width:100%}.cr-jumps{order:9;width:100%;overflow-x:auto}.cr-skip{margin-left:0}.cr-bar .field{width:120px}.cr-chips{max-width:100%;overflow-x:auto}}
-@media (prefers-reduced-motion:reduce){.cr-pop{animation:none;opacity:0}.crs-row.flash{animation:none}}
-
 .wl .cnt{font-size:10px;color:var(--amber);font-family:var(--mono)}
 svg.spark{display:block}
 .flash-up{animation:fu 1s}.flash-down{animation:fd 1s}
@@ -1591,7 +1419,11 @@ html.viewonly .api-bal-wrap{display:none!important}
 .an-dr{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .an-dr:last-child{border-bottom:0} .an-n{font-family:var(--mono);color:var(--dim);font-size:12px;min-width:14px}
 .an-dr a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px;line-height:1.35} .an-dr a:hover{text-decoration:underline}
 .an-dm{font-size:11.5px;color:var(--dim);margin-top:3px}
-.ov-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 18px} @media (max-width:900px){.ov-row{grid-template-columns:1fr}}
+.ov-row{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:0 0 18px} @media (max-width:1180px){.ov-row{grid-template-columns:1fr 1fr}.ov-radar{grid-column:1/-1}} @media (max-width:760px){.ov-row{grid-template-columns:1fr}}
+.ov-radar{background:linear-gradient(180deg,#07121a,#05090d);border-color:rgba(56,225,255,.18)} .ov-radar .rd-b{display:flex;gap:14px;align-items:center;margin-top:8px}
+.ov-radar canvas{width:170px;flex:0 0 170px;aspect-ratio:1;cursor:pointer} .ov-radar .rd-list{flex:1;min-width:0;max-height:180px;margin:0}
+.rd-vix{font-size:11.5px;color:var(--dim)} .rd-key{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:10.5px;color:var(--dim)} .rd-key i{font-style:normal;margin-right:4px}
+@media (max-width:420px){.ov-radar canvas{width:130px;flex-basis:130px}}
 .ov-h{display:flex;justify-content:space-between;align-items:center;gap:8px} .ov-h .h{margin:0}
 .ov-go{background:none;border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 10px;font-size:11.5px;cursor:pointer;white-space:nowrap} .ov-go:hover{color:var(--text);border-color:var(--muted)}
 .ov-card .an-pf{margin-top:8px} .ov-f{padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.4} .ov-f:last-child{border:0}
@@ -1723,6 +1555,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       </div>
       <div class="ov-row">
         <div class="an-card ov-card"><div class="ov-h"><h2 class="h" id="ovPfH">Your portfolio today</h2><button type="button" class="ov-go" data-gotab="portfolio">Portfolio →</button></div><div id="ovPf"></div></div>
+        <div class="an-card ov-card ov-radar" id="ovRadar"></div>
         <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest research · THE WEB</h2><button type="button" class="ov-go" data-gotab="web">THE WEB →</button></div><div id="ovWeb"></div></div>
       </div>
       <div class="bb" id="bestBuys"></div>
@@ -1785,25 +1618,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <p class="fx-sub">Estimates what a company is worth from the cash it could generate over the next five years plus a terminal value, discounted at its cost of capital. Every input is labeled with where it came from — change any of them and the value updates instantly.</p></div></div>
       <form class="fx-bar" id="dcfForm"><input class="field" id="dcfSym" placeholder="Ticker, e.g. MSFT" maxlength="10" autocomplete="off"><button class="btn">Build model</button></form>
       <div id="dcfOut"><div class="fx-empty">Enter a ticker to build a model from its latest 10-K.</div></div>
-    </section>
-    <section id="tab-filings" class="pad fx crx" hidden>
-      <div class="fx-head"><div><div class="fx-kick" id="crKick">🕷 10-K CRAWLER</div><h1>Filing crawler</h1>
-        <p class="fx-sub">A bot reads a company's SEC filings — its 10-K financials, latest earnings release, risk factors or insider trades — and lasers every key fact into the panel on the right. Everything comes from the real filings on SEC EDGAR.</p></div></div>
-      <div class="fa-box" id="crAlerts" hidden></div>
-      <div class="cr-modes" id="crModes" role="tablist" aria-label="What the crawler reads"><button type="button" data-m="fin">📊 10-K financials</button><button type="button" data-m="release">🎙️ Earnings release</button><button type="button" data-m="risk">⚠️ Risk &amp; forensics</button><button type="button" data-m="insiders">💼 Insider trades</button></div>
-      <form class="fx-bar cr-bar" id="crForm"><input class="field" id="crSym" placeholder="Type a ticker — e.g. AAPL" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
-        <span class="cr-chips" id="crChips"><button type="button" data-sym="AAPL">AAPL</button><button type="button" data-sym="NVDA">NVDA</button><button type="button" data-sym="MSFT">MSFT</button><button type="button" data-sym="TSLA">TSLA</button><button type="button" data-sym="AMZN">AMZN</button><button type="button" data-sym="JPM">JPM</button></span>
-        <span class="cr-lay" id="crLayout"><button type="button" data-l="doc" title="Document only">Document</button><button type="button" data-l="both" class="on" title="Document and numbers">Both</button><button type="button" data-l="nums" title="Numbers only">Numbers</button></span>
-        <span class="cr-src" id="crSrc"></span></form>
-      <div class="cr" id="crRoot" data-layout="both">
-        <div class="cr-main">
-          <div class="cr-docwrap"><div class="cr-doc" id="crDoc"><div class="cr-page" id="crPage"><div class="cr-loading">Enter a ticker to start.</div></div><svg class="cr-ov" id="crOv" aria-hidden="true"></svg></div><div class="cr-rail" id="crRail"></div></div>
-          <div class="cr-dock" id="crDock">
-            <div class="cr-dk-row"><span class="cr-live" id="crLive"><i></i><b id="crLiveT">READY</b></span><div class="cr-prog" aria-hidden="true"><i id="crProg"></i></div><span class="cr-status" id="crStatus">Type a ticker to start</span></div>
-          </div>
-        </div>
-        <aside class="cr-side" id="crSide"></aside>
-      </div>
     </section>
     <section id="tab-portfolio" class="pad pfx" hidden>
       <div class="pf-bar">
@@ -2101,7 +1915,7 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","macro","research","fin","dcf","filings","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","health","backtest","quant"];
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","health","backtest","quant"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
@@ -2109,7 +1923,7 @@ const NAV=[
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
-  ["web",[["web","Command center"],["filings","10-K crawler"],["health","System health"]]],
+  ["web",[["web","Command center"],["health","System health"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -2234,7 +2048,6 @@ function setTab(t){
   if(t==="analysis"){ anOpen(); }
   if(t==="aitrade"){ apLoadView(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
-  if(t==="filings"){ crOpen(); }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
   if(t==="risk"){ rkInit(); if(!RK.ran&&$("rkSrc").value){ RK.ran=true; rkRun(); } }
@@ -2246,7 +2059,7 @@ function setTab(t){
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1); const m=h.match(/^filings\/([A-Za-z0-9.\-]{1,10})(?:\/(fin|release|risk|insiders))?$/); if(m){ if(m[2]&&m[2]!==CR.mode){ CR.mode=m[2]; CR.sym=""; } if(!CR.d||CR.d.symbol.replace(".","-")!==m[1].toUpperCase()||!CR.sym) crOpenSym(m[1]); return; } if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
@@ -2329,7 +2142,7 @@ function renderWL(prev={}){
       <div><div class="sym">${esc(s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.error?"No quote":q.name||"…")}</div></div>
       ${spark(q.spark,64,22,q.prevClose)}
       <div><div class="px">${fmt(q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
-      <button class="x10k" data-10k="${esc(s)}" title="Read ${esc(s)}'s 10-K with the crawler">10-K</button><button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
+      <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
   }).join("");
 }
 function renderMovers(){ // News-owned: which companies the headlines are about (prices live in the watchlist)
@@ -2555,7 +2368,7 @@ function renderFeed(){
   const src=i=>`<span class="np-src" style="--c:${SRC[i.source].c}">${SRC[i.source].short}</span>`;
   const meta=i=>{ const isNew=i._new&&now-i._new<10*60e3; return `<div class="np-meta">${src(i)}<span>${when(i.time)}</span>${i._bs===2?`<b class="np-swan" title="Black swan: a rare, unexpected event with outsized market impact">⚠ Black swan</b>`:i._bs===1?`<b class="np-shock" title="Shock watch: unusual, potentially market-moving event">⚠ Shock watch</b>`:""}${i._top?`<b class="np-hot" title="Ranked in today's top business stories${i._web>1?` · covered by ${i._web} publishers across the web`:""}">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:i._cov>=2?`<span class="np-two" title="Covered by ${i._cov} of your news sources">${i._cov} outlets</span>`:""}${isNew?'<b class="np-new">NEW</b>':""}${i.mood>0?'<span class="np-up" title="Positive tone">▲</span>':i.mood<0?'<span class="np-dn" title="Negative tone">▼</span>':""}${i.also.length?`<span class="np-also">also in ${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${SRC[a.source].short}</a>`).join(", ")}</span>`:""}</div>`; };
   const tags=i=>{ const shown=S.view!=="all"&&S.view!=="mine"&&i.tickers.includes(S.view)?[S.view,...i.tickers.filter(t=>t!==S.view)]:i.tickers;
-    return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}${/^[A-Z][A-Z.\-]{0,5}$/.test(shown[0])?`<span class="tg tg10k" data-10k="${esc(shown[0])}" title="Read ${esc(shown[0])}'s latest 10-K with the crawler">📄 10-K</span>`:""}</div>`:""; };
+    return shown.length?`<div class="np-tags">${shown.slice(0,4).map(t=>{const q=S.quotes[t];return `<span class="tg" data-view="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("")}</div>`:""; };
   const dek=(i,n)=>{ const sm=usefulSummary(i); return sm?`<p class="np-dek">${esc(sm.length>n?sm.slice(0,n).replace(/\s+\S*$/,"")+"…":sm)}</p>`:""; };
   // pick the lead: the most-covered, most substantial recent story
   const top=list.slice(0,12), score=i=>(S.newsSort||"top")==="top"?i._heat*10+(usefulSummary(i)?.3:0):i.also.length*3+(usefulSummary(i)?2:0)+(i.tickers.length?1:0)-(top.indexOf(i)*0.25);
@@ -3594,7 +3407,7 @@ function apRender(d){
   <ul class="ap-rules">
     <li><b>Who decides?</b> Claude (Anthropic's AI) wrote these rules; the server follows them on its own, 24/7, so no person picks the trades and it costs nothing to run.</li>
     <li><b>All day, every trading day:</b> stops are checked every minute and about 70 stocks are re-scored every 10 minutes.</li>
-    <li><b>10-K health grade:</b> every candidate is graded A–F with the filing crawler's scorecard (up to 15 checks on its last two 10-Ks: cash backing profit, margins, debt, dilution, and more). A and B add a little to a stock's score, D takes some off, and an F is never bought — and is sold if the bot holds it.</li>
+    <li><b>10-K health grade:</b> every candidate is graded A–F with a 10-K scorecard (up to 15 checks on its last two 10-Ks: cash backing profit, margins, debt, dilution, and more). A and B add a little to a stock's score, D takes some off, and an F is never bought — and is sold if the bot holds it.</li>
     <li><b>Uses the whole site:</b> analyst ratings from the Best Buys scan (30%), 3-month momentum (20%), trend vs 50/200-day averages (20%), <b>news</b> from all five outlets, trending top stories, Smart Money and each stock's own headlines (20%), and today's strength vs the S&amp;P (10%).</li>
     <li><b>Earnings:</b> a company that beats estimates gets a boost (even if it reported at night — it buys at the opening bell); a miss is sold right away; it won't open a new position the day before a report.</li>
     <li><b>Overnight:</b> it keeps reading news and the earnings calendar and builds an opening-bell plan, carried out at 9:30 AM.</li>
@@ -4033,7 +3846,7 @@ function renderResearchHead(){
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
       <button class="btn ghost" data-rs-sub="compare">Compare</button>
       <button class="btn ghost" data-rs-alert="${esc(s)}">Set alert</button>
-      ${!type||type==="EQUITY"?`<button class="btn ghost" data-10k="${esc(s)}">📄 Read 10-K</button>`:""}
+
       <button class="btn claude" data-rs-pred="${esc(s)}">✦ Claude's prediction</button>
     </div></div>`;
 }
@@ -4334,7 +4147,7 @@ document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]");
 
 /* ---------- ASK CLAUDE on every page ---------- */
 S.ac={thread:[],busy:false};
-const TAB_NAMES={web:"THE WEB",filings:"10-K crawler",analysis:"Analysis",news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
+const TAB_NAMES={web:"THE WEB",analysis:"Analysis",news:"News",data:"Markets",research:"Research",portfolio:"Portfolio",signals:"Signals",nyse:"Heatmap",predict:"Claude Predictor"};
 function acContext(){
   const L=[]; const t=S.tab;
   L.push(`Section: ${TAB_NAMES[t]||t}`);
@@ -4426,12 +4239,11 @@ function buildCmd(){
   if(valid&&!cmdResults.length) items.push([`Open ${v} research page`,"Research",()=>openQuote(v)]);
   if(valid&&exact){
     items.push([`Chart ${v}`,"Charts",()=>openChart(v)]);
-    items.push([`Read ${v}'s 10-K with the crawler`,"10-K crawler",()=>crOpenSym(v)]);
     items.push([`Claude's prediction for ${v}`,"Predictions",()=>{setTab("predict");runPredict(v);}]);
     if(!S.wl.includes(v)) items.push([`Add ${v} to watchlist`,"Watchlist",()=>{S.wl.push(v);store.set("wl",S.wl);renderWL();loadQuotes();loadNews();toast(v+" added to your watchlist");}]);
     items.push([`Set a price alert for ${v}`,"Portfolio",()=>{setTab("portfolio");$("aSym").value=v;$("aPx").focus();}]);
   }
-  [["News","news"],["Markets","data"],["Research","research"],["10-K crawler","filings"],["Portfolio","portfolio"],["Claude Predictor","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
+  [["News","news"],["Markets","data"],["Research","research"],["Portfolio","portfolio"],["Claude Predictor","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
   cmdItems=items; cmdSel=0; drawCmd();
 }
 function drawCmd(){ $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||'<div style="color:var(--muted)">Type a company name or ticker, like Apple or VFIAX</div>'; }
@@ -5113,519 +4925,11 @@ setInterval(()=>{ if(S.tab==="nyse"&&!document.hidden) nySnap(); },60e3);
 
 /* ---------- boot ---------- */
 renderNotif(); renderToolbar(); renderWL();
-/* ---------- 10-K Filing Crawler: a spider bot reads the latest 10-K and lasers each figure into the sidebar ---------- */
-const CR={d:null,q:[],i:0,playing:false,speed:2,timer:null,raf:0,busy:false,sym:"",
-  spider:null,lasers:[],pulses:[],vals:{},read:new Set(),risks:[],guides:[],calcs:[],obs:[]};
-const CR_ST=[["income","Income statement"],["balance","Balance sheet"],["cash","Cash flow statement"]];
-const CR_ROWS={
-  income:[["revenue","Net sales / revenue"],["cogs","Cost of sales"],["grossProfit","Gross margin"],["operatingIncome","Operating income"],["pretaxIncome","Income before income taxes"],["incomeTax","Provision for income taxes"],["netIncome","Net income"],["eps","Diluted earnings per share","eps"],["dilutedShares","Diluted shares (millions)","sh"]],
-  balance:[["cash","Cash and cash equivalents"],["receivables","Accounts receivable"],["inventory","Inventories"],["currentAssets","Total current assets"],["totalAssets","Total assets"],["currentLiabilities","Total current liabilities"],["totalDebt","Total debt"],["equity","Shareholders’ equity"]],
-  cash:[["da","Depreciation and amortization"],["cfo","Cash generated by operating activities"],["capex","Payments for property, plant and equipment","neg"],["fcf","Free cash flow"],["cff","Cash used in financing activities"]]};
-const crMil=(v,k)=>{ if(v==null) return "—"; if(k==="eps") return (v<0?"(":"")+Math.abs(v).toFixed(2)+(v<0?")":""); const m=(k==="sh"?v/1e6:v/1e6), r=Math.round(Math.abs(m)).toLocaleString("en-US"); return v<0||k==="neg"?`(${r})`:r; };
-const crBig=(v,k)=>{ if(v==null) return "—"; if(k==="eps") return "$"+v.toFixed(2); if(k==="sh") return (v/1e6).toLocaleString("en-US",{maximumFractionDigits:0})+"M"; const a=Math.abs(v), s=v<0?"−":""; return s+"$"+(a>=1e12?(a/1e12).toFixed(2)+"T":a>=1e9?(a/1e9).toFixed(1)+"B":a>=1e6?(a/1e6).toFixed(1)+"M":a.toLocaleString("en-US")); };
-const crPct=x=>x==null||!isFinite(x)?"—":(x>=0?"+":"−")+Math.abs(x*100).toFixed(1)+"%";
-
-async function crLoad(sym){
-  sym=normSym(sym||$("crSym").value); if(!sym) return; $("crSym").value=sym; CR.sym=sym; crModeBar();
-  if(CR.mode!=="fin") return crLoadMode(sym);
-  crStop(); crSummary(false); CR.M=null; const tok=CR.tok=(CR.tok||0)+1;
-  CR.loading=true; CR.textPending=false; CR.d=null; CR.q=[]; CR.i=0;
-  $("crPage").innerHTML=`<div class="cr-loading"><span class="spin"></span> Pulling ${esc(sym)}'s numbers from SEC EDGAR…</div>`; $("crSide").innerHTML=""; $("crOv").innerHTML=""; crDockSync();
-  try{ const d=await api("/api/pub/filing?fast=1&symbol="+encodeURIComponent(sym)); if(tok!==CR.tok) return;
-    CR.loading=false;
-    if(!d.available||!d.years||!d.years.length){ $("crPage").innerHTML=`<div class="cr-loading">${esc(d.reason||"No 10-K data for this ticker.")}</div>`; crDockSync(); return; }
-    CR.d=d; CR.textPending=!!d.pending; crBuild(); crSeek(0); crPlay();
-    if(S.tab==="filings") try{history.replaceState(null,"","#filings/"+encodeURIComponent(d.symbol.replace(".","-"))+"/fin")}catch{}
-    if(d.pending) crTextLater(sym,tok);
-  }catch(e){ if(tok!==CR.tok) return; CR.loading=false; crDockSync(); $("crPage").innerHTML=`<div class="cr-loading">Couldn't load the filing: ${esc(e.message||String(e))}. <button class="btn ghost" onclick="crLoad()">Retry</button></div>`; }
-}
-// the filing's text (risk factors, guidance) arrives after the numbers: drop it into the document and queue it for the crawler
-async function crTextLater(sym,tok){
-  let d=null; for(let a=0;a<4&&!d;a++){ try{ const r=await api("/api/pub/filing?symbol="+encodeURIComponent(sym)); if(r&&!r.pending) d=r; }catch{} if(!d) await new Promise(x=>setTimeout(x,2500)); }
-  if(tok!==CR.tok||!CR.d) return; CR.textPending=false;
-  const T=(d&&d.text)||{}; CR.d.text=T; if(d&&d.filing) CR.d.filing=d.filing;
-  $("crBizBody").innerHTML=(T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`;
-  $("crRiskBody").innerHTML=(T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:"")+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`);
-  $("crMdBody").innerHTML=((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`);
-  const add=[...(T.risks||[]).slice(0,8).map((r,i)=>({t:"risk",el:"crR-"+i,text:r})),...(T.guidance||[]).map((g,i)=>({t:"guide",el:"crG-"+i,text:g}))];
-  if(add.length){ const wasDone=CR.i>=CR.q.length; CR.q.splice(CR.i,0,...add); crRail(); if(wasDone){ crSummary(false); crPlay(); } }
-  crSideSync();
-}
-function crBuild(){
-  const d=CR.d, Y=d.years.slice(-3).reverse(), f=d.filing||{}, T=d.text||{}, fy=y=>"FY"+String(y.end).slice(0,4), endTxt=new Date((f.period||Y[0].end)+"T12:00:00Z").toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
-  CR.Y=Y; const q=[]; const sec=(id,label)=>q.push({t:"section",el:id,label});
-  const table=(st,title,cols)=>{ const rows=CR_ROWS[st].filter(([k])=>Y[0][k]!=null);
-    return `<h3 class="cr-h3" id="crH-${st}">${title}</h3><p class="cr-unit">(In millions, except per-share amounts)</p><table class="cr-tbl"><thead><tr><th></th>${cols.map(y=>`<th>${fy(y)}<small>${esc(y.end)}</small></th>`).join("")}</tr></thead><tbody>
-      ${rows.map(([k,l,fmt])=>`<tr><td>${esc(l)}${d.years[0]&&Y[0]._src&&Y[0]._src[k]&&/computed/.test(Y[0]._src[k])?' <em title="'+esc(Y[0]._src[k])+'">derived</em>':""}</td>${cols.map((y,ci)=>`<td id="cr-${k}-${ci}" data-metric="${k}" data-period="${esc(y.end)}">${crMil(y[k],fmt)}</td>`).join("")}</tr>`).join("")}</tbody></table>`; };
-  let h=`<div class="cr-cover" id="crS-cover"><div>UNITED STATES<br>SECURITIES AND EXCHANGE COMMISSION</div><small>Washington, D.C. 20549</small><b>FORM ${esc(f.form||"10-K")}</b>
-    <div class="cr-chk">☒ ANNUAL REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934<br>For the fiscal year ended ${esc(endTxt)}</div>
-    <div class="cr-co">${esc(d.name)}</div><small>CIK ${esc(String(d.cik))}${f.exchange?` · ${esc(f.exchange)}: ${esc(d.symbol)}`:""}${f.sic?` · ${esc(f.sic)}`:""}${f.filed?` · filed ${esc(f.filed)}`:""}</small></div>
-    <p class="cr-note">Reconstructed reading copy: the figures are the company's own XBRL-tagged numbers from its 10-K filings and the text is quoted from the filing itself.${f.url?` <a href="${esc(f.url)}" target="_blank" rel="noopener">Open the original on SEC.gov ↗</a>`:""}</p>`;
-  sec("crS-cover","Cover page");
-  const wait=`<p class="cr-dim"><span class="spin"></span> Fetching this section from the filing…</p>`, pend=!!CR.textPending;
-  h+=`<div class="cr-part">PART I</div><h3 class="cr-h3" id="crS-biz">Item 1. Business</h3><div id="crBizBody">`+(pend?wait:(T.business||[]).length?T.business.map(p=>`<p>${esc(p)}</p>`).join(""):`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`)+`</div>`;
-  sec("crS-biz","Item 1. Business");
-  h+=`<h3 class="cr-h3" id="crS-risk">Item 1A. Risk Factors</h3><div id="crRiskBody">${pend?wait:(T.riskIntro?`<p>${esc(T.riskIntro)}</p>`:"")+((T.risks||[]).length?T.risks.map((r,i)=>`<p class="cr-risk" id="crR-${i}"><b>${esc(r)}</b></p><div class="cr-lines"><i></i><i></i><i style="width:62%"></i></div>`).join(""):`<p class="cr-dim">Risk-factor headlines unavailable — see the original filing.</p>`)}</div>`;
-  sec("crS-risk","Item 1A. Risk Factors"); (T.risks||[]).slice(0,8).forEach((r,i)=>q.push({t:"risk",el:"crR-"+i,text:r}));
-  h+=`<div class="cr-part">PART II</div><h3 class="cr-h3" id="crS-mdna">Item 7. Management’s Discussion and Analysis</h3><div id="crMdBody">`+(pend?wait:((T.mdna||[]).length?T.mdna.map(p=>`<p>${esc(p)}</p>`).join(""):"")+((T.guidance||[]).length?T.guidance.map((g,i)=>`<p class="cr-guide" id="crG-${i}">${esc(g)}</p>`).join(""):(T.mdna||[]).length?"":`<p class="cr-dim">Text excerpt unavailable — see the original filing.</p>`))+`</div>`;
-  sec("crS-mdna","Item 7. MD&A"); (T.guidance||[]).forEach((g,i)=>q.push({t:"guide",el:"crG-"+i,text:g}));
-  h+=`<h3 class="cr-h3" id="crS-fin">Item 8. Financial Statements and Supplementary Data</h3>`;
-  sec("crS-fin","Item 8. Financial statements");
-  const cols={income:Y,balance:Y.slice(0,2),cash:Y};
-  for(const [st,title] of [["income","Consolidated Statements of Operations"],["balance","Consolidated Balance Sheets"],["cash","Consolidated Statements of Cash Flows"]]){
-    h+=table(st,title,cols[st]); q.push({t:"section",el:"crH-"+st,label:title,st});
-    for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null) q.push({t:"metric",st,k,label:l,fmt,el:`cr-${k}-0`,prev:Y[1]&&Y[1][k]!=null?`cr-${k}-1`:null}); }
-  const y0=Y[0], y1=Y[1]||{}, R=(a,b)=>a!=null&&b?a/b:null;
-  const calc=(id,label,v,fmt,els,how)=>{ if(v!=null&&isFinite(v)) q.push({t:"calc",id,label,v,fmt,els:els.filter(e=>$("x")||true),how}); };
-  calc("om","Operating margin",R(y0.operatingIncome,y0.revenue),"pct",["cr-operatingIncome-0","cr-revenue-0"],"Operating income ÷ revenue");
-  calc("nm","Net margin",R(y0.netIncome,y0.revenue),"pct",["cr-netIncome-0","cr-revenue-0"],"Net income ÷ revenue");
-  calc("fcf","Free cash flow",y0.fcf,"usd",["cr-cfo-0","cr-capex-0"],"Operating cash flow − capex");
-  calc("fcfm","FCF margin",R(y0.fcf,y0.revenue),"pct",["cr-fcf-0","cr-revenue-0"],"Free cash flow ÷ revenue");
-  calc("nc","Net cash (debt)",y0.cash!=null&&y0.totalDebt!=null?y0.cash-y0.totalDebt:null,"usd",["cr-cash-0","cr-totalDebt-0"],"Cash − total debt");
-  calc("roe","Return on equity",R(y0.netIncome,y0.equity),"pct",["cr-netIncome-0","cr-equity-0"],"Net income ÷ shareholders’ equity");
-  // observations: plain-English takeaways, each pointing at the cells it comes from
-  const ob=(text,els,tone)=>q.push({t:"obs",text,els,tone});
-  if(y0.revenue&&y1.revenue){ const g=y0.revenue/y1.revenue-1; ob(`Revenue ${g>=0?"grew":"fell"} ${Math.abs(g*100).toFixed(1)}% to ${crBig(y0.revenue)} in ${fy(y0)}.`,["cr-revenue-0","cr-revenue-1"],g>=0?1:-1); }
-  if(y0.operatingIncome&&y0.revenue&&y1.operatingIncome&&y1.revenue){ const a=y0.operatingIncome/y0.revenue,b=y1.operatingIncome/y1.revenue; ob(`Operating margin ${a>=b?"widened":"narrowed"} from ${(b*100).toFixed(1)}% to ${(a*100).toFixed(1)}%.`,["cr-operatingIncome-0","cr-operatingIncome-1"],a>=b?1:-1); }
-  if(y0.cfo&&y0.netIncome>0){ const c=y0.cfo/y0.netIncome; ob(`Operating cash flow was ${c.toFixed(2)}× net income — ${c>=1?"earnings are backed by cash":"less cash came in than profit reported"}.`,["cr-cfo-0","cr-netIncome-0"],c>=1?1:-1); }
-  if(y0.cash!=null&&y0.totalDebt!=null){ const n=y0.cash-y0.totalDebt; ob(`${n>=0?"Net cash":"Net debt"} of ${crBig(Math.abs(n))} (cash ${crBig(y0.cash)} vs. debt ${crBig(y0.totalDebt)}).`,["cr-cash-0","cr-totalDebt-0"],n>=0?1:-1); }
-  if(y0.eps!=null&&y1.eps){ const g=y0.eps/y1.eps-1; ob(`Diluted EPS ${g>=0?"rose":"fell"} ${Math.abs(g*100).toFixed(1)}% to $${y0.eps.toFixed(2)}.`,["cr-eps-0","cr-eps-1"],g>=0?1:-1); }
-  // health scorecard: the standard analyst checks, each pointing at the cells it reads
-  CR.health=FIN.health(y0,Y[1]||{});
-  for(const c of CR.health.checks) q.push({t:"check",id:c.id,group:c.group,label:c.label,status:c.status,text:c.detail,flag:c.flag,els:c.keys.map(k=>`cr-${k}-0`)});
-  h+=`<p class="cr-dim cr-end">— End of extracted sections —</p>`;
-  $("crPage").innerHTML=h; CR.q=q;
-  $("crSrc").innerHTML=f.url?`<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(d.symbol)} ${esc(f.form||"10-K")} · period ${esc(f.period||Y[0].end)}</a>`:"";
-  crSide(); crRail(); crSpiderInit();
-}
-/* ---------- sidebar ---------- */
-function crSide(){
-  const d=CR.d, Y=CR.Y;
-  $("crSide").innerHTML=`<div class="crs-h"><b>${esc(d.name)}</b><small>${esc((d.filing&&d.filing.form)||"10-K")} · ${esc(String(Y[0].end))}</small><div class="crs-count" id="crsCount"></div>
-      <div class="crs-act"><button type="button" class="btn ghost" id="crCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crCsv">⇩ Export CSV</button></div>
-    ${CR_ST.map(([st,title])=>`<div class="crs-sec"><h5>${title}<em>${"FY"+String(Y[0].end).slice(0,4)} · YoY</em></h5>${CR_ROWS[st].filter(([k])=>Y[0][k]!=null).map(([k,l])=>`<div class="crs-row" id="crs-${k}"><span>${esc(l)}</span><b>—</b><i></i></div>`).join("")}</div>`).join("")}
-    <div class="crs-sec"><h5>Calculated<em>shown once every input is read</em></h5><div id="crsCalc"></div></div>
-    <div class="crs-sec"><h5>Sections read<em>headings the crawler has passed</em></h5><div id="crsRead"></div></div>
-    <div class="crs-sec"><h5>Risk factors<em>headlines flagged</em></h5><div id="crsRisk"></div></div>
-    <div class="crs-sec"><h5>Guidance<em>forward-looking statements, quoted</em></h5><div id="crsGuide"></div></div>
-    <div class="crs-sec"><h5>Observations<em>what the numbers say</em></h5><div id="crsObs"></div></div>
-    <div class="crs-sec"><h5>Health scorecard<em>standard analyst checks</em></h5><div id="crsGrade"></div><div id="crsHealth"></div></div>`;
-  crSideSync(false);
-  $("crCopy").onclick=crCopy; $("crCsv").onclick=crCsv;
-}
-function crRowsOut(){ const Y=CR.Y, done=new Set(CR.q.slice(0,CR.i).filter(m=>m.t==="metric").map(m=>m.k)), out=[];
-  for(const [st,title] of CR_ST) for(const [k,l,fmt] of CR_ROWS[st]) if(Y[0][k]!=null){ const v=Y[0][k], p=Y[1]&&Y[1][k]; out.push({st:title,k,l,fmt,v:fmt==="neg"?-v:v,p:p==null?null:(fmt==="neg"?-p:p),yoy:p?(v-p)/Math.abs(p):null,scanned:done.has(k)}); }
-  return out; }
-/* ---------- the written summary shown when the crawl is done ---------- */
-function crSummary(show){
-  if(show&&CR.mode!=="fin"){ if(CR.M) CR.M.summary(); return; }
-  let el=$("crSum"); if(!show){ if(el) el.hidden=true; return; } if(!CR.d) return;
-  if(!el){ el=document.createElement("div"); el.id="crSum"; el.className="cr-sum"; document.querySelector("#crRoot .cr-docwrap").appendChild(el); }
-  const d=CR.d, f=d.filing||{}, Y=CR.Y, y0=Y[0], y1=Y[1]||{}, fy=y=>"FY"+String(y.end).slice(0,4);
-  const yoy=k=>y0[k]!=null&&y1[k]?(y0[k]-y1[k])/Math.abs(y1[k]):null, chg=k=>{const v=yoy(k); return v==null?"":` <span class="${v>=0?"up":"down"}">${crPct(v)}</span>`;};
-  const calc=Object.fromEntries(CR.q.filter(m=>m.t==="calc").map(m=>[m.id,m])), obs=CR.q.filter(m=>m.t==="obs"), gd=CR.q.filter(m=>m.t==="guide"), rk=CR.q.filter(m=>m.t==="risk");
-  const pc=id=>calc[id]?(calc[id].v*100).toFixed(1)+"%":"—", rv=yoy("revenue"), ni=yoy("netIncome"), H=CR.health;
-  // one-paragraph verdict built from the numbers
-  const tone=[rv!=null?`revenue ${rv>=0?"grew":"shrank"} ${Math.abs(rv*100).toFixed(1)}% to ${crBig(y0.revenue)}`:y0.revenue!=null?`revenue was ${crBig(y0.revenue)}`:null,
-    ni!=null?`net income ${ni>=0?"rose":"fell"} ${Math.abs(ni*100).toFixed(1)}% to ${crBig(y0.netIncome)}`:y0.netIncome!=null?`net income was ${crBig(y0.netIncome)}`:null,
-    calc.om?`it kept ${pc("om")} of every sales dollar as operating profit`:null,
-    y0.fcf!=null?`and generated ${crBig(y0.fcf)} of free cash flow`:null].filter(Boolean);
-  const lead=tone.length?`In ${fy(y0)}, ${d.name}'s ${tone.slice(0,-1).join(", ")}${tone.length>1?", ":""}${tone.at(-1)}.`:`${d.name}'s ${fy(y0)} figures are below.`;
-  const bal=calc.nc?(calc.nc.v>=0?`It holds more cash than debt (net cash ${crBig(calc.nc.v)}).`:`It carries more debt than cash (net debt ${crBig(-calc.nc.v)}).`):"";
-  const kv=(l,v)=>`<div><span>${l}</span><b>${v}</b></div>`;
-  el.innerHTML=`<div class="cr-sum-in"><div class="cr-sum-h"><div><div class="cr-sum-k">📋 FILING SUMMARY · read by the crawler</div><h3>${esc(d.name)} — ${esc(f.form||"10-K")} for ${fy(y0)}</h3><small>Fiscal year ended ${esc(f.period||y0.end)}${f.filed?` · filed ${esc(f.filed)}`:""} · ${CR.q.filter(m=>m.t==="metric").length} figures read</small></div><button type="button" class="cr-sum-x" id="crSumX" title="Close the summary">✕</button></div>
-    ${H&&H.checks.length?crGradeHtml(H,false):""}
-    <p class="cr-sum-lead">${esc(lead)} ${esc(bal)}</p>
-    ${H&&H.flags.length?`<div class="cr-sum-box cr-flags"><h5>🚩 Red flags <em>worth a closer look before trusting the numbers</em></h5><ul>${H.flags.map(c=>`<li class="down"><b>${esc(c.label.replace(/^Not /,"").replace(/^./,x=>x.toUpperCase()))}:</b> ${esc(c.detail)}</li>`).join("")}</ul></div>`:""}
-    <div class="cr-sum-grid">
-      <div class="cr-sum-box"><h5>The numbers <em>${fy(y0)} · vs. prior year</em></h5>
-        ${y0.revenue!=null?kv("Revenue",crBig(y0.revenue)+chg("revenue")):""}${y0.operatingIncome!=null?kv("Operating income",crBig(y0.operatingIncome)+chg("operatingIncome")):""}${y0.netIncome!=null?kv("Net income",crBig(y0.netIncome)+chg("netIncome")):""}${y0.eps!=null?kv("Diluted EPS","$"+y0.eps.toFixed(2)+chg("eps")):""}${y0.cfo!=null?kv("Operating cash flow",crBig(y0.cfo)+chg("cfo")):""}${y0.totalAssets!=null?kv("Total assets",crBig(y0.totalAssets)+chg("totalAssets")):""}</div>
-      <div class="cr-sum-box"><h5>Profitability &amp; cash <em>calculated</em></h5>
-        ${kv("Operating margin",pc("om"))}${kv("Net margin",pc("nm"))}${calc.fcf?kv("Free cash flow",crBig(calc.fcf.v)):""}${kv("FCF margin",pc("fcfm"))}${calc.nc?kv(calc.nc.v>=0?"Net cash":"Net debt",crBig(Math.abs(calc.nc.v))):""}${kv("Return on equity",pc("roe"))}</div>
-    </div>
-    ${H&&H.checks.length?`<div class="cr-sum-box"><h5>Health scorecard <em>${H.checks.length} checks · ${fy(y0)} vs. ${Y[1]?fy(Y[1]):"prior year"}</em></h5><div class="cr-hgrid">${[...new Set(H.checks.map(c=>c.group))].map(gp=>`<section><h6>${esc(gp)}</h6>${H.checks.filter(c=>c.group===gp).map(c=>`<div class="crs-chk ${c.status}"><i>${CR_MARK[c.status]}</i><span>${esc(c.label)}<small>${esc(c.detail)}</small></span></div>`).join("")}</section>`).join("")}</div></div>`:""}
-    ${obs.length?`<div class="cr-sum-box"><h5>What stands out</h5><ul>${obs.map(m=>`<li class="${m.tone>0?"up":"down"}">${esc(m.text)}</li>`).join("")}</ul></div>`:""}
-    ${gd.length?`<div class="cr-sum-box"><h5>What management says <em>quoted from the filing</em></h5>${gd.slice(0,3).map(m=>`<blockquote>“${esc(m.text)}”</blockquote>`).join("")}</div>`:""}
-    ${rk.length?`<div class="cr-sum-box"><h5>Top risks it lists <em>${rk.length} risk headlines read</em></h5><ul>${rk.slice(0,3).map(m=>`<li>${esc(m.text)}</li>`).join("")}</ul></div>`:""}
-    <div class="cr-sum-act"><button type="button" class="btn" id="crSumCopy">⧉ Copy summary</button><button type="button" class="btn ghost" id="crSumCsv">⇩ Export CSV</button>${f.url?`<a class="btn ghost" href="${esc(f.url)}" target="_blank" rel="noopener">Original filing ↗</a>`:""}</div>
-    <p class="cr-sum-note">Figures are the company's own XBRL numbers from its SEC filings; ratios and observations are calculated from them. Not investment advice.</p></div>`;
-  if($("crRoot").dataset.layout==="nums"){ $("crRoot").dataset.layout="both"; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l==="both")); } // the summary lives in the document pane
-  el.hidden=false; el.scrollTop=0;
-  $("crSumX").onclick=()=>{ el.hidden=true; }; $("crSumCopy").onclick=crCopy; $("crSumCsv").onclick=crCsv;
-}
-async function crCopy(){
-  if(!CR.d) return; const d=CR.d, f=d.filing||{}, rows=crRowsOut(), Y=CR.Y, fy=y=>"FY"+String(y.end).slice(0,4), F=x=>x.fmt==="neg"?null:x.fmt;
-  let t=`## ${d.name} (${d.symbol}) — ${f.form||"10-K"}, fiscal year ended ${f.period||Y[0].end}\n\n`;
-  for(const [,title] of CR_ST){ const r=rows.filter(x=>x.st===title); if(!r.length) continue; t+=`### ${title}\n| Line item | ${fy(Y[0])} | ${Y[1]?fy(Y[1]):"Prior"} | YoY |\n|---|---:|---:|---:|\n`+r.map(x=>`| ${x.l} | ${crBig(x.v,F(x))} | ${x.p==null?"—":crBig(x.p,F(x))} | ${crPct(x.yoy)} |`).join("\n")+"\n\n"; }
-  const calc=CR.q.filter(m=>m.t==="calc"), obs=CR.q.filter(m=>m.t==="obs"), gd=CR.q.filter(m=>m.t==="guide");
-  if(calc.length) t+="### Calculated\n"+calc.map(m=>`- ${m.label}: ${m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)} (${m.how})`).join("\n")+"\n\n";
-  if(obs.length) t+="### Observations\n"+obs.map(m=>"- "+m.text).join("\n")+"\n\n";
-  const H=CR.health; if(H&&H.checks.length) t+=`### Health scorecard: ${H.grade||"not graded"} — ${H.verdict}\n${H.passed} passed, ${H.warned} to watch, ${H.failed} failed${H.flags.length?`, ${H.flags.length} red flag(s)`:""}\n`+H.checks.map(c=>`- ${c.status==="pass"?"PASS":c.status==="warn"?"WATCH":"FAIL"}${c.flag?" (red flag)":""} — ${c.label}: ${c.detail}`).join("\n")+"\n\n";
-  if(gd.length) t+="### Guidance (quoted)\n"+gd.map(m=>"> "+m.text).join("\n")+"\n\n";
-  t+=`Source: SEC EDGAR — ${f.url||"XBRL company facts"}`;
-  try{ await navigator.clipboard.writeText(t); toast("Summary copied to your clipboard"); }catch{ toast("Your browser blocked the clipboard — try again after clicking the page"); }
-}
-function crCsv(){
-  if(!CR.d) return; const rows=crRowsOut(), Y=CR.Y, q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const lines=[["Statement","Line item","Metric key",`FY${String(Y[0].end).slice(0,4)} (USD)`,Y[1]?`FY${String(Y[1].end).slice(0,4)} (USD)`:"Prior year","YoY change","Scanned by crawler"].map(q).join(",")];
-  for(const x of rows) lines.push([x.st,x.l,x.k,x.v,x.p??"",x.yoy==null?"":(x.yoy*100).toFixed(2)+"%",x.scanned?"yes":"no"].map(q).join(","));
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([lines.join("\r\n")],{type:"text/csv"})); a.download=`${CR.d.symbol}-${(CR.d.filing&&CR.d.filing.form)||"10-K"}-${Y[0].end}.csv`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
-}
-function crSideSync(){
-  if(CR.mode!=="fin"){ if(!CR.M) return crDockSync(); CR.q.forEach((m,i)=>{ const e=m.el&&$(m.el); if(e) e.classList.toggle("cr-done",i<CR.i); }); crModeSync(); return; }
-  const q=CR.q, done=q.slice(0,CR.i), Y=CR.Y;
-  const figs=q.filter(m=>m.t==="metric"), got=done.filter(m=>m.t==="metric").length;
-  const chk0=done.filter(m=>m.t==="check").length;
-  $("crsCount").innerHTML=`<b>${got}</b> of ${figs.length} figures · <b>${chk0}</b> checks · <b>${done.filter(m=>m.t==="guide").length}</b> guidance · <b>${done.filter(m=>m.t==="obs").length}</b> observations`;
-  for(const m of figs){ const row=$("crs-"+m.k); if(!row) continue; const on=done.includes(m), v=Y[0][m.k], p=Y[1]&&Y[1][m.k];
-    if(!on){ row.classList.remove("on"); row.querySelector("b").textContent="—"; row.querySelector("i").textContent=""; continue; }
-    if(!row.classList.contains("on")){ row.classList.add("on"); row.querySelector("b").textContent=crBig(m.fmt==="neg"?-v:v,m.fmt); const dl=p?((v-p)/Math.abs(p)):null, el=row.querySelector("i"); el.textContent=crPct(dl); el.className=dl==null?"":dl>=0?"up":"down"; } }
-  const list=(id,arr,f)=>{ const el=$(id); const html=arr.length?arr.map(f).join(""):`<div class="crs-empty">${CR.i>=q.length?"none found":"pending…"}</div>`; if(el.innerHTML!==html) el.innerHTML=html; };
-  list("crsCalc",done.filter(m=>m.t==="calc"),m=>`<div class="crs-row on"><span>${esc(m.label)}<small>${esc(m.how)}</small></span><b>${m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)}</b></div>`);
-  list("crsRead",done.filter(m=>m.t==="section"),m=>`<div class="crs-chip">✓ ${esc(m.label)}</div>`);
-  list("crsRisk",done.filter(m=>m.t==="risk"),m=>`<div class="crs-q risk">${esc(m.text)}</div>`);
-  list("crsGuide",done.filter(m=>m.t==="guide"),m=>`<div class="crs-q">“${esc(m.text)}”</div>`);
-  list("crsObs",done.filter(m=>m.t==="obs"),m=>`<div class="crs-q ${m.tone>0?"up":"down"}">${esc(m.text)}</div>`);
-  const chk=done.filter(m=>m.t==="check"), allChk=q.filter(m=>m.t==="check"), H=CR.health;
-  list("crsHealth",chk,m=>`<div class="crs-chk ${m.status}" title="${esc(m.text)}"><i>${CR_MARK[m.status]}</i><span>${esc(m.label)}${m.flag?' <em>red flag</em>':""}</span></div>`);
-  const gh=H&&allChk.length&&chk.length>=allChk.length?crGradeHtml(H,true):allChk.length&&chk.length?`<div class="crs-empty">checking… ${chk.length} of ${allChk.length}</div>`:""; if($("crsGrade").innerHTML!==gh) $("crsGrade").innerHTML=gh;
-  // document marks
-  q.forEach((m,i)=>{ const ids=m.el?[m.el]:[]; for(const id of ids){ const e=$(id); if(e) e.classList.toggle("cr-done",i<CR.i); } });
-  crDockSync();
-}
-/* ---------- rail + dock ---------- */
-function crRail(){
-  const q=CR.q, n=q.length||1, marks=CR.mode!=="fin"?q.filter(m=>m.mark).map(m=>[m.el,m.mark]):[["crS-risk","Risk"],["crS-mdna","MD&A"],["crH-income","Income"],["crH-balance","Balance"],["crH-cash","Cash flow"]];
-  $("crRail").innerHTML=`<div class="cr-fill" id="crFill"></div>`+marks.map(([el,l])=>{const i=q.findIndex(m=>m.el===el); return i<0?"":`<span style="top:${(i/n*100).toFixed(2)}%" title="${esc(l)}"></span>`;}).join("");
-}
-function crDockSync(){
-  const q=CR.q, n=q.length, d=CR.d, done=d&&n&&CR.i>=n, m=q[Math.min(CR.i,n-1)];
-  $("crLive").classList.toggle("on",!!CR.playing||!!CR.loading); $("crLiveT").textContent=CR.loading?"LOADING":CR.playing?"ANALYZING":done?"DONE":"READY";
-  $("crProg").style.width=(CR.loading?6:n?CR.i/n*100:0)+"%";
-  if($("crFill")) $("crFill").style.height=(n?CR.i/n*100:0)+"%";
-  if(CR.mode!=="fin"&&d){ $("crStatus").textContent=done?`finished · ${CR_MODES[CR.mode].replace(/^\S+ /,"")} · ${d.symbol}`:`reading ${d.symbol} · ${m?(m.label||m.text||"").slice(0,60):""}`; return; }
-  $("crStatus").textContent=CR.loading?`loading ${CR.sym}…`:!d?"Type a ticker to start":done?`finished reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · grade ${CR.health&&CR.health.grade||"—"}${CR.textPending?" · still fetching the filing text…":""}`:`reading ${d.symbol} ${(d.filing&&d.filing.form)||"10-K"} · ${m?(m.label||m.text||"").slice(0,60):""}`;
-}
-/* ---------- playback ---------- */
-const CR_DUR={section:900,metric:1250,risk:800,guide:1100,calc:1100,obs:1300,check:1000};
-const CR_MARK={pass:"✓",warn:"!",fail:"✕"}, CR_TONE={pass:"#21c37a",warn:"#f59e0b",fail:"#f43f5e"};
-function crGradeHtml(H,small){ const g=H.grade, tone=!g?"na":g==="A"||g==="B"?"good":g==="C"?"mid":"bad";
-  return `<div class="cr-grade ${tone} ${small?"sm":""}"><b>${g||"–"}</b><div><strong>${esc(H.verdict)}</strong><small>${H.passed} passed · ${H.warned} to watch · ${H.failed} failed${H.flags.length?` · <span class="down">${H.flags.length} red flag${H.flags.length===1?"":"s"}</span>`:""}</small></div></div>`; }
-const crMs=(ms,min)=>Math.max(min,ms/CR.speed); // speed-scaled time with a floor so lasers stay visible at MAX
-function crPlay(){ if(!CR.d) return; if(CR.i>=CR.q.length) crSeek(0); CR.playing=true; crDockSync(); crNext(); crLoop(); }
-function crPause(){ CR.playing=false; clearTimeout(CR.timer); crDockSync(); }
-function crStop(){ CR.playing=false; clearTimeout(CR.timer); CR.lasers=[]; CR.pulses=[]; }
-function crNext(){ clearTimeout(CR.timer); if(!CR.playing) return; if(CR.i>=CR.q.length){ crPause(); crSummary(true); return; } const m=CR.q[CR.i]; crRun(m,true); CR.timer=setTimeout(()=>{ CR.i++; crSideSync(); crNext(); },crMs(m.dur||CR_DUR[m.t]||1000,45)); }
-function crStep(dir){ crPause(); if(dir<0) crSeek(Math.max(0,CR.i-1)); else if(CR.i<CR.q.length){ const m=CR.q[CR.i]; crRun(m,true); CR.i++; setTimeout(crSideSync,crMs((CR_DUR[m.t]||1000)*0.6,30)); } crLoop(); }
-function crSeek(i){ CR.i=Math.max(0,Math.min(CR.q.length,i)); CR.lasers=[]; CR.pulses=[]; if(CR.i<CR.q.length) crSummary(false);
-  document.querySelectorAll("#crPage .cr-hit").forEach(e=>e.classList.remove("cr-hit")); document.querySelectorAll(".crs-row.on").forEach(r=>r.classList.remove("on"));
-  crSideSync(); const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); }
-function crJump(el){ const i=CR.q.findIndex(m=>m.el===el); if(i<0) return; const was=CR.playing; crPause(); crSeek(i); if(was) crPlay(); }
-// one milestone: walk to it, fire the laser(s), extract
-function crRun(m,anim){
-  const els=(m.els||[m.el,m.prev]).filter(Boolean).map(id=>$(id)).filter(Boolean); if(!els.length) return;
-  const main=els[0], page=$("crPage"), pr=page.getBoundingClientRect(), r=main.getBoundingClientRect();
-  const tx=r.left-pr.left+r.width/2, ty=r.top-pr.top+r.height/2, W=page.clientWidth, sc=CR.spider?CR.spider.scale:1;
-  // park the spider to the left of the target (or right, near the edge), slightly above it
-  const side=tx>W*0.55?-1:1; CR.spider&&(CR.spider.tx=Math.max(60*sc,Math.min(W-60*sc,tx-side*Math.min(220*sc,W*0.28))), CR.spider.ty=ty-30*sc);
-  const doc=$("crDoc"), want=r.top-pr.top-doc.clientHeight*0.45; if(Math.abs(doc.scrollTop-want)>40) doc.scrollTo({top:Math.max(0,want),behavior:anim&&CR.speed<8?"smooth":"auto"});
-  if(!anim){ main.classList.add("cr-hit"); return; }
-  const color=m.color||(m.t==="check"?CR_TONE[m.status]:/^(risk|guide|obs)$/.test(m.t)?"#f43f5e":m.st==="balance"?"#f472b6":"#38bdf8");
-  const delay=crMs(m.t==="section"?250:450,8);
-  setTimeout(()=>{ if(!CR.d) return; const now=performance.now();
-    els.forEach((e,k)=>{ const rr=e.getBoundingClientRect(), p2=page.getBoundingClientRect(); const p={x:rr.left-p2.left+(m.t==="metric"||m.t==="calc"||m.t==="obs"||m.t==="check"||m.t==="x"?rr.width*0.5:Math.min(rr.width*0.15,40)),y:rr.top-p2.top+rr.height/2};
-      CR.lasers.push({to:p,c:k?"#a78bfa":color,t0:now+k*crMs(120,10),life:crMs(m.t==="section"?520:900,150),w:k?1.4:2.4}); CR.pulses.push({p,c:color,t0:now+k*120+120/CR.speed}); e.classList.add("cr-hit"); e.style.setProperty("--zap",color); e.classList.remove("cr-zap"); void e.offsetWidth; e.classList.add("cr-zap"); });
-    if(m.pop) crPop(main,m.pop,color);
-    if(m.fly&&$(m.fly)) crFly(main,$(m.fly),m.pop||m.label,color);
-    if(m.t==="metric") crPop(main,crMil(CR.Y[0][m.k],m.fmt),color);
-    if(m.t==="metric"||m.t==="calc") crFly(main,m.t==="metric"?$("crs-"+m.k):$("crsCalc"),m.t==="metric"?crBig(m.fmt==="neg"?-CR.Y[0][m.k]:CR.Y[0][m.k],m.fmt):(m.fmt==="pct"?(m.v*100).toFixed(1)+"%":crBig(m.v)),color);
-    crLoop(); },delay);
-}
-function crPop(el,text,color){ const page=$("crPage"), pr=page.getBoundingClientRect(), r=el.getBoundingClientRect(), b=document.createElement("div"); b.className="cr-pop"; b.style.cssText=`left:${r.left-pr.left+r.width/2}px;top:${r.top-pr.top-26}px;border-color:${color};color:${color}`; b.textContent=text; page.appendChild(b); setTimeout(()=>b.remove(),crMs(1500,250)+300); }
-function crFly(from,to,text,color){
-  if(!to||matchMedia("(prefers-reduced-motion: reduce)").matches) return; const a=from.getBoundingClientRect(), b=to.getBoundingClientRect();
-  if(b.bottom<0||b.top>innerHeight||b.right<0||b.left>innerWidth) return; // sidebar off screen (phones) — skip the flight
-  const c=document.createElement("div"); c.className="cr-fly"; c.textContent=text; const fd=crMs(600,140); c.style.cssText=`left:${a.left}px;top:${a.top}px;border-color:${color};color:${color};transition-duration:${fd}ms`; document.body.appendChild(c);
-  requestAnimationFrame(()=>{ c.style.transform=`translate(${b.right-90-a.left}px,${b.top-a.top}px) scale(.9)`; c.style.opacity=".2"; });
-  setTimeout(()=>{ c.remove(); to.classList.remove("flash"); void to.offsetWidth; to.classList.add("flash"); },crMs(650,140)+60);
-}
-/* ---------- the spider: 8 two-segment legs with simple inverse kinematics and an alternating gait ---------- */
-function crSpiderInit(){
-  const small=(window.innerWidth||1000)<700, sc=small?0.85:1.45; // the big one
-  const legs=[]; for(const s of [-1,1]) [-62,-24,18,56].forEach((a,i)=>legs.push({s,a:a*Math.PI/180,g:(i+(s>0?1:0))%2,foot:null,from:null,to:null,t0:0}));
-  CR.spider={x:120*sc,y:120*sc,tx:120*sc,ty:120*sc,vx:0,vy:0,scale:sc,legs,ph:0};
-}
-function crHip(S,L){ return {x:S.x+L.s*(8+Math.abs(Math.sin(L.a))*4)*S.scale,y:S.y+Math.sin(L.a)*10*S.scale}; }
-function crRest(S,L){ const R=118*S.scale; return {x:S.x+L.s*Math.cos(L.a)*R+S.vx*7,y:S.y+Math.sin(L.a)*R*0.95+30*S.scale+S.vy*7}; }
-function crKnee(h,f,S,L){ const L1=74*S.scale,L2=88*S.scale; let dx=f.x-h.x,dy=f.y-h.y,d=Math.hypot(dx,dy)||1; const dd=Math.min(d,L1+L2-1),a=(L1*L1-L2*L2+dd*dd)/(2*dd),hh=Math.sqrt(Math.max(0,L1*L1-a*a)),ux=dx/d,uy=dy/d;
-  let px=-uy,py=ux; if(py>0){px=-px;py=-py;} // knee bends up, like a real spider
-  return {x:h.x+ux*a+px*hh,y:h.y+uy*a+py*hh}; }
-function crLoop(){ if(CR.raf) return; const tick=(now)=>{ CR.raf=0; if(S.tab!=="filings"||document.hidden||!CR.spider) return; crFrame(now); if(CR.playing||CR.lasers.length||CR.pulses.length||Math.hypot(CR.spider.tx-CR.spider.x,CR.spider.ty-CR.spider.y)>0.5||CR.spider.stepping) CR.raf=requestAnimationFrame(tick); else { CR.idle=setTimeout(()=>crLoop(),90); } }; clearTimeout(CR.idle); CR.raf=requestAnimationFrame(tick); }
-function crFrame(now){
-  const Sp=CR.spider, page=$("crPage"), ov=$("crOv"); if(!page||!ov) return;
-  const W=page.scrollWidth, H=page.scrollHeight; ov.setAttribute("width",W); ov.setAttribute("height",H); ov.setAttribute("viewBox",`0 0 ${W} ${H}`);
-  // body: spring toward target
-  const k=Math.min(0.32,0.012*CR.speed), damp=0.78; Sp.vx=(Sp.vx+(Sp.tx-Sp.x)*k)*damp; Sp.vy=(Sp.vy+(Sp.ty-Sp.y)*k)*damp; const vmax=Math.min(420,14*CR.speed)*Sp.scale, v=Math.hypot(Sp.vx,Sp.vy); if(v>vmax){Sp.vx*=vmax/v;Sp.vy*=vmax/v;} Sp.x+=Sp.vx; Sp.y+=Sp.vy; if(CR.speed>=8){ const f=CR.speed>=30?0.55:0.35; Sp.x+=(Sp.tx-Sp.x)*f; Sp.y+=(Sp.ty-Sp.y)*f; } Sp.ph+=0.05; // at high speed the body snaps along so it never trails its laser
-  // legs: a foot steps when it drifts too far from its rest spot (only one gait group lifts at a time)
-  let stepping=false; const lifted=Sp.legs.some(L=>L.to);
-  for(const L of Sp.legs){ const rest=crRest(Sp,L); if(!L.foot) L.foot={...rest};
-    if(L.to){ const t=Math.min(1,(now-L.t0)/crMs(150*1.25,45)); L.foot={x:L.from.x+(L.to.x-L.from.x)*t,y:L.from.y+(L.to.y-L.from.y)*t-Math.sin(t*Math.PI)*22*Sp.scale}; if(t>=1){L.foot={...L.to};L.to=null;} stepping=true; }
-    else { const dist=Math.hypot(rest.x-L.foot.x,rest.y-L.foot.y);
-      if(dist>300*Sp.scale) L.foot={...rest}; // fell far behind (big jump / seek): plant it
-      else if(dist>46*Sp.scale&&(!lifted||Sp.legs.find(x=>x.to)?.g===L.g||dist>120*Sp.scale)){ L.from={...L.foot}; L.to={x:rest.x+Sp.vx*5,y:rest.y+Sp.vy*5}; L.t0=now; stepping=true; } } }
-  Sp.stepping=stepping;
-  const tw=Math.sin(now/180)*1.6*Sp.scale;
-  const legsSvg=Sp.legs.map((L,i)=>{ const h=crHip(Sp,L), kn=crKnee(h,L.foot,Sp,L), ky=kn.y+(i%2?tw:-tw); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${ky.toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/><circle class="kn" cx="${kn.x.toFixed(1)}" cy="${ky.toFixed(1)}" r="${(2.2*Sp.scale).toFixed(1)}"/><circle class="ft" cx="${L.foot.x.toFixed(1)}" cy="${L.foot.y.toFixed(1)}" r="${(3*Sp.scale).toFixed(1)}"/>`; }).join("");
-  const lz=CR.lasers.filter(l=>now<l.t0+l.life), pz=CR.pulses.filter(p=>now<p.t0+crMs(700,200)); CR.lasers=lz; CR.pulses=pz;
-  const mouth={x:Sp.x,y:Sp.y+10*Sp.scale};
-  const lasersSvg=lz.filter(l=>now>=l.t0).map(l=>{ const t=(now-l.t0)/l.life, a=t<0.15?t/0.15:t>0.75?(1-t)/0.25:1; return `<g opacity="${a.toFixed(2)}"><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${(l.w*4).toFixed(1)}" opacity=".25" stroke-linecap="round"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${l.w}" stroke-linecap="round" filter="url(#crGlow)"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="#fff" stroke-width="${(l.w*0.4).toFixed(2)}" stroke-linecap="round"/><circle cx="${l.to.x.toFixed(1)}" cy="${l.to.y.toFixed(1)}" r="3.4" fill="#facc15"/></g>`; }).join("");
-  const pulsesSvg=pz.filter(p=>now>=p.t0).map(p=>{ const t=(now-p.t0)/crMs(700,200); const sparks=[0,1,2,3,4,5,6,7].map(k=>{ const a=k/8*Math.PI*2+0.3, r=6+t*30; return `<circle cx="${(p.p.x+Math.cos(a)*r).toFixed(1)}" cy="${(p.p.y+Math.sin(a)*r).toFixed(1)}" r="${(1.8*(1-t)+0.3).toFixed(2)}" fill="${p.c}" opacity="${(1-t).toFixed(2)}"/>`; }).join(""); return sparks+`<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4+t*26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1-t).toFixed(2)}"/><circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(5*(1-t)).toFixed(1)}" fill="#fff" opacity="${(1-t).toFixed(2)}"/>`; }).join("");
-  const s=Sp.scale, bob=Math.sin(Sp.ph*2)*1.2*s;
-  ov.innerHTML=`<defs><filter id="crGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-    ${lasersSvg}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>
-    <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y+bob).toFixed(1)})"><rect x="${(-9*s).toFixed(1)}" y="${(-30*s).toFixed(1)}" width="${(18*s).toFixed(1)}" height="${(46*s).toFixed(1)}" rx="${(8*s).toFixed(1)}" class="cr-body"/><rect x="${(-5*s).toFixed(1)}" y="${(-24*s).toFixed(1)}" width="${(10*s).toFixed(1)}" height="${(16*s).toFixed(1)}" rx="${(4*s).toFixed(1)}" fill="#1a1d24"/><circle cx="-${(3.2*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.8*s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.2*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.8*s).toFixed(1)}" fill="#38bdf8"/></g>${pulsesSvg}`;
-}
-/* ---------- wiring ---------- */
-/* ---------- Document intelligence: three more crawler modes on real SEC filings ----------
-   release  — the latest earnings press release (8-K Item 2.02, EX-99.1): tone, guidance, hedging language
-   risk     — this year's 10-K risk factors vs. last year's, plus forensic accounting checks on the numbers
-   insiders — Form 4 filings: who bought or sold, how much, open market or not, planned (10b5-1) or not
-   Each mode builds a document, a queue of milestones ({el, color, pop, fly, ...}) and a sidebar that is
-   recomputed from the milestones read so far; the spider, lasers and timing are shared with the 10-K mode. */
-const CRC={bull:"#10b981",bear:"#f43f5e",warn:"#f59e0b",buy:"#06b6d4",dim:"#64748b"};
-const CR_MODES={fin:"📊 10-K financials",release:"🎙️ Earnings release",risk:"⚠️ Risk & forensics",insiders:"💼 Insider trades"};
-const crUsd=v=>{ const a=Math.abs(v), s=v<0?"−":""; return s+"$"+(a>=1e9?(a/1e9).toFixed(2)+"B":a>=1e6?(a/1e6).toFixed(1)+"M":a>=1e3?(a/1e3).toFixed(0)+"K":a.toFixed(0)); };
-try{ CR.mode=localStorage.getItem("md_crm")||"fin"; }catch{ CR.mode="fin"; } if(!CR_MODES[CR.mode]) CR.mode="fin";
-function crModeBar(){ document.querySelectorAll("#crModes button").forEach(b=>b.classList.toggle("on",b.dataset.m===CR.mode)); const k=$("crKick"); if(k) k.textContent={fin:"🕷 10-K CRAWLER",release:"🎙️ EARNINGS RELEASE AUDITOR",risk:"⚠️ RISK & FORENSIC AUDITOR",insiders:"💼 FORM 4 INSIDER SCANNER"}[CR.mode]; }
-function crSetMode(m){ if(!CR_MODES[m]||m===CR.mode) return; CR.mode=m; try{localStorage.setItem("md_crm",m)}catch{} crModeBar(); const s=normSym($("crSym").value)||CR.sym||"AAPL"; CR.sym=""; crLoad(s); }
-async function crLoadMode(sym){
-  const tok=CR.tok=(CR.tok||0)+1, mode=CR.mode; crStop(); crSummary(false);
-  CR.loading=true; CR.textPending=false; CR.d=null; CR.q=[]; CR.i=0; CR.M=null;
-  const what={release:"latest earnings press release",risk:"last two 10-K risk sections",insiders:"Form 4 insider filings"}[mode];
-  $("crPage").innerHTML=`<div class="cr-loading"><span class="spin"></span> Reading ${esc(sym)}'s ${what} from SEC EDGAR… (the first look at a company can take 10–20 seconds)</div>`; $("crSide").innerHTML=""; $("crOv").innerHTML=""; crDockSync();
-  try{
-    const ep={release:"/api/pub/release",risk:"/api/pub/riskdiff",insiders:"/api/pub/insiders"}[mode];
-    const [d,f]=await Promise.all([api(ep+"?symbol="+encodeURIComponent(sym)), mode==="risk"?api("/api/pub/sec?symbol="+encodeURIComponent(sym)).catch(()=>null):null]);
-    if(tok!==CR.tok) return; CR.loading=false;
-    if(!d.available){ $("crPage").innerHTML=`<div class="cr-loading">${esc(d.reason||"Nothing to read for this ticker.")}</div>`; crDockSync(); return; }
-    CR.d={...d,symbol:d.symbol}; CR.M={release:crBuildRelease,risk:crBuildRisk,insiders:crBuildInsiders}[mode](d,f);
-    crRail(); crSpiderInit(); crSeek(0); crPlay();
-    if(S.tab==="filings") try{history.replaceState(null,"","#filings/"+encodeURIComponent(d.symbol.replace(".","-"))+"/"+mode)}catch{}
-  }catch(e){ if(tok!==CR.tok) return; CR.loading=false; crDockSync(); $("crPage").innerHTML=`<div class="cr-loading">Couldn't load: ${esc(e.message||String(e))}. <button class="btn ghost" onclick="CR.sym='';crLoad()">Retry</button></div>`; }
-}
-const crDone=()=>CR.q.slice(0,CR.i);
-function crModeSync(){ if(CR.M&&CR.M.sync) CR.M.sync(crDone(),CR.i>=CR.q.length); }
-function crSideShell(title,sub,body){ $("crSide").innerHTML=`<div class="crs-h"><b>${esc(CR.d.name)}</b><small>${esc(sub)}</small><div class="crs-count" id="crsCount"></div><div class="crs-act"><button type="button" class="btn ghost" id="crMCopy">⧉ Copy summary</button>${CR.mode==="insiders"?'<button type="button" class="btn ghost" id="crMCsv">⇩ Export CSV</button>':""}</div></div>${body}`;
-  $("crMCopy").onclick=async()=>{ try{ await navigator.clipboard.writeText(CR.M.text()); toast("Summary copied to your clipboard"); }catch{ toast("Your browser blocked the clipboard"); } };
-  if($("crMCsv")) $("crMCsv").onclick=crInsCsv; }
-const crList=(id,arr,f,empty)=>{ const el=$(id); if(!el) return; const h=arr.length?arr.map(f).join(""):`<div class="crs-empty">${empty||(CR.i>=CR.q.length?"none":"pending…")}</div>`; if(el.innerHTML!==h) el.innerHTML=h; };
-const crGoTo=id=>{ const e=$(id), doc=$("crDoc"), page=$("crPage"); if(!e) return; doc.scrollTo({top:Math.max(0,e.getBoundingClientRect().top-page.getBoundingClientRect().top-doc.clientHeight*0.4),behavior:"smooth"}); e.classList.remove("cr-zap"); void e.offsetWidth; e.classList.add("cr-zap"); };
-function crModeSummaryShow(html){
-  let el=$("crSum"); if(!el){ el=document.createElement("div"); el.id="crSum"; el.className="cr-sum"; document.querySelector("#crRoot .cr-docwrap").appendChild(el); }
-  if($("crRoot").dataset.layout==="nums"){ $("crRoot").dataset.layout="both"; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l==="both")); }
-  el.innerHTML=`<div class="cr-sum-in">${html}<div class="cr-sum-act"><button type="button" class="btn" id="crSumCopy">⧉ Copy summary</button>${CR.mode==="insiders"?'<button type="button" class="btn ghost" id="crSumCsv">⇩ Export CSV</button>':""}${CR.d.filing&&CR.d.filing.url?`<a class="btn ghost" href="${esc(CR.d.filing.url)}" target="_blank" rel="noopener">Original filing ↗</a>`:CR.d.current?`<a class="btn ghost" href="${esc(CR.d.current.url)}" target="_blank" rel="noopener">Latest 10-K ↗</a>`:""}</div><p class="cr-sum-note">Read from the company's SEC filings; tone tags and checks are rule-based. Not investment advice.</p></div>`;
-  el.hidden=false; el.scrollTop=0;
-  $("crSumX").onclick=()=>{ el.hidden=true; }; $("crSumCopy").onclick=$("crMCopy").onclick; if($("crSumCsv")) $("crSumCsv").onclick=crInsCsv;
-}
-const crSumHead=(kick,title,sub)=>`<div class="cr-sum-h"><div><div class="cr-sum-k">${kick}</div><h3>${esc(title)}</h3><small>${esc(sub)}</small></div><button type="button" class="cr-sum-x" id="crSumX" title="Close the summary">✕</button></div>`;
-const crMeter=(a,b,la,lb)=>{ const t=a+b, p=t?a/t*100:50; return `<div class="cr-meter"><div class="cr-meter-bar"><i class="a" style="width:${p.toFixed(1)}%"></i><i class="b" style="width:${(100-p).toFixed(1)}%"></i></div><div class="cr-meter-l"><span class="up">${la} <b>${a}</b></span><span class="down"><b>${b}</b> ${lb}</span></div></div>`; };
-
-/* ---------- 🎙️ earnings release ---------- */
-function crBuildRelease(d){
-  const f=d.filing||{}, q=[]; let n=0, h=`<div class="cr-cover"><div>FORM ${esc(f.form||"8-K")} · CURRENT REPORT</div><small>Item 2.02 — Results of Operations and Financial Condition · Exhibit 99.1</small><b>${esc(d.title||"Earnings press release")}</b><div class="cr-co">${esc(d.name)}</div><small>CIK ${esc(String(d.cik))} · filed ${esc(f.filed||"")}</small></div>
-    <p class="cr-note">The company's own earnings press release as filed with the SEC (calls aren't free to get, but the release carries the results and the guidance). Each sentence is tagged by its wording: <b class="up">bullish</b>, <b class="down">cautious / hedging</b>, <b style="color:${CRC.bull}">guidance</b>. <a href="${esc(f.url||"#")}" target="_blank" rel="noopener">Open the original ↗</a></p>`;
-  d.paragraphs.forEach((p,pi)=>{ const sp=/^(CEO|CFO)/.test(p.speaker)?"exec":p.speaker==="Outlook"?"outlook":"rel";
-    h+=`<div class="cr-turn ${sp}"><div class="cr-spk" id="crT-${pi}">${sp==="exec"?"🎙 ":sp==="outlook"?"🔭 ":""}${esc(p.speaker)}</div><p>`+p.sents.map(s=>{ const id="crE-"+(n++); s.id=id;
-      if(s.tone){ const c=s.tone==="bull"||s.tone==="guide"?CRC.bull:s.tone==="bear"?CRC.bear:CRC.warn, g=s.tone==="guide"?d.guidance.filter(x=>x.text&&s.text.startsWith(x.text.slice(0,60))):[];
-        q.push({t:"x",kind:s.tone,el:id,color:c,label:s.text.slice(0,70),text:s.text,hedge:s.hedge,speaker:p.speaker,guide:g,dur:s.tone==="guide"?1300:950,pop:s.tone==="guide"&&g[0]?`${g[0].metric} ${g[0].value}${g[0].range?" "+g[0].range:""}`:s.tone==="bull"?"▲ bullish":s.tone==="bear"?"▼ cautious":"◆ mixed",fly:s.tone==="guide"?"crsGuideM":"crsMeter"}); }
-      return `<span class="cr-sent ${s.tone||""}" id="${id}">${esc(s.text)}</span>`; }).join(" ")+`</p></div>`;
-    if(sp!=="rel") q.push({t:"section",el:"crT-"+pi,label:p.speaker,mark:p.speaker.split(" — ")[0],dur:500}); });
-  // reading order: each speaker heading before its sentences
-  $("crPage").innerHTML=h; q.sort((a,b)=>$(a.el).compareDocumentPosition($(b.el))&Node.DOCUMENT_POSITION_FOLLOWING?-1:1); CR.q=q;
-  $("crSrc").innerHTML=`<a href="${esc(f.url||"#")}" target="_blank" rel="noopener">${esc(d.symbol)} ${esc(f.form||"8-K")} · earnings release · ${esc(f.filed||"")}</a>`;
-  crSideShell("","8-K Item 2.02 · filed "+(f.filed||""),`
-    <div class="crs-sec"><h5>Bull vs. bear meter<em>sentences tagged so far</em></h5><div id="crsMeter"></div></div>
-    <div class="crs-sec"><h5>Forward guidance<em>what the company said it expects</em></h5><div id="crsGuideM"></div><p class="crs-fine">Analyst consensus isn't free, so this lists the company's own targets.</p></div>
-    <div class="crs-sec"><h5>Hedging language<em>tap a phrase to jump to it</em></h5><div id="crsHedge"></div></div>
-    <div class="crs-sec"><h5>Who said what<em>tone by speaker</em></h5><div id="crsSpk"></div></div>`);
-  const M={sync(done,fin){
-      const bull=done.filter(m=>m.kind==="bull").length, bear=done.filter(m=>m.kind==="bear").length, mixed=done.filter(m=>m.kind==="mixed").length, gd=done.filter(m=>m.kind==="guide");
-      $("crsCount").innerHTML=`<b>${done.filter(m=>m.t==="x").length}</b> of ${q.filter(m=>m.t==="x").length} sentences tagged · <b>${gd.reduce((a,m)=>a+m.guide.length,0)}</b> guidance figures`;
-      const h1=crMeter(bull,bear,"bullish","cautious")+`<div class="crs-fine">${mixed} mixed · ${bull+bear?(bull>=bear*1.5?"leaning bullish":bear>=bull?"leaning cautious":"balanced"):"—"}</div>`; if($("crsMeter").innerHTML!==h1) $("crsMeter").innerHTML=h1;
-      crList("crsGuideM",gd.flatMap(m=>m.guide.length?m.guide:[{metric:"Outlook",value:"",period:null,text:m.text}]),g=>`<div class="crs-row on"><span>${esc(g.metric)}${g.period?`<small>${esc(g.period)}</small>`:g.value?"":`<small>${esc(g.text.slice(0,110))}…</small>`}</span><b>${esc(g.value?(g.metric==="Revenue"||g.metric==="Operating expenses"||g.metric==="Capital expenditures"?"$":"")+g.value:"—")}${g.range?`<small>${esc(g.range)}</small>`:""}</b></div>`,fin?"No numeric guidance in this release":null);
-      const hed={}; for(const m of done) if(m.hedge){ (hed[m.hedge]=hed[m.hedge]||[]).push(m.el); }
-      crList("crsHedge",Object.entries(hed).sort((a,b)=>b[1].length-a[1].length),([w,els])=>`<button type="button" class="crs-flag" data-go="${els[0]}">“${esc(w)}” <b>×${els.length}</b></button>`,fin?"No hedging phrases found":null);
-      document.querySelectorAll("#crsHedge [data-go]").forEach(b=>b.onclick=()=>crGoTo(b.dataset.go));
-      const by={}; for(const m of done.filter(m=>m.t==="x")){ const k=m.speaker.split(" — ")[0]; by[k]=by[k]||{b:0,c:0}; if(m.kind==="bull"||m.kind==="guide") by[k].b++; if(m.kind==="bear") by[k].c++; }
-      crList("crsSpk",Object.entries(by),([k,v])=>`<div class="crs-row on"><span>${esc(k)}</span><b><span class="up">▲${v.b}</span> <span class="down">▼${v.c}</span></b></div>`);
-      crDockSync(); },
-    summary(){ const done=q, bull=done.filter(m=>m.kind==="bull"), bear=done.filter(m=>m.kind==="bear"), gd=done.filter(m=>m.kind==="guide").flatMap(m=>m.guide), t=bull.length+bear.length, share=t?bull.length/t:null;
-      const verdict=share==null?"Neutral wording — few clearly positive or negative sentences.":share>=0.7?"Confident: the release leans clearly bullish.":share>=0.55?"Mostly positive, with some caution.":share>=0.45?"Balanced: as much caution as confidence.":"Cautious: hedging outweighs the positives.";
-      crModeSummaryShow(crSumHead("🎙️ EARNINGS RELEASE · read by the crawler",`${d.name} — earnings release`,`8-K filed ${f.filed||""} · ${q.filter(m=>m.t==="x").length} sentences tagged`)+
-        `<div class="cr-grade ${share==null?"na":share>=0.55?"good":share>=0.45?"mid":"bad"}"><b>${share==null?"–":Math.round(share*100)}</b><div><strong>${esc(verdict)}</strong><small>${bull.length} bullish · ${bear.length} cautious · bull share of tagged sentences (0–100)</small></div></div>
-        ${gd.length?`<div class="cr-sum-box"><h5>Guidance <em>the company's own targets</em></h5>${gd.map(g=>`<div><span>${esc(g.metric)}${g.period?` · ${esc(g.period)}`:""}</span><b>${esc((/Revenue|expenses|expenditures/.test(g.metric)?"$":"")+g.value)}${g.range?" "+esc(g.range):""}</b></div>`).join("")}</div>`:""}
-        <div class="cr-sum-grid"><div class="cr-sum-box"><h5>Most bullish lines</h5><ul>${bull.slice(0,3).map(m=>`<li class="up">${esc(m.text)}</li>`).join("")||"<li>none</li>"}</ul></div><div class="cr-sum-box"><h5>Cautious / hedging lines</h5><ul>${bear.slice(0,3).map(m=>`<li class="down">${esc(m.text)}</li>`).join("")||"<li>none</li>"}</ul></div></div>`); },
-    text(){ const bull=q.filter(m=>m.kind==="bull"), bear=q.filter(m=>m.kind==="bear"), gd=q.filter(m=>m.kind==="guide").flatMap(m=>m.guide);
-      return `## ${d.name} (${d.symbol}) — earnings release, 8-K filed ${f.filed}\n\nTone: ${bull.length} bullish vs ${bear.length} cautious sentences\n\n### Guidance\n${gd.map(g=>`- ${g.metric}${g.period?` (${g.period})`:""}: ${g.value}${g.range?" "+g.range:""}`).join("\n")||"- none stated"}\n\n### Bullish\n${bull.map(m=>"> "+m.text).join("\n")}\n\n### Cautious\n${bear.map(m=>"> "+m.text).join("\n")}\n\nSource: ${f.url}`; }};
-  return M;
-}
-
-/* ---------- ⚠️ risk & forensics ---------- */
-function crBuildRisk(d,fund){
-  const q=[], Y=(fund&&fund.years||[]).slice(-2).reverse(), y0=Y[0]||{}, y1=Y[1]||{}, fy=y=>y.end?"FY"+String(y.end).slice(0,4):"";
-  let h=`<div class="cr-cover"><div>FORM 10-K · ITEM 1A · RISK FACTORS</div><small>${esc(d.current.period)} report vs. ${esc(d.prior.period)} report</small><b>What changed in the risks</b><div class="cr-co">${esc(d.name)}</div><small>${d.current.count} risk headlines now · ${d.prior.count} last year</small></div>
-    <p class="cr-note">Each risk-factor headline in this year's 10-K is matched against last year's: <b class="down">NEW</b> ones were added, <b style="color:${CRC.warn}">REWORDED</b> ones changed wording, and <b class="down">removed</b> ones were dropped. Companies add risks when something has started to worry them. <a href="${esc(d.current.url)}" target="_blank" rel="noopener">This year ↗</a> · <a href="${esc(d.prior.url)}" target="_blank" rel="noopener">Last year ↗</a></p>
-    <h3 class="cr-h3" id="crK-h">Item 1A. Risk Factors — ${esc(d.current.period)}</h3>`;
-  q.push({t:"section",el:"crK-h",label:"Risk factors",mark:"Risks",dur:600});
-  d.heads.forEach((r,i)=>{ h+=`<p class="cr-rk ${r.status}" id="crK-${i}">${r.status!=="same"?`<em>${r.status==="new"?"NEW":"REWORDED"}</em> `:""}<b>${esc(r.text)}</b>${r.before?`<small>was: ${esc(r.before)}</small>`:""}</p>`;
-    if(r.status==="new") q.push({t:"x",kind:"new",el:"crK-"+i,color:CRC.bear,text:r.text,label:"new risk",pop:"NEW RISK",fly:"crsNew",dur:1100});
-    else if(r.status==="reworded") q.push({t:"x",kind:"reworded",el:"crK-"+i,color:CRC.warn,text:r.text,before:r.before,label:"reworded risk",pop:"REWORDED",fly:"crsNew",dur:900});
-    else q.push({t:"x",kind:"same",el:"crK-"+i,color:CRC.dim,text:r.text,label:"unchanged risk",dur:260}); });
-  if(d.removed.length){ h+=`<h3 class="cr-h3" id="crK-rm">Removed since last year</h3>`+d.removed.map((r,i)=>`<p class="cr-rk removed" id="crX-${i}"><s>${esc(r)}</s></p>`).join(""); q.push({t:"section",el:"crK-rm",label:"Removed risks",mark:"Removed",dur:500}); d.removed.forEach((r,i)=>q.push({t:"x",kind:"removed",el:"crX-"+i,color:CRC.bear,text:r,label:"removed risk",pop:"REMOVED",fly:"crsNew",dur:900})); }
-  // forensic accounting checks on the reported numbers
-  const F=[], has=(...v)=>v.every(x=>x!=null&&isFinite(x)), g=(a,b)=>has(a,b)&&b?(a-b)/Math.abs(b):null;
-  if(has(y0.netIncome,y1.netIncome,y0.cfo,y1.cfo)){ const ni=g(y0.netIncome,y1.netIncome), cf=g(y0.cfo,y1.cfo); F.push({id:"div",label:"Profit vs. cash divergence",ok:!(ni>0.05&&cf<ni-0.15),warn:ni>0.05&&cf<ni-0.05,detail:`Net income ${crPct(ni)} vs. operating cash flow ${crPct(cf)}.`,keys:[["netIncome","Net income"],["cfo","Operating cash flow"]]}); }
-  if(has(y0.receivables,y0.revenue,y1.receivables,y1.revenue)){ const a=y0.receivables/y0.revenue*365, b=y1.receivables/y1.revenue*365; F.push({id:"dso",label:"Days sales outstanding (DSO)",ok:a<=b*1.1,warn:a<=b*1.25,detail:`Customers took ${a.toFixed(0)} days to pay vs. ${b.toFixed(0)} a year earlier.`,keys:[["receivables","Accounts receivable"],["revenue","Revenue"]]}); }
-  if(has(y0.inventory,y0.cogs,y1.inventory,y1.cogs)&&y0.inventory>0){ const a=y0.inventory/y0.cogs*365, b=y1.inventory/y1.cogs*365; F.push({id:"dio",label:"Days of inventory",ok:a<=b*1.15,warn:a<=b*1.35,detail:`Inventory covers ${a.toFixed(0)} days of sales vs. ${b.toFixed(0)} a year earlier.`,keys:[["inventory","Inventories"],["cogs","Cost of sales"]]}); }
-  if(has(y0.netIncome,y0.cfo,y0.totalAssets)){ const acc=(y0.netIncome-y0.cfo)/y0.totalAssets; F.push({id:"accr",label:"Accruals ratio",ok:acc<=0.05,warn:acc<=0.1,detail:`(Net income − operating cash flow) ÷ total assets = ${(acc*100).toFixed(1)}%. High values mean profit leans on accounting estimates, not cash.`,keys:[["netIncome","Net income"],["cfo","Operating cash flow"],["totalAssets","Total assets"]]}); }
-  if(has(y0.dilutedShares,y1.dilutedShares)){ const s=g(y0.dilutedShares,y1.dilutedShares); F.push({id:"dil",label:"Share dilution",ok:s<=0.01,warn:s<=0.04,detail:`Diluted shares ${crPct(s)} year over year.`,keys:[["dilutedShares","Diluted shares"]]}); }
-  if(has(y0.totalDebt,y1.totalDebt,y0.operatingIncome,y1.operatingIncome)){ const dg=g(y0.totalDebt,y1.totalDebt), og=g(y0.operatingIncome,y1.operatingIncome); F.push({id:"debt",label:"Debt growing faster than profit",ok:!(dg>og+0.1),warn:!(dg>og+0.25),detail:`Debt ${crPct(dg)} vs. operating income ${crPct(og)}.`,keys:[["totalDebt","Total debt"],["operatingIncome","Operating income"]]}); }
-  const H=Y.length?FIN.health(y0,y1):null;
-  if(F.length){ const mny=v=>v==null?"—":crBig(v);
-    h+=`<div class="cr-part">FORENSIC CHECKS</div><h3 class="cr-h3" id="crF-h">The numbers behind the words — ${fy(y0)} vs. ${fy(y1)}</h3><p class="cr-unit">(from the company's XBRL financial data)</p>
-      <table class="cr-tbl"><thead><tr><th>Check</th><th>Line items</th><th>${fy(y0)}</th><th>${fy(y1)}</th><th>Result</th></tr></thead><tbody>${F.map(c=>`<tr id="crF-${c.id}"><td>${esc(c.label)}</td><td>${c.keys.map(k=>esc(k[1])).join("<br>")}</td><td>${c.keys.map(k=>k[0]==="dilutedShares"?((y0[k[0]]||0)/1e6).toFixed(0)+"M":mny(y0[k[0]])).join("<br>")}</td><td>${c.keys.map(k=>k[0]==="dilutedShares"?((y1[k[0]]||0)/1e6).toFixed(0)+"M":mny(y1[k[0]])).join("<br>")}</td><td class="${c.ok?"up":c.warn?"":"down"}" style="${!c.ok&&c.warn?`color:${CRC.warn}`:""}">${c.ok?"✓ OK":c.warn?"! Watch":"✕ Flag"}</td></tr>`).join("")}</tbody></table>`;
-    q.push({t:"section",el:"crF-h",label:"Forensic checks",mark:"Forensics",dur:600});
-    F.forEach(c=>q.push({t:"x",kind:"forensic",el:"crF-"+c.id,color:c.ok?CRC.bull:CRC.warn,status:c.ok?"pass":c.warn?"warn":"fail",label:c.label,text:c.detail,pop:c.ok?"OK":c.warn?"WATCH":"RED FLAG",fly:"crsDiv",dur:1100})); }
-  $("crPage").innerHTML=h; CR.q=q;
-  $("crSrc").innerHTML=`<a href="${esc(d.current.url)}" target="_blank" rel="noopener">${esc(d.symbol)} 10-K ${esc(d.current.period)} vs. ${esc(d.prior.period)}</a>`;
-  crSideShell("",`10-K ${d.current.period} vs. ${d.prior.period}`,`
-    <div class="crs-sec"><h5>Forensic health score<em>0–100 · transparency of the numbers</em></h5><div id="crsScore"></div></div>
-    <div class="crs-sec"><h5>Divergence alerts<em>where the numbers disagree</em></h5><div id="crsDiv"></div></div>
-    <div class="crs-sec"><h5>Risk landmines<em>new, reworded and removed risks</em></h5><div id="crsNew"></div></div>`);
-  const score=(done)=>{ const fz=done.filter(m=>m.kind==="forensic"), pts=fz.reduce((a,m)=>a+(m.status==="pass"?1:m.status==="warn"?0.5:0),0)+(H?H.checks.reduce((a,c)=>a+(c.status==="pass"?1:c.status==="warn"?0.5:0),0):0), n=fz.length+(H?H.checks.length:0);
-    const nr=done.filter(m=>m.kind==="new").length; return n?Math.max(0,Math.round(pts/n*100-Math.min(15,nr*2))):null; };
-  const M={sync(done,fin){
-      const nNew=done.filter(m=>m.kind==="new").length, nRw=done.filter(m=>m.kind==="reworded").length, nRm=done.filter(m=>m.kind==="removed").length, nSame=done.filter(m=>m.kind==="same").length;
-      $("crsCount").innerHTML=`<b>${nNew}</b> new · <b>${nRw}</b> reworded · <b>${nRm}</b> removed · ${nSame} unchanged`;
-      const fzDone=done.some(m=>m.kind==="forensic"), sc=fin||done.length>=q.length?score(q):fzDone?score(done):null;
-      const sh=sc==null?`<div class="crs-empty">scores once the numbers are checked…</div>`:`<div class="cr-gauge"><div class="cr-gauge-bar"><i style="width:${sc}%;background:${sc>=70?CRC.bull:sc>=45?CRC.warn:CRC.bear}"></i></div><b style="color:${sc>=70?CRC.bull:sc>=45?CRC.warn:CRC.bear}">${sc}</b></div><div class="crs-fine">Health-scorecard checks plus the forensic checks; each new risk factor takes 2 points off (max 15).</div>`;
-      if($("crsScore").innerHTML!==sh) $("crsScore").innerHTML=sh;
-      crList("crsDiv",done.filter(m=>m.kind==="forensic"),m=>`<div class="crs-chk ${m.status}"><i>${CR_MARK[m.status]}</i><span>${esc(m.label)}<small>${esc(m.text)}</small></span></div>`);
-      crList("crsNew",done.filter(m=>/new|reworded|removed/.test(m.kind)),m=>`<button type="button" class="crs-land ${m.kind}" data-go="${m.el}"><em>${m.kind==="new"?"NEW":m.kind==="removed"?"REMOVED":"REWORDED"}</em>${esc(m.text.length>150?m.text.slice(0,150)+"…":m.text)}</button>`,fin?"No changes — same risk headlines as last year":null);
-      document.querySelectorAll("#crsNew [data-go]").forEach(b=>b.onclick=()=>crGoTo(b.dataset.go));
-      crDockSync(); },
-    summary(){ const nw=q.filter(m=>m.kind==="new"), rw=q.filter(m=>m.kind==="reworded"), rm=q.filter(m=>m.kind==="removed"), fz=q.filter(m=>m.kind==="forensic"), sc=score(q);
-      crModeSummaryShow(crSumHead("⚠️ RISK & FORENSICS · read by the crawler",`${d.name} — what changed in the 10-K`,`${d.current.period} report vs. ${d.prior.period} · ${d.current.count} risk headlines`)+
-        `<div class="cr-grade ${sc==null?"na":sc>=70?"good":sc>=45?"mid":"bad"}"><b>${sc==null?"–":sc}</b><div><strong>Forensic health score ${sc==null?"":"("+sc+"/100)"}</strong><small>${nw.length} new risks · ${rw.length} reworded · ${rm.length} removed · ${fz.filter(m=>m.status!=="pass").length} of ${fz.length} forensic checks need a look</small></div></div>
-        ${nw.length?`<div class="cr-sum-box cr-flags"><h5>🚩 New risks this year <em>added since the last 10-K</em></h5><ul>${nw.map(m=>`<li class="down">${esc(m.text)}</li>`).join("")}</ul></div>`:`<p class="cr-sum-lead">No new risk headlines compared with last year's 10-K.</p>`}
-        ${fz.length?`<div class="cr-sum-box"><h5>Forensic checks</h5>${fz.map(m=>`<div class="crs-chk ${m.status}"><i>${CR_MARK[m.status]}</i><span>${esc(m.label)}<small>${esc(m.text)}</small></span></div>`).join("")}</div>`:""}
-        ${rm.length?`<div class="cr-sum-box"><h5>Dropped since last year</h5><ul>${rm.map(m=>`<li>${esc(m.text)}</li>`).join("")}</ul></div>`:""}`); },
-    text(){ const nw=q.filter(m=>m.kind==="new"), rm=q.filter(m=>m.kind==="removed"), fz=q.filter(m=>m.kind==="forensic");
-      return `## ${d.name} (${d.symbol}) — 10-K risk factors ${d.current.period} vs ${d.prior.period}\n\nForensic health score: ${score(q)??"—"}/100\n\n### New risks\n${nw.map(m=>"- "+m.text).join("\n")||"- none"}\n\n### Removed risks\n${rm.map(m=>"- "+m.text).join("\n")||"- none"}\n\n### Forensic checks\n${fz.map(m=>`- ${m.status.toUpperCase()} — ${m.label}: ${m.text}`).join("\n")}\n\nSources: ${d.current.url} · ${d.prior.url}`; }};
-  return M;
-}
-
-/* ---------- 💼 insider trades (Form 4) ---------- */
-const CR_CODE={P:"Open-market buy",S:"Open-market sale",A:"Grant / award",M:"Option exercise",F:"Tax withholding",G:"Gift",C:"Conversion",X:"Option exercise",D:"Returned to company",J:"Other"};
-function crBuildInsiders(d){
-  const rows=[]; for(const f of d.filings) for(const t of f.tx) rows.push({...t,owner:f.owner,role:f.role,officer:f.officer,url:f.url,filed:f.filed});
-  rows.sort((a,b)=>String(b.date).localeCompare(String(a.date))); CR.insRows=rows;
-  const q=[]; let h=`<div class="cr-cover"><div>FORM 4 · STATEMENT OF CHANGES IN BENEFICIAL OWNERSHIP</div><small>Every Form 4 filed for ${esc(d.symbol)} since ${esc(d.since)} (up to the 30 most recent filings)</small><b>Insider transactions</b><div class="cr-co">${esc(d.name)}</div><small>${d.filings.length} filings · ${rows.length} transactions</small></div>
-    <p class="cr-note">Only <b style="color:${CRC.buy}">P (open-market buy)</b> and <b class="down">S (open-market sale)</b> show an insider choosing to trade with their own money — grants, option exercises and tax withholding are routine. Sales under a pre-set <b>Rule 10b5-1 plan</b> are scheduled in advance and say less.</p>
-    <h3 class="cr-h3" id="crI-h">Table I — Non-Derivative Securities Acquired, Disposed of, or Beneficially Owned</h3>
-    <div class="ap-wrap"><table class="cr-tbl cr-f4"><thead><tr><th>Date</th><th>Insider</th><th>Role</th><th>Code</th><th>Shares</th><th>Price</th><th>Value</th><th>Owned after</th><th>D/I</th></tr></thead><tbody>`;
-  q.push({t:"section",el:"crI-h",label:"Table I",mark:"Table I",dur:500});
-  rows.forEach((r,i)=>{ const open=r.code==="P"||r.code==="S", c=r.code==="P"?CRC.buy:r.code==="S"?CRC.bear:CRC.dim;
-    h+=`<tr id="crI-${i}" class="${open?"open":"routine"}"><td>${esc(r.date||"")}</td><td><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.owner)}</a></td><td>${esc(r.role)}</td><td title="${esc(CR_CODE[r.code]||r.code)}"><b style="color:${c}">${esc(r.code)}</b>${r.plan10b51&&r.code==="S"?' <em class="cr-plan">10b5-1</em>':""}</td><td>${r.ad==="D"?"−":"+"}${Math.round(r.shares).toLocaleString()}</td><td>${r.price?"$"+r.price.toFixed(2):"—"}</td><td>${r.value?crUsd(r.value):"—"}</td><td>${r.after?Math.round(r.after).toLocaleString():"—"}</td><td>${r.direct?"D":"I"}</td></tr>`;
-    q.push({t:"x",kind:r.code==="P"?"buy":r.code==="S"?"sell":"routine",el:"crI-"+i,color:c,row:r,label:`${r.owner} ${CR_CODE[r.code]||r.code}`,text:`${r.owner} (${r.role}) — ${CR_CODE[r.code]||r.code} of ${Math.round(r.shares).toLocaleString()} shares${r.value?" ("+crUsd(r.value)+")":""}`,pop:open?(r.code==="P"?"BUY ":"SELL ")+(r.value?crUsd(r.value):""):undefined,fly:open?"crsConv":null,dur:open?950:330}); });
-  h+=`</tbody></table></div>`+(rows.length?"":`<p class="cr-dim">No insider transactions reported in the last 12 months.</p>`);
-  $("crPage").innerHTML=h; CR.q=q;
-  $("crSrc").innerHTML=`<span>${esc(d.symbol)} Form 4 · last 12 months</span>`;
-  crSideShell("",`${d.filings.length} Form 4 filings since ${d.since}`,`
-    <div class="crs-sec"><h5>Insider conviction index<em>open-market buys vs. sells, −100…+100</em></h5><div id="crsConv"></div></div>
-    <div class="crs-sec"><h5>Breakdown<em>by role and transaction type</em></h5><div id="crsBrk"></div></div>
-    <div class="crs-sec"><h5>Biggest insiders<em>net open-market $</em></h5><div id="crsTop"></div></div>`);
-  const stat=(done)=>{ const r=done.filter(m=>m.t==="x").map(m=>m.row), buys=r.filter(x=>x.code==="P"), sells=r.filter(x=>x.code==="S"), B=buys.reduce((a,x)=>a+x.value,0), Sv=sells.reduce((a,x)=>a+x.value,0), planned=sells.filter(x=>x.plan10b51).reduce((a,x)=>a+x.value,0);
-    const idx=B+Sv?Math.round((B-Sv)/(B+Sv)*100):null; return {r,buys,sells,B,Sv,planned,idx}; };
-  const M={sync(done,fin){ const s=stat(done);
-      $("crsCount").innerHTML=`<b>${s.r.length}</b> of ${rows.length} transactions read · <b>${s.buys.length}</b> buys · <b>${s.sells.length}</b> sales`;
-      const p=s.idx==null?50:(s.idx+100)/2, col=s.idx==null?CRC.dim:s.idx>20?CRC.buy:s.idx<-20?CRC.bear:CRC.warn;
-      const ch=`<div class="cr-gauge"><div class="cr-gauge-bar two"><i style="left:${Math.min(p,50)}%;width:${Math.abs(p-50)}%;background:${col}"></i><span></span></div><b style="color:${col}">${s.idx==null?"—":(s.idx>0?"+":"")+s.idx}</b></div>
-        <div class="crs-row on"><span>Bought (open market)</span><b class="up">${crUsd(s.B)}</b></div><div class="crs-row on"><span>Sold (open market)</span><b class="down">${crUsd(s.Sv)}</b></div><div class="crs-row on"><span>…of which planned (10b5-1)</span><b>${s.Sv?Math.round(s.planned/s.Sv*100)+"%":"—"}</b></div>`;
-      if($("crsConv").innerHTML!==ch) $("crsConv").innerHTML=ch;
-      const roles={}, codes={}; for(const x of s.r){ const k=/chief executive|ceo/i.test(x.role)?"CEO":/chief financial|cfo/i.test(x.role)?"CFO":/10% owner/i.test(x.role)?"10% owner":x.officer?"Other officers":/director/i.test(x.role)?"Directors":"Other"; roles[k]=(roles[k]||0)+1; codes[x.code]=(codes[x.code]||0)+1; }
-      crList("crsBrk",[...Object.entries(roles).map(([k,v])=>[k,v,"role"]),...Object.entries(codes).map(([k,v])=>[k,v,"code"])],([k,v,t])=>`<div class="crs-row on"><span>${t==="code"?`<b>${esc(k)}</b> · ${esc(CR_CODE[k]||k)}`:esc(k)}</span><b>${v}</b></div>`);
-      const by={}; for(const x of [...s.buys,...s.sells]){ by[x.owner]=by[x.owner]||{n:0,role:x.role}; by[x.owner].n+=x.code==="P"?x.value:-x.value; }
-      crList("crsTop",Object.entries(by).sort((a,b)=>Math.abs(b[1].n)-Math.abs(a[1].n)).slice(0,6),([k,v])=>`<div class="crs-row on"><span>${esc(k)}<small>${esc(v.role)}</small></span><b class="${v.n>=0?"up":"down"}">${v.n>=0?"+":"−"}${crUsd(Math.abs(v.n)).replace("−","")}</b></div>`,fin?"No open-market trades in the last 12 months":null);
-      crDockSync(); },
-    summary(){ const s=stat(q), v=s.idx==null?"No open-market buying or selling — only routine grants, exercises and tax withholding.":s.idx>=50?"Insiders are net buyers — a rare and usually meaningful sign.":s.idx>20?"More buying than selling by insiders.":s.idx>-20?"Mixed: buying and selling roughly balance.":s.Sv&&s.planned/s.Sv>0.7?"Net selling, but mostly through pre-scheduled 10b5-1 plans (routine diversification).":"Insiders are net sellers on the open market.";
-      crModeSummaryShow(crSumHead("💼 INSIDER TRADES · read by the crawler",`${d.name} — insider activity`,`Form 4 filings since ${d.since} · ${rows.length} transactions`)+
-        `<div class="cr-grade ${s.idx==null?"na":s.idx>20?"good":s.idx>-20?"mid":"bad"}"><b class="${s.idx!=null&&((s.idx>0?"+":"")+s.idx).length>2?"long":""}">${s.idx==null?"–":(s.idx>0?"+":"")+s.idx}</b><div><strong>${esc(v)}</strong><small>bought ${crUsd(s.B)} · sold ${crUsd(s.Sv)}${s.Sv?` (${Math.round(s.planned/s.Sv*100)}% planned)`:""} · conviction index −100…+100</small></div></div>
-        ${s.buys.length?`<div class="cr-sum-box"><h5>Open-market buys</h5>${s.buys.slice(0,6).map(x=>`<div><span>${esc(x.owner)} · ${esc(x.role)} · ${esc(x.date)}</span><b class="up">${crUsd(x.value)}</b></div>`).join("")}</div>`:""}
-        ${s.sells.length?`<div class="cr-sum-box"><h5>Largest sales</h5>${s.sells.slice().sort((a,b)=>b.value-a.value).slice(0,6).map(x=>`<div><span>${esc(x.owner)} · ${esc(x.role)} · ${esc(x.date)}${x.plan10b51?" · 10b5-1":""}</span><b class="down">${crUsd(x.value)}</b></div>`).join("")}</div>`:""}`); },
-    text(){ const s=stat(q); return `## ${d.name} (${d.symbol}) — insider trades since ${d.since}\n\nConviction index: ${s.idx??"—"} (−100 all selling … +100 all buying)\nOpen-market buys: ${crUsd(s.B)} · sales: ${crUsd(s.Sv)} (${s.Sv?Math.round(s.planned/s.Sv*100):0}% under 10b5-1 plans)\n\n| Date | Insider | Role | Code | Shares | Price | Value |\n|---|---|---|---|---:|---:|---:|\n`+rows.map(x=>`| ${x.date} | ${x.owner} | ${x.role} | ${x.code} | ${Math.round(x.shares)} | ${x.price||""} | ${x.value?Math.round(x.value):""} |`).join("\n")+`\n\nSource: SEC EDGAR Form 4 filings`; }};
-  return M;
-}
-function crInsCsv(){ const rows=CR.insRows||[], qv=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
-  const lines=[["Date","Insider","Role","Code","Meaning","Shares","Acquired/Disposed","Price","Value (USD)","Owned after","Direct/Indirect","10b5-1 plan","Filing"].map(qv).join(",")];
-  for(const r of rows) lines.push([r.date,r.owner,r.role,r.code,CR_CODE[r.code]||"",r.shares,r.ad,r.price,r.value,r.after,r.direct?"D":"I",r.plan10b51?"yes":"no",r.url].map(qv).join(","));
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([lines.join("\r\n")],{type:"text/csv"})); a.download=`${CR.d.symbol}-insiders.csv`; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }
-/* ---------- filing alerts: new 10-K / 10-Q / earnings release / Form 4 for your watchlist and holdings ---------- */
-const FA={d:null,seen:{},items:[],toasted:false};
-try{ FA.seen=JSON.parse(localStorage.getItem("md_fseen")||"{}")||{}; }catch{}
-const FA_KINDS=[["er","Earnings release","release","🎙️"],["k","10-K annual report","fin","📊"],["q","10-Q quarterly report",null,"📄"],["f4","Insider trade (Form 4)","insiders","💼"]];
-async function faCheck(){
-  const syms=[...new Set([...(S.wl||[]),...(S.port||[]).map(h=>h.symbol)])].filter(x=>/^[A-Z][A-Z.\-]{0,6}$/.test(x)&&!/-USD$/.test(x)).slice(0,30);
-  if(!syms.length) return;
-  try{ const j=await api("/api/pub/filings?symbols="+encodeURIComponent(syms.join(","))); FA.d=j.filings||{}; }catch{ return; }
-  const week=new Date(Date.now()-7*864e5).toISOString().slice(0,10), items=[];
-  for(const [sym,x] of Object.entries(FA.d)) for(const [k,label,mode,icon] of FA_KINDS){ const f=x[k]; if(!f) continue; const seen=FA.seen[sym+":"+k];
-    if(seen?f.acc!==seen:f.date>=week) items.push({sym,name:x.name,k,label,mode,icon,f,n30:k==="f4"?x.f4.n30:0}); }
-  items.sort((a,b)=>b.f.date.localeCompare(a.f.date)); FA.items=items; faRender();
-  if(items.length&&!FA.toasted){ FA.toasted=true; faNotice(); }
-  // read the newest ones ahead of time so they open instantly
-  for(const it of items.filter(i=>i.mode).slice(0,4)) api({fin:"/api/pub/filing?fast=1&symbol=",release:"/api/pub/release?symbol=",insiders:"/api/pub/insiders?symbol="}[it.mode]+encodeURIComponent(it.sym)).catch(()=>{});
-}
-function faSave(){ try{localStorage.setItem("md_fseen",JSON.stringify(FA.seen))}catch{} }
-function faMark(it){ FA.seen[it.sym+":"+it.k]=it.f.acc; faSave(); FA.items=FA.items.filter(x=>x!==it); faRender(); }
-function faOpen(it){ faMark(it); const n=$("faNote"); if(n) n.remove(); if(!it.mode){ window.open(it.f.url,"_blank","noopener"); return; }
-  CR.mode=it.mode; try{localStorage.setItem("md_crm",it.mode)}catch{} crModeBar(); CR.sym=""; crOpenSym(it.sym); }
-const faWhen=d=>{ const n=Math.round((Date.now()-Date.parse(d+"T12:00:00Z"))/864e5); return n<=0?"today":n===1?"yesterday":n+" days ago"; };
-function faRender(){
-  const el=$("crAlerts"), it=FA.items; document.body.classList.toggle("fa-has",it.length>0); if(!el) return;
-  if(!it.length){ el.hidden=true; el.innerHTML=""; return; }
-  el.hidden=false;
-  el.innerHTML=`<div class="fa-h"><b>📬 New filings from your watchlist</b><small>${it.length} new · checked ${FA.d?"just now":""}</small><button type="button" class="fa-all" id="faAll">Mark all read</button></div>
-    <div class="fa-list">${it.slice(0,12).map((x,i)=>`<button type="button" class="fa-it" data-i="${i}"><span class="fa-ic">${x.icon}</span><span><b>${esc(x.sym)}</b> ${esc(x.label)}${x.k==="f4"&&x.n30>1?` <em>${x.n30} in 30 days</em>`:""}<small>${esc(x.name)} · filed ${faWhen(x.f.date)}</small></span><i>${x.mode?"Crawl it →":"SEC ↗"}</i></button>`).join("")}</div>`;
-  el.querySelectorAll(".fa-it").forEach(b=>b.onclick=()=>faOpen(it[+b.dataset.i]));
-  $("faAll").onclick=()=>{ for(const x of it) FA.seen[x.sym+":"+x.k]=x.f.acc; faSave(); FA.items=[]; faRender(); };
-}
-function faNotice(){
-  if(S.tab==="filings"||$("faNote")) return; const it=FA.items, n=document.createElement("div"); n.id="faNote"; n.className="fa-note";
-  n.innerHTML=`<b>📬 ${it.length} new filing${it.length===1?"":"s"} from your watchlist</b><small>${it.slice(0,3).map(x=>esc(x.sym+" "+x.label.replace(/ \(.*\)$/,""))).join(" · ")}${it.length>3?" …":""}</small><div><button type="button" class="btn" id="faGo">Open in the crawler</button><button type="button" class="btn ghost" id="faX">Later</button></div>`;
-  document.body.appendChild(n); const close=()=>n.remove(); $("faX").onclick=close; $("faGo").onclick=()=>{ close(); setTab("filings"); $("crAlerts").scrollIntoView({block:"start"}); };
-  setTimeout(close,15000);
-}
-setTimeout(faCheck,8000); setInterval(()=>{ if(!document.hidden) faCheck(); },30*60e3);
-$("crModes").onclick=e=>{ const b=e.target.closest("[data-m]"); if(b) crSetMode(b.dataset.m); };
-crModeBar();
-
-$("crForm").onsubmit=e=>{e.preventDefault(); clearTimeout(CR.typeT); const v=normSym($("crSym").value); if(v&&v!==CR.sym) crLoad(v); $("crSym").blur(); };
-$("crSym").addEventListener("input",()=>{ clearTimeout(CR.typeT); const v=normSym($("crSym").value); if(!/^[A-Z][A-Z0-9.\-]{0,9}$/.test(v)||v===CR.sym) return; CR.typeT=setTimeout(()=>crLoad(v),900); });
-document.addEventListener("visibilitychange",()=>{ if(!document.hidden&&S.tab==="filings") crLoop(); });
-$("crLayout").onclick=e=>{const b=e.target.closest("[data-l]"); if(!b) return; $("crRoot").dataset.layout=b.dataset.l; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x===b)); try{localStorage.setItem("md_crl",b.dataset.l)}catch{} setTimeout(()=>{ if(CR.d){ const m=CR.q[Math.max(0,CR.i-1)]; if(m) crRun(m,false); crLoop(); } },60); };
-$("crChips").onclick=e=>{const b=e.target.closest("[data-sym]"); if(b) crLoad(b.dataset.sym);};
-try{ const l=localStorage.getItem("md_crl"); if(l){ $("crRoot").dataset.layout=l; document.querySelectorAll("#crLayout button").forEach(x=>x.classList.toggle("on",x.dataset.l===l)); } }catch{}
-// open the crawler preloaded for a ticker — from the watchlist, news tags, search, research page or a #filings/TICKER link
-function crOpenSym(sym){ sym=normSym(sym); if(!sym) return; $("crSym").value=sym; if(S.tab!=="filings") setTab("filings"); else crLoad(sym); }
-document.addEventListener("click",e=>{ const b=e.target.closest("[data-10k]"); if(!b) return; e.preventDefault(); e.stopPropagation(); crOpenSym(b.dataset["10k"]); },true);
-function crOpen(){ const want=normSym($("crSym").value||"AAPL"); if(CR.sym!==want&&!CR.busy){ CR.busy=true; crLoad(want).finally(()=>CR.busy=false); } else crLoop(); }
-
+/* ---------- start-up: Claude budget, live prices, first page, refresh timers ---------- */
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-{ const fm=location.hash.match(/^#filings\/([A-Za-z0-9.\-]{1,10})(?:\/(fin|release|risk|insiders))?$/); if(fm){ $("crSym").value=fm[1].toUpperCase(); if(fm[2]){ CR.mode=fm[2]; crModeBar(); } }
-  setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":fm?"filings":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news"); }
+setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":"news");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";

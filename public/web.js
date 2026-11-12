@@ -37,12 +37,12 @@
   // then crawls into the center and writes that sentence. The text is the server's live summary: it is rebuilt from new
   // research while the market is open and frozen as the day's final summary after the close.
   const PAGE = { data: ["markets", "Overview"], news: ["markets", "News"], nyse: ["markets", "Heatmap"], analysis: ["markets", "Analysis"], macro: ["markets", "Macro"],
-    research: ["research", "Stock research"], fin: ["research", "Financials"], filings: ["research", "10-K crawler"], portfolio: ["portfolio", "My portfolio"], aitrade: ["ailab", "AI vs S&P 500"] };
+    research: ["research", "Stock research"], fin: ["research", "Financials"], portfolio: ["portfolio", "My portfolio"], aitrade: ["ailab", "AI vs S&P 500"] };
   const GNAME = { markets: "Markets", research: "Research", portfolio: "Portfolio", ailab: "AI Lab", quant: "Quant", web: "THE WEB" };
   const SPOKES = 16, RINGS = 6, GSPOKES = { markets: [13, 14, 15, 0, 1, 2], research: [3, 4, 5, 6], portfolio: [7, 8, 9], ailab: [10, 11, 12] };
   function pageOfJob(j) {
     const g = String(j.go || "").replace(/^#/, "").split("/")[0]; if (PAGE[g]) return g; if (/^q:/.test(j.go || "")) return "research";
-    const a = j.area || ""; return /Heatmap|Overview/.test(a) ? "nyse" : /News/.test(a) ? "news" : /Macro/.test(a) ? "macro" : /earnings/i.test(a) ? "data" : /crawler|Financials|Stock research/.test(a) ? "filings" : /Portfolio/.test(a) ? "portfolio" : /AI Lab/.test(a) ? "aitrade" : null;
+    const a = j.area || ""; return /Heatmap|Overview/.test(a) ? "nyse" : /News/.test(a) ? "news" : /Macro/.test(a) ? "macro" : /earnings/i.test(a) ? "data" : /Financials|Stock research/.test(a) ? "fin" : /Portfolio/.test(a) ? "portfolio" : /AI Lab/.test(a) ? "aitrade" : null;
   }
   const groupOfNode = (n) => n.type === "portfolio" || n.type === "holding" || (n.type === "discovery" && n.cat === "portfolio") ? "portfolio" : n.type === "trader" || n.cat === "ai_trader" ? "ailab"
     : n.type === "watch" || n.type === "company" || ["filing", "insider", "fundamentals", "company", "earnings"].includes(n.cat) ? "research" : "markets";
@@ -60,15 +60,21 @@
     $("twbPop").addEventListener("click", (e) => { const g = e.target.closest("[data-twgo]"); if (g) return go(g.dataset.twgo); const d = e.target.closest("[data-twd]"); if (d) { e.preventDefault(); openDisc(d.dataset.twd); } });
     addEventListener("resize", () => { if (W.open) { layoutWeb(); drawWeb(); } });
   }
+  // The summary sits in a docked panel (left on desktop, bottom on phones) and the web fills the rest of the canvas.
+  // The web's outline is a rounded rectangle (superellipse) that fills its area edge to edge, with a small knot at the centre.
   function layoutWeb() {
-    const box = $("twb"), r = box.getBoundingClientRect(); G.w = r.width; G.h = r.height; G.cx = G.w / 2; G.cy = G.h / 2; G.rx = G.w / 2 - 12; G.ry = G.h / 2 - 12;
-    G.narrow = G.w < 760; G.hub = G.narrow ? 0.74 : 0.6;
-    const hub = $("twbHub"), cw = G.narrow ? G.w * 0.92 : 2 * G.rx * G.hub * 0.84, ch = G.narrow ? G.h * 0.7 : 2 * G.ry * G.hub * 0.9;
-    Object.assign(hub.style, { width: cw + "px", height: ch + "px", left: G.cx - cw / 2 + "px", top: G.cy - ch / 2 + "px" });
+    const box = $("twb"), r = box.getBoundingClientRect(), hub = $("twbHub"); G.w = r.width; G.h = r.height; G.narrow = G.w < 760; G.hub = 0.07;
+    let x0, x1, y0, y1;
+    if (G.narrow) { const lg = $("twbLegend"), bot = (lg ? lg.offsetHeight : 60) + 18, ph = Math.round(G.h * 0.32); Object.assign(hub.style, { left: "8px", top: G.h - ph - bot + "px", width: G.w - 16 + "px", height: ph + "px" }); x0 = 6; x1 = G.w - 6; y0 = 96; y1 = G.h - ph - bot - 8; }
+    else { const pw = Math.round(Math.min(380, Math.max(300, G.w * 0.28)));
+      Object.assign(hub.style, { left: "14px", top: "62px", width: pw + "px", height: G.h - 62 - 56 + "px" }); x0 = pw + 26; x1 = G.w - 10; y0 = 56; y1 = G.h - 48; }
+    G.cx = (x0 + x1) / 2; G.cy = (y0 + y1) / 2; G.rx = (x1 - x0) / 2; G.ry = (y1 - y0) / 2;
   }
-  const ang = (s) => -Math.PI / 2 + (s / SPOKES) * Math.PI * 2 + ROT.a; // ROT.a spins the web inside its own outline
-  const frac = (k) => G.hub + (1 - G.hub) * (k / RINGS);
-  const J = (s, k) => ({ x: G.cx + Math.cos(ang(s)) * G.rx * frac(k), y: G.cy + Math.sin(ang(s)) * G.ry * frac(k) }); // junction, container px
+  const ang = (s) => -Math.PI / 2 + (s / SPOKES) * Math.PI * 2; // fixed: the web does not rotate
+  const frac = (k) => G.hub + (1 - G.hub) * Math.pow(Math.max(0, k) / RINGS, 0.62); // inner rings spread out, so the centre is not crowded
+  const SE = 3.4; // superellipse exponent: 2 = ellipse, higher = squarer
+  const reach = (a) => Math.pow(Math.pow(Math.abs(Math.cos(a)) / G.rx, SE) + Math.pow(Math.abs(Math.sin(a)) / G.ry, SE), -1 / SE);
+  const J = (s, k) => { const a = ang(s), d = reach(a) * frac(k); return { x: G.cx + Math.cos(a) * d, y: G.cy + Math.sin(a) * d }; }; // junction, container px
   const sag = (a, b) => ({ x: G.cx + ((a.x + b.x) / 2 - G.cx) * 0.95, y: G.cy + ((a.y + b.y) / 2 - G.cy) * 0.95 });
   function placeNodes() {
     G.slot = {}; G.nodes = [];
@@ -77,7 +83,7 @@
     const list = g.nodes.filter((n) => n.type !== "industry").slice().sort((a, b) => rank(a) - rank(b));
     for (const n of list) {
       const spokes = GSPOKES[groupOfNode(n)]; let done = false;
-      for (let k = 1; k <= RINGS && !done; k++) for (const s of spokes) { const key = s + ":" + k; if (!G.slot[key]) { G.slot[key] = n; n.s = s; n.k = k; G.nodes.push(n); done = true; break; } }
+      for (let k = 2; k <= RINGS && !done; k++) for (const s of spokes) { const key = s + ":" + k; if (!G.slot[key]) { G.slot[key] = n; n.s = s; n.k = k; G.nodes.push(n); done = true; break; } }
     }
   }
   // ---------------------------------------------------------------- the web is filled with stocks; your portfolio lights up
@@ -99,7 +105,7 @@
   const CAM = { k: 1, x: 0, y: 0 }, VIEWS = { mode: "move", sector: "", mine: false };
   // the web spins slowly inside its outline (≈ one turn every 9 minutes): strands and every dot slide around the oval,
   // labels stay upright, nothing is clipped. Each frame only moves existing elements (no redraw, no filters).
-  const ROT = { a: 0, on: (() => { try { return localStorage.getItem("tw_rot") !== "0"; } catch { return true; } })(), last: 0, lastMove: 0, raf: 0 };
+  const ROT = { a: 0, on: false, last: 0, lastMove: 0, raf: 0 }; // rotation removed; kept so older callers still find the object
   const camT = () => `translate(${CAM.x.toFixed(1)},${CAM.y.toFixed(1)}) scale(${CAM.k.toFixed(3)})`;
   const slotXY = (sl) => { if (sl.t === "m") { const a2 = J(sl.s, sl.k), b2 = J(sl.s + 1, sl.k), c2 = sag(a2, b2); return { x: 0.25 * a2.x + 0.5 * c2.x + 0.25 * b2.x, y: 0.25 * a2.y + 0.5 * c2.y + 0.25 * b2.y }; } return J(sl.s, sl.k); };
   const ringD = (k) => { let d = ""; for (let sp = 0; sp < SPOKES; sp++) { const a2 = J(sp, k), b2 = J((sp + 1) % SPOKES, k), c2 = sag(a2, b2); d += `${sp ? "" : `M${a2.x.toFixed(1)} ${a2.y.toFixed(1)}`} Q${c2.x.toFixed(1)} ${c2.y.toFixed(1)} ${b2.x.toFixed(1)} ${b2.y.toFixed(1)}`; } return d; };
@@ -112,16 +118,7 @@
     (W.kg || []).forEach((e, i) => { const el = document.getElementById("kg" + i); if (el) el.setAttribute("d", kgD(e)); });
     svg.querySelectorAll("[data-js]").forEach((e) => { const p = J(+e.dataset.js, +e.dataset.jk); if (e.tagName === "circle") { e.setAttribute("cx", p.x.toFixed(1)); e.setAttribute("cy", p.y.toFixed(1)); } else e.setAttribute("transform", `translate(${p.x.toFixed(1)},${p.y.toFixed(1)})`); });
   }
-  function rotLoop(t) {
-    ROT.raf = requestAnimationFrame(rotLoop); const dt = ROT.last ? Math.min(0.1, (t - ROT.last) / 1000) : 0; ROT.last = t;
-    const svg = $("twbSvg"); if (!svg || !W.open || document.hidden) return;
-    const paused = !ROT.on || CAM.k > 1.01 || svg.classList.contains("hov") || svg.classList.contains("grab") || (typeof SCAN !== "undefined" && SCAN.on) || matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (paused || !dt) return;
-    const sp = ROT.speed == null ? 1 : ROT.speed; if (!sp) return; ROT.a = (ROT.a + dt * 0.0116 * sp) % (Math.PI * 2);
-    if (t - ROT.lastMove < 33) return; ROT.lastMove = t; reposition(); // ~30 fps is plenty for a slow spin
-    // a spider resting on the web rides along with its junction
-    const c = SPD.cur; if (SPD.el && SPD.at && (!c || (c.wait != null && (c.node || c.rest)))) { const q = scr(J(SPD.at.s, SPD.at.k)); SPD.x += (q.x - SPD.x) * 0.5; SPD.y += (q.y - SPD.y) * 0.5; }
-  }
+
   const SC = { "Information Technology": "#4da3ff", "Health Care": "#34d399", Financials: "#facc15", "Consumer Discretionary": "#f472b6", "Communication Services": "#a78bfa", Industrials: "#94a3b8", "Consumer Staples": "#fb923c", Energy: "#f87171", Utilities: "#67e8f9", "Real Estate": "#c4b5fd", Materials: "#fde68a" };
   const SHORT = { "Information Technology": "Tech", "Health Care": "Health", Financials: "Financials", "Consumer Discretionary": "Discretionary", "Communication Services": "Comms", Industrials: "Industrials", "Consumer Staples": "Staples", Energy: "Energy", Utilities: "Utilities", "Real Estate": "Real estate", Materials: "Materials" };
   function moveCol(p) { if (p == null || !isFinite(p)) return "#475569"; const t = Math.max(-1, Math.min(1, p / 3)); return t >= 0 ? `rgb(${Math.round(40 - 25 * t)},${Math.round(120 + 100 * t)},${Math.round(110 + 15 * t)})` : `rgb(${Math.round(150 + 100 * -t)},${Math.round(70 - 20 * -t)},${Math.round(90 - 10 * -t)})`; }
@@ -219,14 +216,11 @@
   function toolbar() {
     const tb = $("twbTools"); if (!tb) return; const q = (W.snap && W.snap.quotes) || {}, vals = Object.values(q).map((v) => v[2]).filter((x) => x != null), up = vals.filter((x) => x > 0).length, dn = vals.filter((x) => x < 0).length;
     const secs = Object.keys(SC), secMove = (sc) => { const xs = Object.entries(q).filter(([x]) => W.sec && W.sec[x] === sc).map(([, v]) => [v[2], v[3] || 1]).filter(([p]) => p != null); const w = xs.reduce((a2, [, c]) => a2 + c, 0); return w ? xs.reduce((a2, [p, c]) => a2 + p * c, 0) / w : null; };
-    tb.innerHTML = `<div class="twb-seg" id="twbMode"><button data-v="move" class="${VIEWS.mode === "move" ? "on" : ""}">Today's move</button><button data-v="sector" class="${VIEWS.mode === "sector" ? "on" : ""}">Sector</button></div>
-      <button class="twb-chip ${VIEWS.mine ? "on" : ""}" id="twbMine">★ My holdings</button><input id="twbFind" class="twb-find" placeholder="Find ticker…" maxlength="8" autocomplete="off" spellcheck="false">
-      ${vals.length ? `<span class="twb-breadth"><b class="u">▲ ${up}</b><b class="d">▼ ${dn}</b><i><em style="width:${((up / Math.max(1, up + dn)) * 100).toFixed(1)}%"></em></i></span>` : ""}<button class="twb-chip ${ROT.on ? "on rot" : ""}" id="twbRot" title="Slowly rotate the web">⟳ Rotate</button><button class="twb-chip" id="twbReset" ${CAM.k > 1.01 ? "" : "hidden"}>⤢ Reset view</button>`;
+    VIEWS.mode = "move"; VIEWS.mine = false;
+    tb.innerHTML = `<input id="twbFind" class="twb-find" placeholder="Find ticker…" maxlength="8" autocomplete="off" spellcheck="false">
+      ${vals.length ? `<span class="twb-breadth"><b class="u">▲ ${up}</b><b class="d">▼ ${dn}</b><i><em style="width:${((up / Math.max(1, up + dn)) * 100).toFixed(1)}%"></em></i></span>` : ""}<button class="twb-chip" id="twbReset" ${CAM.k > 1.01 ? "" : "hidden"}>⤢ Reset view</button>`;
     const lg = $("twbLegend"); lg.innerHTML = secs.map((sc) => { const m = secMove(sc); return `<button data-sec="${esc(sc)}" class="${VIEWS.sector === sc ? "on" : ""}"><i style="background:${SC[sc]}"></i>${SHORT[sc]}${m != null ? `<b class="${m >= 0 ? "u" : "d"}">${m >= 0 ? "+" : ""}${m.toFixed(1)}%</b>` : ""}</button>`; }).join("") + (VIEWS.mode === "move" ? `<span class="twb-ramp"><em>−3%</em><i></i><em>+3%</em></span>` : "");
-    $("twbMode").onclick = (e) => { const v = e.target.dataset.v; if (!v) return; VIEWS.mode = v; toolbar(); applyFilters(); };
-    $("twbMine").onclick = () => { VIEWS.mine = !VIEWS.mine; toolbar(); applyFilters(); };
     $("twbReset").onclick = () => setCam(1, 0, 0, true);
-    $("twbRot").onclick = () => { ROT.on = !ROT.on; try { localStorage.setItem("tw_rot", ROT.on ? "1" : "0"); } catch {} toolbar(); };
     $("twbFind").placeholder = "Search ticker, company, sector…";
     $("twbFind").onkeydown = (e) => { if (e.key === "Escape") { e.target.value = ""; searchWeb(""); return; } if (e.key !== "Enter") return; const v = e.target.value.trim(); if (!v) { searchWeb(""); return; } if (!searchWeb(v) && !focusSym(v.toUpperCase())) { e.target.classList.add("bad"); setTimeout(() => e.target.classList.remove("bad"), 900); } };
     lg.onclick = (e) => { const b = e.target.closest("[data-sec]"); if (!b) return; VIEWS.sector = VIEWS.sector === b.dataset.sec ? "" : b.dataset.sec; toolbar(); applyFilters(); };
@@ -419,7 +413,7 @@
   const PAGE_JOB = { quant: ["portfolio_scan"], news: ["news_sweep"], data: ["market_pulse"], nyse: ["market_pulse"], analysis: ["market_pulse"], macro: ["macro_check"], portfolio: ["portfolio_scan"], risk: ["portfolio_scan"], aitrade: ["ai_trader_sync"], filings: ["filings_watch"] };
   const FOL = { asked: {}, job: null, jobLabel: "", page: null };
   const pageLabel = (t) => { const g = typeof groupOf === "function" ? groupOf(t) : ""; const it = (NAV.find(([k]) => k === g) || [, []])[1].find(([k]) => k === t); return `${GNAME[g] || g} › ${it ? it[1] : t}`; };
-  function symFor(t) { const v = t === "research" ? S.rq && S.rq.sym : t === "fin" ? ($("finSym") || {}).value : t === "dcf" ? ($("dcfSym") || {}).value : t === "filings" ? (typeof CR !== "undefined" && CR.sym) : null; const s = String(v || "").toUpperCase().trim(); return /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s) && !/[\^=]/.test(s) ? s : null; }
+  function symFor(t) { const v = t === "research" ? S.rq && S.rq.sym : t === "fin" ? ($("finSym") || {}).value : t === "dcf" ? ($("dcfSym") || {}).value : null; const s = String(v || "").toUpperCase().trim(); return /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s) && !/[\^=]/.test(s) ? s : null; }
   async function startResearch(t) {
     const sym = symFor(t), type = sym ? (t === "research" ? "company_snapshot" : "fundamentals") : (PAGE_JOB[t] || [])[0]; if (!type) return null;
     const key = type + ":" + (sym || ""); if (Date.now() - (FOL.asked[key] || 0) < 10 * 60e3) return FOL.job && FOL.jobKey === key ? FOL.job : null;
@@ -446,7 +440,7 @@
   function hideSpider() { SPD.wanted = false; SPD.on = false; cancelAnimationFrame(SPD.raf); SPD.q = []; SPD.cur = null; if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = "none"; }
   function onTab(t) {
     if (SCAN.on) { SCAN.on = false; SCAN.aborted = true; } // switching pages cancels a running scan
-    if (t !== "web") return hideSpider(); // the spider stays on THE WEB page; the 10-K crawler has its own reader
+    if (t !== "web") return hideSpider(); // the spider stays on THE WEB page
     if (!SPD.el) return; for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = ""; startSpider();
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     SPD.q = []; SPD.cur = null; FOL.page = t;
@@ -613,7 +607,13 @@
   // gait, a laser from its mouth to every figure it reads, spark bursts where the beam lands — drawn huge across the
   // whole screen at the crawler's 2× speed.
   const BS = { sp: null, lasers: [], pulses: [], raf: 0, ov: null, cap: null };
-  const bsMs = (ms, min) => (typeof crMs === "function" ? crMs(ms, min) : Math.max(min, ms / 2));
+  const bsMs = (ms, min) => Math.max(min, ms / 2); // 2x speed
+  // two-segment spider legs with simple inverse kinematics (knees bend up, like a real spider)
+  function crHip(S,L){ return {x:S.x+L.s*(8+Math.abs(Math.sin(L.a))*4)*S.scale,y:S.y+Math.sin(L.a)*10*S.scale}; }
+  function crRest(S,L){ const R=118*S.scale; return {x:S.x+L.s*Math.cos(L.a)*R+S.vx*7,y:S.y+Math.sin(L.a)*R*0.95+30*S.scale+S.vy*7}; }
+  function crKnee(h,f,S,L){ const L1=74*S.scale,L2=88*S.scale; let dx=f.x-h.x,dy=f.y-h.y,d=Math.hypot(dx,dy)||1; const dd=Math.min(d,L1+L2-1),a=(L1*L1-L2*L2+dd*dd)/(2*dd),hh=Math.sqrt(Math.max(0,L1*L1-a*a)),ux=dx/d,uy=dy/d;
+  let px=-uy,py=ux; if(py>0){px=-px;py=-py;} // knee bends up, like a real spider
+  return {x:h.x+ux*a+px*hh,y:h.y+uy*a+py*hh}; }
   function bsInit() {
     if (!BS.ov) { BS.ov = document.createElementNS("http://www.w3.org/2000/svg", "svg"); BS.ov.setAttribute("class", "bs-ov"); BS.cap = document.createElement("div"); BS.cap.className = "bs-cap"; document.body.append(BS.ov, BS.cap); }
     const sc = innerWidth < 700 ? 0.95 : 1.7, legs = []; for (const sd of [-1, 1]) [-62, -24, 18, 56].forEach((a, i) => legs.push({ s: sd, a: (a * Math.PI) / 180, g: (i + (sd > 0 ? 1 : 0)) % 2, foot: null, from: null, to: null, t0: 0 }));
@@ -805,7 +805,7 @@
   window.webOpen = function () {
     shell(); W.open = true; layoutWeb(); const firstIn = !SPD.el; startSpider();
     if (firstIn) { SPD.at = { s: 12, k: RINGS }; cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 240, cap: "Crawling into the web" }); }
-    wireWeb(); toolbar(); loadSnap(); if (!ROT.raf) ROT.raf = requestAnimationFrame(rotLoop); loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
+    wireWeb(); toolbar(); loadSnap(); loadStatus(); loadGraph(); loadSummary(); pushCtx(true);
     clearInterval(W.snapPoll); W.snapPoll = setInterval(() => { if (!document.hidden && W.open) loadSnap(); }, 60e3); // live heat map
     clearInterval(W.poll); W.poll = setInterval(() => { if (!document.hidden) loadStatus(); }, 5000);
     clearInterval(W.sumPoll); W.sumPoll = setInterval(() => { if (!document.hidden) loadSummary(); }, SUM.meta && !SUM.meta.live ? 300e3 : 30e3);

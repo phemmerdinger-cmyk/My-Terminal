@@ -6,7 +6,7 @@ Every feature has **one home**. Other pages may show a compact summary of it wit
 
 | Area (nav) | Page | Owns | Summaries it may show (and where they link) |
 |---|---|---|---|
-| Markets | **Overview** (dashboard) | Earnings calendar, top gainers/losers/most active, watchlist performance table (1W–1Y, news mood), cross-asset tables (indexes, Treasuries, bond funds, crypto, ETFs, mutual funds, futures), analyst Best Buys/Sells | Market health (→ Analysis), Your portfolio today (→ Portfolio), Latest research findings (→ THE WEB) |
+| Markets | **Overview** (dashboard) | Market radar (what is unusual right now: big moves, breaking news, volume, earnings, macro findings), earnings calendar, top gainers/losers/most active, watchlist performance table (1W–1Y, news mood), cross-asset tables (indexes, Treasuries, bond funds, crypto, ETFs, mutual funds, futures), analyst Best Buys/Sells | Market health (→ Analysis), Your portfolio today (→ Portfolio), Latest research findings (→ THE WEB) |
 | Markets | **News** | Full news feed, filters, Smart Money, article previews, which companies are most in the news | — |
 | Markets | **Heatmap** | Every S&P 500 stock's move, grouped by sector | — |
 | Markets | **Analysis** | The market-health score (one scorer: `anScores`), the written market brief, sector leadership, what's driving the market, Claude's market deep dive | Top 6 stories (→ News) |
@@ -20,8 +20,7 @@ Every feature has **one home**. Other pages may show a compact summary of it wit
 | AI Lab | **AI vs S&P 500** | The three paper bots (swing, day trader, quant trader): positions, trades, performance vs the S&P | — |
 | AI Lab | **Claude Predictor** | Claude predictions and free-text questions (behind the Claude password), screener, head-to-head, the prediction log | Saved count + accuracy (→ Prediction accuracy) |
 | AI Lab | **Prediction accuracy** | Grading of every saved prediction vs the S&P 500 | — |
-| THE WEB | **Command center** | The spider, research findings with sources, market radar, workstation (research summary, holdings intel, macro intel, event timeline, technical chart) | Paper-bot values (→ AI Lab), models (→ Quant) |
-| THE WEB | **10-K crawler** | Filing crawler: 10-K, earnings releases, risk & forensics, insider trades, filing alerts | — |
+| THE WEB | **Command center** | The spider, the stock web (S&P 500 by market cap, holdings lit), research findings with sources, workstation (research summary, holdings intel, macro intel, event timeline, technical chart) | Paper-bot values (→ AI Lab), models (→ Quant) |
 | THE WEB | **System health** | Data sources, freshness, scheduler, tests, errors | — |
 
 Global (every page): the watchlist sidebar (prices), the ticker tape, the Claude budget chip, the Spider button, and the floating Ask Claude panel (it answers questions about the page you're on).
@@ -42,6 +41,8 @@ Global (every page): the watchlist sidebar (prices), the ticker tape, the Claude
 | Accuracy by stance | Prediction database, Prediction accuracy | Prediction accuracy. The database keeps the count + overall accuracy and a link |
 | "Claude used today" counter | Predictor header line | Header budget chip + budget card |
 | Old in-page backtester (no longer had a UI) | index.html | Removed. Backtest lab replaced it |
+| 10-K crawler page, watchlist "10-K" buttons, filing alerts | THE WEB | Removed at the owner's request. SEC statements stay in Research › Financials / DCF; the server-side 10-K scorecard still feeds the AI trader |
+| Market radar | THE WEB canvas | Moved to the Overview dashboard, where market-wide alerts belong. THE WEB's map now fills its canvas: no oval hub, no rotation, no optional view toggles |
 
 ## Shared data layer — `public/data.js`
 

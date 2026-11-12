@@ -96,8 +96,7 @@ The **🕷 Spider** button in the top bar sends THE WEB's spider onto whatever p
 left edge, scrolls through every section at 2× speed, inspects each one and records the figures it reads, starts the
 matching server research job, then opens a report: takeaways (positive vs negative figures, biggest moves, most-mentioned
 tickers, any STALE/ERROR flags), THE WEB's market context and stored research on those tickers, and a section-by-section
-list of what it collected. Rule-based, no paid AI. Outside a scan the spider stays on THE WEB page; the 10-K crawler
-(THE WEB → 10-K crawler) reads filings with its own reader at 2× and writes a filing summary.
+list of what it collected. Rule-based, no paid AI. Outside a scan the spider stays on THE WEB page.
 
 ## Quant › Quant Lab (fully automatic)
 

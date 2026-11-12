@@ -14,7 +14,8 @@
   "use strict";
   if (typeof VIEW !== "undefined" && VIEW) return;
   const X = () => window.TWX, E = { mode: "net", mounted: false, sig: [], radarRaf: 0, intelSym: null, spcPoll: 0, wsLayout: null, cache: {} };
-  const cfg = (() => { try { return { perf: "high", motion: "auto", ...JSON.parse(localStorage.getItem("tw_env") || "{}") }; } catch { return { perf: "high", motion: "auto" }; } })();
+  // no display-settings panel any more: full quality, motion follows the operating system's reduced-motion setting
+  const cfg = { perf: "high", motion: "auto" }; try { localStorage.removeItem("tw_env"); } catch {}
   const saveCfg = () => { try { localStorage.setItem("tw_env", JSON.stringify(cfg)); } catch {} };
   const reduced = () => cfg.motion === "reduced" || (cfg.motion === "auto" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const pct = (x, d = 2) => (x == null || !isFinite(x) ? "—" : (x >= 0 ? "+" : "−") + Math.abs(x).toFixed(d) + "%");
@@ -29,22 +30,22 @@
 
   // ================================================================ mount
   function mount() {
-    const T = X(), box = $("twb"); if (!T || !box) return; if (E.mounted && box.querySelector("#twbModes")) { radarStart(); return; }
+    const T = X(), box = $("twb"); if (!T || !box) return; if (E.mounted && box.querySelector("#twbModes")) return;
     E.mounted = true;
-    box.insertAdjacentHTML("beforeend", `<div class="twb-modes" id="twbModes">${["net:◉ Network", "ws:▦ Workstation", "cine:✦ Cinematic"].map((x) => { const [k, t] = x.split(":"); return `<button data-m="${k}" class="${E.mode === k ? "on" : ""}">${t}</button>`; }).join("")}<button data-m="spc" title="Spider console">🕷 Console</button><button data-m="cfg" title="Display settings">⚙</button></div>
-      <div class="twg twb-radar" id="twbRadar"><div class="twg-h"><b>Market radar</b><span id="rdVix"></span><button class="twg-x" data-min="twbRadar" title="Collapse">–</button></div><div class="twg-b"><canvas id="rdCv"></canvas><div class="rd-list" id="rdList"></div></div></div>
+    box.insertAdjacentHTML("beforeend", `<div class="twb-modes" id="twbModes">${["net:◉ Network", "ws:▦ Workstation"].map((x) => { const [k, t] = x.split(":"); return `<button data-m="${k}" class="${E.mode === k ? "on" : ""}">${t}</button>`; }).join("")}<button data-m="spc" title="Spider console">🕷 Console</button></div>
       <div class="twg twb-intel" id="twbIntel" hidden></div>
       <div class="twg twb-spc" id="twbSpc" hidden></div>
       <div class="twg twb-cfg" id="twbCfg" hidden></div>
       <div class="twb-ws" id="twbWs" hidden></div>
       <button class="twb-cine-x" id="twbCineX" hidden>Exit cinematic · Esc</button>`);
     $("twbModes").onclick = (e) => { const m = e.target.closest("[data-m]"); if (!m) return; const k = m.dataset.m; if (k === "spc") return toggleSpc(); if (k === "cfg") return toggleCfg(); setMode(k); };
-    box.addEventListener("click", (e) => { const mn = e.target.closest("[data-min]"); if (mn) { const p = $(mn.dataset.min); p.classList.toggle("min"); mn.textContent = p.classList.contains("min") ? "+" : "–"; } });
+    box.addEventListener("click", (e) => { const mn = e.target.closest("[data-min]"); if (mn) { const p = $(mn.dataset.min); p.classList.toggle("min"); mn.textContent = p.classList.contains("min") ? "+" : "–"; dispatchEvent(new Event("resize")); } });
+    setTimeout(() => dispatchEvent(new Event("resize")), 0); // dock the radar under the summary panel
     $("twbCineX").onclick = () => setMode("net");
     addEventListener("keydown", (e) => { if (e.key === "Escape" && S.tab === "web") { if (E.mode === "cine") setMode("net"); else if (!$("twbIntel").hidden) closeIntel(); } });
     // the spider itself opens its console
     document.addEventListener("click", (e) => { if (e.target.closest(".tw-crawler") && S.tab === "web") toggleSpc(true); });
-    applyCfg(); radarStart(); refreshSignals(); setInterval(() => { if (S.tab === "web" && !document.hidden) refreshSignals(); }, 60e3);
+    applyCfg();
   }
   function setMode(m) {
     E.mode = m; const box = $("twb"); $("twbModes").querySelectorAll("[data-m]").forEach((b) => b.classList.toggle("on", b.dataset.m === m));
@@ -66,7 +67,7 @@
   // ================================================================ market radar
   const SECS = ["Information Technology", "Communication Services", "Consumer Discretionary", "Consumer Staples", "Health Care", "Financials", "Real Estate", "Utilities", "Energy", "Materials", "Industrials", "Macro & news"];
   async function refreshSignals() {
-    const T = X(); if (!T) return; await T.loadSnap(); const W = T.W, q = (W.snap && W.snap.quotes) || {}, sec = W.sec || {}, nm = W.nm || {}, sig = [], mine = T.myStocks();
+    const T = X(); if (!T) return; await T.loadSnap(); if (!T.W.sec) { try { const j = await fetch("/sp500.json").then((r) => r.json()); T.W.sec = Object.fromEntries((j.rows || []).map((r) => [r[0], r[2]])); T.W.nm = Object.fromEntries((j.rows || []).map((r) => [r[0], r[1]])); } catch {} } const W = T.W, q = (W.snap && W.snap.quotes) || {}, sec = W.sec || {}, nm = W.nm || {}, sig = [], mine = T.myStocks();
     // 1 · large moves
     Object.entries(q).filter(([, v]) => v[2] != null && Math.abs(v[2]) >= 2.5).sort((a, b) => Math.abs(b[1][2]) - Math.abs(a[1][2])).slice(0, 14)
       .forEach(([s, v]) => sig.push({ kind: "move", sym: s, sec: sec[s] || "Macro & news", strength: Math.min(1, Math.abs(v[2]) / 8), label: `${s} ${pct(v[2], 1)}`, sub: nm[s] || "", c: v[2] >= 0 ? "#22e39a" : "#ff4d6d", mine: mine.has(s) }));
@@ -90,14 +91,22 @@
     $("rdList").innerHTML = top.length ? top.map((g, i) => `<button data-i="${sig.indexOf(g)}"><i style="color:${g.c}">${ic[g.kind]}</i><span>${esc(g.label)}</span><em>${esc(g.sub)}</em></button>`).join("") : `<p class="twg-note">No unusual signals right now.</p>`;
     $("rdList").onclick = (e) => { const b = e.target.closest("[data-i]"); if (b) openSignal(E.sig[+b.dataset.i]); };
   }
-  function openSignal(g) { if (!g) return; if (g.sym) return intel(g.sym); if (g.url) return window.open(g.url, "_blank", "noopener"); }
+  function openSignal(g) { if (!g) return; if (g.sym) return typeof openQuote === "function" ? openQuote(g.sym) : intel(g.sym); if (g.url) return window.open(g.url, "_blank", "noopener"); }
+  // ---- the radar is an Overview card: what's unusual across the market right now (moves, breaking news, volume, earnings, macro)
+  function radarMount() {
+    const host = $("ovRadar"); if (!host || host.dataset.ready || !X()) return; host.dataset.ready = "1";
+    host.innerHTML = `<div class="ov-h"><h2 class="h">Market radar</h2><span id="rdVix" class="rd-vix"></span></div><div class="rd-b"><canvas id="rdCv"></canvas><div class="rd-list" id="rdList"><p class="twg-note">Scanning…</p></div></div>
+      <div class="rd-key"><span><i style="color:#22e39a">◆</i>big move</span><span><i style="color:#38e1ff">●</i>breaking news</span><span><i>▲</i>volume</span><span><i>◷</i>earnings</span><span><i>◎</i>macro</span><span><i style="color:#f5c518">○</i>yours</span></div>`;
+    radarStart(); refreshSignals(); setInterval(() => { if (S.tab === "data" && !document.hidden) refreshSignals(); }, 60e3);
+  }
+  const rdWait = setInterval(() => { if (typeof S !== "undefined" && $("ovRadar") && X()) { clearInterval(rdWait); if (typeof VIEW !== "undefined" && VIEW) { $("ovRadar").hidden = true; return; } radarMount(); } }, 300);
   function radarStart() {
     const cv = $("rdCv"); if (!cv || E.radarRaf) return; const ctx = cv.getContext("2d"); let last = 0;
     cv.onclick = (e) => { const r = cv.getBoundingClientRect(), R = r.width / 2, x = e.clientX - r.left - R, y = e.clientY - r.top - R; let best = null, bd = 14;
       for (const g of E.sig) { const gx = Math.cos(g.ang) * g.r * R * 0.86, gy = Math.sin(g.ang) * g.r * R * 0.86, d = Math.hypot(gx - x, gy - y); if (d < bd) { bd = d; best = g; } } if (best) openSignal(best); };
     cv.onmousemove = (e) => { const r = cv.getBoundingClientRect(), R = r.width / 2, x = e.clientX - r.left - R, y = e.clientY - r.top - R; let best = null, bd = 12; for (const g of E.sig) { const d = Math.hypot(Math.cos(g.ang) * g.r * R * 0.86 - x, Math.sin(g.ang) * g.r * R * 0.86 - y); if (d < bd) { bd = d; best = g; } } cv.title = best ? `${best.label} — ${best.sub}` : ""; cv.style.cursor = best ? "pointer" : "default"; };
     const draw = (t) => {
-      E.radarRaf = requestAnimationFrame(draw); if (S.tab !== "web" || document.hidden || $("twbRadar").classList.contains("min") || E.mode === "ws") return;
+      E.radarRaf = requestAnimationFrame(draw); if (S.tab !== "data" || document.hidden) return; // the radar lives on the Overview dashboard
       const fpsCap = cfg.perf === "low" ? 4 : cfg.perf === "balanced" ? 24 : 60; if (t - last < 1000 / fpsCap) return; last = t;
       const d = Math.min(2, devicePixelRatio || 1), size = cv.clientWidth; if (cv.width !== size * d) { cv.width = cv.height = size * d; } const R = size / 2, ctx2 = ctx; ctx2.setTransform(d, 0, 0, d, 0, 0); ctx2.clearRect(0, 0, size, size);
       const cx = R, cy = R, Rr = R * 0.86, sweep = reduced() || cfg.perf === "low" ? -Math.PI / 2 : ((t / 4200) % 1) * Math.PI * 2 - Math.PI / 2;
