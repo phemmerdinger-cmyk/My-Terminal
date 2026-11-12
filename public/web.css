@@ -310,3 +310,14 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .sp-sec ul{margin:4px 0 0;padding-left:16px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}.sp-sec p{margin:4px 0 0;color:var(--dim)}
 .sp-foot{font-size:11px;color:var(--dim);margin-top:16px}
 @media (max-width:760px){.sp-btn{padding:4px 8px}}
+/* the original crawler spider, full-screen for the Spider button */
+.bs-ov{position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:58;pointer-events:none;overflow:visible}
+.bs-cap{position:fixed;left:0;top:0;z-index:59;pointer-events:none;max-width:320px;font:12px var(--mono);color:#e6f6ff;background:rgba(6,10,14,.92);border:1px solid rgba(56,189,248,.5);border-radius:8px;padding:5px 10px;box-shadow:0 0 18px rgba(244,63,94,.25)}
+.bs-zap{animation:bsZap 1.2s ease-out;border-radius:4px}
+@keyframes bsZap{0%{box-shadow:0 0 0 2px rgba(56,189,248,.9),0 0 18px rgba(244,63,94,.6);background:rgba(56,189,248,.18)}100%{box-shadow:0 0 0 0 transparent;background:transparent}}
+.bs-zap{animation:none!important;background:rgba(250,204,21,.55)!important;color:#111!important;outline:2px solid #ff2d95;outline-offset:1px;border-radius:3px;transition:background .3s}
+.bs-chip{position:fixed;z-index:60;pointer-events:none;background:#ff2d95;color:#fff;font:600 11.5px var(--mono);padding:3px 9px;border-radius:5px;box-shadow:0 0 14px rgba(255,45,149,.6);animation:bsChip .25s ease-out;white-space:nowrap}
+@keyframes bsChip{from{transform:scale(.6);opacity:0}}
+.bs-pill{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(10,12,16,.92);border:1px solid rgba(255,45,149,.6);border-radius:999px;padding:7px 16px;font:12px var(--mono);color:#cbd5e1;box-shadow:0 0 22px rgba(255,45,149,.25)}
+.bs-pill b{color:#fff;letter-spacing:.06em}.bs-pill span{color:#ff4fa8;font-weight:600}
+.bs-cap{border-color:rgba(255,45,149,.6)!important;box-shadow:0 0 18px rgba(255,45,149,.3)!important}

@@ -219,7 +219,9 @@ main{min-width:0}
 .cr-doc{position:relative;height:min(68vh,720px);overflow:auto;border-radius:3px;scrollbar-width:thin;overscroll-behavior:contain}
 .cr-page{position:relative;padding:22px 26px 60px;font:12.5px/1.55 var(--cr-m);color:#aeb6c4;background:linear-gradient(180deg,#0b0e13,#090b0f)}
 .cr-ov{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
-.cr-legs polyline{stroke:#eef2ff;stroke-width:2.1;filter:drop-shadow(0 0 3px rgba(244,63,94,.85)) drop-shadow(0 0 7px rgba(56,189,248,.35))}
+.cr-legs polyline{stroke:#ff2d95;stroke-width:2.3;filter:drop-shadow(0 0 3px rgba(255,45,149,.75))}
+.cr-legs .kn{fill:#ff2d95}.cr-legs .ft{fill:#facc15;filter:drop-shadow(0 0 3px rgba(250,204,21,.9))}
+.cr-body{fill:#07080b;stroke:#ff2d95;stroke-width:2.2;filter:drop-shadow(0 0 8px rgba(255,45,149,.7))}
 .cr-abd{fill:#121620;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 6px rgba(244,63,94,.8))}
 .cr-head{fill:#0d1118;stroke:#f5f7ff;stroke-width:2;filter:drop-shadow(0 0 5px rgba(56,189,248,.8))}
 .cr-loading{padding:40px 10px;text-align:center;color:var(--muted);font-family:var(--cr-m)}
@@ -5416,7 +5418,7 @@ function crFly(from,to,text,color){
 }
 /* ---------- the spider: 8 two-segment legs with simple inverse kinematics and an alternating gait ---------- */
 function crSpiderInit(){
-  const small=(window.innerWidth||1000)<700, sc=small?0.62:1;
+  const small=(window.innerWidth||1000)<700, sc=small?0.85:1.45; // the big one
   const legs=[]; for(const s of [-1,1]) [-62,-24,18,56].forEach((a,i)=>legs.push({s,a:a*Math.PI/180,g:(i+(s>0?1:0))%2,foot:null,from:null,to:null,t0:0}));
   CR.spider={x:120*sc,y:120*sc,tx:120*sc,ty:120*sc,vx:0,vy:0,scale:sc,legs,ph:0};
 }
@@ -5440,16 +5442,15 @@ function crFrame(now){
       else if(dist>46*Sp.scale&&(!lifted||Sp.legs.find(x=>x.to)?.g===L.g||dist>120*Sp.scale)){ L.from={...L.foot}; L.to={x:rest.x+Sp.vx*5,y:rest.y+Sp.vy*5}; L.t0=now; stepping=true; } } }
   Sp.stepping=stepping;
   const tw=Math.sin(now/180)*1.6*Sp.scale;
-  const legsSvg=Sp.legs.map((L,i)=>{ const h=crHip(Sp,L), kn=crKnee(h,L.foot,Sp,L); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${(kn.y+(i%2?tw:-tw)).toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/>`; }).join("");
+  const legsSvg=Sp.legs.map((L,i)=>{ const h=crHip(Sp,L), kn=crKnee(h,L.foot,Sp,L), ky=kn.y+(i%2?tw:-tw); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${ky.toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/><circle class="kn" cx="${kn.x.toFixed(1)}" cy="${ky.toFixed(1)}" r="${(2.2*Sp.scale).toFixed(1)}"/><circle class="ft" cx="${L.foot.x.toFixed(1)}" cy="${L.foot.y.toFixed(1)}" r="${(3*Sp.scale).toFixed(1)}"/>`; }).join("");
   const lz=CR.lasers.filter(l=>now<l.t0+l.life), pz=CR.pulses.filter(p=>now<p.t0+crMs(700,200)); CR.lasers=lz; CR.pulses=pz;
   const mouth={x:Sp.x,y:Sp.y+10*Sp.scale};
-  const lasersSvg=lz.filter(l=>now>=l.t0).map(l=>{ const t=(now-l.t0)/l.life, a=t<0.15?t/0.15:t>0.75?(1-t)/0.25:1; return `<g opacity="${a.toFixed(2)}"><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${(l.w*4).toFixed(1)}" opacity=".25" stroke-linecap="round"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${l.w}" stroke-linecap="round" filter="url(#crGlow)"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="#fff" stroke-width="${(l.w*0.4).toFixed(2)}" stroke-linecap="round"/></g>`; }).join("");
+  const lasersSvg=lz.filter(l=>now>=l.t0).map(l=>{ const t=(now-l.t0)/l.life, a=t<0.15?t/0.15:t>0.75?(1-t)/0.25:1; return `<g opacity="${a.toFixed(2)}"><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${(l.w*4).toFixed(1)}" opacity=".25" stroke-linecap="round"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${l.c}" stroke-width="${l.w}" stroke-linecap="round" filter="url(#crGlow)"/><line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="#fff" stroke-width="${(l.w*0.4).toFixed(2)}" stroke-linecap="round"/><circle cx="${l.to.x.toFixed(1)}" cy="${l.to.y.toFixed(1)}" r="3.4" fill="#facc15"/></g>`; }).join("");
   const pulsesSvg=pz.filter(p=>now>=p.t0).map(p=>{ const t=(now-p.t0)/crMs(700,200); const sparks=[0,1,2,3,4,5,6,7].map(k=>{ const a=k/8*Math.PI*2+0.3, r=6+t*30; return `<circle cx="${(p.p.x+Math.cos(a)*r).toFixed(1)}" cy="${(p.p.y+Math.sin(a)*r).toFixed(1)}" r="${(1.8*(1-t)+0.3).toFixed(2)}" fill="${p.c}" opacity="${(1-t).toFixed(2)}"/>`; }).join(""); return sparks+`<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4+t*26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1-t).toFixed(2)}"/><circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(5*(1-t)).toFixed(1)}" fill="#fff" opacity="${(1-t).toFixed(2)}"/>`; }).join("");
   const s=Sp.scale, bob=Math.sin(Sp.ph*2)*1.2*s;
   ov.innerHTML=`<defs><filter id="crGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     ${lasersSvg}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>
-    <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y+bob).toFixed(1)})"><ellipse cx="0" cy="-${(16*s).toFixed(1)}" rx="${(13*s).toFixed(1)}" ry="${(17*s).toFixed(1)}" class="cr-abd"/><circle cx="0" cy="${(6*s).toFixed(1)}" r="${(10*s).toFixed(1)}" class="cr-head"/>
-    <circle cx="-${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.5*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.9*s).toFixed(1)}" fill="#38bdf8"/><circle cx="0" cy="${(12*s).toFixed(1)}" r="${(1.4*s).toFixed(1)}" fill="#f43f5e"/></g>${pulsesSvg}`;
+    <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y+bob).toFixed(1)})"><rect x="${(-9*s).toFixed(1)}" y="${(-30*s).toFixed(1)}" width="${(18*s).toFixed(1)}" height="${(46*s).toFixed(1)}" rx="${(8*s).toFixed(1)}" class="cr-body"/><rect x="${(-5*s).toFixed(1)}" y="${(-24*s).toFixed(1)}" width="${(10*s).toFixed(1)}" height="${(16*s).toFixed(1)}" rx="${(4*s).toFixed(1)}" fill="#1a1d24"/><circle cx="-${(3.2*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.8*s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.2*s).toFixed(1)}" cy="${(9*s).toFixed(1)}" r="${(1.8*s).toFixed(1)}" fill="#38bdf8"/></g>${pulsesSvg}`;
 }
 /* ---------- wiring ---------- */
 /* ---------- Document intelligence: three more crawler modes on real SEC filings ----------

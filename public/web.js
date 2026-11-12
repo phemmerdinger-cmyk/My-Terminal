@@ -420,24 +420,75 @@
       const bare = l.length <= 16 && !/[a-z]{4,}/i.test(l.replace(/[KMBT]$/, "")); const lab = bare && i > 0 && !NUMLINE.test(lines[i - 1]) ? lines[i - 1] : null; const f = lab ? `${lab}: ${l}` : l; if (!facts.includes(f) && f.length > 3) facts.push(f); }
     SCAN.found.push({ title, facts, text: lines.join(" ").slice(0, 4000) });
   }
-  window.spiderScan = function () {
-    if (SCAN.on) return; spiderEl(); const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
-    for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.display = ""; SPD.q = []; SPD.cur = null; startSpider();
-    const T = scanTargets(t), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, X2 = 2; // double speed
-    cmd({ jump: leftMid }); cmd({ pts: () => [() => ({ x: Math.min(innerWidth * 0.22, 220), y: innerHeight / 2 - HALF })], speed: 320 * X2, cap: `Spider deployed: examining ${pageLabel(t)} at 2× speed` });
-    T.forEach((e, k) => { const title = titleOf(e) || `section ${k + 1}`, fx = 0.2 + ((k * 37) % 60) / 100;
-      cmd({ scroll: e });
-      cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top + Math.min(r.height / 2, 60) - HALF }; }], speed: 260 * X2, cap: `Examining ${title}` });
-      cmd({ wait: reduce ? 100 : 1300 / X2, collect: e, cap: `Reading ${title}` });
-      cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * Math.min(0.9, fx + 0.3) - HALF, y: r.top + Math.min(r.height - HALF, 120) - HALF }; }], speed: 160 * X2, cap: `Collecting figures from ${title}` }); });
-    if (!T.length) cmd({ wait: 600, cap: "Nothing to examine on this page yet" });
-    cmd({ pts: () => [leftMid], speed: 320 * X2, cap: "Writing the report" }); cmd({ finish: true });
+  // The scan uses the ORIGINAL spider — the 10-K crawler's: two-segment legs with inverse kinematics and an alternating
+  // gait, a laser from its mouth to every figure it reads, spark bursts where the beam lands — drawn huge across the
+  // whole screen at the crawler's 2× speed.
+  const BS = { sp: null, lasers: [], pulses: [], raf: 0, ov: null, cap: null };
+  const bsMs = (ms, min) => (typeof crMs === "function" ? crMs(ms, min) : Math.max(min, ms / 2));
+  function bsInit() {
+    if (!BS.ov) { BS.ov = document.createElementNS("http://www.w3.org/2000/svg", "svg"); BS.ov.setAttribute("class", "bs-ov"); BS.cap = document.createElement("div"); BS.cap.className = "bs-cap"; document.body.append(BS.ov, BS.cap); }
+    const sc = innerWidth < 700 ? 0.95 : 1.7, legs = []; for (const sd of [-1, 1]) [-62, -24, 18, 56].forEach((a, i) => legs.push({ s: sd, a: (a * Math.PI) / 180, g: (i + (sd > 0 ? 1 : 0)) % 2, foot: null, from: null, to: null, t0: 0 }));
+    BS.sp = { x: -150 * sc, y: innerHeight / 2, tx: -150 * sc, ty: innerHeight / 2, vx: 0, vy: 0, scale: sc, legs, ph: 0 }; BS.lasers = []; BS.pulses = [];
+    BS.ov.style.display = BS.cap.style.display = ""; cancelAnimationFrame(BS.raf); BS.raf = requestAnimationFrame(bsFrame);
+  }
+  function bsHide() { cancelAnimationFrame(BS.raf); BS.raf = 0; if (BS.ov) { BS.ov.style.display = "none"; BS.ov.innerHTML = ""; BS.cap.style.display = "none"; } }
+  function bsFrame(now) {
+    const Sp = BS.sp, ov = BS.ov; if (!Sp || ov.style.display === "none") return; BS.raf = requestAnimationFrame(bsFrame);
+    ov.setAttribute("viewBox", `0 0 ${innerWidth} ${innerHeight}`); ov.setAttribute("width", innerWidth); ov.setAttribute("height", innerHeight);
+    const speed = 2, k = Math.min(0.32, 0.012 * speed * 1.6), damp = 0.78; Sp.vx = (Sp.vx + (Sp.tx - Sp.x) * k) * damp; Sp.vy = (Sp.vy + (Sp.ty - Sp.y) * k) * damp;
+    const vmax = 14 * speed * 1.4 * Sp.scale, v = Math.hypot(Sp.vx, Sp.vy); if (v > vmax) { Sp.vx *= vmax / v; Sp.vy *= vmax / v; } Sp.x += Sp.vx; Sp.y += Sp.vy; Sp.ph += 0.05;
+    let stepping = false; const lifted = Sp.legs.some((L) => L.to);
+    for (const L of Sp.legs) { const rest = crRest(Sp, L); if (!L.foot) L.foot = { ...rest };
+      if (L.to) { const t = Math.min(1, (now - L.t0) / bsMs(150 * 1.25, 45)); L.foot = { x: L.from.x + (L.to.x - L.from.x) * t, y: L.from.y + (L.to.y - L.from.y) * t - Math.sin(t * Math.PI) * 22 * Sp.scale }; if (t >= 1) { L.foot = { ...L.to }; L.to = null; } stepping = true; }
+      else { const dist = Math.hypot(rest.x - L.foot.x, rest.y - L.foot.y); if (dist > 300 * Sp.scale) L.foot = { ...rest };
+        else if (dist > 46 * Sp.scale && (!lifted || (Sp.legs.find((x) => x.to) || {}).g === L.g || dist > 120 * Sp.scale)) { L.from = { ...L.foot }; L.to = { x: rest.x + Sp.vx * 5, y: rest.y + Sp.vy * 5 }; L.t0 = now; stepping = true; } } }
+    Sp.stepping = stepping;
+    const tw = Math.sin(now / 180) * 1.6 * Sp.scale, s = Sp.scale, bob = Math.sin(Sp.ph * 2) * 1.2 * s, mouth = { x: Sp.x, y: Sp.y + 10 * s };
+    const legsSvg = Sp.legs.map((L, i) => { const h = crHip(Sp, L), kn = crKnee(h, L.foot, Sp, L), ky = kn.y + (i % 2 ? tw : -tw); return `<polyline points="${h.x.toFixed(1)},${h.y.toFixed(1)} ${kn.x.toFixed(1)},${ky.toFixed(1)} ${L.foot.x.toFixed(1)},${L.foot.y.toFixed(1)}"/><circle class="kn" cx="${kn.x.toFixed(1)}" cy="${ky.toFixed(1)}" r="${(2.2 * s).toFixed(1)}"/><circle class="ft" cx="${L.foot.x.toFixed(1)}" cy="${L.foot.y.toFixed(1)}" r="${(3 * s).toFixed(1)}"/>`; }).join("");
+    BS.lasers = BS.lasers.filter((l) => now < l.t0 + l.life); BS.pulses = BS.pulses.filter((p) => now < p.t0 + bsMs(700, 200));
+    const lasers = BS.lasers.filter((l) => now >= l.t0).map((l) => { const t = (now - l.t0) / l.life, a = t < 0.15 ? t / 0.15 : t > 0.75 ? (1 - t) / 0.25 : 1, L = (w, c, o, f) => `<line x1="${mouth.x.toFixed(1)}" y1="${mouth.y.toFixed(1)}" x2="${l.to.x.toFixed(1)}" y2="${l.to.y.toFixed(1)}" stroke="${c}" stroke-width="${w}" ${o ? `opacity="${o}"` : ""} stroke-linecap="round" ${f ? 'filter="url(#bsGlow)"' : ""}/>`;
+      return `<g opacity="${a.toFixed(2)}">${L((l.w * 4).toFixed(1), l.c, ".22")}${L(l.w, l.c, "", true)}${L((l.w * 0.35).toFixed(2), "#fff")}<circle cx="${l.to.x.toFixed(1)}" cy="${l.to.y.toFixed(1)}" r="4" fill="#facc15"/></g>`; }).join("");
+    const pulses = BS.pulses.filter((p) => now >= p.t0).map((p) => { const t = (now - p.t0) / bsMs(700, 200); return [0, 1, 2, 3, 4, 5, 6, 7].map((k2) => { const a = (k2 / 8) * Math.PI * 2 + 0.3, r = 6 + t * 30; return `<circle cx="${(p.p.x + Math.cos(a) * r).toFixed(1)}" cy="${(p.p.y + Math.sin(a) * r).toFixed(1)}" r="${(1.8 * (1 - t) + 0.3).toFixed(2)}" fill="${p.c}" opacity="${(1 - t).toFixed(2)}"/>`; }).join("") + `<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4 + t * 26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1 - t).toFixed(2)}"/>`; }).join("");
+    ov.innerHTML = `<defs><filter id="bsGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${lasers}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>
+      <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y + bob).toFixed(1)})"><rect x="${(-9 * s).toFixed(1)}" y="${(-30 * s).toFixed(1)}" width="${(18 * s).toFixed(1)}" height="${(46 * s).toFixed(1)}" rx="${(8 * s).toFixed(1)}" class="cr-body"/><rect x="${(-5 * s).toFixed(1)}" y="${(-24 * s).toFixed(1)}" width="${(10 * s).toFixed(1)}" height="${(16 * s).toFixed(1)}" rx="${(4 * s).toFixed(1)}" fill="#1a1d24"/><circle cx="-${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#38bdf8"/><circle cx="${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#38bdf8"/></g>${pulses}`;
+    BS.cap.style.transform = `translate(${Math.max(8, Math.min(innerWidth - 330, Sp.x + 70 * s)).toFixed(0)}px,${Math.max(8, Math.min(innerHeight - 40, Sp.y - 50 * s)).toFixed(0)}px)`;
+  }
+  const bsWait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function bsGo(x, y, maxMs) { const Sp = BS.sp; Sp.tx = x; Sp.ty = y; const t0 = performance.now(); while (SCAN.on && Math.hypot(Sp.x - x, Sp.y - y) > 18 * Sp.scale && performance.now() - t0 < maxMs) await bsWait(40); }
+  const COLORS = ["#ff2d95", "#ff2d95", "#ff4fa8", "#ff2d95", "#e11d74", "#ff2d95"];
+  function bsChip(text, x, y) { const c = document.createElement("div"); c.className = "bs-chip"; c.textContent = text; c.style.left = Math.max(8, Math.min(innerWidth - 220, x)) + "px"; c.style.top = Math.max(60, y) + "px"; document.body.appendChild(c); setTimeout(() => c.remove(), bsMs(2600, 900)); }
+  function bsPill(txt) { let p = document.getElementById("bsPill"); if (!p) { p = document.createElement("div"); p.id = "bsPill"; p.className = "bs-pill"; document.body.appendChild(p); } p.hidden = !txt; p.innerHTML = txt || ""; }
+  function figuresIn(e) { // leaf elements on screen that show a number
+    const out = []; for (const el of e.querySelectorAll("b, td, em, span, strong, h3, text, small")) { if (out.length >= 7) break; if (el.children.length > 1) continue; const t = (el.textContent || "").trim(); if (!t || t.length > 32 || !NUMLINE.test(" " + t + " ")) continue;
+      const r = el.getBoundingClientRect(); if (r.width < 4 || r.bottom < 60 || r.top > innerHeight - 20 || r.right < 0 || r.left > innerWidth) continue; if (out.some((o) => o.contains(el) || el.contains(o))) continue; out.push(el); }
+    return out; }
+  window.spiderScan = async function () {
+    if (SCAN.on) return; const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
+    const btn = $("spBtn"); if (btn) btn.classList.add("on"); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "hidden";
     if (typeof startResearch === "function") startResearch(t).then((id) => { SCAN.job = id ? FOL.jobLabel : null; });
-    const b = $("spBtn"); if (b) b.classList.add("on");
+    const T = scanTargets(t), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches, say2 = (x) => { if (BS.cap) BS.cap.textContent = x; };
+    if (reduce) { T.forEach((e) => scanCollect(e)); return scanFinish(); }
+    bsInit(); SCAN.figs = 0; bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>0 figures</span> · 0 of ${T.length} sections`); say2(`Spider deployed · examining ${pageLabel(t)} at 2× speed`);
+    await bsGo(Math.min(innerWidth * 0.2, 260), innerHeight / 2, 1200);
+    for (const [k, e] of T.entries()) { if (!SCAN.on) break;
+      try { e.scrollIntoView({ block: "center", behavior: "instant" }); } catch {}
+      await bsWait(60); const r = e.getBoundingClientRect(), sc = BS.sp.scale, title = titleOf(e) || `section ${k + 1}`;
+      say2(`Examining ${title}`);
+      await bsGo(Math.max(90 * sc, Math.min(innerWidth - 90 * sc, r.left + r.width * (0.25 + (k % 3) * 0.2))), Math.max(170 * sc, Math.min(innerHeight - 150 * sc, r.top + Math.min(r.height * 0.45, 220))), bsMs(1600, 400));
+      if (!SCAN.on) break;
+      scanCollect(e); const figs = figuresIn(e), now = performance.now(), color = COLORS[k % COLORS.length];
+      (figs.length ? figs : [e]).forEach((el, j) => { const q = el.getBoundingClientRect(), p = { x: q.left + q.width / 2, y: q.top + q.height / 2 };
+        BS.lasers.push({ to: p, c: j ? "#a78bfa" : color, t0: now + j * bsMs(120, 10), life: bsMs(900, 150), w: j ? 1.6 : 2.6 }); BS.pulses.push({ p, c: color, t0: now + j * 60 + 60 });
+        el.classList.remove("bs-zap"); void el.offsetWidth; el.classList.add("bs-zap"); setTimeout(() => el.classList.remove("bs-zap"), 2600); });
+      SCAN.figs = (SCAN.figs || 0) + figs.length; bsChip(title, r.left + 8, r.top - 6); bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${SCAN.figs} figures</span> · ${k + 1} of ${T.length} sections`);
+      const f = SCAN.found[SCAN.found.length - 1]; say2(`Read ${title}: ${f && f.facts.length ? f.facts.slice(0, 2).join(" · ") : "no figures"}`.slice(0, 120));
+      await bsWait(bsMs(1100, 250) + figs.length * bsMs(120, 10)); }
+    if (SCAN.on) { say2("Writing the report"); await bsGo(-160 * BS.sp.scale, innerHeight / 2, 1500); }
+    bsHide(); bsPill(""); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "";
+    if (SCAN.on) scanFinish(); else { SCAN.on = false; if (btn) btn.classList.remove("on"); }
   };
   async function scanFinish() {
     const page = SCAN.page, secs = ((performance.now() - SCAN.t0) / 1000).toFixed(1), F = SCAN.found; SCAN.on = false; const btn = $("spBtn"); if (btn) btn.classList.remove("on");
-    if (S.tab !== "web") hideSpider(); else { SPD.q = []; cmd({ jump: leftMid }); cmd({ pts: () => [jf(12, RINGS)], speed: 260, cap: "Crawling into the web", end: () => (SPD.at = { s: 12, k: RINGS }) }); }
     if (SCAN.aborted) return;
     // ---- analysis of what was collected (all derived from the collected text)
     const all = F.flatMap((f) => f.facts.map((x) => ({ s: f.title, x }))), pcts = [];
