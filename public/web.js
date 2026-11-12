@@ -528,6 +528,53 @@
     }
     return null;
   }
+  // ---- entities: combine every word that refers to the same company (ticker, company name, its people and products)
+  // Names come from the S&P 500 list; people/products are learned from the headlines themselves: a word or two-word name
+  // that keeps appearing in headlines about one company is attached to that company (no hand-kept CEO list to go stale).
+  const NAME_JUNK = /\b(inc|incorporated|corp|corporation|co|company|companies|holdings?|group|plc|ltd|limited|class [a-c]|the|n\.?v|s\.?a|ag|se|lp|llc|trust|reit|international|technologies|technology|systems|enterprises?)\b\.?/gi;
+  const GENERIC = new Set("american,general,united,first,national,international,global,bank,financial,capital,energy,health,healthcare,services,industries,motors,brands,foods,airlines,systems,resources,pacific,southern,northern,western,eastern,public,realty,properties,data,digital,new,best,old,royal,state,street,mutual,insurance,life,group,dollar,home,world,electric,power,devices,micro,pharmaceuticals,semiconductor,communications,entertainment,petroleum,oil,gas,chemical,materials,water,solutions,texas,california,florida,carolina,virginia,york,jersey,chicago,boston,atlanta,dallas,houston,denver,phoenix,seattle,ohio,illinois,michigan,arizona,nevada,georgia,washington,america,atlantic,central,united,federal,regional,community,church,arch,ross,ball,cooper,hess,mosaic,target,visa,progressive,principal,prudential,discover,match,gap,apa,lowe,ford,fox,news,host,check,live,block,square,snap,pool,fair,smith,howmet,booking,expedia".split(","));
+  async function aliasMap() {
+    if (W.alias) return W.alias; if (!W.sp500) { try { W.sp500 = (await (await fetch("/sp500.json")).json()).rows || []; } catch { W.sp500 = []; } }
+    const m = new Map(), nm = {};
+    for (const [sym, name] of W.sp500) { const base = String(name || "").replace(NAME_JUNK, " ").replace(/[.,&']/g, " ").replace(/\s+/g, " ").trim().toLowerCase(); nm[sym] = String(name || sym).replace(/,? (Inc\.?|Corporation|Corp\.?|Co\.?|Company|plc|Ltd\.?|Holdings?|N\.V\.)$/i, "");
+      const w = base.split(" ").filter(Boolean); if (!w.length) continue;
+      if (w[0].length >= 4 && !GENERIC.has(w[0])) m.set(w[0], sym); if (w.length >= 2) m.set(w.slice(0, 2).join(" "), sym);
+      }
+    W.tickers = new Set(W.sp500.map((r) => r[0]));
+    for (const [k, v] of [["google", "GOOGL"], ["alphabet", "GOOGL"], ["facebook", "META"], ["meta", "META"], ["nvidia", "NVDA"], ["amazon", "AMZN"], ["microsoft", "MSFT"], ["apple", "AAPL"], ["tesla", "TSLA"], ["berkshire", "BRK.B"], ["jpmorgan", "JPM"], ["openai", null]]) if (v) { m.set(k, v); } else m.delete(k);
+    W.alias = { m, nm }; return W.alias;
+  }
+  function entities(items, A) {
+    const STOP = new Set("the,and,for,with,from,that,this,after,over,into,about,amid,says,said,will,have,has,its,are,was,were,than,more,what,when,your,their,they,just,could,would,stock,stocks,shares,share,market,markets,new,how,why,who,report,reports,week,today,year,inc,corp,price,prices,quarter,deal,deals,first,also,back,still,here,there,these,those,most,could,should,ahead,amid,set,sees,gets,make,makes,big,top,now,up,down,out,off,per,via,vs".split(","));
+    const disp = {}; const seeD = (w, orig) => { const k = w.toLowerCase(); disp[k] = disp[k] || {}; disp[k][orig] = (disp[k][orig] || 0) + 1; };
+    const H = items.map((i) => { const title = String(i.title || "").replace(/['’]s\b/g, ""), low = title.toLowerCase(), ents = new Set(i.tickers || []);
+      for (const o of title.match(/[A-Za-z][A-Za-z'.-]{2,}/g) || []) seeD(o, o);
+      for (const tk2 of title.match(/\b[A-Z]{2,5}\b/g) || []) if (W.tickers && W.tickers.has(tk2)) ents.add(tk2); // tickers count only when written in capitals
+      const tw = low.match(/[a-z][a-z0-9&.'-]*/g) || []; // every word and every adjacent pair
+      for (let k = 0; k < tw.length; k++) for (const key of [tw[k], k + 1 < tw.length ? tw[k] + " " + tw[k + 1] : null]) { const s2 = key && A.m.get(key); if (s2) ents.add(s2); }
+      const caps = []; const toks = title.match(/[A-Za-z][A-Za-z'.-]+/g) || [];
+      for (let k = 0; k < toks.length - 1; k++) if (/^[A-Z][a-z]{2,}$/.test(toks[k]) && /^[A-Z][a-z]{2,}$/.test(toks[k + 1])) caps.push(toks[k] + " " + toks[k + 1]); // two-word names
+      const words = new Set([...caps.filter((c) => !c.split(" ").some((x) => A.m.has(x.toLowerCase()))), ...(low.match(/[a-z][a-z'-]{2,}/g) || []).filter((w) => !STOP.has(w) && !A.m.has(w))]);
+      return { i, ents, words }; });
+    const wc = {}, co = {}; for (const h of H) for (const w of h.words) { wc[w] = (wc[w] || 0) + 1; for (const e of h.ents) { const k = w + "|" + e; co[k] = (co[k] || 0) + 1; } }
+    for (const p of Object.keys(wc)) if (p.includes(" ") && wc[p] >= 2) for (const part of p.toLowerCase().split(" ")) if (wc[part] && wc[part] <= wc[p] + 1) delete wc[part]; // "jensen", "huang" fold into "Jensen Huang"
+    const ec = {}; for (const h of H) for (const e of h.ents) { ec[e] = ec[e] || { n: 0, m: 0, attach: [] }; ec[e].n++; ec[e].m += Math.sign(h.i.mood || 0); }
+    const used = new Set();
+    // attach: a word seen ≥2 times mostly alongside one company; a person's name (two capitalized words) needs only half
+    for (const [w, n] of Object.entries(wc)) { if (n < 2) continue; const person = /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(w); let best = null;
+      for (const e of Object.keys(ec)) { const c = co[w + "|" + e] || 0; if ((person ? c >= 1 && c / n >= 0.5 : c >= 2 && c / n >= 0.6) && (!best || c > best[1])) best = [e, c]; }
+      if (best) { ec[best[0]].attach.push([w, n]); used.add(w); } }
+    // second pass: a headline that names only a company's person or product counts for that company too
+    for (const [e, v] of Object.entries(ec)) for (const [w] of v.attach) for (const h of H) if (h.words.has(w) && !h.ents.has(e)) { h.ents.add(e); v.n++; v.m += Math.sign(h.i.mood || 0); }
+    const ents = Object.entries(ec).sort((a, b) => b[1].n - a[1].n).map(([sym, v]) => ({ sym, name: A.nm[sym] || sym, n: v.n, lean: v.m, attach: v.attach.sort((a, b) => b[1] - a[1]).slice(0, 4).map(([w]) => (w.includes(" ") ? w : nice(w))) }));
+    // non-company themes merge the same way: a word that mostly appears with a stronger theme joins it ("Fed · Powell")
+    const tl = Object.entries(wc).filter(([w, n]) => n >= 2 && !used.has(w)).sort((a, b) => b[1] - a[1]), merged = new Set(), themes = [];
+    for (const [w, n] of tl) { if (merged.has(w)) continue; const g = [w];
+      for (const [v, m] of tl) { if (v === w || merged.has(v) || m > n) continue; const both = H.filter((h) => h.words.has(w) && h.words.has(v)).length; if (both / m >= 0.6) { g.push(v); merged.add(v); } }
+      themes.push([g.map((x) => (x.includes(" ") ? x : nice(x))).join(" · "), H.filter((h) => g.some((x) => h.words.has(x))).length]); if (themes.length >= 8) break; }
+    function nice(w) { const d = disp[w.toLowerCase()]; if (!d) return w; return Object.entries(d).sort((a, b) => b[1] - a[1] || (a[0] === a[0].toLowerCase()) - (b[0] === b[0].toLowerCase()))[0][0]; }
+    return { ents, themes, H };
+  }
   window.spiderScan = async function () {
     if (SCAN.on) return; const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
     const btn = $("spBtn"); if (btn) btn.classList.add("on"); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "hidden";
@@ -589,15 +636,14 @@
       const it = DP.items, srcs = new Set(it.map((i) => i.source)), pos = it.filter((i) => i.mood > 0).length, neg = it.filter((i) => i.mood < 0).length, tk = {};
       for (const i of it) for (const x of i.tickers || []) { tk[x] = tk[x] || { n: 0, m: 0 }; tk[x].n++; tk[x].m += Math.sign(i.mood || 0); }
       const topT = Object.entries(tk).sort((a, b) => b[1].n - a[1].n).slice(0, 8);
-      const STOP = new Set("the,and,for,with,from,that,this,after,over,into,about,amid,says,said,will,have,has,its,are,was,were,than,more,what,when,your,their,they,just,could,would,stock,stocks,shares,market,markets,new,how,why,who,report,reports,week,today,year,inc,corp".split(","));
-      const wc = {}; for (const i of it) for (const w of String(i.title || "").toLowerCase().match(/[a-z][a-z'-]{3,}/g) || []) if (!STOP.has(w)) wc[w] = (wc[w] || 0) + 1;
-      for (const x of Object.keys(tk)) delete wc[x.toLowerCase()];
-      const themes = Object.entries(wc).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      const EN = entities(it, await aliasMap()), themes = EN.themes;
       take.push(`Read all ${it.length} headlines from ${DP.span} across ${srcs.size} source${srcs.size === 1 ? "" : "s"} (${[...srcs].join(", ")}).`);
       take.push(`Tone: ${pos} positive, ${neg} negative, ${it.length - pos - neg} neutral — the news flow reads ${pos > neg * 1.4 ? "positive" : neg > pos * 1.4 ? "negative" : "mixed"}.`);
-      if (topT.length) take.push(`Most-covered tickers: ${topT.map(([k, v]) => `${k} (${v.n}${v.m > 0 ? ", leaning positive" : v.m < 0 ? ", leaning negative" : ""})`).join(", ")}.`);
-      if (themes.length) take.push(`Recurring themes: ${themes.map(([w, n]) => `${w} (${n})`).join(", ")}.`);
-      const groups = {}; for (const i of it) { const g = (i.tickers && i.tickers[0]) || "Market-wide"; (groups[g] = groups[g] || []).push(i); }
+      const topE = EN.ents.slice(0, 6); void topT;
+      if (topE.length) take.push(`Most-covered companies: ${topE.map((e) => `${e.name} (${[e.sym, ...e.attach].join(" · ")}) — ${e.n} headline${e.n === 1 ? "" : "s"}${e.lean > 0 ? ", leaning positive" : e.lean < 0 ? ", leaning negative" : ""}`).join("; ")}.`);
+      if (themes.length) take.push(`Other recurring themes: ${themes.map(([w, n]) => `${w} (${n})`).join(", ")}.`);
+      const rankE = new Map(EN.ents.map((e, k) => [e.sym, k])), nameOf = Object.fromEntries(EN.ents.map((e) => [e.sym, `${e.name} · ${e.sym}`])), groups = {};
+      for (const h of EN.H) { const es = [...h.ents].sort((a, b) => (rankE.get(a) ?? 99) - (rankE.get(b) ?? 99)), g = es.length ? nameOf[es[0]] || es[0] : "Market-wide"; (groups[g] = groups[g] || []).push(h.i); }
       const gs = Object.entries(groups).sort((a, b) => (a[0] === "Market-wide") - (b[0] === "Market-wide") || b[1].length - a[1].length);
       const tm = (t) => new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
       deepHtml = `<h4>Every headline read (${it.length})</h4>${gs.map(([g, xs]) => `<div class="sp-sec"><b>${esc(g)} · ${xs.length}</b><ul class="sp-news">${xs.map((i) => `<li><i class="${i.mood > 0 ? "up" : i.mood < 0 ? "down" : ""}">●</i>${esc(i.title)} <em>${esc(i.source || "")} · ${tm(i.time)}</em></li>`).join("")}</ul></div>`).join("")}`;
