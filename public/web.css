@@ -321,3 +321,16 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .bs-pill{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:60;pointer-events:none;background:rgba(10,12,16,.92);border:1px solid rgba(255,45,149,.6);border-radius:999px;padding:7px 16px;font:12px var(--mono);color:#cbd5e1;box-shadow:0 0 22px rgba(255,45,149,.25)}
 .bs-pill b{color:#fff;letter-spacing:.06em}.bs-pill span{color:#ff4fa8;font-weight:600}
 .bs-cap{border-color:rgba(255,45,149,.6)!important;box-shadow:0 0 18px rgba(255,45,149,.3)!important}
+/* the web is filled with stocks; portfolio holdings light up */
+.twb-s{cursor:pointer}
+.twb-fill text{fill:rgba(160,180,195,.38);font:600 7.5px var(--mono);text-anchor:middle;pointer-events:none;letter-spacing:.02em}
+.twb-fill .twb-s:hover text{fill:#fff;font-size:10px}
+.twb-fill circle{opacity:.55}
+.twb-lit .glow{fill:#f5c518;opacity:.22;filter:blur(5px);animation:twLit 2.4s ease-in-out infinite}
+.twb-lit .ring{fill:none;stroke:#f5c518;stroke-width:1.4;opacity:.85}
+.twb-lit .dot{fill:#fff6cc;filter:drop-shadow(0 0 4px #f5c518)}
+.twb-lit text{fill:#ffe27a;font:700 10.5px var(--mono);text-anchor:middle;paint-order:stroke;stroke:#05080c;stroke-width:3px;filter:drop-shadow(0 0 4px rgba(245,197,24,.6))}
+@keyframes twLit{50%{opacity:.5;transform:scale(1.25)}}
+@media (prefers-reduced-motion:reduce){.twb-lit .glow{animation:none}}
+.twb-n.mine text{fill:#ffe27a!important;font:700 10.5px var(--mono);opacity:1!important;paint-order:stroke;stroke:#05080c;stroke-width:3px}
+.twb-n.mine .core{fill:#fff6cc!important;stroke:#f5c518}

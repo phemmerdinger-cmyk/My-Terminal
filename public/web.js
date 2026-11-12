@@ -56,7 +56,7 @@
     root.innerHTML = `<div class="twb" id="twb"><svg class="twb-web" id="twbSvg"></svg><div class="twb-hub" id="twbHub"><div class="twb-k" id="twbK">THE WEB · MARKET SUMMARY</div><div class="twb-lines" id="twbLines"><p class="twb-wait">The spider is gathering the first summary…</p></div><div class="twb-foot" id="twbFoot"></div></div><div class="twb-pop" id="twbPop" hidden></div></div>
       <div class="tw-modal" id="twModal" hidden><div class="tw-mbox" id="twMbox"></div></div>`;
     $("twModal").onclick = (e) => { if (e.target.id === "twModal" || e.target.closest(".x")) closeModal(); };
-    $("twb").addEventListener("click", (e) => { const n = e.target.closest(".twb-n"); if (n) return showPop(n.dataset.id); if (!e.target.closest(".twb-pop")) $("twbPop").hidden = true; });
+    $("twb").addEventListener("click", (e) => { const st = e.target.closest(".twb-s"); if (st && typeof openQuote === "function") return openQuote(st.dataset.sym); const n = e.target.closest(".twb-n"); if (n) return showPop(n.dataset.id); if (!e.target.closest(".twb-pop")) $("twbPop").hidden = true; });
     $("twbPop").addEventListener("click", (e) => { const g = e.target.closest("[data-twgo]"); if (g) return go(g.dataset.twgo); const d = e.target.closest("[data-twd]"); if (d) { e.preventDefault(); openDisc(d.dataset.twd); } });
     addEventListener("resize", () => { if (W.open) { layoutWeb(); drawWeb(); } });
   }
@@ -86,9 +86,40 @@
     let out = "";
     for (let s = 0; s < SPOKES; s++) { const a = J(s, 0), b = J(s, RINGS + 0.35); out += `<line class="spoke" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`; }
     for (let k = 0; k <= RINGS; k++) { let d = ""; for (let s = 0; s < SPOKES; s++) { const a = J(s, k), b = J((s + 1) % SPOKES, k), c = sag(a, b); d += `${s ? "" : `M${a.x} ${a.y}`} Q${c.x} ${c.y} ${b.x} ${b.y}`; } out += `<path class="ring${k === 0 ? " hubring" : ""}" d="${d}"/>`; }
-    for (const n of G.nodes) { const p = J(n.s, n.k), c = ncol(n), lab = ["portfolio", "holding", "sector", "macro", "trader"].includes(n.type);
-      out += `<g class="twb-n${lab ? " lab" : ""}" data-id="${esc(n.id)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" tabindex="0" role="button" aria-label="${esc(n.type + ": " + n.label)}"><circle class="hit" r="12"/><circle class="halo" r="9" fill="${c}"/><circle class="core" r="${n.type === "portfolio" ? 4.5 : 3}" fill="${c}"/><text x="7" y="3">${esc(n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label)}</text><title>${esc(n.label + (n.sub ? " — " + n.sub : ""))}</title></g>`; }
+    const mineSet = myStocks();
+    for (const n of G.nodes) { const p = J(n.s, n.k), c = ncol(n), lab = ["portfolio", "holding", "sector", "macro", "trader"].includes(n.type), mine = mineSet.has(String(n.label || "").toUpperCase());
+      if (mine) out += `<g class="twb-lit" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" pointer-events="none"><circle class="glow" r="16" style="fill:#f5c518"/><circle r="9" fill="none" stroke="#f5c518" stroke-width="1.4" opacity=".85"/></g>`;
+      out += `<g class="twb-n${lab || mine ? " lab" : ""}${mine ? " mine" : ""}" data-id="${esc(n.id)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})" tabindex="0" role="button" aria-label="${esc(n.type + ": " + n.label)}"><circle class="hit" r="12"/><circle class="halo" r="9" fill="${c}"/><circle class="core" r="${n.type === "portfolio" ? 4.5 : 3}" fill="${c}"/><text x="7" y="3">${esc(n.label.length > 22 ? n.label.slice(0, 21) + "…" : n.label)}</text><title>${esc(n.label + (n.sub ? " — " + n.sub : ""))}</title></g>`; }
+    out = out.replace(/(<g class="twb-n)/, fillWeb() + "$1"); if (!/class="twb-n/.test(out)) out += fillWeb();
     svg.innerHTML = out;
+  }
+  // ---------------------------------------------------------------- the web is filled with stocks; your portfolio lights up
+  // Every free spot on the web (each junction, the middle of each ring segment, and the points between rings) holds a stock:
+  // your holdings first (spread around the web, glowing), then the largest S&P 500 companies, then the rest of the index.
+  const MEGA = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "TSLA", "BRK.B", "LLY", "JPM", "V", "UNH", "XOM", "MA", "COST", "WMT", "HD", "PG", "JNJ", "NFLX", "ORCL", "ABBV", "BAC", "CRM", "AMD", "KO", "CVX", "MRK", "PEP", "ADBE", "TMO", "CSCO", "ACN", "MCD", "LIN", "WFC", "ABT", "IBM", "GE", "PM", "QCOM", "CAT", "TXN", "INTU", "DIS", "VZ", "AMGN", "NOW", "GS", "ISRG", "PFE", "SPGI", "UBER", "MS", "RTX", "AXP", "BKNG", "T", "LOW", "UNP", "NEE", "PLTR", "BLK", "SCHW", "C", "DE", "LMT", "SBUX", "MU", "PANW", "ANET", "KLAC", "LRCX", "AMAT", "ADI", "BA", "NKE", "GILD", "CMCSA", "INTC", "MDT", "CB", "SO", "DUK", "MO", "PYPL", "CRWD", "SHW", "ICE"];
+  function myStocks() { const out = new Set(); for (const p of S.pfs || []) for (const h of p.holdings || []) if (h && h.symbol && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(h.symbol.toUpperCase())) out.add(h.symbol.toUpperCase()); return out; }
+  function webSlots() { const out = [], used = new Set(G.nodes.map((n) => n.s + ":" + n.k));
+    for (let k = 1; k <= RINGS; k++) for (let s = 0; s < SPOKES; s++) {
+      if (!used.has(s + ":" + k)) out.push({ ...J(s, k), s, k });
+      const a = J(s, k), b = J((s + 1) % SPOKES, k), c = sag(a, b); out.push({ x: 0.25 * a.x + 0.5 * c.x + 0.25 * b.x, y: 0.25 * a.y + 0.5 * c.y + 0.25 * b.y, s: s + 0.5, k }); // mid-segment
+      if (k < RINGS) out.push({ ...J(s, k + 0.5), s, k: k + 0.5 }); // between rings, on the spoke
+    }
+    return out; }
+  function fillWeb() {
+    if (!W.sp500) { if (!W.sp500Loading) { W.sp500Loading = true; fetch("/sp500.json").then((r) => r.json()).then((j) => { W.sp500 = j.rows || []; if (W.open) drawWeb(); }).catch(() => { W.sp500 = []; }); } }
+    const slots = webSlots(); if (!slots.length) return "";
+    const mine = myStocks(), shown = new Set(G.nodes.map((n) => String(n.label || "").toUpperCase())), rows = W.sp500 || [], sector = Object.fromEntries(rows.map((r) => [r[0], r[2]]));
+    const all = [...new Set([...MEGA, ...rows.map((r) => r[0])])].filter((x) => !mine.has(x) && !shown.has(x));
+    // spread holdings evenly around the web (a stride through the slots), then fill the rest in order
+    const order = [], taken = new Set(), mineL = [...mine].filter((x) => !shown.has(x)), stride = Math.max(1, Math.floor(slots.length / Math.max(1, mineL.length)));
+    mineL.forEach((sym, i) => { let j = (i * stride + 7) % slots.length; while (taken.has(j)) j = (j + 1) % slots.length; taken.add(j); order[j] = { sym, mine: true }; });
+    let q = 0; for (let j = 0; j < slots.length; j++) if (!order[j] && q < all.length) order[j] = { sym: all[q++], mine: false };
+    const SC = { "Information Technology": "#4da3ff", "Health Care": "#34d399", Financials: "#facc15", "Consumer Discretionary": "#f472b6", "Communication Services": "#a78bfa", Industrials: "#94a3b8", "Consumer Staples": "#fb923c", Energy: "#f87171", Utilities: "#67e8f9", "Real Estate": "#c4b5fd", Materials: "#fde68a" };
+    let out = "", lit = "";
+    slots.forEach((p, j) => { const o = order[j]; if (!o) return; const d = (q) => esc(q);
+      if (o.mine) lit += `<g class="twb-s mine" data-sym="${d(o.sym)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><title>${d(o.sym)} · in your portfolio</title><circle class="glow" r="16"/><circle class="ring" r="7.5"/><circle class="dot" r="4"/><text y="-11">${d(o.sym)}</text></g>`;
+      else out += `<g class="twb-s" data-sym="${d(o.sym)}" transform="translate(${p.x.toFixed(1)},${p.y.toFixed(1)})"><title>${d(o.sym)}${sector[o.sym] ? " · " + d(sector[o.sym]) : ""}</title><circle r="1.9" fill="${SC[sector[o.sym]] || "#64748b"}"/><text y="-4">${d(o.sym)}</text></g>`; });
+    return `<g class="twb-fill">${out}</g><g class="twb-lit">${lit}</g>`;
   }
   const NCOL = { portfolio: "#f5c518", holding: "#4da3ff", watch: "#22d3ee", company: "#8b95a3", sector: "#a78bfa", industry: "#7c6bb8", macro: "#ff9f43", event: "#5eead4", trader: "#ff6fae" };
   const ncol = (n) => (n.type === "discovery" ? (n.tone > 0 ? "#0fbf7d" : n.tone < 0 ? "#f6465d" : "#c9ced6") : NCOL[n.type] || "#888");
