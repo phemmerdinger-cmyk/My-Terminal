@@ -503,3 +503,7 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 /* smoothness: the big SVG repaints on every animation frame, so keep continuous animation inside it to a minimum */
 .twb-web .shim{display:none}
 .twb-lit .glow{animation:none!important;filter:none!important;opacity:.16}
+/* the big spider's legs and body (Spider button scan). These rules used to live with the 10-K crawler's styles. */
+.cr-legs polyline{fill:none;stroke:#ff2d95;stroke-width:2.3;filter:drop-shadow(0 0 3px rgba(255,45,149,.75))}
+.cr-legs .kn{fill:#ff2d95}.cr-legs .ft{fill:#facc15;filter:drop-shadow(0 0 3px rgba(250,204,21,.9))}
+.cr-body{fill:#07080b;stroke:#ff2d95;stroke-width:2.2;filter:drop-shadow(0 0 8px rgba(255,45,149,.7))}
