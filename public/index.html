@@ -4345,7 +4345,7 @@ function startStream(){
   es.addEventListener("hello",()=>{ S.streaming=true; });
   es.onmessage=e=>{
     let d; try{d=JSON.parse(e.data)}catch{return}
-    if(!paintPending) prevPaint=Object.fromEntries(Object.entries(S.quotes).map(([k,v])=>[k,{price:v.price}]));
+    if(!paintPending) prevPaint=Object.fromEntries(streamSymsNow().map(k=>[k,{price:S.quotes[k]&&S.quotes[k].price}]));
     for(const [s,t] of Object.entries(d)){
       const q=S.quotes[s]; if(!q||q.error||q.prevClose==null) continue;
       if(q.marketTime&&t.t<q.marketTime-1000) continue; // ignore stale trades
@@ -4354,11 +4354,22 @@ function startStream(){
       if(q.spark&&q.spark.length) q.spark[q.spark.length-1]=t.p;
     }
     S.lastTick=Date.now(); S.streaming=true;
-    if(!paintPending){ paintPending=true; requestAnimationFrame(()=>{ paintPending=false;
-      renderTape(); renderWL(prevPaint); renderMovers(); checkAlerts();
-      if(S.tab==="data") renderData(); if(S.tab==="portfolio") renderPortfolio(); if(S.tab==="nyse") nyRender();  if(S.tab==="research"&&S.rq.sym) renderResearchHead(); }); }
+    streamPaint();
   };
   es.onerror=()=>{ S.streaming=false; }; // EventSource reconnects by itself
+}
+// Trades can arrive many times a second. Repainting the page on each one froze it, so painting is throttled:
+// the ticker tape and watchlist at most once a second, the page you're on at most every 5 seconds.
+const SP={last:0,heavy:0,timer:0};
+function streamSymsNow(){ return streamKey?streamKey.split(","):[]; }
+function streamPaint(){
+  if(paintPending) return; paintPending=true;
+  const wait=Math.max(0,1000-(Date.now()-SP.last));
+  SP.timer=setTimeout(()=>requestAnimationFrame(()=>{ paintPending=false; SP.last=Date.now(); if(document.hidden) return;
+    renderTape(); renderWL(prevPaint); checkAlerts();
+    if(Date.now()-SP.heavy<5000) return; SP.heavy=Date.now();
+    if(S.tab==="data") renderData(); else if(S.tab==="portfolio") renderPortfolio(); else if(S.tab==="nyse") nyRender(); else if(S.tab==="research"&&S.rq.sym) renderResearchHead(); else if(S.tab==="news") renderMovers();
+  }),wait);
 }
 // Re-subscribe when the watchlist, holdings or alerts change
 setInterval(startStream,3000);
@@ -5151,15 +5162,21 @@ async function anOpen(){
   if(S.tab==="analysis") anRender();
 }
 setInterval(()=>{ if(S.tab==="analysis"&&!document.hidden){ anQuotes().then(()=>anRender()); } },30e3);
+var AN_NEWS={k:"",v:null}; // var: renderMood may run before this line during start-up
 function anData(){
+  if(!AN_NEWS) AN_NEWS={k:"",v:null};
   const q=s=>{const x=S.quotes[s];return x&&!x.error?x:null};
   const spx=q("^GSPC"), ndq=q("^IXIC"), dji=q("^DJI"), rut=q("^RUT"), vix=q("^VIX");
   const sec=SECTORS.map(([s,n])=>({s,n,q:q(s)})).filter(x=>x.q&&x.q.changePct!=null).sort((a,b)=>b.q.changePct-a.q.changePct);
   let up=0,down=0; const snap=S.an&&S.an.snap&&S.an.snap.quotes; if(snap) for(const v of Object.values(snap)){ if(v[2]>0) up++; else if(v[2]<0) down++; }
-  let items=(S.news?S.news.items:[]).filter(i=>Date.now()-(i.time||0)<24*3600e3); if(items.length<10) items=(S.news?S.news.items:[]).slice(0,80);
-  const pos=items.filter(i=>i.mood>0).length, neg=items.filter(i=>i.mood<0).length;
-  let list=[]; try{ list=cluster(items).slice(); newsHeat(list); list.sort((a,b)=>b._heat-a._heat); }catch{}
-  return {spx,ndq,dji,rut,vix,sec,up,down,pos,neg,list,stress:marketStress()};
+  const stress=marketStress(), nk=(S.newsAt||0)+"|"+(S.trendAt||0)+"|"+stress.join(",")+"|"+Math.floor(Date.now()/600e3);
+  if(!AN_NEWS.v||AN_NEWS.k!==nk){ // headline clustering + ranking: recomputed when the news changes, not on every price tick
+    let items=(S.news?S.news.items:[]).filter(i=>Date.now()-(i.time||0)<24*3600e3); if(items.length<10) items=(S.news?S.news.items:[]).slice(0,80);
+    const pos=items.filter(i=>i.mood>0).length, neg=items.filter(i=>i.mood<0).length;
+    let list=[]; try{ list=cluster(items).slice(); newsHeat(list); list.sort((a,b)=>b._heat-a._heat); }catch{}
+    AN_NEWS.k=nk; AN_NEWS.v={pos,neg,list}; }
+  const {pos,neg,list}=AN_NEWS.v;
+  return {spx,ndq,dji,rut,vix,sec,up,down,pos,neg,list,stress};
 }
 function anScores(d){
   const cl=x=>Math.max(0,Math.min(100,Math.round(x)));
