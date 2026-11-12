@@ -136,20 +136,17 @@
     cmd({ write: v.lines || null, cap: "Writing the summary" });
     cmd({ pts: () => [jf(SPD.at.s, 0)], speed: 160, cap: "" });
   }
+  // Strictly real activity: the spider only travels for (1) research jobs the server actually recorded and
+  // (2) summary sentences the server actually changed. With neither, it rests where it is.
   function nextCycle() {
-    if (!SUM.target.length && !SPD.visits.length) { const n = G.nodes[Math.floor(Math.random() * G.nodes.length)]; if (n) { crawl(n.s, n.k, `Checking ${n.label}`); cmd({ wait: 1200, cap: `Checking ${n.label}`, node: n.id }); } else cmd({ wait: 1500, cap: "Waiting for research" }); return; }
-    const pend = [...SUM.pending];
-    if (pend.length) { // rewrite changed sentences: visit the section each one comes from
-      const first = SUM.shown.length === 0, page = SUM.target[pend[0]].area, v = SPD.visits.find((x) => x.page === page);
-      SPD.visits = SPD.visits.filter((x) => x !== v);
-      return planVisit({ page, text: v ? v.text : null, lines: first ? pend : pend.filter((i) => SUM.target[i].area === page) });
-    }
     const v = SPD.visits.shift();
-    if (v) return planVisit({ page: v.page, text: v.text, lines: [] });
-    // nothing new: patrol the web and re-check stored data points
-    const n = G.nodes[Math.floor(Math.random() * G.nodes.length)];
-    if (n) { crawl(n.s, n.k, `Re-checking ${n.label}`, 70); cmd({ wait: 1400, cap: `Re-checking ${n.label}${n.sub ? " · " + n.sub : ""}`, node: n.id }); }
-    else cmd({ wait: 2000, cap: "" });
+    if (v) { const lines = [...SUM.pending].filter((i) => SUM.target[i] && SUM.target[i].area === v.page); return planVisit({ page: v.page, text: v.text, lines }); }
+    if (SUM.pending.size) { // changed text with no recorded job to show: go straight to the center and write it
+      crawl(SPD.at.s, 0, "New data — rewriting the summary");
+      cmd({ pts: () => { const r = $("twbHub").getBoundingClientRect(); return [() => ({ x: r.left + 10, y: r.top - HALF })]; }, speed: 160, cap: "Writing the summary" });
+      cmd({ write: null, cap: "Writing the summary" }); cmd({ pts: () => [jf(SPD.at.s, 0)], speed: 160, cap: "" }); return;
+    }
+    const st = W.st; cmd({ wait: 1500, cap: st && st.running ? `Server is working: ${st.running.label}` : "", rest: true });
   }
   function step(t) {
     if (!SPD.on) return; SPD.raf = requestAnimationFrame(step);
@@ -175,6 +172,7 @@
     SPD.el.style.transform = `translate(${SPD.x.toFixed(1)}px,${SPD.y.toFixed(1)}px) rotate(${SPD.ang.toFixed(0)}deg)`;
     SPD.el.style.setProperty("--gait", busy ? ".14s" : ".22s");
     SPD.el.classList.toggle("stopped", !moving && !(c && c.write));
+    SPD.el.classList.toggle("resting", !!(c && c.rest));
     SPD.el.classList.toggle("offline", !!W.offline);
     SPD.cap.textContent = SPD.capText || ""; SPD.cap.style.display = SPD.capText ? "" : "none";
     SPD.cap.style.transform = `translate(${Math.min(innerWidth - 300, SPD.x + SIZE + 4).toFixed(0)}px,${(SPD.y + HALF - 10).toFixed(0)}px)`;
@@ -195,7 +193,7 @@
     FOL.asked[key] = Date.now();
     try { const r = await api("/api/web/run", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ type, symbol: sym || undefined }) }); FOL.job = r.id; FOL.jobKey = key; FOL.jobLabel = sym ? `${sym}` : pageLabel(t); FOL.found = null; watchJob(); return r.id; } catch { return null; }
   }
-  function watchJob() { clearInterval(FOL.timer); const t0 = Date.now(); FOL.timer = setInterval(async () => { if (Date.now() - t0 > 4 * 60e3) return clearInterval(FOL.timer); await loadStatus(); const j = W.st && (W.st.recent || []).find((x) => x.id === FOL.job); if (j && j.status !== "running") { clearInterval(FOL.timer); FOL.found = j.status === "done" ? `Found: ${j.result || "done"}` : `Research failed: ${j.error || ""}`; } }, 5000); }
+  function watchJob() { clearInterval(FOL.timer); FOL.watching = true; const t0 = Date.now(); FOL.timer = setInterval(async () => { if (Date.now() - t0 > 4 * 60e3) { FOL.watching = false; return clearInterval(FOL.timer); } await loadStatus(); const j = W.st && (W.st.recent || []).find((x) => x.id === FOL.job); if (j && j.status !== "running") { clearInterval(FOL.timer); FOL.watching = false; FOL.found = j.status === "done" ? `Found: ${j.result || "done"}` : `Research failed: ${j.error || ""}`; } }, 5000); }
   function targetsOn(t) {
     const sec = $("tab-" + t); if (!sec) return [];
     const els = [...sec.querySelectorAll("svg, canvas, table, .card, .fx-card, .pf-card, .pfc, .an-card, .ny-pane, .apx, .mc-grid > *, .heat, .feed > *, .hm-frame, .kpis, .mood-card, .earn-card")];
@@ -205,7 +203,9 @@
   function pageCycle() {
     const t = S.tab;
     if (FOL.found) { cmd({ wait: 4500, cap: FOL.found }); FOL.found = null; return; }
-    const T = targetsOn(t); if (!T.length) { cmd({ wait: 1500, cap: FOL.job ? `Researching ${FOL.jobLabel}…` : "" }); return; }
+    const live = (W.st && W.st.running) || (FOL.job && FOL.watching);
+    if (!live) { cmd({ wait: 1500, cap: "", rest: true }); return; } // nothing running: rest
+    const T = targetsOn(t); if (!T.length) { cmd({ wait: 1500, cap: W.st && W.st.running ? `Server is working: ${W.st.running.label}` : "" }); return; }
     const e = T[Math.floor(Math.random() * T.length)], fx = 0.15 + Math.random() * 0.7, title = titleOf(e);
     cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * fx - HALF, y: r.top - HALF + 6 }; }], speed: 220, cap: title ? `Reading ${title}` : `Reading ${pageLabel(t)}` });
     cmd({ pts: () => [() => { const r = e.getBoundingClientRect(); return { x: r.left + r.width * Math.min(0.95, fx + 0.12) - HALF, y: r.top + Math.min(r.height - HALF, 40) - HALF }; }], speed: 70, cap: FOL.job && !FOL.found ? `Researching ${FOL.jobLabel} on the server…` : title ? `Reading ${title}` : "" });
@@ -341,5 +341,5 @@
   setTimeout(() => { startSpider(); if (S.tab !== "web") onTab(S.tab); }, 1500); // the spider lives on every page
   if (S.tab === "web") window.webOpen(); // the page opened straight on #web (setTab ran before this script loaded)
   setTimeout(() => { pushCtx(true); loadStatus(); }, 2500);
-  W.navPoll = setInterval(() => { if (!W.open && !document.hidden) loadStatus(); }, 30e3);
+  W.navPoll = setInterval(() => { if (!W.open && !document.hidden) loadStatus(); }, 8000);
 })();

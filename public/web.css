@@ -289,3 +289,4 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .twb-pop{position:absolute;z-index:5;width:240px;background:rgba(9,13,19,.96);border:1px solid var(--tw-l2);border-radius:10px;padding:10px 12px;font-size:12.5px}
 .twb-cap{position:fixed;left:0;top:0;z-index:41;max-width:300px;pointer-events:none;font:11px var(--mono);color:var(--tw-c);background:rgba(6,10,14,.9);border:1px solid var(--tw-l2);border-radius:6px;padding:3px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:760px){.twb{height:calc(100vh - 210px)}.twb-hub{border-radius:18px}.twb-lines p{font-size:13px}}
+.tw-crawler.resting{opacity:.75;filter:drop-shadow(0 0 3px rgba(94,234,212,.25))}
