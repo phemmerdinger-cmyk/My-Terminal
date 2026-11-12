@@ -683,7 +683,7 @@
   function entities(items, A) {
     const STOP = new Set("the,and,for,with,from,that,this,after,over,into,about,amid,says,said,will,have,has,its,are,was,were,than,more,what,when,your,their,they,just,could,would,stock,stocks,shares,share,market,markets,new,how,why,who,report,reports,week,today,year,inc,corp,price,prices,quarter,deal,deals,first,also,back,still,here,there,these,those,most,could,should,ahead,amid,set,sees,gets,make,makes,big,top,now,up,down,out,off,per,via,vs".split(","));
     const disp = {}; const seeD = (w, orig) => { const k = w.toLowerCase(); disp[k] = disp[k] || {}; disp[k][orig] = (disp[k][orig] || 0) + 1; };
-    const H = items.map((i) => { const title = String(i.title || "").replace(/['’]s\b/g, ""), low = title.toLowerCase(), ents = new Set(i.tickers || []);
+    const H = items.map((i) => { const title = String(i.title || "").replace(/\s+[-–|]\s+[^-–|]{2,40}$/, "").replace(/['’]s\b/g, ""), low = title.toLowerCase(), ents = new Set(i.tickers || []);
       for (const o of title.match(/[A-Za-z][A-Za-z'.-]{2,}/g) || []) seeD(o, o);
       for (const tk2 of title.match(/\b[A-Z]{2,5}\b/g) || []) if (W.tickers && W.tickers.has(tk2)) ents.add(tk2); // tickers count only when written in capitals
       const tw = low.match(/[a-z][a-z0-9&.'-]*/g) || []; // every word and every adjacent pair
@@ -710,6 +710,85 @@
       themes.push([g.map((x) => (x.includes(" ") ? x : nice(x))).join(" · "), H.filter((h) => g.some((x) => h.words.has(x))).length]); if (themes.length >= 8) break; }
     function nice(w) { const d = disp[w.toLowerCase()]; if (!d) return w; return Object.entries(d).sort((a, b) => b[1] - a[1] || (a[0] === a[0].toLowerCase()) - (b[0] === b[0].toLowerCase()))[0][0]; }
     return { ents, themes, H };
+  }
+  // ---- research scans: tie the stock to every other part of the terminal (portfolio, news, THE WEB, Claude, the bots, filings, quant)
+  async function stockLinks(sym) {
+    const Q = S.quotes && S.quotes[sym], card = [], sg = (v, d = 1) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%", usd = (v) => (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
+    const add = (k, h, body, btns) => card.push(`<div class="sp-link"><div class="sp-lk">${esc(k)}</div><b>${h}</b>${body ? `<p>${body}</p>` : ""}${btns.length ? `<div class="sp-lb">${btns.map(([l, go, x]) => `<button type="button" data-sp-go="${go}" data-sp-sym="${esc(sym)}"${x ? ` data-sp-x="${esc(x)}"` : ""}>${esc(l)} →</button>`).join("")}</div>` : ""}</div>`);
+    const [web, ap, dt, qt] = await Promise.all([api(`/api/web/discoveries?symbols=${encodeURIComponent(sym)}&limit=5`).catch(() => null), api("/api/autopilot").catch(() => null), api("/api/daytrader").catch(() => null), api("/api/quanttrader").catch(() => null)]);
+    // your money: every portfolio that holds it
+    const held = (S.pfs || []).flatMap((pf) => (pf.holdings || []).filter((h) => h.symbol === sym).map((h) => ({ pf, h })));
+    if (held.length) { const tot = (S.pfs || []).map((pf) => (pf.holdings || []).reduce((a, h) => a + h.shares * ((S.quotes[h.symbol] || {}).price || h.cost || 0), 0));
+      add("Your portfolio", held.map(({ pf, h }) => { const px = (Q && Q.price) || h.cost, val = h.shares * px, pl = h.cost ? (px - h.cost) * h.shares : null, pw = tot[(S.pfs || []).indexOf(pf)] || 0;
+        return `${esc(pf.name)}: ${h.shares} shares, ${usd(val)}${pw ? ` (${((val / pw) * 100).toFixed(1)}% of it)` : ""}${pl != null ? `, ${pl >= 0 ? "up" : "down"} ${usd(Math.abs(pl))} since you bought` : ""}`; }).join("<br>"),
+        Q && Q.change != null ? `Today it is ${Q.change >= 0 ? "adding" : "costing"} ${usd(Math.abs(held.reduce((a, x) => a + x.h.shares * Q.change, 0)))}. Risk & stress shows how much of your portfolio's risk it carries.` : "", [["Portfolio", "portfolio"], ["Risk & stress", "risk"], ["Quant Lab", "quant"]]); }
+    else add("Your portfolio", "Not held", `${S.wl.includes(sym) ? "It is on your watchlist." : "It isn't on your watchlist either."} The backtest lab can show how it would have done in your mix.`, [["Backtest it", "backtest"]]);
+    // alerts + earnings
+    const al = (S.alerts || []).filter((a) => a.symbol === sym && !a.hit), er = S.earn && !S.earn.error ? [...(S.earn.yours || []), ...(S.earn.notable || [])].find((x) => x.symbol === sym) : null;
+    if (al.length || er) add("Coming up", [er ? `Earnings ${esc(er.date)}${er.time ? ` (${esc(er.time)})` : ""}` : "", al.length ? `${al.length} price alert${al.length > 1 ? "s" : ""} set` : ""].filter(Boolean).join(" · "), "", al.length ? [["Alerts", "portfolio"]] : []);
+    // the news about it
+    const items = ((S.news && S.news.items) || []).filter((i) => (i.tickers || []).includes(sym) && Date.now() - (i.time || 0) < 3 * 864e5).sort((a, b) => b.time - a.time);
+    if (items.length) { const p = items.filter((i) => i.mood > 0).length, n = items.filter((i) => i.mood < 0).length;
+      add("News", `${items.length} headline${items.length > 1 ? "s" : ""} in 3 days · ${p > n ? "leaning positive" : n > p ? "leaning negative" : "mixed"}`, items.slice(0, 3).map((i) => `“${esc(String(i.title).replace(/\s+[-–|]\s+[^-–|]{2,40}$/, ""))}” <em>${esc(i.source || "")}</em>`).join("<br>"), [["All its headlines", "news"]]); }
+    else add("News", "No headlines in the last 3 days", "", []);
+    // THE WEB's stored research
+    const wi = (web && web.items) || [];
+    add("THE WEB research", wi.length ? `${wi.length} finding${wi.length > 1 ? "s" : ""} on file` : "Nothing on file yet", wi.slice(0, 3).map((d) => esc(d.headline)).join("<br>") || "The spider will pick it up on its next pass over your holdings and watchlist.", [["THE WEB", "web"]]);
+    // Claude's calls
+    const pr = (S.db || []).filter((p) => p.symbol === sym);
+    if (pr.length) { const l = pr[0]; add("Claude Predictor", `Last call: ${esc(l.stance)}${l.confidence != null ? `, ${Math.round(l.confidence * (l.confidence <= 1 ? 100 : 1))}% confidence` : ""}`, `${new Date(l.generated).toLocaleDateString()}${l.targetShort ? ` · short-term target ${esc(String(l.targetShort))}` : ""} · ${pr.length} saved call${pr.length > 1 ? "s" : ""} on it`, [["Prediction log", "predict"], ["How accurate", "leader"]]); }
+    else add("Claude Predictor", "No prediction yet", "Ask Claude for a call; it will be graded against the S&P 500.", [["Predict " + sym, "predict", "run"]]);
+    // the paper bots
+    const bots = [["Swing trader", ap], ["Day trader", dt], ["Quant trader", qt]].map(([n, d]) => { const p = d && (d.positions || []).find((x) => x.sym === sym); return p ? `${n}: holds ${usd(p.value)}${p.pnl != null ? ` (${p.pnl >= 0 ? "+" : "−"}${usd(Math.abs(p.pnl)).replace(/^[−]?\$/, "$")})` : ""}` : null; }).filter(Boolean);
+    add("AI traders (paper money)", bots.length ? bots.join(" · ") : "None of the three bots own it right now", "", [["AI vs S&P 500", "aitrade"]]);
+    // fundamentals + valuation
+    add("Fundamentals", "SEC financial statements and a DCF valuation", "", [["Financials", "fin"], ["DCF model", "dcf"]]);
+    return `<h4>Connected research on ${esc(sym)}${Q && Q.changePct != null ? ` <span class="sp-mv"><i class="${Q.changePct >= 0 ? "up" : "down"}">${sg(Q.changePct, 2)}</i> today</span>` : ""}</h4><div class="sp-links">${card.join("")}</div>`;
+  }
+  // ---- news report: a written picture of the market (prices + what the headlines are about), not a list of what was read
+  function newsStory(DP, EN) {
+    const Q = (k) => { const q = S.quotes && S.quotes[k]; return q && !q.error && q.price != null ? q : null; };
+    const sg = (v, d = 1) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d) + "%", ab = (v) => Math.abs(v).toFixed(1) + "%";
+    const clean = (t) => String(t || "").replace(/\s+[-–|]\s+[^-–|]{2,40}$/, "");
+    const it = DP.items, pos = it.filter((i) => i.mood > 0).length, neg = it.filter((i) => i.mood < 0).length, out = [];
+    // 1) the tape: indexes, leadership, sectors
+    const ix = [["^GSPC", "S&P 500"], ["^IXIC", "Nasdaq"], ["^DJI", "Dow"], ["^RUT", "Russell 2000"]].map(([k, n]) => [n, Q(k)]).filter((x) => x[1] && x[1].changePct != null);
+    if (ix.length) {
+      const spx = ix.find((x) => x[0] === "S&P 500") || ix[0], d = spx[1].changePct, big = Math.abs(d) >= 1.2, word = d > 0.15 ? (big ? "rallying hard" : "higher") : d < -0.15 ? (big ? "selling off" : "lower") : "roughly flat";
+      let t = `Stocks are ${word}: ${ix.map(([n, q]) => `${n} ${sg(q.changePct, 2)}`).join(", ")}.`;
+      const nq = ix.find((x) => x[0] === "Nasdaq"), ru = ix.find((x) => x[0] === "Russell 2000"), dj = ix.find((x) => x[0] === "Dow");
+      if (nq && dj && Math.abs(nq[1].changePct - dj[1].changePct) >= 0.5) t += nq[1].changePct > dj[1].changePct ? " Tech and growth names are doing the heavy lifting while the Dow's industrial and value stocks lag." : " Money is rotating out of tech, with the Nasdaq trailing the Dow.";
+      if (ru && Math.abs(ru[1].changePct - spx[1].changePct) >= 0.6) t += ru[1].changePct > spx[1].changePct ? " Small caps are outrunning the big indexes, a sign of broad risk appetite." : " Small caps are underperforming, so the move is concentrated in the largest companies.";
+      const sec = (typeof SECTORS !== "undefined" ? SECTORS : []).map(([k, n]) => [n, Q(k)]).filter((x) => x[1] && x[1].changePct != null).sort((a, b) => b[1].changePct - a[1].changePct);
+      if (sec.length >= 4) { const upN = sec.filter((x) => x[1].changePct > 0).length;
+        t += ` ${upN} of ${sec.length} sectors are up; ${sec.slice(0, 2).map(([n, q]) => `${n} (${sg(q.changePct)})`).join(" and ")} lead, while ${sec.slice(-2).reverse().map(([n, q]) => `${n} (${sg(q.changePct)})`).join(" and ")} are the weakest.`; }
+      out.push(t);
+    }
+    // fear gauge, rates, commodities, crypto
+    const mac = [], vix = Q("^VIX"), tnx = Q("^TNX"), oil = Q("CL=F"), gold = Q("GC=F"), btc = Q("BTC-USD");
+    if (vix) mac.push(`the VIX is ${vix.price.toFixed(1)}${vix.changePct != null ? ` (${sg(vix.changePct)})` : ""}, ${vix.price >= 25 ? "so investors are clearly nervous" : vix.price >= 19 ? "so there is some hedging going on" : "so fear is low"}`);
+    if (tnx) { const bp = tnx.change != null ? Math.round(tnx.change * 100) : 0; mac.push(`the 10-year Treasury yield is ${tnx.price.toFixed(2)}%${bp ? ` (${bp > 0 ? "up" : "down"} ${Math.abs(bp)} bp${Math.abs(bp) >= 5 ? ", a meaningful move for rates" : ""})` : ""}`); }
+    if (oil && oil.changePct != null) mac.push(`crude oil is ${oil.changePct >= 0 ? "up" : "down"} ${ab(oil.changePct)} at $${oil.price.toFixed(2)}`);
+    if (gold && Math.abs(gold.changePct || 0) >= 0.3) mac.push(`gold ${gold.changePct > 0 ? "gains" : "slips"} ${ab(gold.changePct)}`);
+    if (btc && Math.abs(btc.changePct || 0) >= 1) mac.push(`Bitcoin ${btc.changePct > 0 ? "climbs" : "drops"} ${ab(btc.changePct)} to $${Math.round(btc.price).toLocaleString()}`);
+    if (mac.length) out.push(mac[0][0].toUpperCase() + mac[0].slice(1) + (mac.length > 1 ? "; " + mac.slice(1).join("; ") : "") + ".");
+    // 2) the biggest stories: the same story from several outlets counts once, ranked by how hot it is
+    let cl = []; try { cl = cluster(it).slice(); newsHeat(cl); cl.sort((a, b) => (b._heat || 0) - (a._heat || 0)); } catch { cl = it.slice(0, 6); }
+    const stories = [], seenT = new Set();
+    const wset = (t) => new Set((clean(t).toLowerCase().match(/[a-z]{3,}/g) || []).map((w) => w.replace(/s$/, "")).filter((w) => !/^(the|and|for|with|after|over|says|said|stock|share)$/.test(w))), seenW = [];
+    for (const c of cl) { if (stories.length >= 5) break; const ws = wset(c.title); if (seenW.some((o) => [...ws].filter((w) => o.has(w)).length >= Math.max(2, Math.min(ws.size, o.size) * 0.4))) continue; seenW.push(ws); const tks = (c.tickers || []).filter((x) => !seenT.has(x)); if ((c.tickers || []).length && !tks.length) continue; tks.slice(0, 2).forEach((x) => seenT.add(x));
+      const outlets = 1 + ((c.also || []).length || 0), mv = (c.tickers || []).slice(0, 3).map((x) => [x, Q(x)]).filter((x) => x[1] && x[1].changePct != null);
+      stories.push(`<li><b>${esc(clean(c.title))}</b>${outlets > 1 ? ` <em>· ${outlets} outlets</em>` : ""}${mv.length ? ` <span class="sp-mv">${mv.map(([x, q]) => `${esc(x)} <i class="${q.changePct >= 0 ? "up" : "down"}">${sg(q.changePct)}</i>`).join(" ")}</span>` : ""}${c.mood ? ` <em>· ${c.mood > 0 ? "upbeat" : "negative"} coverage</em>` : ""}</li>`); }
+    // 3) companies in focus: every name that refers to one company counted together, with how the stock is trading
+    const comp = EN.ents.slice(0, 6).map((e) => { const q = Q(e.sym), heads = EN.H.filter((h) => h.ents.has(e.sym)).map((h) => h.i).sort((a, b) => Math.abs(b.mood || 0) - Math.abs(a.mood || 0));
+      const tone = e.lean > 1 ? "mostly positive" : e.lean < -1 ? "mostly negative" : "mixed", lead = heads[0] ? clean(heads[0].title) : "";
+      return `<li><b>${esc(e.name)}</b> <em>${esc([e.sym, ...e.attach].join(" · "))}</em>: ${e.n} headline${e.n === 1 ? "" : "s"}, ${tone}${q && q.changePct != null ? `; the stock is <i class="${q.changePct >= 0 ? "up" : "down"}">${sg(q.changePct)}</i>${Math.abs(q.changePct) >= 3 ? " (a big move)" : ""}` : ""}.${lead ? ` Lead story: “${esc(lead)}”.` : ""}</li>`; });
+    // 4) themes beyond single companies, and the overall tone
+    const th = EN.themes.slice(0, 4), tone = pos > neg * 1.4 ? "leans positive" : neg > pos * 1.4 ? "leans negative" : "is mixed";
+    const close = `Overall the news flow ${tone} (${pos} upbeat vs ${neg} downbeat stories)${th.length ? `, and coverage keeps returning to ${th.map(([w]) => w).join(", ")}` : ""}.`;
+    return `<h4>The market right now</h4><div class="sp-story">${out.map((x) => `<p>${esc(x)}</p>`).join("") || `<p>Live prices haven't loaded yet, so this picture comes from the headlines alone.</p>`}<p>${esc(close)}</p></div>
+      ${stories.length ? `<h4>Biggest stories</h4><ul class="sp-take sp-stories">${stories.join("")}</ul>` : ""}
+      ${comp.length ? `<h4>Companies in focus</h4><ul class="sp-take sp-stories">${comp.join("")}</ul>` : ""}`;
   }
   window.spiderScan = async function () {
     if (SCAN.on) return; const t = S.tab; SCAN.on = true; SCAN.aborted = false; SCAN.page = t; SCAN.found = []; SCAN.t0 = performance.now(); SCAN.job = null;
@@ -767,40 +846,33 @@
     const warns = F.flatMap((f) => (f.text.match(/[^.\n]{0,50}\b(STALE|ERROR|UNAVAILABLE|failed|red flag|faded out-of-sample|broke down)\b[^.\n]{0,30}/g) || []).map((w) => ({ s: f.title, w: w.trim() }))).slice(0, 4);
     let sum = null, disc = []; try { sum = await api("/api/web/summary"); } catch {}
     if (tick.length) try { disc = ((await api(`/api/web/discoveries?symbols=${encodeURIComponent(tick.slice(0, 4).map((x) => x[0]).join(","))}&limit=4`)).items || []); } catch {}
-    const take = [], DP = SCAN.deep; let deepHtml = "";
-    if (DP && DP.kind === "news") {
-      const it = DP.items, srcs = new Set(it.map((i) => i.source)), pos = it.filter((i) => i.mood > 0).length, neg = it.filter((i) => i.mood < 0).length, tk = {};
-      for (const i of it) for (const x of i.tickers || []) { tk[x] = tk[x] || { n: 0, m: 0 }; tk[x].n++; tk[x].m += Math.sign(i.mood || 0); }
-      const topT = Object.entries(tk).sort((a, b) => b[1].n - a[1].n).slice(0, 8);
-      const EN = entities(it, await aliasMap()), themes = EN.themes;
-      take.push(`Read all ${it.length} headlines from ${DP.span} across ${srcs.size} source${srcs.size === 1 ? "" : "s"} (${[...srcs].join(", ")}).`);
-      take.push(`Tone: ${pos} positive, ${neg} negative, ${it.length - pos - neg} neutral — the news flow reads ${pos > neg * 1.4 ? "positive" : neg > pos * 1.4 ? "negative" : "mixed"}.`);
-      const topE = EN.ents.slice(0, 6); void topT;
-      if (topE.length) take.push(`Most-covered companies: ${topE.map((e) => `${e.name} (${[e.sym, ...e.attach].join(" · ")}) — ${e.n} headline${e.n === 1 ? "" : "s"}${e.lean > 0 ? ", leaning positive" : e.lean < 0 ? ", leaning negative" : ""}`).join("; ")}.`);
-      if (themes.length) take.push(`Other recurring themes: ${themes.map(([w, n]) => `${w} (${n})`).join(", ")}.`);
-      const rankE = new Map(EN.ents.map((e, k) => [e.sym, k])), nameOf = Object.fromEntries(EN.ents.map((e) => [e.sym, `${e.name} · ${e.sym}`])), groups = {};
-      for (const h of EN.H) { const es = [...h.ents].sort((a, b) => (rankE.get(a) ?? 99) - (rankE.get(b) ?? 99)), g = es.length ? nameOf[es[0]] || es[0] : "Market-wide"; (groups[g] = groups[g] || []).push(h.i); }
-      const gs = Object.entries(groups).sort((a, b) => (a[0] === "Market-wide") - (b[0] === "Market-wide") || b[1].length - a[1].length);
-      const tm = (t) => new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-      deepHtml = `<h4>Every headline read (${it.length})</h4>${gs.map(([g, xs]) => `<div class="sp-sec"><b>${esc(g)} · ${xs.length}</b><ul class="sp-news">${xs.map((i) => `<li><i class="${i.mood > 0 ? "up" : i.mood < 0 ? "down" : ""}">●</i>${esc(i.title)} <em>${esc(i.source || "")} · ${tm(i.time)}</em></li>`).join("")}</ul></div>`).join("")}`;
-    }
+    const take = [], DP = SCAN.deep;
+    let story = "";
+    if (DP && DP.kind === "news") story = newsStory(DP, entities(DP.items, await aliasMap()));
+    const rsym = page === "research" && S.rq && S.rq.sym ? S.rq.sym : null; let linked = ""; if (rsym) try { linked = await stockLinks(rsym); } catch {}
     if (!DP) take.push(`Examined ${F.length} section${F.length === 1 ? "" : "s"} of ${pageLabel(page)} and recorded ${all.length} figures in ${secs} s.`);
-    if (pcts.length) take.push(`Of ${pcts.length} signed percentages on the page, ${up} were positive and ${dn} negative${up + dn ? ` — the page reads ${up > dn * 1.5 ? "mostly positive" : dn > up * 1.5 ? "mostly negative" : "mixed"}` : ""}.`);
-    if (hi && hi.v > 0) take.push(`Largest gain seen: ${hi.v > 0 ? "+" : ""}${hi.v}% (${hi.s}: “${hi.ctx}”).`);
-    if (lo && lo.v < 0) take.push(`Largest decline seen: ${lo.v}% (${lo.s}: “${lo.ctx}”).`);
-    if (tick.length) take.push(`Most-mentioned tickers: ${tick.map(([k, n]) => `${k} (${n})`).join(", ")}.`);
+    if (!DP && pcts.length) take.push(`Of ${pcts.length} signed percentages on the page, ${up} were positive and ${dn} negative${up + dn ? ` — the page reads ${up > dn * 1.5 ? "mostly positive" : dn > up * 1.5 ? "mostly negative" : "mixed"}` : ""}.`);
+    if (!DP && hi && hi.v > 0) take.push(`Largest gain seen: ${hi.v > 0 ? "+" : ""}${hi.v}% (${hi.s}: “${hi.ctx}”).`);
+    if (!DP && lo && lo.v < 0) take.push(`Largest decline seen: ${lo.v}% (${lo.s}: “${lo.ctx}”).`);
+    if (!DP && tick.length) take.push(`Most-mentioned tickers: ${tick.map(([k, n]) => `${k} (${n})`).join(", ")}.`);
     for (const w of warns) take.push(`Flag in ${w.s}: “${w.w}”.`);
     if (SCAN.job) take.push(`Started a server research job for ${SCAN.job}; its findings will appear in THE WEB.`);
     const el = document.createElement("div"); el.className = "sp-rep"; el.innerHTML = `<div class="sp-rep-in" role="dialog" aria-label="Spider report">
-      <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>What the spider found</h3><small>${new Date().toLocaleTimeString()} · ${DP ? `${DP.items.length} headlines` : `${F.length} sections · ${all.length} figures`} · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
-      <h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>${DP ? "What’s going on in the market" : "What the spider found"}</h3><small>${new Date().toLocaleTimeString()} · ${DP ? `built from ${DP.items.length} headlines (${esc(DP.span)}) and live prices` : `${F.length} sections · ${all.length} figures`} · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
+      ${story || `<h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`}
+      ${linked}
       ${sum && sum.lines && sum.lines.length ? `<h4>Market context (THE WEB ${sum.live ? "live summary" : "latest summary"})</h4><ul class="sp-take">${sum.lines.slice(0, 3).map((l) => `<li>${esc(l.t)}</li>`).join("")}</ul>` : ""}
       ${disc.length ? `<h4>Research on those tickers</h4><ul class="sp-take">${disc.map((d) => `<li><b>${esc(d.headline)}</b></li>`).join("")}</ul>` : ""}
-      ${deepHtml}${DP ? "" : `<h4>Section by section</h4>`}${DP ? "" : (() => { const m = new Map(); for (const f of F) { if (!f.facts.length) continue; const g = m.get(f.title) || []; for (const x of f.facts) if (!g.includes(x) && g.length < 12) g.push(x); m.set(f.title, g); }
-        return m.size ? [...m].map(([t2, fs]) => `<div class="sp-sec"><b>${esc(t2)}</b><ul>${fs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("") : `<p class="sp-foot">Nothing readable on this page yet — prices may still be loading.</p>`; })()}
+      ${DP || (linked && !F.some((f) => f.facts.length)) ? "" : `<h4>Section by section</h4>`}${DP ? "" : (() => { const m = new Map(); for (const f of F) { if (!f.facts.length) continue; const g = m.get(f.title) || []; for (const x of f.facts) if (!g.includes(x) && g.length < 12) g.push(x); m.set(f.title, g); }
+        return m.size ? [...m].map(([t2, fs]) => `<div class="sp-sec"><b>${esc(t2)}</b><ul>${fs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`).join("") : linked ? "" : `<p class="sp-foot">Nothing readable on this page yet — prices may still be loading.</p>`; })()}
       <p class="sp-foot">A rule-based summary of what the spider read on this page plus THE WEB's stored research. No paid AI; nothing is traded.</p></div>`;
     document.querySelectorAll(".sp-rep").forEach((x) => x.remove()); document.body.appendChild(el);
-    const close = () => el.remove(); el.querySelector(".sp-x").onclick = close; el.onclick = (e) => { if (e.target === el) close(); }; document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k); } });
+    const close = () => el.remove(); el.querySelector(".sp-x").onclick = close;
+    el.querySelectorAll("[data-sp-go]").forEach((b) => (b.onclick = () => { const go = b.dataset.spGo, sy = b.dataset.spSym; close(); // jump to the section, already pointed at this stock
+      if (go === "news") { S.q = sy; setTab("news"); if (typeof renderFeed === "function") renderFeed(); return; }
+      if (go === "fin" || go === "dcf") { setTab(go); const f = $(go + "Sym"); if (f) { f.value = sy; $(go + "Form").requestSubmit(); } return; }
+      if (go === "predict") { setTab("predict"); if (typeof aiShow === "function") aiShow("predict"); if (b.dataset.spX === "run") { $("predInput").value = sy; $("predForm").requestSubmit(); } return; }
+      setTab(go); })); el.onclick = (e) => { if (e.target === el) close(); }; document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k); } });
   }
 
   // ---------------------------------------------------------------- open / close
