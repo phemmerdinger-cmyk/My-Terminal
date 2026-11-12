@@ -71,7 +71,7 @@
   async function loadSeries(syms, from, to) {
     const pad = new Date(Date.parse(from) - 420 * 864e5).toISOString().slice(0, 10), out = {}, todo = [...syms]; let done = 0, failed = [];
     const one = async () => { while (todo.length) { const s = todo.shift(), key = `${s}|${pad}|${to}`;
-      try { const j = QB.cache.get(key) || await api(`/api/pub/hist?symbol=${encodeURIComponent(s)}&from=${pad}&to=${to}&interval=1d`); QB.cache.set(key, j); out[s] = { t: j.t, close: j.close, adj: j.adj }; } catch (e) { failed.push(s); }
+      try { const j = await window.MD.hist(s, pad, to); out[s] = { t: j.t, close: j.close, adj: j.adj }; } catch (e) { failed.push(s); }
       $("qbOut").innerHTML = `<div class="fx-empty"><span class="spin"></span> Loading daily price history… ${++done}/${syms.length}</div>`; } };
     await Promise.all([one(), one(), one()]);
     return { series: out, failed };

@@ -36,15 +36,13 @@
   // today's histories are also kept in this browser, so a revisit is instant (older days are cleaned up)
   const LK = (k) => "qh2:" + k;
   try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith("qh2:") && !k.endsWith("|" + new Date().toISOString().slice(0, 10))) localStorage.removeItem(k); } } catch {}
-  function hist(sym, from, to) { const k = `${sym}|${from}|${to}`; if (!HC.has(k)) {
-      let hit = null; try { const v = localStorage.getItem(LK(k)); if (v) hit = JSON.parse(v); } catch {}
-      const p = hit ? Promise.resolve(hit) : api(`/api/pub/hist?symbol=${encodeURIComponent(sym)}&from=${from}&to=${to}&interval=1d`).then((j) => { try { localStorage.setItem(LK(k), JSON.stringify({ t: j.t, close: j.close, adj: j.adj, name: j.name })); } catch {} return j; });
-      HC.set(k, p); p.catch(() => HC.delete(k)); } return HC.get(k); }
+  // price history comes from the shared data layer (public/data.js): one copy per symbol for every page
+  const hist = (sym, from, to) => window.MD.hist(sym, from, to);
   async function loadAll(syms, from, to, onEach) { const out = {}, todo = [...syms]; let n = 0, failed = [];
     const one = async () => { while (todo.length) { const s = todo.shift(); try { const j = await hist(s, from, to); if (j && j.t && j.t.length > 30) out[s] = j; else failed.push(s); } catch { failed.push(s); } onEach && onEach(++n, syms.length); } };
     await Promise.all([one(), one(), one()]);
     // free data sources rate-limit bursts: retry anything that failed once, one at a time, after a pause
-    if (failed.length) { const again = failed; failed = []; await new Promise((r) => setTimeout(r, 1500)); for (const s of again) { try { HC.delete(`${s}|${from}|${to}`); const j = await hist(s, from, to); if (j && j.t && j.t.length > 30) out[s] = j; else failed.push(s); } catch { failed.push(s); } } }
+    if (failed.length) { const again = failed; failed = []; await new Promise((r) => setTimeout(r, 1500)); for (const s of again) { try { const j = await hist(s, from, to); if (j && j.t && j.t.length > 30) out[s] = j; else failed.push(s); } catch { failed.push(s); } } }
     return { out, failed }; }
 
   // ---------------------------------------------------------------- shell
@@ -168,7 +166,7 @@
     const peq = b.eq, seq = cum(sp), dd = M.drawdownSeries(peq), sdd = M.drawdownSeries(seq);
     const rv = roll(pr, 63, (x) => M.annVol(x)), srv = roll(sp, 63, (x) => M.annVol(x)), rs = roll(pr, 126, (x) => M.sharpe(x, b.rf)), ssr = roll(sp, 126, (x) => M.sharpe(x, b.rf));
     const rb = pr.map((_, i) => (i + 1 < 126 ? null : M.beta(pr.slice(i - 125, i + 1), sp.slice(i - 125, i + 1)))), rvar = roll(pr, 252, (x) => M.varHist(x)), r1 = roll(pr, 252, (x) => x.reduce((a, y) => a * (1 + y), 1) - 1);
-    let ap = null; try { ap = await api("/api/autopilot"); } catch {} b.ap = ap;
+    try { b.ap = await api("/api/autopilot"); } catch { b.ap = null; } // used by the signal board (overlap with the AI Trader)
     const pad = (a) => [null, ...a]; // daily-return series start one day after the equity series
     b.cc = { D, peq, seq, dd, sdd, rv: pad(rv), srv: pad(srv), rs: pad(rs), ssr: pad(ssr) };
     const top = [...b.assets].sort((x, y) => y.rc - x.rc).slice(0, 6), mx = Math.max(...top.map((a) => Math.max(a.rc, a.w)), 0.01);
@@ -178,7 +176,7 @@
         ${tile("ES 95%", usd(s.es95 * s.value), "", "", pct(s.es95, 2))}${tile("Regime", '<span id="qlRegK">…</span>')}${tile("Simulation", '<span id="qlMcK">queued</span>')}${tile("Data", day(b.lastT), "", b.stale ? "down" : "", b.stale ? Math.floor(b.ageD) + "d old" : "latest close")}</div>
       <div class="ql-two"><div>${segH("qlCcV", [["g", "Growth"], ["dd", "Drawdown"], ["v", "Volatility"], ["s", "Sharpe"], ["h", "Distribution"]], "g")}<div id="qlCcC"></div></div>
       <div class="ql-side"><h4>Risk vs capital</h4>${top.map((a) => `<div class="ql-rv"><span>${esc(a.sym)}</span><div><i class="w" style="width:${(a.w / mx) * 100}%"></i><i class="r" style="width:${(a.rc / mx) * 100}%"></i></div><em>${pct(a.rc, 0)}</em></div>`).join("")}${legend([["#64748b", "capital"], ["#5eead4", "risk"]])}
-      ${ap ? `<h4>AI Trader · paper</h4><div class="ql-tiles sm">${tile("Positions", String((ap.positions || []).length))}${tile("Mode", ap.lastScan && ap.lastScan.riskOff ? '<span class="down">risk-off</span>' : '<span class="up">risk-on</span>')}</div>` : ""}</div></div>`;
+</div></div>`;
     const draw = (v) => { const el = $("qlCcC");
       if (v === "g") el.innerHTML = lineSVG([{ v: peq.map((x) => x - 1), c: "#5eead4", name: "Portfolio", sw: 2 }, { v: seq.map((x) => x - 1), c: "#94a3b8", name: "S&P 500", dash: true }], { dates: D, zero: true, h: 240 });
       else if (v === "dd") el.innerHTML = lineSVG([{ v: dd, c: "#f6465d", name: "Portfolio", sw: 1.8 }, { v: sdd, c: "#94a3b8", name: "S&P 500", dash: true }], { dates: D, zero: true, h: 240, band: [{ lo: dd.map(() => 0), hi: dd, c: "rgba(246,70,93,.15)" }] });

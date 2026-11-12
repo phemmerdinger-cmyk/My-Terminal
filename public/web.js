@@ -125,7 +125,7 @@
   const SC = { "Information Technology": "#4da3ff", "Health Care": "#34d399", Financials: "#facc15", "Consumer Discretionary": "#f472b6", "Communication Services": "#a78bfa", Industrials: "#94a3b8", "Consumer Staples": "#fb923c", Energy: "#f87171", Utilities: "#67e8f9", "Real Estate": "#c4b5fd", Materials: "#fde68a" };
   const SHORT = { "Information Technology": "Tech", "Health Care": "Health", Financials: "Financials", "Consumer Discretionary": "Discretionary", "Communication Services": "Comms", Industrials: "Industrials", "Consumer Staples": "Staples", Energy: "Energy", Utilities: "Utilities", "Real Estate": "Real estate", Materials: "Materials" };
   function moveCol(p) { if (p == null || !isFinite(p)) return "#475569"; const t = Math.max(-1, Math.min(1, p / 3)); return t >= 0 ? `rgb(${Math.round(40 - 25 * t)},${Math.round(120 + 100 * t)},${Math.round(110 + 15 * t)})` : `rgb(${Math.round(150 + 100 * -t)},${Math.round(70 - 20 * -t)},${Math.round(90 - 10 * -t)})`; }
-  async function loadSnap(force) { if (!force && W.snap && Date.now() - W.snapAt < 60e3) return; try { W.snap = await api("/api/sp500"); W.snapAt = Date.now(); if (W.open) { drawWeb(); toolbar(); } } catch {} }
+  async function loadSnap(force) { if (!force && W.snap && Date.now() - W.snapAt < 60e3) return; try { W.snap = await window.MD.sp500(); W.snapAt = Date.now(); if (W.open) { drawWeb(); toolbar(); } } catch {} }
   function drawWeb() {
     const svg = $("twbSvg"); if (!svg || !G.w) return;
     svg.setAttribute("viewBox", `0 0 ${G.w} ${G.h}`);
