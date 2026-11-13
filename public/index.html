@@ -1681,7 +1681,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
-      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div><div class="lv" id="apLive"><div class="lv-h"><span class="lv-dot"></span><b>Live</b><small id="apLiveNote">connecting…</small><span class="lv-key"><i class="ai"></i>Swing <i class="dy"></i>Day trader <i class="sp"></i>S&amp;P 500 · return since start</span></div><svg id="apLiveSvg" viewBox="0 0 800 90" preserveAspectRatio="none"></svg></div></div>
+      <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
         <aside class="ap-hold" id="apNote"></aside>
@@ -3675,7 +3675,7 @@ function liveApply(flash){
   }
   liveChart();
 }
-function liveChart(){
+function liveChart(){ // the "Live" strip was removed: it only drew while the page was open and sat flat after the close. The race chart's "Today" range shows the intraday curve.
   const svg=$("apLiveSvg"), note=$("apLiveNote"), L=LIVE.d; if(!svg||!L) return;
   const hs=LIVE.hist.swing||[], hd=LIVE.hist.day||[], h=hs.length>=hd.length?hs:hd, ago=Math.max(0,Math.round((Date.now()-(L.pricesAt||L.t))/1000));
   note.textContent=!L.open?"market closed — showing the last prices":`prices ${ago<3?"just now":ago+"s ago"} · ${h.length>1?(()=>{const sec=Math.round((h.at(-1).t-h[0].t)/1000);return sec<60?`${sec}s since you opened the page`:`${Math.round(sec/60)} min since you opened the page`;})():"building…"}`;
