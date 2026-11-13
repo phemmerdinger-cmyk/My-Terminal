@@ -456,7 +456,7 @@
   // ---------------------------------------------------------------- the summary inside the web
   async function loadSummary() {
     let s; try { s = await api("/api/web/summary"); } catch { return; }
-    SUM.meta = s; if (SUM.pinned) return; // the spider's own report is in the box; the live summary comes back on request
+    SUM.meta = s;
     const lines = s.lines || [];
     lines.forEach((l, i) => { if (!SUM.target[i] || SUM.target[i].t !== l.t || SUM.shown[i] !== l.t) { if (SUM.shown[i] !== l.t) SUM.pending.add(i); } });
     for (const i of [...SUM.pending]) if (i >= lines.length) SUM.pending.delete(i);
@@ -467,7 +467,7 @@
     foot();
   }
   function foot() {
-    const s = SUM.meta; if (!s || SUM.pinned) return; // the spider's summary is in the box
+    const s = SUM.meta; if (!s) return;
     $("twbK").textContent = s.live ? "THE WEB · LIVE MARKET SUMMARY" : "THE WEB · " + (s.title || "MARKET SUMMARY").toUpperCase();
     const st = W.st, job = st && st.running ? `Spider is ${STATE[st.state] ? STATE[st.state].toLowerCase() : "working"}: ${st.running.label}` : "";
     $("twbFoot").innerHTML = `<span>${s.live ? `<b class="up">● Live</b> · updated ${et(s.generatedAt)} ET · keeps rewriting until the 4:00 PM close` : `Market ${esc(s.phase || "closed")} — this is the final summary${s.generatedAt ? ` (written ${etD(s.generatedAt)} ET)` : ""}. Live rewriting resumes at 9:30 AM ET.`}</span>${s.freshness ? `<span class="tw-muted">${esc(s.freshness.quotes.label)}</span>` : ""}${job ? `<span class="tw-muted">${esc(job)}</span>` : ""}<button class="tw-btn ghost" type="button" id="twbRe">Rewrite now</button>`;
@@ -656,7 +656,7 @@
   // Complete readers for pages whose content is a long list: the spider reads the data behind the page, not just what
   // is scrolled into view. News: every headline published today (since midnight ET), whatever the filters hide.
   function deepRead(t) {
-    if ((t === "news" || t === "analysis" || t === "web") && S.news && S.news.items) {
+    if ((t === "news" || t === "analysis") && S.news && S.news.items) {
       const et = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })), mid = Date.now() - (et.getHours() * 3600 + et.getMinutes() * 60 + et.getSeconds()) * 1000;
       let items = S.news.items.filter((i) => (i.time || 0) >= mid), span = "today";
       if (items.length < 10) { items = S.news.items.filter((i) => (i.time || 0) >= Date.now() - 24 * 3600e3); span = "the last 24 hours"; }
@@ -829,27 +829,10 @@
     if (SCAN.deep && SCAN.on) bsPill(`<b>${esc(pageLabel(t).toUpperCase())}</b> · <span>${hl} of ${hl} headlines read</span>`);
     // everything on the page gets read, including the sections the tour didn't stop at
     if (SCAN.on) { if (SCAN.deep) say2(`Read all ${SCAN.deep.items.length} headlines from ${SCAN.deep.span}`); }
-    if (SCAN.on && t === "web" && $("twbHub")) { // walk to the summary box and write the report in it
-      const hr = $("twbHub").getBoundingClientRect(); say2("Writing the summary in the box"); await bsGo(Math.min(innerWidth - 120 * sc, hr.right + 70 * sc), Math.max(170 * sc, hr.top + 90 * sc), 1600);
-      if (SCAN.on) { bsPill(""); await scanFinish(); } bsHide(); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = ""; return; }
     if (SCAN.on) { say2("Writing the report"); await bsGo(-160 * BS.sp.scale, innerHeight / 2, 1500); }
     bsHide(); bsPill(""); if (SPD.el) for (const e of [SPD.el, SPD.cap, SPD.fx]) e.style.visibility = "";
     if (SCAN.on) scanFinish(); else { SCAN.on = false; if (btn) btn.classList.remove("on"); }
   };
-  // THE WEB: the spider writes its report into the summary box, block by block, while it stands beside it
-  async function writeBox(story, disc, sum, secs) {
-    let web = []; try { web = ((await api("/api/web/discoveries?limit=6")).items || []); } catch {}
-    const html = `${story}${web.length ? `<h4>What the spider has dug up</h4><ul class="sp-take sp-stories">${web.map((d) => `<li><b>${esc(d.headline)}</b>${(d.tickers || []).length ? ` <em>· ${esc(d.tickers.slice(0, 3).join(", "))}</em>` : ""}</li>`).join("")}</ul>` : ""}`;
-    SUM.pinned = true; $("twbK").textContent = "🕷 SPIDER SUMMARY · " + new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    const box = $("twbLines"); box.classList.add("sp-box"); box.innerHTML = ""; const tmp = document.createElement("div"); tmp.innerHTML = html;
-    const blocks = []; for (const n of [...tmp.children]) { if (n.matches("ul,div.sp-story")) { const shell2 = n.cloneNode(false); blocks.push([shell2, null]); for (const c of [...n.children]) blocks.push([c, shell2]); } else blocks.push([n, null]); }
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    for (const [n, parent] of blocks) { (parent || box).appendChild(n); if (parent || !n.children.length) n.classList.add("sp-write"); n.scrollIntoView({ block: "nearest" });
-      if (!reduce && (parent || !n.matches("ul,div"))) { if (BS.cap) BS.cap.textContent = "Writing: " + (n.textContent || "").trim().slice(0, 60); await new Promise((r) => setTimeout(r, Math.min(900, 160 + (n.textContent || "").length * 4))); } }
-    box.scrollTo({ top: 0, behavior: "smooth" });
-    $("twbFoot").innerHTML = `<span>Written by the spider in ${secs} s from today's headlines, live prices and its stored research.</span> <button class="twb-chip" id="twbLive">↺ Back to the live summary</button>`;
-    $("twbLive").onclick = () => { SUM.pinned = false; box.classList.remove("sp-box"); SUM.shown = []; SUM.pending = new Set(SUM.target.map((_, i) => i)); renderLines(); SUM.shown = SUM.target.map((l) => l.t); SUM.pending.clear(); renderLines(); foot(); };
-  }
   async function scanFinish() {
     const page = SCAN.page, secs = ((performance.now() - SCAN.t0) / 1000).toFixed(1), F = SCAN.found; SCAN.on = false; const btn = $("spBtn"); if (btn) btn.classList.remove("on");
     if (SCAN.aborted) return;
@@ -874,7 +857,6 @@
     if (!DP && tick.length) take.push(`Most-mentioned tickers: ${tick.map(([k, n]) => `${k} (${n})`).join(", ")}.`);
     for (const w of warns) take.push(`Flag in ${w.s}: “${w.w}”.`);
     if (SCAN.job) take.push(`Started a server research job for ${SCAN.job}; its findings will appear in THE WEB.`);
-    if (page === "web" && $("twbLines")) return writeBox(story || `<ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`, disc, sum, secs);
     const el = document.createElement("div"); el.className = "sp-rep"; el.innerHTML = `<div class="sp-rep-in" role="dialog" aria-label="Spider report">
       <div class="sp-rep-h"><div><div class="sp-k">🕷 SPIDER REPORT · ${esc(pageLabel(page).toUpperCase())}</div><h3>${DP ? "What’s going on in the market" : "What the spider found"}</h3><small>${new Date().toLocaleTimeString()} · ${DP ? `built from ${DP.items.length} headlines (${esc(DP.span)}) and live prices` : `${F.length} sections · ${all.length} figures`} · ${secs} s at 2× speed</small></div><button class="sp-x" type="button" aria-label="Close">✕</button></div>
       ${story || `<h4>Takeaways</h4><ul class="sp-take">${take.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`}

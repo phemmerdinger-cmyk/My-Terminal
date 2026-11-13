@@ -519,13 +519,3 @@ html.viewonly [data-group="web"],html.viewonly #webPfCard,html.viewonly #webApCa
 .sp-lk{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#ff6fd8;margin-bottom:3px}
 .sp-lb{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sp-lb button{background:none;border:1px solid var(--line2);color:var(--text);border-radius:999px;padding:3px 10px;font-size:11.5px;cursor:pointer}.sp-lb button:hover{border-color:#ff6fd8;color:#ff6fd8}
 .sp-mv i.up{font-style:normal;color:var(--up)}.sp-mv i.down{font-style:normal;color:var(--down)}
-/* spider summary written into THE WEB's summary box */
-.twb-lines.sp-box{font-size:13px;line-height:1.55;color:#dbe7ef}
-.twb-lines.sp-box h4{margin:12px 0 4px;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#ff6fd8}
-.twb-lines.sp-box h4:first-child{margin-top:0}
-.twb-lines.sp-box .sp-story p{font-size:13px}
-.twb-lines.sp-box .sp-take{padding-left:16px;font-size:12.5px}
-.sp-write{animation:spWrite .45s ease-out both}
-@keyframes spWrite{from{clip-path:inset(0 100% 0 0);opacity:.4}to{clip-path:inset(0 0 0 0);opacity:1}}
-@media (prefers-reduced-motion:reduce){.sp-write{animation:none}}
-.twb-hub .twb-lines.sp-box{flex:1 1 auto;min-height:0;overflow:auto;display:block;justify-content:flex-start;margin-top:10px;padding-right:4px}
