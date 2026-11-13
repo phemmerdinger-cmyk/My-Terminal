@@ -2180,7 +2180,7 @@ function renderMovers(){ // News-owned: which companies the headlines are about 
 }
 
 /* ---------- NEWS ---------- */
-const NEWS_RANGES=[["today","Today"],["24h","Last 24 hours"],["week","Past week"],["month","Past month"],["6m","Past 6 months"],["year","Past year"],["all","All time"]];
+const NEWS_RANGES=[["closed","Market closed (close → open)"],["today","Today"],["24h","Last 24 hours"],["week","Past week"],["month","Past month"],["6m","Past 6 months"],["year","Past year"],["all","All time"]];
 S.newsRange=store.get("newsRange","24h"); S.newsShow=150;
 function renderToolbar(){
   const views=[["all","All news"],["mine","My stocks"],["smart","✦ Smart Money"]];
@@ -2214,16 +2214,31 @@ document.addEventListener("change",e=>{
 });
 function rangeStart(){
   const now=Date.now();
+  if(S.newsRange==="closed") return lastCloseMs(now); // everything since the last 4:00 PM ET close
   if(S.newsRange==="today"){ const p=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"numeric",second:"numeric",hour12:false}).formatToParts(new Date()).map(x=>[x.type,x.value])); return now-((+p.hour%24)*3600+(+p.minute)*60+(+p.second))*1000; }
   const d={"24h":1,week:7,month:31,"6m":183,year:366}[S.newsRange]; return d?now-d*86400e3:0;
 }
+// the most recent 4:00 PM ET close: today's if it's already past 4 on a weekday, otherwise the previous weekday's
+function lastCloseMs(now=Date.now()){
+  const p=Object.fromEntries(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short",hour:"numeric",minute:"numeric",second:"numeric",hour12:false}).formatToParts(new Date(now)).map(x=>[x.type,x.value]));
+  const mid=now-((+p.hour%24)*3600+(+p.minute)*60+(+p.second))*1000, wd=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(p.weekday);
+  let t=mid+16*3600e3, d=wd; if(!(d>=1&&d<=5&&now>=t)){ do{ t-=86400e3; d=(d+6)%7; } while(d===0||d===6); }
+  return t;
+}
+// the closed session that starts at that close ends at the next 9:30 AM ET open (weekends skipped)
+function nextOpenAfter(close){
+  const wd=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].indexOf(new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"short"}).format(new Date(close)));
+  let t=close+17.5*3600e3, d=(wd+1)%7; while(d===0||d===6){ t+=86400e3; d=(d+1)%7; } return t;
+}
+function rangeEnd(){ if(S.newsRange!=="closed") return 0; const c=lastCloseMs(), o=nextOpenAfter(c); return o<Date.now()?o:0; } // market open now → stop at this morning's open
 function filtered(){
   if(!S.news) return [];
   const q=S.q.trim().toLowerCase();
-  const since=rangeStart();
+  const since=rangeStart(), until=rangeEnd();
   return S.news.items.filter(i=>{
     if(S.srcOff.has(i.source)) return false;
     if(since&&i.time&&i.time<since) return false;
+    if(until&&i.time&&i.time>until) return false;
     if(S.view==="mine"&&!i.tickers.some(t=>S.wl.includes(t)||S.port.some(h=>h.symbol===t))) return false;
     if(!["all","mine","smart"].includes(S.view)&&!i.tickers.includes(S.view)) return false;
     if(q&&!(i.title+" "+i.summary+" "+i.tickers.join(" ")).toLowerCase().includes(q)) return false;
@@ -2299,7 +2314,7 @@ function newsHeat(list){
   loadTrending();
   const TP=newsTopics();
   const now=Date.now(), T=S.trend||[];
-  const keep={today:18,"24h":24,week:96,month:400,"6m":2400,year:4800,all:6000}[S.newsRange]||24;
+  const keep={closed:18,today:18,"24h":24,week:96,month:400,"6m":2400,year:4800,all:6000}[S.newsRange]||24;
   for(const i of list){
     // match against the "top stories" lists
     let g=0,c=0,rel=1;

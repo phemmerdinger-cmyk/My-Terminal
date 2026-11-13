@@ -213,7 +213,7 @@ const TICKER_RE = /^[A-Z0-9.\-^=]{1,12}$/;
 // ---------------------------------------------------------------- news archive (older headlines)
 // RSS feeds only hold the latest stories, so older news comes from Google News
 // searches limited to each outlet's site and split into date windows.
-const RANGE_DAYS = { today: 1, "24h": 1, week: 7, month: 31, "6m": 183, year: 366, all: null };
+const RANGE_DAYS = { closed: 4, today: 1, "24h": 1, week: 7, month: 31, "6m": 183, year: 366, all: null };
 const DOMAINS = { yahoo: "finance.yahoo.com", cnbc: "cnbc.com", morningstar: "morningstar.com", seekingalpha: "seekingalpha.com", wsj: "wsj.com" };
 function newsWindows(range) {
   const day = 86400e3, now = Date.now();
