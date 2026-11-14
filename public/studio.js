@@ -3,7 +3,7 @@
  * Never trades, never calls paid models, never claims a scenario is a forecast. */
 (function () {
   "use strict";
-  const Core = window.MDStudioCore;
+  const Core = window.MDStudioCore, STRAT = window.MDStrategyLibrary;
   if (!Core || typeof S === "undefined") return;
   const byId = (s) => document.getElementById(s);
   const clean = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -15,8 +15,8 @@
   const LS = { options: "md_studio_opts_v1", seen: "md_studio_seen_v1", events: "md_studio_alerts_v1" };
   const defaults = { price: true, research: true, priceMove: 5, importance: 75, density: "comfortable", color: "cyan", motion: "system" };
   const opts = { ...defaults, ...safeStorage.get(LS.options, {}) };
-  const E = { mounted: false, tab: "scenario", pf: null, market: -15, tech: -5, custom: 0, symbol: "NVDA",
-    sec: {}, research: [], trader: null, graph: null, focus: null, loading: false, initialized: false, seen: safeStorage.get(LS.seen, {}), events: safeStorage.get(LS.events, []), fetched: 0, graphInfo: "" };
+  const E = { mounted: false, tab: "strategies", pf: null, market: -15, tech: -5, custom: 0, symbol: "NVDA",
+    sec: {}, research: [], trader: null, graph: null, focus: null, loading: false, initialized: false, seen: safeStorage.get(LS.seen, {}), events: safeStorage.get(LS.events, []), fetched: 0, graphInfo: "", strategyResults: safeStorage.get("md_studio_strategy_results_v1", {}), strategyBusy: false, strategyHistory: new Map(), strategyAuto: false };
   const SCENARIOS = [
     ["Broad selloff", -20, 0, 0], ["Tech-specific stress", -8, -25, 0],
     ["Single-stock shock", 0, 0, -30], ["Broad rally", 12, 5, 0], ["Reset", 0, 0, 0]
@@ -36,12 +36,24 @@
     const el = byId("tab-studio");
     if (E.mounted && byId("mdsModes")) return;
     E.mounted = true;
-    el.innerHTML = `<header class="mds-hero"><div class="mds-eyebrow">◈ THE WEB / RESEARCH OPERATIONS</div><h1>Intelligence Studio <span class="mds-beacon" aria-hidden="true"></span></h1>
-      <p>Connect market research to your own positions and risk decisions. All calculations run locally; analysis is evidence-linked and hypothetical, never an order.</p>
-      <div class="mds-hero-actions"><button type="button" data-msgo="web">◉ Open full Spider graph</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest lab</button><button type="button" data-msgo="health">▤ System Health</button></div></header>
+    el.innerHTML = `<div class="mds-hero">
+      <div class="mds-hero-copy"><div class="mds-eyebrow">◈ THE WEB / RESEARCH OPERATIONS</div>
+      <div class="mds-title-line"><h1>Intelligence Studio</h1><span class="mds-beacon" aria-label="Studio ready"></span></div>
+      <p>Portfolio intelligence, researched connections and quant strategies in one workspace. All projections are hypothetical and no orders are placed.</p></div>
+      <div class="mds-hero-actions" aria-label="Connected terminal tools"><button type="button" data-msgo="web">◉ Spider network</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest Lab</button><button type="button" data-msgo="health">▤ System Health</button></div>
+      </div>
       <div class="mds-nav" id="mdsModes" role="tablist" aria-label="Intelligence Studio modules">
-        ${[["scenario","Shock simulator"],["research","Research bridge"],["graph","Knowledge network"],["quant","Quant audit"],["ask","Ask Spider"],["alerts","Smart alerts"],["settings","Appearance"]].map(([id,n])=>`<button type="button" data-msmode="${id}" role="tab" aria-selected="false">${n}</button>`).join("")}</div>
+        ${[["strategies","Strategies"],["scenario","Shock simulator"],["research","Research bridge"],["graph","Knowledge network"],["quant","Quant audit"],["ask","Ask Spider"],["alerts","Smart alerts"],["settings","Appearance"]].map(([id,n])=>`<button type="button" data-msmode="${id}" role="tab" aria-selected="false">${n}</button>`).join("")}</div>
       <div id="mdsFeedback" class="mds-feedback" aria-live="polite"></div>
+      <section id="mdsStrategies" data-mspanel="strategies" class="mds-panel" hidden>
+        <div class="mds-intro"><h2>Strategy research lab <span class="mds-section-tag">14 executable models</span></h2>
+          <p>Explore different investing rules, then compare their actual historical backtests. Every figure appears only after downloading price data and calculating performance — never from preset sample returns.</p></div>
+        <div class="mds-strategy-toolbar"><label for="mdsStrategyFilter">Filter family</label><select class="field" id="mdsStrategyFilter"><option value="all">All models</option><option value="trend">Trend &amp; momentum</option><option value="reversal">Mean reversion &amp; RSI</option><option value="factors">Multi-factor</option><option value="allocation">Portfolio allocation</option></select>
+          <button type="button" id="mdsRunSamples" class="mds-strategy-primary">▶ Run 5 examples</button><button type="button" id="mdsRunAll">Run all 14 backtests</button></div>
+        <div id="mdsStrategyProgress" class="mds-strategy-progress" role="status" aria-live="polite">Historical results will appear beneath each strategy once calculated.</div>
+        <div id="mdsStrategyCards" class="mds-strategy-grid"></div>
+        <p class="mds-caption">Same 5-year window, SPY benchmark and $10,000 simulated capital; 5 bps spread, 5 bps slippage, 0 commission, and a 2% cash floor. This is research, not live trading. Survivorship bias and free data availability affect backtest reliability.</p>
+      </section>
       <section id="mdsScenario" data-mspanel="scenario" class="mds-panel">
         <div class="mds-intro"><h2>Portfolio shock simulator</h2><p>Test <b>synthetic</b> scenarios, not price predictions or historical replays. P&amp;L is computed from the available quoted positions; missing quotes are excluded and clearly reported.</p></div>
         <div class="mds-controls"><label>Portfolio<select class="field" id="mdsPf"></select></label><label>Single-stock override<input id="mdsSym" class="field" placeholder="NVDA" maxlength="12"></label></div>
@@ -68,13 +80,22 @@
         <div class="mds-toolbar"><label><input type="checkbox" id="mdsPriceOn"> Monitor quoted price moves</label><label><input type="checkbox" id="mdsResearchOn"> Monitor important Spider findings</label><button id="mdsAlertClear" type="button">Clear history</button></div>
         <p id="mdsAlertFreshness" class="mds-caption"></p><div id="mdsAlertOut"></div></section>
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Customize your terminal</h2><p>Settings apply to this device only; motion respects your operating-system preference unless reduced motion is selected.</p></div>
+        <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
         <div class="mds-controls"><label>Information density<select class="field" id="mdsDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
           <label>Accent theme<select class="field" id="mdsAccent"><option value="cyan">Cyber cyan</option><option value="amber">Terminal amber</option></select></label>
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
-        <p class="mds-caption">Existing features, navigation and your portfolio data remain unchanged by these display settings.</p></section>`;
+        <div class="mds-settings-note"><span class="mds-settings-symbol">◈</span><div><strong>Visual preferences only</strong><p>Your portfolios, watchlist, saved backtests, research findings and paper-trading controls remain untouched.</p></div></div></section>`;
     el.querySelectorAll("[data-msgo]").forEach((b) => b.onclick = () => { if (typeof setTab === "function") setTab(b.dataset.msgo); });
     byId("mdsModes").onclick = (e) => { const b = e.target.closest("[data-msmode]"); if (b) mode(b.dataset.msmode); };
+    byId("mdsStrategyFilter").onchange = renderStrategies;
+    byId("mdsRunSamples").onclick = () => runStrategyBatch(5);
+    byId("mdsRunAll").onclick = () => runStrategyBatch(14);
+    byId("mdsStrategyCards").onclick = (e) => {
+      const btn = e.target.closest("[data-ms-strategy], [data-ms-report]");
+      if (!btn) return;
+      if (btn.dataset.msStrategy) runStrategy(btn.dataset.msStrategy);
+      if (btn.dataset.msReport) fullStrategyReport(btn.dataset.msReport);
+    };
     byId("mdsPf").onchange = (e) => { E.pf = e.target.value; renderScenario(); };
     byId("mdsSym").onchange = (e) => { E.symbol = String(e.target.value || "").toUpperCase().replace(/[^A-Z0-9.\-]/g,"").slice(0,12); renderScenario(); };
     for (const [k, p] of [["Market","market"],["Tech","tech"],["Custom","custom"]]) byId("mds"+k).oninput = (e) => { E[p] = Number(e.target.value); renderScenario(); };
@@ -101,6 +122,7 @@
     E.tab = next;
     document.querySelectorAll("#mdsModes [data-msmode]").forEach((b) => { const on = b.dataset.msmode === next; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
     document.querySelectorAll("#tab-studio [data-mspanel]").forEach((p) => { p.hidden = p.dataset.mspanel !== next; });
+    if (next === "strategies") renderStrategies();
     if (next === "scenario") renderScenario();
     if (next === "research") { renderResearch(); if (Date.now() - E.fetched > 90000) fetchResearch(); }
     if (next === "graph") { if (!E.graph) fetchGraph(); else renderGraph(); }
@@ -228,6 +250,7 @@
     if (!E.pf) E.pf=S.pfActive;
     if (!E.focus) E.focus=(activePf() && (activePf().holdings || []).find((h)=>+h.shares>0)?.symbol) || (S.wl || [])[0] || "NVDA";
     mode(E.tab);
+    if (E.tab === "strategies") firstStrategyExamples();
     if (!Object.keys(E.sec).length) fetch("/sp500.json").then((r)=>r.json()).then((j)=>{E.sec=Object.fromEntries((j.rows||[]).map((r)=>[r[0],r[2]]));renderScenario();}).catch(()=>{});
     if(Date.now()-E.fetched>90000)fetchResearch();
     scanAlerts();
