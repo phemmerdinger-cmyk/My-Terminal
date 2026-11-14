@@ -169,3 +169,12 @@ html[data-md-motion="reduced"] .mds-beacon{box-shadow:none}
   #tab-studio .mds-panel[data-mspanel="settings"] .mds-controls{grid-template-columns:1fr;}
   #tab-studio .mds-strategy-toolbar .field{min-width:0;flex:1;}
 }
+
+/* Gentle, useful onboarding in previously blank tabs. Never imply sample values are market data. */
+.md-example-starter{background:linear-gradient(120deg,#122431,#101c27);border:1px solid #36556b;border-radius:11px;padding:17px;margin:14px 0 20px;}
+.md-example-starter h3{font-size:15px;margin:0 0 5px;color:#d7eff8;}
+.md-example-starter p{font-size:12px;line-height:1.6;color:#9cb5c5;margin:0 0 13px;max-width:850px;}
+.md-example-starter .md-example-buttons{display:flex;flex-wrap:wrap;gap:8px;}
+.md-example-starter .md-example-buttons button{cursor:pointer;border-radius:7px;background:#1d4053;border:1px solid #427187;
+  padding:9px 14px;color:#dbf4fa;font-weight:600;font-size:12px;}
+.md-example-starter .md-example-buttons button:hover{background:#26576b;border-color:#66c4e1;}
