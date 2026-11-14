@@ -25,7 +25,7 @@ body.rdr-open{overflow:hidden}
 .rdr-meta i{font-style:normal;color:var(--c);font-weight:600}
 .rdr-br{background:#ff2d5533;color:#ff7a90;border-radius:4px;padding:0 5px;font-weight:600}.rdr-sv{color:#facc15}
 .rdr-t{display:block;font-size:13.5px;line-height:1.35}.rdr-tk{display:block;font-size:11px;color:var(--dim);margin-top:3px}.rdr-tk em{font-style:normal;font-family:var(--mono,monospace);color:#9fb3c2}
-.rdr-empty{color:var(--dim);font-size:13px;padding:16px}
+.rdr-prio{display:block;margin-top:5px;font-size:11px;line-height:1.4;color:#8be4ce}.rdr-prio::first-letter{text-transform:uppercase}\n.rdr-empty{color:var(--dim);font-size:13px;padding:16px}
 .rdr-c{position:relative;min-height:0;min-width:0;display:flex;flex-direction:column}
 .rdr-prog{height:2px;background:transparent}.rdr-prog i{display:block;height:2px;width:0;background:linear-gradient(90deg,#38e1ff,#ff2d95);transition:width .1s linear}
 .rdr-scroll{overflow:auto;flex:1}
