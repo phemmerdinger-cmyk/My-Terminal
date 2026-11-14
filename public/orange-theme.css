@@ -5,12 +5,12 @@
   color-scheme:dark;
   --bg:#08090b;--panel:#101114;--panel2:#18191d;--line:#292a2e;--line2:#383940;
   --text:#f2f0ed;--muted:#a4a09b;--dim:#77736f;
-  --olive:#879f55;--military green:#879f55;--military green-hi:#b5c68a;--military green-deep:#4e6534;
-  --military green-glow:rgba(135,159,85,.15);--flash:rgba(135,159,85,.16);
+  --amber:#879f55;--orange:#879f55;--orange-hi:#b5c68a;--orange-deep:#4e6534;
+  --orange-glow:rgba(135,159,85,.15);--flash:rgba(135,159,85,.16);
   --up:#22c68a;--down:#fa5967;--claude:#e68b60;
 }
 html,body{background:#08090b;color:var(--text)}
-body{accent-color:var(--military green)}
+body{accent-color:var(--orange)}
 ::selection{background:#879f55;color:#100c08}
 :focus-visible{outline:2px solid #a7ba7a!important;outline-offset:2px}
 ::-webkit-scrollbar{width:10px;height:9px}
@@ -18,7 +18,7 @@ body{accent-color:var(--military green)}
 ::-webkit-scrollbar-thumb{background:#44403c;border:2px solid #0c0d10;border-radius:12px}
 ::-webkit-scrollbar-thumb:hover{background:#687c47}
 a:hover{color:#b5c68a}
-button,select,input,textarea{accent-color:var(--military green)}
+button,select,input,textarea{accent-color:var(--orange)}
 button{transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s}
 input,select,textarea{background-color:#121316;color:#f1ede8;border-color:#3b3936}
 input:focus,select:focus,textarea:focus{border-color:#879f55!important;box-shadow:0 0 0 2px rgba(135,159,85,.13)}
