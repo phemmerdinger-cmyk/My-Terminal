@@ -164,6 +164,145 @@
         <p class="fx-note">AI Trader's live rules use news, analyst ratings and earnings data that have no free history, so they can't be backtested faithfully here; its record is paper-traded only.</p>`; }
     catch { $("qbPaperB").innerHTML = '<p class="fx-note">AI Trader results unavailable right now.</p>'; }
   }
+
+  // ---- Five actually calculated, separately saved experiments (not a sample-results mockup).
+  function saveBatch() {
+    try { localStorage.setItem(BATCH_KEY, JSON.stringify(QB.batch)); } catch {}
+  }
+  function batchMetrics(m) {
+    return '<span>CAGR <b>' + pc(m.cagr) + '</b></span>' +
+      '<span>Sharpe <b>' + nf(m.sharpe) + '</b></span>' +
+      '<span>Max DD <b>' + pc(m.maxDrawdown) + '</b></span>' +
+      '<span>Return <b>' + pc(m.totalReturn) + '</b></span>';
+  }
+  function renderBatch() {
+    const el = $("qbBatch"); if (!el) return;
+    const batch = QB.batch;
+    const title = '<h3>🎲 Five random strategy experiments <em>real adjusted daily prices · $10,000 per run · SPY benchmark · no look-ahead</em></h3>';
+    if (!B) { el.innerHTML = title + '<p class="fx-warn">Batch generator could not load. Other Backtest Lab features are still available.</p>'; return; }
+    if (!batch || !Array.isArray(batch.items)) {
+      el.innerHTML = title + '<p class="fx-note">Five distinct strategies, randomly selected from seven tested configurations, will be run on the same five-year window. Results will appear here and in Saved runs. No fictional performance numbers.</p>';
+      return;
+    }
+    const completed = batch.items.filter((x) => x.state === "done").length;
+    const failed = batch.items.filter((x) => x.state === "error").length;
+    const status = QB.batchBusy ? 'Running ' + (completed + failed) + '/5…' :
+      completed === 5 ? "All five historical tests completed" :
+      failed ? completed + " succeeded, " + failed + " failed (unavailable data is never substituted)" :
+      completed + " completed";
+    let html = title + '<p class="fx-note"><b>' + esc(status) + '</b> · ' +
+      esc(batch.items[0].spec.from) + ' to ' + esc(batch.items[0].spec.to) +
+      ' · costs: 0 bps commission, 5 bps spread, 5 bps slippage · 35% maximum weight, 2% cash floor, 3% annual cash rate.</p>';
+    html += '<div class="qb-five-grid">';
+    for (const [i, item] of batch.items.entries()) {
+      const m = item.result, done = item.state === "done";
+      html += '<article class="qb-five-item"><div class="qb-five-line"><span>#' + (i+1) + ' ' + esc(item.title) + '</span><small class="' +
+        (item.state === "error" ? "down" : done ? "up" : "") + '">' +
+        esc(({done:"✓ Computed",error:"Unavailable",running:"Calculating",queued:"Queued"})[item.state] || item.state) + '</small></div>' +
+        '<p class="fx-note">' + esc(item.note) + '<br>Universe: ' + esc(item.spec.universe.join(", ")) +
+        ' · ' + esc(JSON.stringify(item.spec.params)) + '</p>' +
+        (done && m ? '<div class="qb-five-metrics">' + batchMetrics(m) + '</div>' +
+          '<p class="fx-note">' + m.trades + ' recorded orders · ending equity ' + money(m.finalValue) + '</p>' +
+          '<button type="button" class="btn ghost" data-batchview="' + i + '">Inspect complete backtest →</button>' :
+          item.state === "error" ? '<p class="fx-warn">' + esc(item.error || "Price data unavailable") + '</p>' : '') +
+        '</article>';
+    }
+    html += '</div><p class="fx-note">Backtested results are hypothetical. One fixed random draw is saved on this device, so refreshing does not silently replace your results. The button above creates five new random experiments. These use today\'s surviving symbols, so survivorship bias, data gaps and execution assumptions still matter.</p>';
+    el.innerHTML = html;
+  }
+  // Keep the batch's price data strictly separate from mock/test candles and require every chosen symbol.
+  async function batchSeries(spec) {
+    if (!window.MD || typeof window.MD.hist !== "function") throw new Error("Historical price provider is unavailable.");
+    const pad = new Date(Date.parse(spec.from + "T00:00:00Z") - 420 * 864e5).toISOString().slice(0, 10);
+    const syms = [...new Set([...spec.universe, spec.benchmark])], series = {}, failed = [];
+    const getOne = async (sym) => {
+      const key = sym + "|" + pad + "|" + spec.to;
+      try {
+        if (!QB.cache.has(key)) {
+          const history = await window.MD.hist(sym, pad, spec.to);
+          if (!Array.isArray(history.t) || history.t.length < 250 || history.close.length !== history.t.length)
+            throw new Error("insufficient price history");
+          QB.cache.set(key, { t: history.t, close: history.close, adj: history.adj });
+        }
+        series[sym] = QB.cache.get(key);
+      } catch (e) { failed.push(sym + " (" + String(e.message || e).slice(0, 85) + ")"); }
+    };
+    // Three concurrent requests maximum so the free data provider is not flooded.
+    for (let i = 0; i < syms.length; i += 3) await Promise.all(syms.slice(i, i + 3).map(getOne));
+    if (failed.length) throw new Error("Unable to test the declared universe: " + failed.join(", ") + ". Missing tickers are not silently dropped.");
+    return series;
+  }
+  async function evaluateBatchItem(item) {
+    const spec = item.spec, series = await batchSeries(spec);
+    const result = Q.run({ ...spec, series,
+      from: Date.parse(spec.from + "T00:00:00Z") / 1000,
+      to: Date.parse(spec.to + "T23:59:59Z") / 1000 });
+    const m = result.metrics;
+    if (!m || !Number.isFinite(m.finalValue) || !Number.isFinite(m.totalReturn) ||
+        !Number.isFinite(m.cagr) || result.dates.length < 252)
+      throw new Error("Insufficient or invalid observations; no result was recorded.");
+    return result;
+  }
+  async function runFive(automatic) {
+    if (!B || QB.busy || QB.batchBusy) return;
+    QB.busy = QB.batchBusy = true;
+    const batch = { id: Date.now(), automatic: !!automatic,
+      items: B.generateFive().map((p) => ({ ...p, state: "queued", result: null })) };
+    QB.batch = batch; QB.batchDetails.clear(); saveBatch(); renderBatch();
+    const btn = $("qbRunFive"); if (btn) { btn.disabled = true; btn.textContent = "Running 5 strategies…"; }
+    try {
+      for (let i = 0; i < batch.items.length; i++) {
+        const item = batch.items[i];
+        item.state = "running"; renderBatch();
+        await new Promise((resolve) => setTimeout(resolve, 20)); // paint progress first
+        try {
+          const result = await evaluateBatchItem(item);
+          QB.batchDetails.set(batch.id + ":" + i, result);
+          const m = result.metrics;
+          item.result = { cagr:m.cagr, sharpe:m.sharpe, maxDrawdown:m.maxDrawdown,
+            totalReturn:m.totalReturn, finalValue:m.finalValue, trades:result.trades.length };
+          remember(item.spec, result, "backtest");
+          QB.runs[0].title = item.title;
+          QB.runs[0].batchId = batch.id;
+          saveRuns(); runsUI();
+          item.state = "done";
+        } catch (error) {
+          item.state = "error"; item.error = String(error.message || error).slice(0, 250);
+        }
+        saveBatch(); renderBatch();
+      }
+    } finally {
+      batch.finishedAt = Date.now(); saveBatch();
+      QB.busy = QB.batchBusy = false;
+      if (btn) { btn.disabled = false; btn.textContent = "🎲 Run 5 random backtests"; }
+      renderBatch();
+    }
+  }
+  async function showBatchDetail(index) {
+    if (QB.busy || QB.batchBusy || !QB.batch || !QB.batch.items[index]) return;
+    const item = QB.batch.items[index]; if (item.state !== "done") return;
+    QB.busy = true; const out = $("qbOut");
+    out.innerHTML = '<div class="fx-empty"><span class="spin"></span> Reconstructing the full ' + esc(item.title) + ' backtest from historical prices…</div>';
+    try {
+      const key = QB.batch.id + ":" + index;
+      const r = QB.batchDetails.get(key) || await evaluateBatchItem(item);
+      QB.batchDetails.set(key, r);
+      out.innerHTML = '<h2 class="qb-h">Experiment #' + (index + 1) + ': ' + esc(item.title) + '</h2>' + resultHTML(r, []);
+      wire(r); out.scrollIntoView({behavior:"smooth",block:"start"});
+    } catch (error) {
+      out.innerHTML = '<div class="fx-warn">' + esc(String(error.message || error)) + '</div>';
+    } finally { QB.busy = false; }
+  }
+  function maybeAutoFive() {
+    if (!B || QB.batchBusy || QB.busy || window.__VISITOR ||
+        (typeof VIEW !== "undefined" && VIEW) || S.tab !== "backtest") return;
+    try {
+      if (localStorage.getItem(AUTO_KEY)) return;
+      localStorage.setItem(AUTO_KEY, String(Date.now()));
+    } catch { return; } // do not auto-run on every navigation if storage is restricted
+    setTimeout(() => { if (S.tab === "backtest" && !QB.busy) runFive(true); }, 250);
+  }
+
   window.qbOpen = function () { shell(); maybeAutoFive(); };
   if (S.tab === "backtest") window.qbOpen();
 })();
