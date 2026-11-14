@@ -82,7 +82,7 @@
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
         <div class="mds-controls"><label>Information density<select class="field" id="mdsDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
-          <label>Accent theme<select class="field" id="mdsAccent"><option value="amber">Black &amp; orange</option><option value="cyan">Legacy cyber cyan</option></select></label>
+          <label>Accent theme<select class="field" id="mdsAccent"><option value="amber">Black &amp; military green</option><option value="cyan">Legacy cyber cyan</option></select></label>
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
         <div class="mds-settings-note"><span class="mds-settings-symbol">◈</span><div><strong>Visual preferences only</strong><p>Your portfolios, watchlist, saved backtests, research findings and paper-trading controls remain untouched.</p></div></div></section>`;
     el.querySelectorAll("[data-msgo]").forEach((b) => b.onclick = () => { if (typeof setTab === "function") setTab(b.dataset.msgo); });
