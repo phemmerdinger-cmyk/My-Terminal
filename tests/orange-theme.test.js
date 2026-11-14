@@ -8,7 +8,7 @@ const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 const css=fs.readFileSync(path.join(root,"orange-theme.css"),"utf8");
 const studio=fs.readFileSync(path.join(root,"studio.js"),"utf8");
 test("global black-green stylesheet is loaded after existing inline and feature CSS",()=>{
- const marker='<link rel="stylesheet" href="/orange-theme.css?v=1">';
+ const marker='<link rel="stylesheet" href="/orange-theme.css?v=2">';
  assert.equal(html.split(marker).length,2);
  assert.ok(html.indexOf(marker)>html.indexOf("</style>"));
  for(const sheet of ["studio.css","reader.css","quant.css","web.css","health.css"])
@@ -22,7 +22,7 @@ test("military-green palette covers shell, studio, news and quant while preservi
  assert.ok(css.includes("--down:#fa5967"));
  assert.ok(css.includes("prefers-reduced-motion"));
 });
-test("studio appearance defaults to orange and still has a reversible legacy option",()=>{
+test("studio appearance defaults to military green and still has a reversible legacy option",()=>{
  assert.ok(studio.includes('color: "amber", motion: "system"'));
  assert.ok(studio.includes('value="amber">Black &amp; military green'));
  assert.ok(studio.includes('value="cyan">Legacy cyber cyan'));
