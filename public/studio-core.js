@@ -81,12 +81,12 @@
     const nowT = Number(now) || Date.now(), p = P || {}, seen = L || {}, events = [], next = { ...seen };
     const tracked = new Set((H || []).map((x) => symbol(x.symbol))), threshold = clamp(Number(p.priceMove) || 5, 1, 50),
       minImportance = clamp(Number(p.importance) || 75, 30, 100), sixHours = 6 * 3600e3;
-    const quoteFresh = Number.isFinite(quoteAt) && nowT - quoteAt >= 0 && nowT - quoteAt < 30 * 60e3;
+    const quoteFresh = Number.isFinite(quoteAt) && nowT - quoteAt >= 0 && nowT - quoteAt < 30 * 60e3; // terminal connection freshness alone is insufficient; every market quote must also be recent
     if (p.price !== false && quoteFresh) {
       const keyDay = new Date(nowT).toISOString().slice(0, 10);
       for (const sym of tracked) {
         const q = (quotes || {})[sym], pct = q && Number(q.changePct);
-        if (!q || q.error || !Number.isFinite(pct) || Math.abs(pct) < threshold) continue;
+        if (!q || q.error || !Number.isFinite(pct) || Math.abs(pct) < threshold || !Number.isFinite(q.marketTime) || nowT - q.marketTime < 0 || nowT - q.marketTime > 30 * 60e3) continue;
         const sign = pct >= 0 ? "up" : "down", key = "move:" + keyDay + ":" + sym + ":" + sign;
         if (next[key]) continue;
         events.push({ key, time: nowT, kind: "Price move", symbol: sym,
