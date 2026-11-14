@@ -41,7 +41,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <script src="/tickers.js"></script>
 <script src="/fin.js?v=3"></script>
 <script src="/data.js"></script>
-<script src="/reader.js" defer></script>
+<script src="/news-intel.js" defer></script> <script src="/reader.js" defer></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
@@ -2099,7 +2099,7 @@ function setTab(t){
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
