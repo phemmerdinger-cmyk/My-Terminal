@@ -395,6 +395,7 @@
     host.querySelectorAll("[data-mssym]").forEach((b)=>b.onclick=()=>{if(typeof openQuote==="function")openQuote(b.dataset.mssym);else setTab("research");});
     const example=host.querySelector("[data-ms-alert-example]");if(example)example.onclick=()=>{opts.priceMove=3;opts.importance=80;byId("mdsMove").value=3;byId("mdsImp").value=80;preferences();renderAlerts();};
   }
+  window.studioSelectMode=function(next){menu();if(["strategies","scenario","research","graph","quant","ask","alerts","settings"].includes(next))mode(next);};
   window.studioOpen=function(){
     menu();E.initialized=true;
     if (!E.pf) E.pf=S.pfActive;
