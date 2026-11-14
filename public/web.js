@@ -268,14 +268,14 @@
     if (SPD.el) return;
     SPD.el = document.createElement("div"); SPD.el.className = "tw-crawler";
     SPD.el.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs>
-      <radialGradient id="spAbd" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#ab6830"/><stop offset=".55" stop-color="#4c2c19"/><stop offset="1" stop-color="#170f0b"/></radialGradient>
-      <radialGradient id="spTh" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#e08a35"/><stop offset="1" stop-color="#2d1b11"/></radialGradient>
-      <radialGradient id="spEye"><stop offset="0" stop-color="#fff2d9"/><stop offset=".45" stop-color="#ffad42"/><stop offset="1" stop-color="#ff7a18" stop-opacity="0"/></radialGradient></defs>
+      <radialGradient id="spAbd" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#8aa565"/><stop offset=".55" stop-color="#34442a"/><stop offset="1" stop-color="#0c130b"/></radialGradient>
+      <radialGradient id="spTh" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#b6cb90"/><stop offset="1" stop-color="#202c1b"/></radialGradient>
+      <radialGradient id="spEye"><stop offset="0" stop-color="#eaf4d9"/><stop offset=".45" stop-color="#a9c77b"/><stop offset="1" stop-color="#7f9c50" stop-opacity="0"/></radialGradient></defs>
       <g class="sp-legs">${LEGS.map((_, i) => `<path class="sp-leg" id="spL${i}"/><path class="sp-leg-core" id="spC${i}"/><circle class="sp-knee" id="spK${i}" r="1.6"/>`).join("")}</g>
-      <ellipse cx="50" cy="63" rx="13" ry="17" fill="url(#spAbd)" stroke="#895022" stroke-width=".8"/>
+      <ellipse cx="50" cy="63" rx="13" ry="17" fill="url(#spAbd)" stroke="#536b3d" stroke-width=".8"/>
       <path class="sp-acc" d="M50 49 L50 77 M43 56 Q50 60 57 56 M42 65 Q50 69 58 65 M44 73 Q50 76 56 73"/>
-      <ellipse cx="50" cy="45" rx="9" ry="8" fill="url(#spTh)" stroke="#895022" stroke-width=".8"/>
-      <path d="M44 38 Q50 30 56 38 L54 41 Q50 37 46 41 Z" fill="#3d210f" stroke="#ffad42" stroke-width=".6"/>
+      <ellipse cx="50" cy="45" rx="9" ry="8" fill="url(#spTh)" stroke="#536b3d" stroke-width=".8"/>
+      <path d="M44 38 Q50 30 56 38 L54 41 Q50 37 46 41 Z" fill="#27371e" stroke="#a9c77b" stroke-width=".6"/>
       <circle class="sp-eye" cx="46.5" cy="38.5" r="2.4" fill="url(#spEye)"/><circle class="sp-eye" cx="53.5" cy="38.5" r="2.4" fill="url(#spEye)"/>
       <circle class="sp-eye s" cx="44" cy="41" r="1.2" fill="url(#spEye)"/><circle class="sp-eye s" cx="56" cy="41" r="1.2" fill="url(#spEye)"/>
       <circle class="sp-core" cx="50" cy="63" r="2.2"/></svg>`;
