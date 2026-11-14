@@ -117,6 +117,7 @@ function createSpider(deps) {
   function fresh() {
     return { v: 1, created: now(), context: { portfolios: [], watchlist: [], active: null, updated: 0 }, queue: [], lastRun: {}, researched: {}, jobs: [], hour: [],
       seen: { filings: {}, policy: {}, macro: {}, earn: {} }, funda: {}, exposure: null, market: null, macro: null, earnings: null, newsDigest: null, trader: null, explore: [],
+      ctrl: { paused: false, freq: 1, extra: [], sectors: [], off: [], notify: true },
       stats: { day: "", jobs: 0, discoveries: 0, errors: 0, total: 0 }, hyp: { supported: 0, refuted: 0, inconclusive: 0 }, seq: 0 };
   }
   const nextId = (p) => p + (++ST.seq).toString(36) + now().toString(36).slice(-4);
@@ -126,7 +127,7 @@ function createSpider(deps) {
     loading = (async () => {
       try {
         const [s, d, b] = await Promise.all([store.get("state"), store.get("disc"), store.get("bidx")]);
-        if (s && s.v === 1) ST = { ...fresh(), ...s, seen: { ...fresh().seen, ...(s.seen || {}) }, stats: { ...fresh().stats, ...(s.stats || {}) }, hyp: { ...fresh().hyp, ...(s.hyp || {}) } };
+        if (s && s.v === 1) ST = { ...fresh(), ...s, ctrl: { ...fresh().ctrl, ...(s.ctrl || {}) }, seen: { ...fresh().seen, ...(s.seen || {}) }, stats: { ...fresh().stats, ...(s.stats || {}) }, hyp: { ...fresh().hyp, ...(s.hyp || {}) } };
         if (Array.isArray(d)) DISC = d;
         if (Array.isArray(b)) BIDX = b;
         ST.queue = (ST.queue || []).filter((j) => JOBS[j.type]).slice(0, QUEUE_CAP);
@@ -186,7 +187,8 @@ function createSpider(deps) {
     return { ok: true, changed, holdings: held().length, watchlist: wl.length };
   }
   const held = () => uniq(ST.context.portfolios.flatMap((p) => p.holdings.map((h) => h.symbol)));
-  const tracked = () => uniq([...held(), ...ST.context.watchlist]);
+  const wlAll = () => uniq([...ST.context.watchlist, ...((ST.ctrl && ST.ctrl.extra) || [])]); // your watchlist + companies you asked the spider to monitor
+  const tracked = () => uniq([...held(), ...wlAll()]);
   const traderState = () => { try { return (deps.trader && deps.trader()) || null; } catch { return null; } };
   const traderHeld = () => Object.keys((traderState() || {}).positions || {});
   const traderTop = () => (((traderState() || {}).lastScan || {}).top || []).map((x) => x.sym);
@@ -210,10 +212,12 @@ function createSpider(deps) {
       if (w != null) { syms.push(t); (ex.holders[t] || []).forEach((n) => pfs.add(n)); rel = Math.max(rel, 0.45 + Math.min(0.55, w * 2.2)); reasons.push(`you hold ${t} (${(w * 100).toFixed(0)}% of a portfolio)`); }
       else if (held().includes(t)) { syms.push(t); rel = Math.max(rel, 0.5); reasons.push(`you hold ${t}`); }
       else if (ST.context.watchlist.includes(t)) { rel = Math.max(rel, 0.35); reasons.push(`${t} is on your watchlist`); }
+      else if ((ST.ctrl.extra || []).includes(t)) { rel = Math.max(rel, 0.35); reasons.push(`you asked the spider to monitor ${t}`); }
     }
     for (const s of uniq([...sectors, ...tickers.map(sectorOf)])) {
       const w = ex.sectorWeight[s];
       if (w && w >= 0.05 && !syms.length) { rel = Math.max(rel, Math.min(0.4, w * 1.2)); reasons.push(`${(w * 100).toFixed(0)}% of a portfolio is in ${s}`); }
+      if ((ST.ctrl.sectors || []).includes(s) && !syms.length) { rel = Math.max(rel, 0.3); reasons.push(`you monitor ${s}`); }
     }
     return { rel: r2(rel), syms: uniq(syms), pfs: [...pfs], why: uniq(reasons).slice(0, 3) };
   }
@@ -347,17 +351,18 @@ function createSpider(deps) {
       if (j0.prio.score <= ST.queue[ST.queue.length - 1].prio.score) return null;
       ST.queue.pop();
     }
-    const j = prioritize({ id: nextId("j"), type, sym: sym || null, slot: opts.slot || null, key, boost: opts.boost || 0, reason: opts.reason || null, depth: opts.depth || 0, extra: opts.extra || {}, created: now(), notBefore: opts.notBefore || 0, tries: 0, manual: !!opts.manual });
+    const j = prioritize({ id: nextId("j"), manual: !!opts.manual, type, sym: sym || null, slot: opts.slot || null, key, boost: opts.boost || 0, reason: opts.reason || null, depth: opts.depth || 0, extra: opts.extra || {}, created: now(), notBefore: opts.notBefore || 0, tries: 0, manual: !!opts.manual });
     ST.queue.push(j); markDirty();
     return j;
   }
   function plan() {
-    const t = now(), open = marketOpen(t);
+    if (ST.ctrl.paused) return; // automatic research is paused; "Research now" and company research still run
+    const t = now(), open = marketOpen(t), f = clamp(+ST.ctrl.freq || 1, 0.5, 4), off = new Set(ST.ctrl.off || []);
     for (const [type, spec] of Object.entries(JOBS)) {
-      if (!spec.ttl) continue;
+      if (!spec.ttl || off.has(type)) continue;
       if (type === "portfolio_scan" && !held().length) continue;
       const last = ST.lastRun[type] || 0;
-      if (t - last >= spec.ttl[open ? 0 : 1] * MIN) enqueue(type, null, {});
+      if (t - last >= spec.ttl[open ? 0 : 1] * MIN * f) enqueue(type, null, {});
     }
     // briefings: one per slot per trading day, generated inside the slot's window (catch-up after a wake-up)
     const s = session(t);
@@ -426,7 +431,7 @@ function createSpider(deps) {
       if (ST.hour.length >= MAX_PER_HOUR) { activity.state = "idle"; activity.note = `hourly research budget reached (${MAX_PER_HOUR} jobs) — resuming shortly`; return; }
       ST.queue.forEach(prioritize);
       ST.queue.sort((a, b) => b.prio.score - a.prio.score || a.created - b.created);
-      const i = ST.queue.findIndex((j) => (j.notBefore || 0) <= now());
+      const i = ST.queue.findIndex((j) => (j.notBefore || 0) <= now() && (!ST.ctrl.paused || j.manual));
       if (i < 0) return;
       const [j] = ST.queue.splice(i, 1);
       await runJob(j);
@@ -483,7 +488,7 @@ function createSpider(deps) {
       const pfs = ST.context.portfolios.filter((p) => p.holdings.length);
       if (!pfs.length) return { summary: "No holdings shared yet — open your Portfolio tab once so the Spider can see them." };
       c.phase("fetch", `Pricing ${held().length} holdings across ${pfs.length} portfolio${pfs.length > 1 ? "s" : ""}`);
-      const Q = await q(uniq([...held(), ...ST.context.watchlist]).slice(0, 80));
+      const Q = await q(uniq([...held(), ...wlAll()]).slice(0, 80));
       c.phase("analyze", "Measuring allocation, sector exposure and concentration");
       const symWeight = {}, sectorWeight = {}, holders = {}, names = {}, out = [];
       for (const p of pfs) {
@@ -1075,6 +1080,7 @@ function createSpider(deps) {
       stats: { ...ST.stats, memory: DISC.length, briefings: BIDX.length, budget: { used: ST.hour.filter((t) => now() - t < HOUR).length, max: MAX_PER_HOUR }, hypotheses: { ...ST.hyp, open: DISC.filter((d) => d.hyp && d.hyp.status === "open").length } },
       scheduler: { lastTick: lastTickAt, error: lastTickError, nextBriefing: nextSlot ? { slot: nextSlot[0], label: nextSlot[1].label, at: nextSlot[1].from } : null },
       context: { holdings: held().length, watchlist: ST.context.watchlist.length, portfolios: ST.context.portfolios.length, updated: ST.context.updated },
+      ctrl: { ...ST.ctrl }, jobTypes: Object.entries(JOBS).filter(([, v]) => v.ttl).map(([k, v]) => ({ type: k, label: typeof v.label === "function" ? v.label("") : v.label, every: v.ttl })),
       storage: store.info(),
     };
   }
@@ -1127,7 +1133,45 @@ function createSpider(deps) {
   }
   async function briefing(id) { await load(); if (id === "latest") id = (BIDX[0] || {}).id; return id ? store.get("b:" + id) : null; }
 
+  // ------------------------------------------------------------ controls, backup and company timelines
+  function setCtrl(c = {}) {
+    const C = ST.ctrl, sym = (x) => String(x || "").toUpperCase().trim();
+    if (c.paused != null) C.paused = !!c.paused;
+    if (c.freq != null) C.freq = clamp(+c.freq || 1, 0.5, 4);
+    if (Array.isArray(c.extra)) C.extra = uniq(c.extra.map(sym).filter((x) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(x))).slice(0, 40);
+    if (Array.isArray(c.sectors)) C.sectors = uniq(c.sectors.map((x) => String(x).slice(0, 40)).filter((x) => SECTOR_ETF[x])).slice(0, 11);
+    if (Array.isArray(c.off)) C.off = uniq(c.off.filter((x) => JOBS[x] && JOBS[x].ttl));
+    if (c.notify != null) C.notify = !!c.notify;
+    markDirty(); save(true).catch(() => {});
+    if (!C.paused && Array.isArray(c.extra)) for (const t of C.extra.filter((t) => !ST.researched[t]).slice(0, 5)) enqueue("company_snapshot", t, { boost: 0.4, reason: "you added it to the spider's monitored companies" });
+    return { ...C };
+  }
+  function exportData() { return { kind: "market-desk-spider-backup", v: 1, exported: now(), state: ST, discoveries: DISC, briefings: BIDX }; }
+  async function importData(b) {
+    if (!b || b.kind !== "market-desk-spider-backup" || !Array.isArray(b.discoveries)) throw new Error("That isn't a spider backup file.");
+    await load(); const have = new Map(DISC.map((d) => [d.key, d])); let added = 0, kept = 0;
+    for (const d of b.discoveries.slice(0, DISC_CAP)) {
+      if (!d || !d.key || typeof d.headline !== "string") continue;
+      const cur = have.get(d.key); if (cur && (cur.u || 0) >= (d.u || 0)) { kept++; continue; }
+      const clean = { ...d, tickers: (d.tickers || []).slice(0, 12), sectors: (d.sectors || []).slice(0, 6), headline: String(d.headline).slice(0, 220), summary: String(d.summary || "").slice(0, 900) };
+      if (cur) Object.assign(cur, clean); else { DISC.push(clean); have.set(d.key, clean); } added++;
+    }
+    DISC.sort((x, y) => (y.u || 0) - (x.u || 0)); if (DISC.length > DISC_CAP) prune(true);
+    if (Array.isArray(b.briefings)) { const ids = new Set(BIDX.map((x) => x.id)); for (const x of b.briefings) if (x && x.id && !ids.has(x.id)) BIDX.push(x); BIDX.sort((x, y) => (y.generatedAt || 0) - (x.generatedAt || 0)); }
+    if (b.state && b.state.ctrl) setCtrl(b.state.ctrl);
+    markDirty(); await save(true);
+    return { added, kept, total: DISC.length };
+  }
+  // everything the spider has learned about one company, oldest change last, each with its sources
+  function timeline(symIn) {
+    const sym = String(symIn || "").toUpperCase();
+    return DISC.filter((d) => d.tickers.includes(sym)).flatMap((d) => [{ t: d.u, first: d.t, cat: d.cat, kind: kindOf(d), headline: d.headline, summary: d.summary, sources: d.sources, importance: d.importance, v: d.v, expired: d.exp && d.exp < now(), hyp: d.hyp ? { claim: d.hyp.claim || d.hyp.text || null, status: d.hyp.status } : null, id: d.id },
+      ...(d.prev || []).map((p) => ({ t: p.u, cat: d.cat, kind: "superseded", headline: p.headline, summary: p.summary, sources: d.sources, superseded: true, v: p.v, id: d.id }))])
+      .sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 120);
+  }
+
   const self = {
+    setCtrl, exportData, importData, timeline,
     load, save, start, stop, tick, runNow, liveSummary, enqueue, setContext, status, discoveries, getDiscovery, briefings, briefing, packet, signal, traderAdjust, traderView, promptContext, session, marketOpen,
     graph: (o) => require("./intel").graph({ ST, DISC, SP, sectorOf, industryOf, nameOf, held: held(), tracked: tracked(), traderHeld: traderHeld(), MACRO_LINKS, now: now(), ...o }),
     ask: (question, opts = {}) => require("./intel").ask({ question, spider: self, ST, DISC, BIDX, SP, sectorOf, nameOf, held: held(), tracked: tracked(), now: now(), ...opts }),

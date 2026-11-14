@@ -1113,10 +1113,10 @@ async function ask(apiKey, body) {
   return { ...(await askWithActions(apiKey, prompt)), model: MODEL, generated: Date.now() };
 }
 
-function readBody(req) {
+function readBody(req, max = 1_000_000) {
   return new Promise((resolve, reject) => {
     let d = "";
-    req.on("data", (c) => { d += c; if (d.length > 1_000_000) req.destroy(); });
+    req.on("data", (c) => { d += c; if (d.length > max) { reject(new Error("too large")); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch (e) { reject(e); } });
     req.on("error", reject);
   });
@@ -2867,6 +2867,25 @@ async function webRoute(req, res, u) {
     return send(res, 202, { started: true, slot });
   }
   if (p === "summary") return send(res, 200, await SPIDER.liveSummary());
+  if (p === "control") { // pause/resume, frequency, monitored companies and sectors, job types, notifications
+    if (req.method === "POST") { let b = {}; try { b = await readBody(req); } catch { return send(res, 400, { error: "bad data" }); } return send(res, 200, SPIDER.setCtrl(b || {})); }
+    return send(res, 200, SPIDER.status().ctrl);
+  }
+  if (p === "export") { res.setHeader("Content-Disposition", `attachment; filename="spider-backup-${new Date().toISOString().slice(0, 10)}.json"`); return send(res, 200, SPIDER.exportData()); }
+  if (p === "import" && req.method === "POST") { let b = null; try { b = await readBody(req, 8_000_000); } catch (e) { return send(res, 400, { error: "That file is too big or isn't JSON." }); } try { return send(res, 200, await SPIDER.importData(b)); } catch (e) { return send(res, 400, { error: String(e.message || e) }); } }
+  if (p === "timeline") { // a company's intelligence timeline: spider findings + SEC filings + headlines, each with a source
+    const [sym] = parseList(qp("symbol"), 1); if (!sym) return send(res, 400, { error: "symbol required" });
+    const out = SPIDER.timeline(sym).map((x) => ({ ...x, src: "spider" }));
+    try { const id = await secCik(sym), sub = await secSubs(id.cik), r = sub.filings.recent, since = Date.now() - 365 * 864e5;
+      for (let i = 0; i < r.form.length && out.length < 400; i++) { const f = r.form[i]; if (!/^(8-K|10-Q|10-K|20-F|6-K|DEF 14A|S-1|4)$/.test(f)) continue; const t = Date.parse(r.acceptanceDateTime[i] || r.filingDate[i]); if (t < since) break;
+        if (f === "4") continue; const items = String(r.items[i] || "").split(",").map((x) => x.trim()).filter((x) => x && x !== "9.01");
+        out.push({ t, src: "sec", cat: f === "8-K" && items.includes("2.02") ? "earnings" : "filing", kind: "fact", headline: `${f}${items.length ? ": " + items.map((x) => ITEMS_8K[x] || "item " + x).join(", ") : f === "10-Q" ? ": quarterly report" : f === "10-K" ? ": annual report" : ""}`, summary: `Filed with the SEC on ${r.filingDate[i]}${r.reportDate[i] ? ` for the period ending ${r.reportDate[i]}` : ""}.`, sources: [{ name: "SEC EDGAR", url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]) }] }); }
+      const f4 = r.form.filter((f, i) => f === "4" && Date.parse(r.filingDate[i]) > Date.now() - 90 * 864e5).length; if (f4) out.push({ t: Date.now(), src: "sec", cat: "insider", kind: "fact", headline: `${f4} insider filing${f4 > 1 ? "s" : ""} (Form 4) in the last 90 days`, summary: "Officers and directors must report trades in the company's stock on Form 4.", sources: [{ name: "SEC EDGAR", url: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${id.cik}&type=4` }] });
+    } catch {}
+    try { const news = await fetchFeed(SOURCES.yahoo.ticker(sym)[0]); for (const n of news.slice(0, 15)) out.push({ t: n.time, src: "news", cat: "news", kind: "fact", headline: n.title, summary: "", sources: [{ name: n.publisher || "Yahoo Finance", url: n.link }], tone: sentiment(n.title) }); } catch {}
+    out.sort((a, b) => (b.t || 0) - (a.t || 0));
+    return send(res, 200, { symbol: sym, items: out.slice(0, 200) });
+  }
   if (p === "graph") return send(res, 200, SPIDER.graph({ focus: qp("focus") ? String(qp("focus")).slice(0, 80) : null }));
   if (p === "trader") return send(res, 200, { ...SPIDER.traderView(), weight: SPIDER_W, explain: SPIDER_W > 0 ? `Spider research nudges the swing bot's ranking score by at most ±${SPIDER_W.toFixed(2)} (scores run about 0–1), using only inputs the bot doesn't already score: insider buying, earnings-release tone and sector news patterns. Stops, news and trend rules still decide every trade, and the Spider itself never trades.` : "The Spider shares research with AI Trader for display only (SPIDER_TRADER_WEIGHT is 0, so it doesn't change the bot's scores)." });
   if (p === "research") { const [s] = parseList(qp("symbol"), 1); if (!s) return send(res, 400, { error: "symbol required" }); return send(res, 200, SPIDER.packet(s)); }
