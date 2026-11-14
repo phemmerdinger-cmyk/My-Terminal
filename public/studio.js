@@ -129,6 +129,145 @@
     if (next === "quant") renderQuant();
     if (next === "alerts") renderAlerts();
   }
+
+  // Source-linked, actually computed backtests. No embedded or random performance claims.
+  const STRATEGY_STORAGE = "md_studio_strategy_results_v1";
+  const STRATEGY_INITIAL = "md_studio_strategy_autorun_v1";
+  function strategyNum(n, digits=1) { return Number.isFinite(n) ? (n >= 0 ? "+" : "−") + Math.abs(n * 100).toFixed(digits) + "%" : "—"; }
+  function strategyCurve(points) {
+    if (!Array.isArray(points) || points.length < 2 || !points.every((n)=>Number.isFinite(n) && n > 0)) return "";
+    const lo=Math.min(...points),hi=Math.max(...points),delta=Math.max(.0001,hi-lo);
+    const d=points.map((v,i)=>(i ? "L" : "M") + (i/(points.length-1)*288).toFixed(1) + " " + (70-60*(v-lo)/delta).toFixed(1)).join(" ");
+    const rising=points[points.length-1]>=points[0];
+    return '<svg class="mds-sparkline" viewBox="0 0 288 80" preserveAspectRatio="none" role="img" aria-label="Historical simulated equity path"><path d="' + d + '" stroke="' + (rising?"#4de5b0":"#ff808e") + '" fill="none" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+  }
+  function renderStrategies() {
+    const host=byId("mdsStrategyCards"); if (!host || !STRAT) return;
+    const filter=byId("mdsStrategyFilter").value;
+    const list=STRAT.CATALOG.filter((x)=>filter==="all"||x.category===filter);
+    const state=E.strategyResults || {};
+    host.innerHTML = list.map((item) => {
+      const r=state[item.id], ok=r && r.status==="done" && r.result && r.to===STRAT.makeSpec(item).to;
+      const error=r && r.status==="error", busy=r && r.status==="running" && E.strategyBusy;
+      return `<article class="mds-strategy-card"><div class="mds-strategy-top"><span class="mds-strategy-family">${clean(item.category)}</span><span class="mds-strategy-state ${ok?"is-done":error?"is-error":""}">${ok?"✓ HISTORICAL":error?"DATA UNAVAILABLE":busy?"CALCULATING":"NOT RUN"}</span></div>
+        <h3>${clean(item.title)}</h3><p>${clean(item.summary)}</p>
+        <div class="mds-strategy-rule"><span>ENTRY / ALLOCATION RULE</span><strong>${clean(item.trigger)}</strong></div>
+        <p class="mds-strategy-universe">Universe: ${clean(item.universe.join(" · "))}</p>
+        ${ok ? `<div class="mds-strategy-numbers"><div><small>Total return</small><b class="${r.result.totalReturn>=0?"mds-up":"mds-down"}">${strategyNum(r.result.totalReturn)}</b></div>
+        <div><small>CAGR</small><b>${strategyNum(r.result.cagr)}</b></div><div><small>Sharpe</small><b>${Number.isFinite(r.result.sharpe)?r.result.sharpe.toFixed(2):"—"}</b></div>
+        <div><small>Max drawdown</small><b class="mds-down">${strategyNum(r.result.maxDrawdown)}</b></div></div>
+        ${strategyCurve(r.result.curve)}
+        <p class="mds-strategy-computed">Ending value ${fmt(r.result.finalValue)} · ${r.result.trades} orders · ${age(r.at)}</p>` :
+         error ? `<p class="mds-warning">${clean(r.error || "Missing historical prices.")}</p>` :
+         '<div class="mds-strategy-no-result">Run to calculate real historical returns.</div>'}
+        <div class="mds-strategy-actions"><button type="button" data-ms-strategy="${clean(item.id)}" ${E.strategyBusy?"disabled":""}>${ok?"↻ Recalculate":"▶ Run backtest"}</button>
+        <button type="button" data-ms-report="${clean(item.id)}" ${E.strategyBusy?"disabled":""}>${ok?"Full report ↗":"Open in Backtest Lab ↗"}</button></div>
+      </article>`;
+    }).join("");
+    const progress=byId("mdsStrategyProgress");
+    if(progress && !E.strategyBusy){
+      const num=STRAT.CATALOG.filter((item)=>state[item.id]&&state[item.id].status==="done"&&state[item.id].to===STRAT.makeSpec(item).to).length;
+      progress.textContent=num+" of "+STRAT.CATALOG.length+" strategy examples have actual historical results on this device. This is a fixed five-year backtest, not a live trading signal.";
+    }
+    for(const id of ["mdsRunSamples","mdsRunAll"]){const b=byId(id);if(b)b.disabled=E.strategyBusy;}
+  }
+  async function strategyHistory(spec) {
+    if (!window.MD || typeof window.MD.hist!=="function") throw new Error("Free historical-price provider is not available");
+    const pad = new Date(Date.parse(spec.from + "T00:00:00Z") - 420*864e5).toISOString().slice(0,10);
+    const symbols=[...new Set([...spec.universe,spec.benchmark])], data={}, failures=[];
+    for(let i=0;i<symbols.length;i+=3)await Promise.all(symbols.slice(i,i+3).map(async (sym)=>{
+      const key=sym+"|"+pad+"|"+spec.to;
+      try {
+        if(!E.strategyHistory.has(key)){
+          const h=await window.MD.hist(sym,pad,spec.to);
+          if(!Array.isArray(h.t)||h.t.length<252||!Array.isArray(h.close)||h.close.length!==h.t.length)
+            throw new Error("insufficient historical observations");
+          E.strategyHistory.set(key,{t:h.t,close:h.close,adj:h.adj});
+        }
+        data[sym]=E.strategyHistory.get(key);
+      } catch(e){failures.push(sym+": "+String(e.message||e).slice(0,80));}
+    }));
+    if(failures.length)throw new Error("History unavailable for "+failures.join("; ")+". No partial-performance substitution.");
+    return data;
+  }
+  function saveStrategyResult(item, r, spec) {
+    const m=r.metrics;
+    const take=35,curve=[];
+    for(let i=0;i<take;i++) curve.push(r.equity[Math.round(i*(r.equity.length-1)/(take-1))]);
+    E.strategyResults[item.id]={status:"done",at:Date.now(),from:spec.from,to:spec.to,
+      result:{totalReturn:m.totalReturn,cagr:m.cagr,sharpe:m.sharpe,maxDrawdown:m.maxDrawdown,finalValue:m.finalValue,
+        trades:r.trades.length,curve,benchmarkReturn:r.benchMetrics.totalReturn}};
+    safeStorage.set(STRATEGY_STORAGE,E.strategyResults);
+    try {
+      const runs=JSON.parse(localStorage.getItem("md_qb_runs")||"[]");
+      if(Array.isArray(runs)){
+        const existing=runs.filter(x=>!(x.studioId===item.id && x.to===spec.to));
+        existing.unshift({at:Date.now(),kind:"backtest",strategy:item.title,studioId:item.id,title:item.title,
+          universe:spec.universe.join(", "),params:Object.entries(spec.params).map(([k,v])=>k+" "+v).join(", "),
+          from:spec.from,to:spec.to,costs:spec.costs,cagr:m.cagr,sharpe:m.sharpe,
+          mdd:m.maxDrawdown,vol:m.vol,var95:m.var95});
+        localStorage.setItem("md_qb_runs",JSON.stringify(existing.slice(0,25)));
+      }
+    }catch{}
+  }
+  async function computeStrategy(item) {
+    const spec=STRAT.makeSpec(item), now=Date.now();
+    E.strategyResults[item.id]={status:"running",at:now,to:spec.to};
+    renderStrategies();
+    try {
+      const series=await strategyHistory(spec);
+      const result=window.QUANT.run({...spec,series,from:Date.parse(spec.from+"T00:00:00Z")/1000,to:Date.parse(spec.to+"T23:59:59Z")/1000});
+      if(!result||result.dates.length<252||!Number.isFinite(result.metrics.finalValue)||!Number.isFinite(result.metrics.cagr))
+        throw new Error("Insufficient data or non-finite performance; results not saved.");
+      saveStrategyResult(item,result,spec);
+      return true;
+    }catch(e){
+      E.strategyResults[item.id]={status:"error",at:Date.now(),to:spec.to,error:String(e.message||e).slice(0,240)};
+      safeStorage.set(STRATEGY_STORAGE,E.strategyResults);
+      return false;
+    }finally{renderStrategies();}
+  }
+  async function runStrategy(id) {
+    if(!STRAT || E.strategyBusy)return;
+    const item=STRAT.CATALOG.find(x=>x.id===id);if(!item)return;
+    E.strategyBusy=true;
+    try{
+      const status=byId("mdsStrategyProgress");
+      if(status) status.textContent="Calculating "+item.title+" from real historical data…";
+      await computeStrategy(item);
+    }finally{E.strategyBusy=false;renderStrategies();}
+  }
+  async function runStrategyBatch(count) {
+    if(!STRAT || E.strategyBusy || window.__VISITOR || (typeof VIEW!=="undefined"&&VIEW))return;
+    E.strategyBusy=true;
+    try{
+      const list=STRAT.CATALOG.slice(0,count), status=byId("mdsStrategyProgress");let done=0,failed=0;
+      for(let i=0;i<list.length;i++){
+        if(status)status.textContent="Calculating real backtests: "+(i+1)+" / "+list.length+" · "+list[i].title+"…";
+        // Allow progress to paint between potentially expensive CPU simulations.
+        await new Promise(r=>setTimeout(r,20));
+        if(await computeStrategy(list[i]))done++;else failed++;
+      }
+      if(status)status.textContent="Finished "+done+" historical backtests"+(failed?" · "+failed+" could not load required data":"")+". Every successful result was saved on this device.";
+    }finally{E.strategyBusy=false;renderStrategies();}
+  }
+  function fullStrategyReport(id) {
+    if(!STRAT||E.strategyBusy)return;
+    const item=STRAT.CATALOG.find(x=>x.id===id);if(!item)return;
+    try{sessionStorage.setItem("md_qb_pending_spec_v1",JSON.stringify(STRAT.makeSpec(item)));}
+    catch{return toast("Unable to pass the strategy to Backtest Lab on this device.");}
+    setTab("backtest");
+  }
+  function firstStrategyExamples() {
+    if(E.strategyAuto||!STRAT||window.__VISITOR||(typeof VIEW!=="undefined"&&VIEW))return;
+    E.strategyAuto=true;
+    let completed=false;
+    try{completed=!!localStorage.getItem(STRATEGY_INITIAL);}catch{return;}
+    if(completed)return;
+    try{localStorage.setItem(STRATEGY_INITIAL,String(Date.now()));}catch{return;}
+    setTimeout(()=>{if(S.tab==="studio"&&E.tab==="strategies")runStrategyBatch(5);},350);
+  }
+
   function renderScenario() {
     if (!E.mounted) return;
     const options = portfolios().map((p) => `<option value="${clean(p.id)}"${p.id === (activePf() || {}).id ? " selected" : ""}>${clean(p.name)}</option>`).join("");
