@@ -13,7 +13,7 @@
   const link = (url) => typeof url === "string" && /^https:\/\/[^\s"'<>]+$/i.test(url) ? url : null;
   const safeStorage = { get(k, d) { try { const r = JSON.parse(localStorage.getItem(k)); return r == null ? d : r; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
   const LS = { options: "md_studio_opts_v1", seen: "md_studio_seen_v1", events: "md_studio_alerts_v1" };
-  const defaults = { price: true, research: true, priceMove: 5, importance: 75, density: "comfortable", color: "cyan", motion: "system" };
+  const defaults = { price: true, research: true, priceMove: 5, importance: 75, density: "comfortable", color: "amber", motion: "system" };
   const opts = { ...defaults, ...safeStorage.get(LS.options, {}) };
   const E = { mounted: false, tab: "strategies", pf: null, market: -15, tech: -5, custom: 0, symbol: "NVDA",
     sec: {}, research: [], trader: null, graph: null, focus: null, loading: false, initialized: false, seen: safeStorage.get(LS.seen, {}), events: safeStorage.get(LS.events, []), fetched: 0, graphInfo: "", strategyResults: safeStorage.get("md_studio_strategy_results_v1", {}), strategyBusy: false, strategyHistory: new Map(), strategyAuto: false };
@@ -82,7 +82,7 @@
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
         <div class="mds-controls"><label>Information density<select class="field" id="mdsDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
-          <label>Accent theme<select class="field" id="mdsAccent"><option value="cyan">Cyber cyan</option><option value="amber">Terminal amber</option></select></label>
+          <label>Accent theme<select class="field" id="mdsAccent"><option value="amber">Black &amp; orange</option><option value="cyan">Legacy cyber cyan</option></select></label>
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
         <div class="mds-settings-note"><span class="mds-settings-symbol">◈</span><div><strong>Visual preferences only</strong><p>Your portfolios, watchlist, saved backtests, research findings and paper-trading controls remain untouched.</p></div></div></section>`;
     el.querySelectorAll("[data-msgo]").forEach((b) => b.onclick = () => { if (typeof setTab === "function") setTab(b.dataset.msgo); });
