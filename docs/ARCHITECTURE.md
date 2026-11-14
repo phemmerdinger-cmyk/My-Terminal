@@ -7,7 +7,7 @@ Every feature has **one home**. Other pages may show a compact summary of it wit
 | Area (nav) | Page | Owns | Summaries it may show (and where they link) |
 |---|---|---|---|
 | Markets | **Overview** (dashboard) | Market radar (what is unusual right now: big moves, breaking news, volume, earnings, macro findings), earnings calendar, top gainers/losers/most active, watchlist performance table (1W–1Y, news mood), cross-asset tables (indexes, Treasuries, bond funds, crypto, ETFs, mutual funds, futures), analyst Best Buys/Sells | Market health (→ Analysis), Your portfolio today (→ Portfolio), Latest research findings (→ THE WEB) |
-| Markets | **News** | Full news feed, filters, Smart Money, article previews, which companies are most in the news | — |
+| Markets | **News** | Full news feed (6 sources incl. Official: Fed, SEC, BLS, BEA, Treasury, 8-Ks), filters, Smart Money, the in-site **reader** (`public/reader.js`), saved articles, which companies are most in the news | — |
 | Markets | **Heatmap** | Every S&P 500 stock's move, grouped by sector | — |
 | Markets | **Analysis** | The market-health score (one scorer: `anScores`), the written market brief, sector leadership, what's driving the market, Claude's market deep dive | Top 6 stories (→ News) |
 | Markets | **Macro** | Economic series from FRED (rates, inflation, jobs, growth, recession signals) | — |
@@ -15,12 +15,12 @@ Every feature has **one home**. Other pages may show a compact summary of it wit
 | Research | **Financials / DCF** | SEC statement analysis and valuation | — |
 | Portfolio | **My portfolio** | Holdings, allocation, performance chart, price alerts, past-year return / Sharpe / beta summary | → Risk & stress |
 | Portfolio | **Risk & stress** | VaR / expected shortfall, concentration, rate sensitivity, hypothetical shocks, historical crisis replays | Correlations (→ Quant › Correlation lab) |
-| Quant | **Quant Lab** | Rolling risk diagnostics, risk universe (MDS / MST / component VaR / ENB), correlation lab, factor exposure, optimization, regime, Monte Carlo, strategy tournament, signal board | AI Trader overlap (signal board) |
+| Quant | **Quant Lab** | Rolling risk diagnostics, risk universe (MDS / MST / component VaR / ENB), correlation lab, factor exposure, optimization, regime, Monte Carlo, strategy tournament, signal board, earnings event study (SEC 8-K dates × prices) and the spider's graded-hypothesis record | AI Trader overlap (signal board) |
 | Quant | **Backtest lab** | Custom rule-based backtests, walk-forward tests, saved runs | — |
-| AI Lab | **AI vs S&P 500** | The three paper bots (swing, day trader, quant trader): positions, trades, performance vs the S&P | — |
+| AI Lab | **AI vs S&P 500** | The three paper bots (swing, day trader, quant trader): positions, trades, performance vs the S&P, and the spider's research signals (rules, inputs, sources) | Past earnings reactions (→ Quant) |
 | AI Lab | **Claude Predictor** | Claude predictions and free-text questions (behind the Claude password), screener, head-to-head, the prediction log | Saved count + accuracy (→ Prediction accuracy) |
 | AI Lab | **Prediction accuracy** | Grading of every saved prediction vs the S&P 500 | — |
-| THE WEB | **Command center** | The spider, the stock web (S&P 500 by market cap, holdings lit), research findings with sources, workstation (research summary, holdings intel, macro intel, event timeline, technical chart) | Paper-bot values (→ AI Lab), models (→ Quant) |
+| THE WEB | **Command center** | The spider, the stock web (S&P 500 by market cap, holdings lit), research findings with sources, workstation, **Control center** (Research now / Research company, pause, frequency, monitored companies & sectors, live monitor, research timeline, company timelines, backup) (research summary, holdings intel, macro intel, event timeline, technical chart) | Paper-bot values (→ AI Lab), models (→ Quant) |
 | THE WEB | **System health** | Data sources, freshness, scheduler, tests, errors | — |
 
 Global (every page): the watchlist sidebar (prices), the ticker tape, the Claude budget chip, the Spider button, and the floating Ask Claude panel (it answers questions about the page you're on).
@@ -58,3 +58,13 @@ Pages read shared data through `window.MD` instead of keeping their own copies:
 2. Summaries are fine elsewhere; full duplicates are not. A summary always links to its home (`data-gotab="<tab>"`, optional `data-scroll="<element id>"`).
 3. Each AI insight is tailored to the page it sits on. Don't add a second general "market summary".
 4. Fetch shared data through `MD`. Don't add a new per-page cache.
+
+## Research engine data flow
+
+News feed (`getNews`, incl. Official) → spider jobs (`web/spider.js`: news_sweep, policy_watch, filings_watch, earnings_release, insiders, …) → discoveries (deduplicated by key, versioned, with sources, fact/interpretation labels, expiry) →
+- THE WEB (findings, summary, briefings, graph, control center, timelines)
+- News reader (spider research on the story's tickers)
+- AI vs S&P (`researchSignals`; the swing bot's ranking nudge via `traderAdjust`, capped by `SPIDER_TRADER_WEIGHT`)
+- Quant (hypothesis record) · Research › stock spider report (connected research)
+
+Storage: Upstash Redis free tier when `UPSTASH_REDIS_REST_URL`/`TOKEN` are set, otherwise the server temp folder (wiped by Render on redeploy). `/api/web/export` and `/api/web/import` back it up and restore it.
