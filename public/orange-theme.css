@@ -1,105 +1,105 @@
-/* MARKET DESK — unified graphite / black / orange visual system.
+/* MARKET DESK — unified graphite / black / military green visual system.
    Pure presentation: no price, portfolio, backtest or trade logic is changed.
    Loaded after the legacy inline styles and all feature CSS. */
 :root{
   color-scheme:dark;
   --bg:#08090b;--panel:#101114;--panel2:#18191d;--line:#292a2e;--line2:#383940;
   --text:#f2f0ed;--muted:#a4a09b;--dim:#77736f;
-  --amber:#ff991f;--orange:#ff991f;--orange-hi:#ffb457;--orange-deep:#9e4d0d;
-  --orange-glow:rgba(255,153,31,.15);--flash:rgba(255,153,31,.16);
+  --olive:#879f55;--military green:#879f55;--military green-hi:#b5c68a;--military green-deep:#4e6534;
+  --military green-glow:rgba(135,159,85,.15);--flash:rgba(135,159,85,.16);
   --up:#22c68a;--down:#fa5967;--claude:#e68b60;
 }
 html,body{background:#08090b;color:var(--text)}
-body{accent-color:var(--orange)}
-::selection{background:#ff991f;color:#100c08}
-:focus-visible{outline:2px solid #ffad4c!important;outline-offset:2px}
+body{accent-color:var(--military green)}
+::selection{background:#879f55;color:#100c08}
+:focus-visible{outline:2px solid #a7ba7a!important;outline-offset:2px}
 ::-webkit-scrollbar{width:10px;height:9px}
 ::-webkit-scrollbar-track{background:#0c0d10}
 ::-webkit-scrollbar-thumb{background:#44403c;border:2px solid #0c0d10;border-radius:12px}
-::-webkit-scrollbar-thumb:hover{background:#a65c1e}
-a:hover{color:#ffb457}
-button,select,input,textarea{accent-color:var(--orange)}
+::-webkit-scrollbar-thumb:hover{background:#687c47}
+a:hover{color:#b5c68a}
+button,select,input,textarea{accent-color:var(--military green)}
 button{transition:background-color .16s,border-color .16s,color .16s,box-shadow .16s}
 input,select,textarea{background-color:#121316;color:#f1ede8;border-color:#3b3936}
-input:focus,select:focus,textarea:focus{border-color:#ff991f!important;box-shadow:0 0 0 2px rgba(255,153,31,.13)}
+input:focus,select:focus,textarea:focus{border-color:#879f55!important;box-shadow:0 0 0 2px rgba(135,159,85,.13)}
 /* Shell: navbar, watchlist, tabs, live tape, headers */
 header{background:#0d0d0f;border-bottom-color:#2d2925}
 nav.tabs,.tabs{background:#0d0e11;border-color:#2d2925}
-nav.tabs button.active,nav.tabs .active,.tabs .on{border-color:#ff991f!important;color:#ffb45b!important}
-nav.tabs button:hover,.tabs button:hover{color:#ffbd71}
+nav.tabs button.active,nav.tabs .active,.tabs .on{border-color:#879f55!important;color:#b4c48a!important}
+nav.tabs button:hover,.tabs button:hover{color:#b6c78f}
 .tape{background:#0b0c0e;border-bottom-color:#2c2722}
-.tape .tk .s,.brand span,.iconbtn.on{color:#ff991f}
-.iconbtn.on{border-color:#ff991f}
+.tape .tk .s,.brand span,.iconbtn.on{color:#879f55}
+.iconbtn.on{border-color:#879f55}
 aside,.sidebar,.watchlist{border-color:#2c2a28}
 .card,.panel,.fx-card,.modal,.dropdown{border-color:#33312f}
-/* Primary actions: orange; status greens/reds remain semantic. */
+/* Primary actions: military green; status greens/reds remain semantic. */
 .btn.primary,.btn.on,.btn.active,button.primary,button.active,.seg.on,.chip.on{
-  background-color:#b75e16;border-color:#e7882a;color:#fff4e7}
-.btn.primary:hover,button.primary:hover{background-color:#df7b22}
+  background-color:#526a38;border-color:#8fa963;color:#f0f3e6}
+.btn.primary:hover,button.primary:hover{background-color:#7f9855}
 button:disabled{box-shadow:none!important}
 .badge,.pill{border-color:#51402f}
-.progress-bar,.progress-fill{background-color:#ff991f}
-/* Studio — dark charcoal panels and a consistent amber hierarchy. */
+.progress-bar,.progress-fill{background-color:#879f55}
+/* Studio — dark charcoal panels and a consistent olive hierarchy. */
 #tab-studio{color:#f0ece8;background:transparent}
 #tab-studio .mds-hero{
-  border:1px solid #664327!important;
-  background:radial-gradient(ellipse at 88% -30%,rgba(255,148,24,.19),transparent 57%),
+  border:1px solid #4e5e3c!important;
+  background:radial-gradient(ellipse at 88% -30%,rgba(135,159,85,.19),transparent 57%),
     linear-gradient(130deg,#17120e,#0e1013 74%)!important;
   box-shadow:0 16px 50px rgba(0,0,0,.2)}
 #tab-studio .mds-hero:before{
-  background-image:linear-gradient(to right,#ff991f12 1px,transparent 1px),
-    linear-gradient(to bottom,#ff991f12 1px,transparent 1px)!important}
-#tab-studio .mds-eyebrow,#tab-studio .mds-section-tag{color:#ffb45d!important}
-#tab-studio .mds-beacon{background:#ff991f!important;box-shadow:0 0 18px #ff991f77!important}
+  background-image:linear-gradient(to right,#879f5512 1px,transparent 1px),
+    linear-gradient(to bottom,#879f5512 1px,transparent 1px)!important}
+#tab-studio .mds-eyebrow,#tab-studio .mds-section-tag{color:#b4c48a!important}
+#tab-studio .mds-beacon{background:#879f55!important;box-shadow:0 0 18px #879f5577!important}
 #tab-studio .mds-hero-copy p,#tab-studio .mds-caption{color:#b7afa7}
 #tab-studio .mds-nav{background:#121315;border:1px solid #38312b}
 #tab-studio .mds-nav button{color:#c4bcb4}
 #tab-studio .mds-nav button.on,#tab-studio .mds-nav button.active{
-  background:#ff991f!important;color:#17100a!important;border-color:#ff991f!important;box-shadow:0 3px 20px #ff991f2b}
+  background:#879f55!important;color:#17100a!important;border-color:#879f55!important;box-shadow:0 3px 20px #879f552b}
 #tab-studio .mds-panel{background:#111214;border-color:#39332d}
 #tab-studio .mds-panel h2{color:#f6f1e9}
 #tab-studio .mds-hero-actions button,#tab-studio .mds-toolbar button,
 #tab-studio .mds-presets button,#tab-studio .mds-actions button{
-  background:#201914;border-color:#68462c;color:#ffcf97}
+  background:#201914;border-color:#4e5e3c;color:#d1dcb3}
 #tab-studio .mds-hero-actions button:hover,#tab-studio .mds-toolbar button:hover{
   border-color:#ffa12f;background:#332216}
 #tab-studio .mds-strategy-card{background:linear-gradient(150deg,#1b1713,#101113);border-color:#42352b}
-#tab-studio .mds-strategy-card:hover{border-color:#f89a34}
-#tab-studio .mds-strategy-family{background:#352315;border-color:#6d4829;color:#ffb96b}
+#tab-studio .mds-strategy-card:hover{border-color:#9db373}
+#tab-studio .mds-strategy-family{background:#352315;border-color:#6d4829;color:#b6c78f}
 #tab-studio .mds-strategy-rule,#tab-studio .mds-strategy-no-result,
 #tab-studio .mds-strategy-numbers>div,#tab-studio .mds-sparkline{background:#12100e;border-color:#3b3129}
 #tab-studio .mds-strategy-rule strong{color:#f5d6b1}
-#tab-studio .mds-strategy-progress{background:#1c1713;border-color:#684a32;color:#e7c39d}
+#tab-studio .mds-strategy-progress{background:#1c1713;border-color:#4e5e3c;color:#e7c39d}
 #tab-studio .mds-strategy-toolbar button.mds-strategy-primary{
-  background:linear-gradient(110deg,#ff991f,#ffbf6a)!important;color:#170e06!important;border-color:#ffaf4d!important}
+  background:linear-gradient(110deg,#879f55,#b6c78f)!important;color:#170e06!important;border-color:#ffaf4d!important}
 #tab-studio .mds-strategy-toolbar button,
-#tab-studio .mds-strategy-actions button{background:#2c1e13;border-color:#754825;color:#ffd1a0}
-#tab-studio .mds-strategy-actions button:first-child{background:#7e3f11;border-color:#cf762a;color:#fff3e7}
-#tab-studio .mds-settings-note,#tab-studio .mds-example-panel{background:#1c1713;border-color:#5e402b}
-#tab-studio .mds-settings-symbol{background:#382414;color:#ffad50}
-#tab-studio .mds-example-panel button{background:#322316;border-color:#765131;color:#ffd4a3}
+#tab-studio .mds-strategy-actions button{background:#2c1e13;border-color:#5c7043;color:#d1dcb3}
+#tab-studio .mds-strategy-actions button:first-child{background:#526a38;border-color:#849d5c;color:#f0f3e6}
+#tab-studio .mds-settings-note,#tab-studio .mds-example-panel{background:#1c1713;border-color:#4e5e3c}
+#tab-studio .mds-settings-symbol{background:#382414;color:#a7ba7a}
+#tab-studio .mds-example-panel button{background:#322316;border-color:#5c7043;color:#d1dcb3}
 #tab-studio .mds-intro p{color:#afa59c}
 /* News reading experience, including its separate fullscreen overlay. */
 #rdr{background:#09090a!important;color:#f1ece6}
 #rdr .rdr-top{background:linear-gradient(#17120f,#0e0e10);border-color:#473425}
-#rdr .rdr-brand{color:#ffae50}
+#rdr .rdr-brand{color:#a7ba7a}
 #rdr .rdr-tools button,#rdr .rdr-orig,#rdr .rdr-tabs button{background:#1c1916;border-color:#45382e;color:#d6c4b4}
-#rdr .rdr-tools button:hover,#rdr .rdr-orig:hover{border-color:#ff991f}
-#rdr .rdr-tools button.on{color:#ffbd6a;border-color:#d47c2a}
+#rdr .rdr-tools button:hover,#rdr .rdr-orig:hover{border-color:#879f55}
+#rdr .rdr-tools button.on{color:#b6c78f;border-color:#849d5c}
 /* Quant, charts, audit, experiment grids and other feature panels. */
 .qb-five{background:linear-gradient(125deg,#1d1712,#111113)!important;border-color:#68482f!important}
-.qb-five-btn{background:linear-gradient(100deg,#ab5818,#ff991f)!important;border-color:#ffb25c!important;color:#180f08!important;box-shadow:0 0 16px #ff991f30!important}
+.qb-five-btn{background:linear-gradient(100deg,#526a38,#879f55)!important;border-color:#b6c78f!important;color:#180f08!important;box-shadow:0 0 16px #879f5530!important}
 .qb-five-item{background:#171411!important;border-color:#57402d!important}
 .qb-five-metrics>span{background:#0e0d0c!important;color:#c4ad9b!important}
 .qb-five-metrics b{color:#fff1df!important}
-.md-example-starter{background:linear-gradient(120deg,#1b1713,#101113)!important;border-color:#65442d!important}
-.md-example-starter h3{color:#ffdfb6!important}
+.md-example-starter{background:linear-gradient(120deg,#1b1713,#101113)!important;border-color:#4e5e3c!important}
+.md-example-starter h3{color:#d1dcb3!important}
 .md-example-starter p{color:#bcae9e!important}
-.md-example-starter .md-example-buttons button{background:#3b2515!important;border-color:#8a552c!important;color:#ffdcba!important}
+.md-example-starter .md-example-buttons button{background:#3b2515!important;border-color:#5c7043!important;color:#d1dcb3!important}
 .md-example-starter .md-example-buttons button:hover{background:#603619!important}
 /* Replace cyan link/selection accents without repainting positive and negative P&L. */
 #tab-studio a:not(.up):not(.down),#tab-studio .mds-find-foot a,
-#tab-studio .mds-cite a{color:#ffb35b}
+#tab-studio .mds-cite a{color:#b6c78f}
 #tab-studio .mds-up,.up,.positive,.gain{color:var(--up)}
 #tab-studio .mds-down,.down,.negative,.loss{color:var(--down)}
 /* Newer features with hardcoded cyan use these limited, semantically safe borders. */
@@ -116,23 +116,39 @@ button:disabled{box-shadow:none!important}
 }
 
 
-/* Spider identity: the header mark, articulated crawler and its web all use orange. */
-.sp-btn{border-color:#b46a2c!important;color:#ffb04c!important;background:rgba(255,153,31,.12)!important}
-.sp-btn:hover{background:rgba(255,153,31,.22)!important}
-.sp-btn .sp-ico{color:#ff991f;filter:drop-shadow(0 0 4px rgba(255,153,31,.5))}
-.tw-crawler{filter:drop-shadow(0 6px 8px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(255,153,31,.42))!important}
+/* Spider identity: the header mark, articulated crawler and its web all use military green. */
+.sp-btn{border-color:#b46a2c!important;color:#b4c48a!important;background:rgba(135,159,85,.12)!important}
+.sp-btn:hover{background:rgba(135,159,85,.22)!important}
+.sp-btn .sp-ico{color:#879f55;filter:drop-shadow(0 0 4px rgba(135,159,85,.5))}
+.tw-crawler{filter:drop-shadow(0 6px 8px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(135,159,85,.42))!important}
 .tw-crawler .sp-leg{stroke:#60412a}
 .tw-crawler .sp-leg-core{stroke:#ffa12b}
-.tw-crawler .sp-knee{fill:#27170d;stroke:#ffb457}
-.tw-crawler .sp-acc{stroke:#ff9b27}
-.tw-crawler .sp-eye{filter:drop-shadow(0 0 3px #ff991f)}
-.tw-crawler .sp-core{fill:#ff8d17;filter:drop-shadow(0 0 4px #ff991f)}
-.tw-crawler.resting{filter:drop-shadow(0 5px 8px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(255,153,31,.26))!important}
+.tw-crawler .sp-knee{fill:#27170d;stroke:#b5c68a}
+.tw-crawler .sp-acc{stroke:#93aa65}
+.tw-crawler .sp-eye{filter:drop-shadow(0 0 3px #879f55)}
+.tw-crawler .sp-core{fill:#90a95b;filter:drop-shadow(0 0 4px #879f55)}
+.tw-crawler.resting{filter:drop-shadow(0 5px 8px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(135,159,85,.26))!important}
 .tw-crawler.offline .sp-leg-core,.tw-crawler.offline .sp-acc{stroke:var(--down)}
 .tw-crawler.offline .sp-core{fill:var(--down)}
-.tw-spider .body{fill:#2b190f;stroke:#ff991f}
-.tw-spider .leg,.tw-spider .thread{stroke:#ff991f}
-.tw-spider .eye{fill:#ffb75c}
-.tw-spider.discovering .body{fill:rgba(255,153,31,.3)}
-.tw-spider.idle .leg,.tw-spider.idle .body{stroke:#aa642b}
-.tw-spider.idle .eye{fill:#d58535}
+.tw-spider .body{fill:#2b190f;stroke:#879f55}
+.tw-spider .leg,.tw-spider .thread{stroke:#879f55}
+.tw-spider .eye{fill:#c0d19a}
+.tw-spider.discovering .body{fill:rgba(135,159,85,.3)}
+.tw-spider.idle .leg,.tw-spider.idle .body{stroke:#758b50}
+.tw-spider.idle .eye{fill:#9bae73}
+
+/* Military-green finishing layer: deep-black panels, subdued olive accents and the Spider. */
+:root{--amber:#879f55;--orange:#879f55;--orange-hi:#b5c68a;--orange-deep:#4e6534;
+  --tw-c:#91ad62;--tw-v:#a5b781;--tw-l:rgba(135,159,85,.16);--tw-l2:rgba(135,159,85,.32);
+  --tw-bg:linear-gradient(180deg,rgba(12,17,12,.9),rgba(7,10,8,.94))}
+#tab-studio .mds-hero{background:radial-gradient(ellipse at 90% -25%,rgba(112,144,73,.19),transparent 57%),linear-gradient(130deg,#141a12,#0b0d0b 74%)!important}
+#tab-studio .mds-strategy-toolbar button.mds-strategy-primary{background:linear-gradient(110deg,#617b41,#a9be7c)!important;color:#0a1008!important;border-color:#9ab371!important}
+#tab-studio .mds-nav button.on,#tab-studio .mds-nav button.active{background:#879f55!important;color:#0a1008!important;border-color:#879f55!important}
+.tw-crawler .sp-leg{stroke:#425339}.tw-crawler .sp-leg-core,.tw-crawler .sp-acc{stroke:#9ab76b}
+.tw-crawler .sp-knee{fill:#11190e;stroke:#a3bd78}.tw-crawler .sp-eye{filter:drop-shadow(0 0 3px #9ab76b)}
+.tw-crawler .sp-core{fill:#9bb86a;filter:drop-shadow(0 0 4px #9bb86a)}
+.tw-spider .leg,.tw-spider .thread{stroke:#8eac5f}.tw-spider .body{fill:#1b2516;stroke:#8eac5f}
+.tw-spider .eye{fill:#b7cc8d}.tw-spider.discovering .body{fill:rgba(135,159,85,.3)}
+.sp-btn{border-color:#617d46!important;color:#c0d59a!important;background:rgba(135,159,85,.13)!important}
+.sp-btn:hover{background:rgba(135,159,85,.23)!important}
+.sp-btn .sp-ico{color:#a3bd78;filter:drop-shadow(0 0 4px rgba(135,159,85,.55))}
