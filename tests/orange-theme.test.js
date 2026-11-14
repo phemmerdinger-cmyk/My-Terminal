@@ -7,23 +7,39 @@ const root=path.join(__dirname,"..","public");
 const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 const css=fs.readFileSync(path.join(root,"orange-theme.css"),"utf8");
 const studio=fs.readFileSync(path.join(root,"studio.js"),"utf8");
-test("global black-orange stylesheet is loaded after existing inline and feature CSS",()=>{
+test("global black-green stylesheet is loaded after existing inline and feature CSS",()=>{
  const marker='<link rel="stylesheet" href="/orange-theme.css?v=1">';
  assert.equal(html.split(marker).length,2);
  assert.ok(html.indexOf(marker)>html.indexOf("</style>"));
  for(const sheet of ["studio.css","reader.css","quant.css","web.css","health.css"])
    assert.ok(html.indexOf(marker)>html.indexOf('href="/'+sheet+'"'),sheet);
 });
-test("orange palette covers shell, studio, news and quant while preserving gains/losses",()=>{
+test("military-green palette covers shell, studio, news and quant while preserving gains/losses",()=>{
  for(const selector of [":root{","header{","nav.tabs","#tab-studio .mds-hero","#tab-studio .mds-strategy-card","#rdr{",".qb-five{",".md-example-starter"])
   assert.ok(css.includes(selector),selector);
- assert.ok(css.includes("--orange:#ff991f"));
+ assert.ok(css.includes("--orange:#879f55"));
  assert.ok(css.includes("--up:#22c68a"));
  assert.ok(css.includes("--down:#fa5967"));
  assert.ok(css.includes("prefers-reduced-motion"));
 });
 test("studio appearance defaults to orange and still has a reversible legacy option",()=>{
  assert.ok(studio.includes('color: "amber", motion: "system"'));
- assert.ok(studio.includes('value="amber">Black &amp; orange'));
+ assert.ok(studio.includes('value="amber">Black &amp; military green'));
  assert.ok(studio.includes('value="cyan">Legacy cyber cyan'));
+});
+
+test("both owner and visitor tab favicons are green and not the legacy pink/orange",()=>{
+ const visitor=fs.readFileSync(path.join(root,"favicon-visitor.svg"),"utf8");
+ const owner=fs.readFileSync(path.join(root,"favicon-owner.svg"),"utf8");
+ assert.ok(visitor.includes("#91ad65"));assert.ok(owner.includes("#91ad65"));
+ assert.ok(!visitor.includes("#ff9e1b"));assert.ok(!owner.includes("#ff4fa3"));
+ assert.ok(html.includes("/favicon-visitor.svg?v=4"));assert.ok(html.includes("/favicon-owner.svg?v=4"));
+ assert.ok(html.includes("%2391ad65"));
+});
+test("moving Spider and navbar spider button use green instead of orange",()=>{
+ const web=fs.readFileSync(path.join(root,"web.js"),"utf8");
+ assert.ok(web.includes("#a9c77b"));
+ assert.ok(web.includes("#7f9c50"));
+ assert.ok(css.includes(".tw-crawler .sp-leg-core"));
+ assert.ok(css.includes(".sp-btn .sp-ico"));
 });
