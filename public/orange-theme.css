@@ -114,3 +114,25 @@ button:disabled{box-shadow:none!important}
 @media(prefers-reduced-motion:reduce){
  button{transition:none}
 }
+
+
+/* Spider identity: the header mark, articulated crawler and its web all use orange. */
+.sp-btn{border-color:#b46a2c!important;color:#ffb04c!important;background:rgba(255,153,31,.12)!important}
+.sp-btn:hover{background:rgba(255,153,31,.22)!important}
+.sp-btn .sp-ico{color:#ff991f;filter:drop-shadow(0 0 4px rgba(255,153,31,.5))}
+.tw-crawler{filter:drop-shadow(0 6px 8px rgba(0,0,0,.55)) drop-shadow(0 0 8px rgba(255,153,31,.42))!important}
+.tw-crawler .sp-leg{stroke:#60412a}
+.tw-crawler .sp-leg-core{stroke:#ffa12b}
+.tw-crawler .sp-knee{fill:#27170d;stroke:#ffb457}
+.tw-crawler .sp-acc{stroke:#ff9b27}
+.tw-crawler .sp-eye{filter:drop-shadow(0 0 3px #ff991f)}
+.tw-crawler .sp-core{fill:#ff8d17;filter:drop-shadow(0 0 4px #ff991f)}
+.tw-crawler.resting{filter:drop-shadow(0 5px 8px rgba(0,0,0,.5)) drop-shadow(0 0 4px rgba(255,153,31,.26))!important}
+.tw-crawler.offline .sp-leg-core,.tw-crawler.offline .sp-acc{stroke:var(--down)}
+.tw-crawler.offline .sp-core{fill:var(--down)}
+.tw-spider .body{fill:#2b190f;stroke:#ff991f}
+.tw-spider .leg,.tw-spider .thread{stroke:#ff991f}
+.tw-spider .eye{fill:#ffb75c}
+.tw-spider.discovering .body{fill:rgba(255,153,31,.3)}
+.tw-spider.idle .leg,.tw-spider.idle .body{stroke:#aa642b}
+.tw-spider.idle .eye{fill:#d58535}
