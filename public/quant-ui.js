@@ -303,6 +303,38 @@
     setTimeout(() => { if (S.tab === "backtest" && !QB.busy) runFive(true); }, 250);
   }
 
-  window.qbOpen = function () { shell(); maybeAutoFive(); };
+  // Intelligence Studio hands off real strategy configurations for full chart and trade drilldown.
+  // The same Backtest Lab engine, costs and validation are used; do not create sample returns.
+  function studioSpec() {
+    let x=null;
+    try { const raw=sessionStorage.getItem("md_qb_pending_spec_v1"); if(raw){x=JSON.parse(raw);sessionStorage.removeItem("md_qb_pending_spec_v1");} } catch {}
+    if(!x || !Q.STRATEGIES[x.strategy] || !Array.isArray(x.universe))return null;
+    return x;
+  }
+  function fillStudioSpec(s) {
+    $("qbStrat").value=s.strategy;
+    paramsUI();
+    $("qbUni").value=s.universe.join(", ");
+    $("qbBench").value=s.benchmark || "SPY";
+    $("qbFrom").value=s.from;
+    $("qbTo").value=s.to;
+    $("qbInit").value=s.initial || 10000;
+    if(s.weights)$("qbW").value=Object.entries(s.weights).map(([k,v])=>k+":"+v).join(", ");
+    for(const [k,v] of Object.entries(s.params||{})){
+      const el=[...$("qbParams").querySelectorAll("[data-p]")].find((e)=>e.dataset.p===k);
+      if(el)el.value=v;
+    }
+    const c=s.costs||{}, lim=s.limits||{};
+    $("qbCom").value=c.commissionBps ?? 0; $("qbSpr").value=c.spreadBps ?? 5;
+    $("qbSlip").value=c.slippageBps ?? 5;
+    $("qbMax").value=Math.round((lim.maxWeight ?? 1)*100);
+    $("qbCash").value=Math.round((lim.minCash ?? 0)*100);
+    $("qbRf").value=(s.rf ?? .03)*100;
+  }
+  window.qbOpen = function () {
+    shell();
+    const pending=studioSpec();
+    if(pending){fillStudioSpec(pending);go("run");}else maybeAutoFive();
+  };
   if (S.tab === "backtest") window.qbOpen();
 })();
