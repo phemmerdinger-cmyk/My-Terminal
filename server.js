@@ -252,6 +252,7 @@ async function getNews(tickers, range) {
     jobs.push(loadSource(key, SOURCES[key].market, null).then((r) => ({ key, ...r })));
     for (const t of tickers) jobs.push(loadSource(key, SOURCES[key].ticker(t), t).then((r) => ({ key, ...r })));
   }
+  jobs.push(loadOfficial(tickers).then((r) => ({ key: "official", ...r })).catch(() => ({ key: "official", ok: false, items: [] })));
   const [done, older] = await Promise.all([Promise.all(jobs), newsArchive(range, tickers).catch(() => [])]);
   done.push({ key: "archive", ok: false, items: older });
   const status = {};
@@ -288,7 +289,7 @@ async function getNews(tickers, range) {
   }).slice(0, long ? 6000 : 500);
   return {
     updated: Date.now(),
-    sources: Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, { name: s.name, ok: !!status[k] }])),
+    sources: { ...Object.fromEntries(Object.entries(SOURCES).map(([k, s]) => [k, { name: s.name, ok: !!status[k] }])), official: { name: "Official (Fed, SEC, BLS, BEA, Treasury)", ok: !!status.official } },
     items,
   };
 }
@@ -343,6 +344,112 @@ async function articlePreview(url) {
       image: img && /^https:\/\//.test(img) ? img : null, author: ((a) => a && /^https?:\/\//.test(a) ? a.replace(/\/+$/, "").split("/").pop().replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : a)(meta(["author", "article:author", "parsely-author", "sailthru.author"])),
       published: meta(["article:published_time", "parsely-pub-date", "pubdate", "date"]), site: meta(["og:site_name"]) };
   });
+}
+
+// ---------------------------------------------------------------- official sources (free, public domain or public record)
+// Federal Reserve Board, SEC, BLS, BEA and Treasury publish in the public domain (17 U.S.C. §105 / the agencies' own
+// website policies), and SEC EDGAR filings are public records. Those are the only pages whose full text the in-site
+// reader shows; every other publisher gets its own headline, summary and a link back.
+const OFFICIAL_FEEDS = [
+  { agency: "Federal Reserve", url: "https://www.federalreserve.gov/feeds/press_all.xml" },
+  { agency: "SEC", url: "https://www.sec.gov/news/pressreleases.rss" },
+  { agency: "BLS", url: "https://www.bls.gov/feed/bls_latest.rss" },
+  { agency: "BEA", url: "https://apps.bea.gov/rss/rss.xml" },
+];
+const ITEMS_8K = { "1.01": "material agreement", "1.02": "agreement ended", "1.05": "cybersecurity incident", "2.01": "acquisition or sale completed", "2.02": "results of operations (earnings)", "2.03": "new debt obligation", "2.05": "restructuring costs", "2.06": "impairment", "3.01": "delisting notice", "4.01": "auditor change", "4.02": "prior financials unreliable", "5.01": "change in control", "5.02": "executive or director change", "5.03": "bylaw change", "5.07": "shareholder vote results", "7.01": "Reg FD disclosure", "8.01": "other events", "9.01": "exhibits" };
+async function treasuryPress() {
+  return cached("off:treasury", 30 * 60e3, async () => {
+    const html = await get("https://home.treasury.gov/news/press-releases", "text/html");
+    const out = [], seen = new Set();
+    for (const m of html.matchAll(/<time[^>]*datetime="([^"]+)"[^>]*>[\s\S]{0,400}?<a[^>]+href="(\/news\/press-releases\/[a-z0-9-]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+      const link = "https://home.treasury.gov" + m[2]; if (seen.has(link)) continue; seen.add(link);
+      out.push({ title: stripTags(m[3]), link, summary: "", time: Date.parse(m[1]) || null, agency: "Treasury" });
+    }
+    return out.slice(0, 15);
+  });
+}
+async function filings8K(tickers) {
+  const out = [];
+  for (const t of tickers.filter((x) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(x)).slice(0, 12)) {
+    try {
+      const cik = await secCik(t), sub = await secSubs(cik), r = sub.filings && sub.filings.recent; if (!r) continue;
+      for (let i = 0; i < Math.min(r.form.length, 60); i++) {
+        if (r.form[i] !== "8-K") continue; const when = Date.parse(r.acceptanceDateTime[i] || r.filingDate[i]); if (!when || Date.now() - when > 45 * 864e5) break;
+        const items = String(r.items[i] || "").split(",").map((x) => x.trim()).filter((x) => x && x !== "9.01");
+        out.push({ title: `${t} 8-K: ${items.map((x) => ITEMS_8K[x] || "item " + x).join(", ") || "current report"}`, link: edgarUrl(cik, r.accessionNumber[i], r.primaryDocument[i]), summary: `Form 8-K filed with the SEC by ${sub.name || t}${items.length ? ` · Item${items.length > 1 ? "s" : ""} ${items.join(", ")}` : ""}.`, time: when, agency: "SEC filing", ticker: t, items });
+      }
+    } catch {}
+  }
+  return out;
+}
+async function loadOfficial(tickers) {
+  const feeds = await Promise.allSettled([...OFFICIAL_FEEDS.map((f) => fetchFeed(f.url).then((l) => l.slice(0, 20).map((i) => ({ ...i, agency: f.agency })))), treasuryPress(), filings8K(tickers)]);
+  const ok = feeds.some((r) => r.status === "fulfilled" && r.value.length);
+  const items = feeds.flatMap((r) => (r.status === "fulfilled" ? r.value : [])).map((it, n, a) => ({
+    id: ("official|" + it.agency + "|" + it.title).toLowerCase().replace(/\W+/g, "").slice(0, 120), source: "official", agency: it.agency, title: it.title, link: it.link,
+    summary: (it.summary || "").slice(0, 280), time: it.time, mood: sentiment(it.title), tickers: it.ticker ? [it.ticker] : [], pct: 0.5, items8k: it.items || undefined, rights: "public" }));
+  return { ok, items };
+}
+
+// ---------------------------------------------------------------- in-site article reader
+// Full text only for public-domain / public-record hosts, fetched with an allowlist on every redirect hop (no SSRF).
+// Everything else: the publisher's own metadata (title, description, author, date) and a link back. The browser
+// renders the result as plain text, so nothing from a fetched page can run on this site.
+const FULLTEXT_HOSTS = [
+  [/^(www\.)?federalreserve\.gov$/i, "Board of Governors of the Federal Reserve System", "Public domain: the Federal Reserve Board's website policy allows copying with credit."],
+  [/^(www\.)?bls\.gov$/i, "U.S. Bureau of Labor Statistics", "Public domain: BLS material may be reproduced with credit."],
+  [/^(www\.|apps\.)?bea\.gov$/i, "U.S. Bureau of Economic Analysis", "Public domain: a U.S. government work (17 U.S.C. §105)."],
+  [/^home\.treasury\.gov$/i, "U.S. Department of the Treasury", "Public domain: a U.S. government work (17 U.S.C. §105)."],
+  [/^(www\.)?sec\.gov$/i, "U.S. Securities and Exchange Commission", "Public record on SEC.gov."],
+];
+const fullHost = (h) => FULLTEXT_HOSTS.find(([re]) => re.test(h));
+async function govFetch(url) {
+  let u = new URL(url);
+  for (let hop = 0; hop < 4; hop++) {
+    if (u.protocol !== "https:" || !fullHost(u.hostname)) throw new Error("not an allowed host");
+    const sec = /(^|\.)sec\.gov$/i.test(u.hostname);
+    const r = await fetch(u.href, { redirect: "manual", headers: { "User-Agent": sec ? SEC_UA : UA, Accept: "text/html,application/xhtml+xml,text/plain" }, signal: AbortSignal.timeout(12000) });
+    if (r.status >= 300 && r.status < 400 && r.headers.get("location")) { u = new URL(r.headers.get("location"), u); continue; }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const ct = r.headers.get("content-type") || ""; if (!/text\/html|text\/plain|application\/xhtml/.test(ct)) throw new Error("not a text page");
+    return { url: u.href, html: (await r.text()).slice(0, 2_500_000) };
+  }
+  throw new Error("too many redirects");
+}
+function extractArticle(html) {
+  const meta = (n) => { const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${n}["'][^>]*content=["']([^"']+)["']`, "i")); return m ? decode(m[1]).trim() : null; };
+  let body = html.replace(/<(script|style|noscript|svg|form|iframe|template)[\s\S]*?<\/\1>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ");
+  const pick = body.match(/<div[^>]+id=["']article["'][\s\S]*$/i) || body.match(/<article[\s\S]*?<\/article>/i) || body.match(/<main[\s\S]*?<\/main>/i) || body.match(/<body[\s\S]*?<\/body>/i);
+  body = (pick ? pick[0] : body).replace(/<(nav|header|footer|aside)[\s\S]*?<\/\1>/gi, " ");
+  body = body.replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_, x) => "\n§PRE§" + x.replace(/<[^>]+>/g, "").replace(/\n/g, "§NL§") + "\n");
+  body = body.replace(/<h[1-4][^>]*>/gi, "\n§H§").replace(/<li[^>]*>/gi, "\n• ").replace(/<(br|\/p|p|\/div|\/tr|\/li|\/h\d|\/table|\/blockquote)[^>]*>/gi, "\n").replace(/<td[^>]*>/gi, " │ ").replace(/<[^>]+>/g, " ");
+  const text = decode(body).replace(/[ \t ​]+/g, " ");
+  const paras = []; let chars = 0;
+  for (let line of text.split("\n")) {
+    line = line.trim(); if (!line) continue;
+    if (line.startsWith("§PRE§")) { for (const block of line.slice(5).split(/§NL§\s*§NL§/)) { const t = block.replace(/§NL§/g, "\n").replace(/[ ]+$/gm, "").trim(); if (t) { paras.push({ t, pre: true }); chars += t.length; } } continue; }
+    const h = line.startsWith("§H§"); line = line.replace(/^§H§\s*/, ""); if (!line || line.length < 2) continue;
+    if (!h && line.length < 25 && !/[.:;!?]$/.test(line) && paras.length < 3) continue; // menu crumbs before the story
+    paras.push(h ? { t: line, h: true } : { t: line }); chars += line.length;
+    if (chars > 90_000 || paras.length > 600) { paras.push({ t: "… (shortened here — the full document is at the original link)" }); break; }
+  }
+  const title = meta("og:title") || stripTags((html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || "");
+  const published = meta("article:published_time") || meta("dcterms.date") || meta("DC.date.issued") || (html.match(/<time[^>]+datetime="([^"]+)"/i) || [])[1] || null;
+  return { title, published, author: meta("author"), description: meta("og:description") || meta("description"), paragraphs: paras };
+}
+async function articleFull(url) {
+  let u; try { u = new URL(String(url)); } catch { throw new Error("bad url"); }
+  if (u.protocol !== "https:" || u.username || u.password || u.port) throw new Error("only plain https article links can be opened");
+  const host = fullHost(u.hostname);
+  if (u.protocol === "https:" && host) {
+    return cached("art:" + u.href, 6 * 3600e3, async () => {
+      const r = await govFetch(u.href), a = extractArticle(r.html);
+      const filing = /\/Archives\/edgar\/data\//.test(r.url);
+      return { url: r.url, host: new URL(r.url).hostname, full: a.paragraphs.length > 0, publisher: host[1], rights: filing ? "Public SEC filing: written by the company and filed with the SEC (public record)." : host[2], ...a };
+    });
+  }
+  const pv = await articlePreview(u.href).catch(() => ({ url: u.href, limited: true }));
+  return { url: u.href, host: u.hostname, full: false, publisher: pv.site || u.hostname.replace(/^www\./, ""), rights: "Publisher's article: only the publisher's own summary is shown here. Read the full story on their site.", title: pv.title || null, description: pv.description || null, author: pv.author || null, published: pv.published || null, image: pv.image || null, paragraphs: [] };
 }
 
 // ---------------------------------------------------------------- Smart Money (free feeds: regulators, newsletters, earnings calls, Reddit)
@@ -711,7 +818,7 @@ try{var r=await fetch("/api/login",{method:"POST",headers:{"content-type":"appli
 if(!r.ok)throw new Error(j.error||"Wrong password.");try{localStorage.setItem("ownerMode","1")}catch(x){}var n=new URLSearchParams(location.search).get("next")||"/";location.replace(/^\\/(?!\\/)/.test(n)?n:"/");}
 catch(x){e.textContent=x.message;b.disabled=false;document.getElementById("p").select();}};</script></body></html>`;
 // API routes anyone may use (the demo needs public market data); everything else is owner-only
-const PUBLIC_API = new Set(["/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
+const PUBLIC_API = new Set(["/api/article", "/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
 const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || ((u.pathname === "/api/autopilot" || u.pathname === "/api/daytrader" || u.pathname === "/api/quanttrader") && req.method === "GET") || u.pathname.startsWith("/api/pub/");
 // ---------------------------------------------------------------- abuse protection
 // Per-visitor request budget for the API (keeps outbound traffic low so the free plan is never suspended)
@@ -2902,6 +3009,7 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/bestbuys") return send(res, 200, await bestBuys());
       if (u.pathname === "/api/trending") return send(res, 200, await getTrending());
+      if (u.pathname === "/api/article") { try { return send(res, 200, await articleFull(u.searchParams.get("url") || "")); } catch (e) { return send(res, 400, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/preview") return send(res, 200, await articlePreview(u.searchParams.get("url") || "").catch((e) => ({ url: u.searchParams.get("url"), limited: true, error: String(e.message || e) })));
       if (u.pathname === "/api/smart") return send(res, 200, await getSmart());
       if (u.pathname === "/api/pub/hist") {

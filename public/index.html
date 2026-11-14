@@ -41,6 +41,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <script src="/tickers.js"></script>
 <script src="/fin.js?v=3"></script>
 <script src="/data.js"></script>
+<script src="/reader.js" defer></script>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
@@ -861,12 +862,16 @@ a.iconbtn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 @media (max-width:760px){
   .wrap{grid-template-columns:minmax(0,1fr)}
   .toolbar{overflow-x:auto;flex-wrap:nowrap}
+  .news-grid>*,.news-grid main,#tab-news>*{min-width:0} /* the scrolling toolbar must not widen the page */
   .toolbar .search{min-width:180px}
   .left{border-right:0;border-bottom:1px solid var(--line)}
   .wl{display:flex;overflow-x:auto}
   .wl li{grid-template-columns:auto;min-width:118px;border-top:0;border-right:1px solid var(--line)}
   .wl li svg{display:none}
   .hstat .hide-sm{display:none}
+  .hstat{gap:8px;min-width:0;flex-shrink:1} #diLbl{display:none} .di-btn .dl{font-size:10px}
+  #spBtn{font-size:0;padding:5px 8px} #spBtn .sp-ico{font-size:15px} /* icon-only on phones so the header fits */
+  @media (max-width:430px){ .brand span{display:none} .brand{min-width:0} header{gap:8px} }
   .cmd-btn{min-width:0} .cmd-btn .lbl,.cmd-btn kbd{display:none}
   .search{width:100%;margin-left:0}
   .item{grid-template-columns:48px 1fr}
@@ -1451,6 +1456,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 .owner-gate form{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;width:min(340px,90vw);display:grid;gap:10px}
 </style>
 <link rel="stylesheet" href="/web.css">
+<link rel="stylesheet" href="/reader.css">
 <link rel="stylesheet" href="/health.css">
 <link rel="stylesheet" href="/quant.css">
 </head>
@@ -1905,6 +1911,7 @@ const SRC = {
   morningstar:{name:"Morningstar",short:"M★",c:"var(--morningstar)"},
   seekingalpha:{name:"Seeking Alpha",short:"SA",c:"var(--seekingalpha)"},
   wsj:{name:"Wall Street Journal",short:"WSJ",c:"var(--wsj)"},
+  official:{name:"Official: Fed, SEC, BLS, BEA, Treasury",short:"Official",c:"#7dd3fc"},
 };
 const INDEXES = [["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow Jones"],["^RUT","Russell 2000"],["^VIX","VIX"],["^TNX","10Y Treasury"],["CL=F","Crude Oil"],["GC=F","Gold"],["BTC-USD","Bitcoin"],["ETH-USD","Ethereum"],["XRP-USD","XRP"],["SOL-USD","Solana"]];
 const IDX_NAME = Object.fromEntries(INDEXES);
@@ -2141,7 +2148,7 @@ async function loadPerf(){
 /* ---------- notifications ---------- */
 function notify(items){
   if(!S.notif||!items.length||!("Notification" in window)||Notification.permission!=="granted") return;
-  items.slice(0,3).forEach(i=>{ const n=new Notification(`${i.tickers.join(", ")} · ${SRC[i.source].name}`,{body:i.title,tag:i.id}); n.onclick=()=>window.open(i.link,"_blank"); });
+  items.slice(0,3).forEach(i=>{ const n=new Notification(`${i.tickers.join(", ")} · ${SRC[i.source].name}`,{body:i.title,tag:i.id}); n.onclick=()=>{ window.focus(); if(window.openReader) openReader(i); else window.open(i.link,"_blank"); }; });
 }
 $("notifBtn").onclick=async()=>{
   if(!("Notification" in window)) return toast("This browser doesn't support desktop alerts.");
@@ -2187,7 +2194,7 @@ function renderToolbar(){
   if(!["all","mine","smart"].includes(S.view)) views.push([S.view,S.view+" ✕"]);
   const SMV=S.view==="smart";
   const on=Object.keys(SRC).filter(k=>!S.srcOff.has(k));
-  const srcLabel=on.length===5?"All sources":on.length===0?"No sources":on.length===1?SRC[on[0]].name:on.length+" sources";
+  const srcLabel=on.length===Object.keys(SRC).length?"All sources":on.length===0?"No sources":on.length===1?SRC[on[0]].name:on.length+" sources";
   $("toolbar").innerHTML=
     views.map(([k,l])=>`<span class="chip ${S.view===k?"on":""}" data-view="${esc(k)}">${esc(l)}</span>`).join("")+
     (SMV?`<span class="sm-tb-note">Free feeds from regulators, top finance writers, earnings calls and Reddit · refreshes every 10 min</span>`:`<div class="dd" id="srcDD"><button class="dd-btn" type="button" data-dd="srcDD">${esc(srcLabel)} <span class="car">▾</span></button>
@@ -5127,43 +5134,7 @@ function renderBestBuys(){
 $("bestBuys")&&$("bestBuys").addEventListener("click",e=>{ if(e.target.closest("a")) return; const r=e.target.closest("[data-nyopen]"); if(r) openQuote(r.dataset.nyopen); });
 setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*60e3);
 
-/* ---------- Article preview panel: click a headline to read the preview on the site ---------- */
-(function(){
-  const box=document.createElement("div"); box.className="ap-modal"; box.hidden=true; box.innerHTML='<div class="ap-card" role="dialog" aria-modal="true"><button class="ap-x" type="button" title="Close">✕</button><div class="ap-body"></div></div>';
-  document.body.appendChild(box);
-  const close=()=>{ box.hidden=true; document.body.classList.remove("ap-open"); };
-  box.addEventListener("click",e=>{ if(e.target===box||e.target.closest(".ap-x")) close(); });
-  document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!box.hidden) close(); });
-  function render(i,pv){
-    const now=Date.now(), s=SRC[i.source]||{name:i.source,c:"#888",short:i.source};
-    const when=i.time?new Date(i.time).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+" ET":"";
-    const desc=(pv&&pv.description&&pv.description.length>(i.summary||"").length?pv.description:i.summary)||"";
-    const chips=(i.tickers||[]).slice(0,6).map(t=>{const q=S.quotes[t];return `<span class="tg" data-ap-open="${esc(t)}">${esc(t)}${q&&!q.error?`<span class="p ${cls(q.change)}">${pct(q.changePct)}</span>`:""}</span>`}).join("");
-    const tags=[i._bs===2?'<b class="np-swan">⚠ Black swan</b>':i._bs===1?'<b class="np-shock">⚠ Shock watch</b>':"",i._top?`<b class="np-hot">🔥 Top story${i._web>1?` · ${i._web} publishers`:""}</b>`:"",i.mood>0?'<span class="ap-mood up">▲ Positive tone</span>':i.mood<0?'<span class="ap-mood down">▼ Negative tone</span>':""].join("");
-    const paid=/wsj\.com|morningstar\.com|barrons\.com|ft\.com/.test(i.link);
-    box.querySelector(".ap-body").innerHTML=`
-      ${pv&&pv.image?`<div class="ap-img"><img src="${esc(pv.image)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></div>`:""}
-      <div class="ap-src"><span class="np-src" style="--c:${s.c}">${esc(s.name||s.short)}</span>${pv&&pv.author?`<span>By ${esc(pv.author.replace(/^by\s+/i,""))}</span>`:""}<span>${esc(when)}</span></div>
-      <h2 class="ap-h">${esc((pv&&pv.title)||i.title)}</h2>
-      ${tags?`<div class="ap-tags">${tags}</div>`:""}
-      ${desc?`<p class="ap-d">${esc(desc)}</p>`:pv===undefined?'<p class="ap-d dim"><span class="spin"></span>Loading the preview…</p>':'<p class="ap-d dim">The publisher doesn\'t share a summary for this one. Open the full article below.</p>'}
-      ${chips?`<div class="ap-sec"><h4>Stocks in this story</h4><div class="np-tags">${chips}</div></div>`:""}
-      ${i.also&&i.also.length?`<div class="ap-sec"><h4>Also covered by</h4><div class="ap-also">${i.also.map(a=>`<a href="${esc(a.link)}" target="_blank" rel="noopener">${esc((SRC[a.source]||{name:a.source}).name)} ↗</a>`).join("")}</div></div>`:""}
-      <div class="ap-act"><a class="btn" href="${esc(i.link)}" target="_blank" rel="noopener">Read full article on ${esc(s.name||"the site")} ↗</a>${paid?'<span class="ap-note">May require a subscription</span>':""}</div>`;
-  }
-  async function open(i){
-    box.hidden=false; document.body.classList.add("ap-open"); render(i,undefined);
-    let pv=null; try{ pv=await api("/api/preview?url="+encodeURIComponent(i.link)); if(pv&&pv.limited) pv=null; }catch{}
-    if(!box.hidden) render(i,pv);
-  }
-  document.addEventListener("click",e=>{
-    const a=e.target.closest("a[data-story]"); if(!a||e.metaKey||e.ctrlKey||e.shiftKey||e.button!==0) return;
-    const i=S._feedMap&&S._feedMap.get(a.dataset.story); if(!i) return;
-    e.preventDefault(); open(i);
-  });
-  box.addEventListener("click",e=>{ const t=e.target.closest("[data-ap-open]"); if(t){ close(); openQuote(t.dataset.apOpen); } });
-})();
-
+/* ---------- Clicking a headline opens the in-site reader (public/reader.js) ---------- */
 /* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
 async function anQuotes(){
   const syms=[...INDEXES.map(x=>x[0]),...SECTORS.map(x=>x[0]),...S.port.map(h=>h.symbol)];
