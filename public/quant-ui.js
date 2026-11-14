@@ -1,8 +1,10 @@
 /* Quant › Backtest lab — UI for public/quant.js. Prices come from /api/pub/hist (free Yahoo daily history);
    all simulation math runs in the browser, so it costs nothing on the server. */
 (function () {
-  const Q = window.QUANT; if (!Q) return;
-  const QB = { cache: new Map(), runs: [], last: null, busy: false };
+  const Q = window.QUANT, B = window.QBATCH; if (!Q) return;
+  const QB = { cache: new Map(), runs: [], last: null, busy: false, batchBusy: false, batch: null, batchDetails: new Map() };
+  const BATCH_KEY = "md_qb_five_latest_v1", AUTO_KEY = "md_qb_five_autorun_v1";
+  try { QB.batch = JSON.parse(localStorage.getItem(BATCH_KEY) || "null"); } catch {}
   try { QB.runs = JSON.parse(localStorage.getItem("md_qb_runs") || "[]"); } catch {}
   const PRESETS = [["Sector ETFs", "XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLU, XLB, XLRE, XLC"], ["Mega caps", "AAPL, MSFT, NVDA, AMZN, GOOGL, META, AVGO, JPM, LLY, XOM"], ["Stocks & bonds", "SPY, QQQ, IWM, AGG, TLT, GLD"], ["Factor ETFs", "MTUM, QUAL, USMV, VLUE, SIZE, SPY"]];
   const DESC = {
@@ -36,9 +38,10 @@
           <div class="qb-three"><label>Commission (bps)<input type="number" class="field" id="qbCom" value="0" min="0" step="0.5"></label><label>Bid-ask spread (bps)<input type="number" class="field" id="qbSpr" value="5" min="0" step="0.5"></label><label>Slippage (bps)<input type="number" class="field" id="qbSlip" value="5" min="0" step="0.5"></label></div>
           <div class="qb-three"><label>Max per position (%)<input type="number" class="field" id="qbMax" value="100" min="1" max="100"></label><label>Min cash (%)<input type="number" class="field" id="qbCash" value="0" min="0" max="99"></label><label>Risk-free rate (%)<input type="number" class="field" id="qbRf" value="3" step="0.1"></label></div>
           <p class="qb-desc" id="qbRfNote">Cash earns the risk-free rate; Sharpe and Sortino use it too.</p></details>
-        <div class="qb-act"><button class="btn" type="submit" data-mode="run">Run backtest</button><button class="btn ghost" type="button" data-mode="optimize" title="Tune on the first 70%, test once on the last 30%">Optimize + out-of-sample</button><button class="btn ghost" type="button" data-mode="walk" title="Re-tune every year on the previous 3 years">Walk-forward</button><button class="btn ghost" type="button" data-mode="sens">Parameter sensitivity</button></div>
+        <div class="qb-act"><button class="btn" type="submit" data-mode="run">Run backtest</button><button class="btn ghost" type="button" data-mode="optimize" title="Tune on the first 70%, test once on the last 30%">Optimize + out-of-sample</button><button class="btn ghost" type="button" data-mode="walk" title="Re-tune every year on the previous 3 years">Walk-forward</button><button class="btn ghost" type="button" data-mode="sens">Parameter sensitivity</button><button class="btn qb-five-btn" type="button" id="qbRunFive">🎲 Run 5 random backtests</button></div>
       </form>
       <div id="qbOut"><div class="fx-empty">Pick a strategy and press <b>Run backtest</b>.</div></div></div>
+      <div class="fx-card qb-five" id="qbBatch" aria-live="polite"></div>
       <div class="fx-card" id="qbRuns"></div>
       <div class="fx-card" id="qbPaper"></div>`;
     $("qbStrat").onchange = paramsUI; paramsUI();
@@ -46,7 +49,9 @@
     $("qbForm").onsubmit = (e) => { e.preventDefault(); go("run"); };
     el.querySelector(".qb-act").onclick = (e) => { const b = e.target.closest("[data-mode]"); if (b && b.type === "button") go(b.dataset.mode); };
     $("qbRuns").onclick = (e) => { const x = e.target.closest("[data-del]"); if (x) { QB.runs.splice(+x.dataset.del, 1); saveRuns(); runsUI(); } };
-    runsUI(); paperUI(); rfDefault();
+    $("qbRunFive").onclick = () => runFive(false);
+    $("qbBatch").onclick = (e) => { const b = e.target.closest("[data-batchview]"); if (b) showBatchDetail(+b.dataset.batchview); };
+    runsUI(); renderBatch(); paperUI(); rfDefault();
   }
   async function rfDefault() { try { const q = (await api("/api/quotes?symbols=%5EIRX")).quotes["^IRX"]; if (q && q.price > 0 && q.price < 20) { $("qbRf").value = (+q.price).toFixed(2); $("qbRfNote").textContent = `Default = today's 13-week Treasury bill yield (${(+q.price).toFixed(2)}%). Cash earns it; Sharpe and Sortino use it.`; } } catch {} }
   function paramsUI() {
@@ -159,6 +164,6 @@
         <p class="fx-note">AI Trader's live rules use news, analyst ratings and earnings data that have no free history, so they can't be backtested faithfully here; its record is paper-traded only.</p>`; }
     catch { $("qbPaperB").innerHTML = '<p class="fx-note">AI Trader results unavailable right now.</p>'; }
   }
-  window.qbOpen = function () { shell(); };
+  window.qbOpen = function () { shell(); maybeAutoFive(); };
   if (S.tab === "backtest") window.qbOpen();
 })();
