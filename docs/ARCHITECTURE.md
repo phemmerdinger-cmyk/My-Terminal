@@ -44,6 +44,14 @@ Global (every page): the watchlist sidebar (prices), the ticker tape, the Claude
 | 10-K crawler page, watchlist "10-K" buttons, filing alerts | THE WEB | Removed at the owner's request. SEC statements stay in Research › Financials / DCF; the server-side 10-K scorecard still feeds the AI trader |
 | Market radar | THE WEB canvas | Moved to the Overview dashboard, where market-wide alerts belong. THE WEB's map now fills its canvas: no oval hub, no rotation, no optional view toggles |
 
+## Reader relevance — `public/news-intel.js`
+
+The News reader's **For you** filter uses a standalone, browser-only rules engine (`MDNewsIntel`) that ranks headlines by *direct holdings*, watchlist matches, source coverage, official primary sources and recency. Its rank is a **personal relevance measure, not a market-impact forecast or buy/sell signal**. The reader shows the reasons behind each result.
+
+The For you view collapses likely duplicate headlines published within 36 hours, conservatively requiring high title-token overlap and compatible tickers; it keeps other publishers' names and links attached to the chosen item. All original feed items remain available through the default All filter. There are no new background jobs, paid APIs or storage requirements.
+
+The old `#newss` deep link now normalizes to `#news` even when clicked while another tab is open. Unit tests: `tests/news-intel.test.js` (`npm test`).
+
 ## Shared data layer — `public/data.js`
 
 Pages read shared data through `window.MD` instead of keeping their own copies:
