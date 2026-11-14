@@ -9,7 +9,7 @@
   const M = window.QMATH, Q = window.QUANT;
   if (!M || !Q) return;
   let wireHoverLater = false; const QL = { busy: false, res: null, sig: "", at: 0, st: {}, ms: {}, view: "net", color: "cluster", scen: "none", sector: "", rot: { yaw: 0.6, pitch: -0.35, zoom: 1, auto: true }, hover: -1, sel: null };
-  const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Signal board"]];
+  const MODS = [["cc", "Command center"], ["uni", "Portfolio risk universe"], ["bt", "Strategy tournament & replay"], ["mc", "Monte Carlo"], ["fx", "Factor exposure"], ["cor", "Correlation lab"], ["opt", "Portfolio optimization"], ["reg", "Market regime"], ["ai", "Signal board"], ["ev", "Earnings event study"]];
   const FACTORS = [["MKT", "Market", "SPY minus cash"], ["SIZE", "Size (small caps)", "IWM − SPY"], ["VALUE", "Value", "IWD − IWF (value minus growth)"], ["MOM", "Momentum", "MTUM − SPY"], ["QUAL", "Quality", "QUAL − SPY"], ["LOWVOL", "Low volatility", "USMV − SPY"]];
   const PROXIES = ["SPY", "IWM", "IWD", "IWF", "MTUM", "QUAL", "USMV", "HYG", "IEF"];
   const SAMPLE = [["SPY", 0.4], ["QQQ", 0.2], ["AGG", 0.2], ["GLD", 0.1], ["IWM", 0.1]];
@@ -86,7 +86,7 @@
       QL.res = base; QL.at = Date.now();
       $("qlFresh").textContent = `Prices through ${day(lastT)}${stale ? ` · ${Math.floor(ageD)} days old` : ""} · risk-free ${pct(rf, 2)} (${rfSrc})`;
       const mark = (k) => setSt(k, stale ? "STALE" : "ONLINE", stale ? `Latest price is ${Math.floor(ageD)} days old` : "Calculated from the latest daily closes");
-      const steps = [["cc", renderCC], ["uni", renderUni], ["cor", renderCor], ["fx", renderFx], ["opt", renderOpt], ["reg", renderReg], ["bt", renderBt], ["mc", renderMC]];
+      const steps = [["cc", renderCC], ["uni", renderUni], ["cor", renderCor], ["fx", renderFx], ["opt", renderOpt], ["reg", renderReg], ["bt", renderBt], ["mc", renderMC], ["ev", renderEv]];
       for (const [k, fn] of steps) { const t = performance.now(); try { const r = await fn(base); if (r === "na") continue; mark(k); } catch (e) { setSt(k, "ERROR", e.message); $("qb-" + k).innerHTML = `<div class="fx-empty">⚠ ${esc(e.message)}</div>`; } QL.ms[k] = performance.now() - t; await tick(); }
       const t = performance.now(); await renderAI(base); mark("ai"); QL.ms.ai = performance.now() - t;
       QL.ms.total = performance.now() - T0; foot();
@@ -538,6 +538,52 @@
   }
 
   // ---------------------------------------------------------------- 9. signal board (rule-based, no paid AI)
+  // ---------------------------------------------------------------- 10. earnings event study (SEC 8-K dates × real prices)
+  // For each holding: every earnings release the company filed with the SEC (8-K Item 2.02). The reaction day is the
+  // filing day if it was accepted before 4 pm ET, otherwise the next trading day. Abnormal return = stock − SPY on the
+  // same day. Only past prices are used, so nothing looks ahead; the averages are descriptive, not a forecast.
+  async function renderEv(b) {
+    const syms = b.have.filter((s) => !/[\^=]|-USD$/.test(s)).slice(0, 8); if (!syms.length) { $("qb-ev").innerHTML = `<div class="fx-empty">No individual stocks in this portfolio (funds don't file earnings releases).</div>`; return "na"; }
+    const spy = b.out.SPY, dkey = (t) => new Date(t * 1000).toISOString().slice(0, 10);
+    const ret = (s) => { const a = s.adj || s.close, r = [null]; for (let i = 1; i < a.length; i++) r.push(a[i] && a[i - 1] ? a[i] / a[i - 1] - 1 : null); return r; };
+    const spyR = ret(spy), spyIx = new Map(spy.t.map((t, i) => [dkey(t), i])), K0 = -5, K1 = 10, rows = [], pooled = [];
+    for (const s of syms) {
+      let ev; try { ev = await api("/api/pub/events?symbol=" + encodeURIComponent(s)); } catch { continue; }
+      const sr = b.out[s]; if (!sr) continue; const r = ret(sr), ix = new Map(sr.t.map((t, i) => [dkey(t), i])), dates = sr.t.map(dkey);
+      const ar = (i) => { const j = spyIx.get(dates[i]); return i > 0 && i < r.length && r[i] != null && j != null && spyR[j] != null ? r[i] - spyR[j] : null; };
+      const absAll = []; for (let i = 1; i < r.length; i++) { const a = ar(i); if (a != null) absAll.push(Math.abs(a)); }
+      const typical = absAll.length ? absAll.reduce((x, y) => x + y, 0) / absAll.length : null, out = [];
+      for (const e of ev.events || []) {
+        const acc = String(e.accepted || e.filed), day = acc.slice(0, 10), hm = +(acc.slice(11, 13) || 0) * 60 + +(acc.slice(14, 16) || 0); // EDGAR acceptance clock is Eastern time
+        let i = ix.get(day); if (i == null) { const k = dates.findIndex((d) => d > day); if (k < 0) continue; i = k; } else if (hm >= 16 * 60) i += 1;
+        if (i >= r.length || i + K0 < 1) continue;
+        const path = []; for (let k = K0; k <= K1; k++) path.push(i + k < r.length ? ar(i + k) : null);
+        if (path[-K0] == null) continue; out.push({ day: dates[i], ar0: path[-K0], path, url: e.url }); pooled.push(path);
+      }
+      if (!out.length) continue;
+      const a0 = out.map((x) => x.ar0).sort((x, y) => x - y), mean = a0.reduce((x, y) => x + y, 0) / a0.length, sd = Math.sqrt(a0.reduce((x, y) => x + (y - mean) ** 2, 0) / Math.max(1, a0.length - 1));
+      rows.push({ s, n: out.length, mean, median: a0[Math.floor(a0.length / 2)], hit: a0.filter((x) => x > 0).length / a0.length, absMean: a0.reduce((x, y) => x + Math.abs(y), 0) / a0.length, typical, t: a0.length > 1 && sd > 0 ? mean / (sd / Math.sqrt(a0.length)) : null, last: out[0] });
+    }
+    if (!rows.length) { $("qb-ev").innerHTML = `<div class="fx-empty">No SEC earnings releases overlap the loaded price history for these holdings.</div>`; return "na"; }
+    // pooled cumulative abnormal return from day −5 to +10, with a 95% band
+    const L = K1 - K0 + 1, car = [], lo = [], hi = [], nK = [];
+    for (let k = 0; k < L; k++) { const c = pooled.map((p) => { let s = 0; for (let j = 0; j <= k; j++) { if (p[j] == null) return null; s += p[j]; } return s; }).filter((x) => x != null);
+      const m = c.length ? c.reduce((x, y) => x + y, 0) / c.length : null, sd = c.length > 1 ? Math.sqrt(c.reduce((x, y) => x + (y - m) ** 2, 0) / (c.length - 1)) : 0, se = c.length ? sd / Math.sqrt(c.length) : 0;
+      car.push(m); lo.push(m == null ? null : m - 1.96 * se); hi.push(m == null ? null : m + 1.96 * se); nK.push(c.length); }
+    const W = 640, H = 210, vals = [...lo, ...hi].filter((x) => x != null), mn = Math.min(0, ...vals), mx = Math.max(0, ...vals), X = (k) => 40 + (k / (L - 1)) * (W - 60), Y = (v) => 14 + (1 - (v - mn) / (mx - mn || 1)) * (H - 40);
+    const pathOf = (a) => a.map((v, k) => (v == null ? "" : `${k && a[k - 1] != null ? "L" : "M"}${X(k).toFixed(1)},${Y(v).toFixed(1)}`)).join("");
+    const band = lo.map((v, k) => (v == null ? null : [X(k), Y(v)])).filter(Boolean), bandH = hi.map((v, k) => (v == null ? null : [X(k), Y(v)])).filter(Boolean).reverse();
+    const svg = `<svg viewBox="0 0 ${W} ${H}" class="ql-svg"><polygon points="${[...band, ...bandH].map((p) => p.join(",")).join(" ")}" fill="#38e1ff22"/><line x1="40" x2="${W - 20}" y1="${Y(0)}" y2="${Y(0)}" class="ql-zero"/><line x1="${X(-K0)}" x2="${X(-K0)}" y1="10" y2="${H - 24}" stroke="#ff2d95" stroke-dasharray="4 4"/>
+      <path d="${pathOf(car)}" fill="none" stroke="#38e1ff" stroke-width="2"/>${car.map((v, k) => (v == null ? "" : `<circle cx="${X(k)}" cy="${Y(v)}" r="2.5" fill="#38e1ff"><title>day ${k + K0}: ${sgn(v, 2)} (n=${nK[k]})</title></circle>`)).join("")}
+      ${[K0, 0, 5, K1].map((k) => `<text x="${X(k - K0)}" y="${H - 8}" text-anchor="middle" class="ql-ax">${k === 0 ? "release" : (k > 0 ? "+" : "") + k + "d"}</text>`).join("")}<text x="36" y="${Y(mx) + 4}" text-anchor="end" class="ql-ax">${sgn(mx, 1)}</text><text x="36" y="${Y(mn) + 4}" text-anchor="end" class="ql-ax">${sgn(mn, 1)}</text></svg>`;
+    let hyp = ""; try { const st = await api("/api/web/status"), h = st.stats && st.stats.hypotheses; if (h && (h.supported || h.refuted)) { const n = h.supported + h.refuted; hyp = `<div class="ql-tiles sm">${tile("Spider hypotheses graded", String(n + (h.inconclusive || 0)))}${tile("Held up", `${h.supported} of ${n}`, "", h.supported / n >= 0.5 ? "up" : "down", pct(h.supported / n, 0) + " · inconclusive excluded")}${tile("Still open", String(h.open || 0))}</div>`; } } catch {}
+    $("qb-ev").innerHTML = `<div class="ql-src">${rows.reduce((x, r) => x + r.n, 0)} earnings releases from SEC EDGAR · ${rows.length} holding${rows.length > 1 ? "s" : ""} · abnormal return = stock − SPY</div>
+      <div class="ql-two"><div>${svg}${legend([["#38e1ff", "average cumulative abnormal return around the release"], ["#38e1ff44", "95% interval"]])}</div>
+      <div style="overflow-x:auto"><table class="ql-tbl"><tr><th>Stock</th><th>n</th><th>Avg day-0</th><th>Median</th><th>Up</th><th>Move vs normal day</th><th>Last</th></tr>${rows.map((r) => `<tr><td><b>${esc(r.s)}</b></td><td>${r.n}</td><td class="${r.mean >= 0 ? "up" : "down"}" title="t = ${num(r.t, 1)}">${sgn(r.mean, 2)}${r.t != null && Math.abs(r.t) >= 2 ? " ★" : ""}</td><td>${sgn(r.median, 2)}</td><td>${pct(r.hit, 0)}</td><td>${r.typical ? num(r.absMean / r.typical, 1) + "×" : "—"}</td><td><a href="${esc(r.last.url)}" data-read data-title="${esc(r.s)} earnings release ${esc(r.last.day)}">${esc(r.last.day)}</a> <span class="${r.last.ar0 >= 0 ? "up" : "down"}">${sgn(r.last.ar0, 1)}</span></td></tr>`).join("")}</table></div></div>
+      ${hyp}
+      ${note("Event dates are every 8-K (or 6-K) with Item 2.02 in the company's SEC submissions; EDGAR's acceptance clock is Eastern time, so a filing accepted at or after 4:00 pm counts from the next trading day. Daily abnormal return = the stock's adjusted-close return minus SPY's on the same day. Each row averages the reaction-day abnormal return across releases (★: |t| ≥ 2, a rough test that treats releases as independent). 'Move vs normal day' compares the average absolute reaction to the stock's average absolute abnormal move on all days. The chart pools every release: the line is the average cumulative abnormal return from 5 days before to 10 days after, with a 95% interval from the cross-section; n falls toward +10 days for the most recent release. These are historical averages over small samples, not forecasts. The spider's hypothesis record counts its own directional calls that a later job checked against real prices.")}`;
+  }
+
   async function renderAI(b) {
     const s = b.stats, A = [...b.assets].sort((x, y) => y.rc - x.rc), top = A[0], sig = [];
     const add = (k, v, state, why, viz) => sig.push({ k, v, state, why, viz });

@@ -1133,6 +1133,32 @@ function createSpider(deps) {
   }
   async function briefing(id) { await load(); if (id === "latest") id = (BIDX[0] || {}).id; return id ? store.get("b:" + id) : null; }
 
+  // ------------------------------------------------------------ named research signals (for AI Trader and the UI)
+  // Each signal is a rule over stored findings. It lists the findings it used (with their sources) and the arithmetic,
+  // and carries no confidence percentage: the evidence count and the rule are the whole story.
+  const REG = /\b(SEC|FTC|DOJ|antitrust|probe|investigation|lawsuit|subpoena|fine[sd]?|penalt(y|ies)|regulat\w*|recall|ban(s|ned)?|sanction\w*)\b/i;
+  const FIL = /\b(restat\w*|auditor|going concern|impair\w*|material weakness|risk factors? (added|changed|new)|unreliable|delist\w*|downgrad\w*)\b/i;
+  function researchSignals(o = {}) {
+    const syms = uniq([...held(), ...wlAll(), ...traderHeld(), ...(o.symbols || [])]).slice(0, 80), out = [], t = now();
+    const ev = (d) => ({ id: d.id, headline: d.headline, cat: d.cat, tone: d.tone, kind: kindOf(d), at: d.u, sources: (d.sources || []).slice(0, 2) });
+    for (const sym of syms) {
+      const ds = discFor(sym, 14).filter((d) => !ownPortfolio(d));
+      const earn = ds.filter((d) => d.cat === "earnings" && d.u >= t - 10 * DAY && d.tone);
+      if (earn.length) { const tone = earn.reduce((x, d) => x + d.tone, 0); if (tone) out.push({ sym, name: tone > 0 ? "Positive earnings development" : "Negative earnings development", dir: Math.sign(tone), inputs: earn.slice(0, 4).map(ev), calc: `${earn.length} earnings finding${earn.length > 1 ? "s" : ""} in 10 days; tone sum ${tone > 0 ? "+" : ""}${tone} (each finding is −2…+2 from the release's wording and the numbers it reports).`, history: "quant:ev" }); }
+      const ins = ds.filter((d) => d.cat === "insider" && d.tone);
+      if (ins.length) { const tone = ins.reduce((x, d) => x + d.tone, 0); if (tone) out.push({ sym, name: tone > 0 ? "Insider buying" : "Insider selling", dir: Math.sign(tone), inputs: ins.slice(0, 3).map(ev), calc: `${ins.length} insider finding${ins.length > 1 ? "s" : ""} from Form 4 filings in 14 days; tone sum ${tone > 0 ? "+" : ""}${tone}.` }); }
+      const reg = ds.filter((d) => d.tone < 0 && REG.test(d.headline + " " + d.summary));
+      if (reg.length) out.push({ sym, name: "Negative regulatory development", dir: -1, inputs: reg.slice(0, 3).map(ev), calc: `${reg.length} negative finding${reg.length > 1 ? "s" : ""} in 14 days that mention a regulator, probe, lawsuit, fine or recall.` });
+      const fil = ds.filter((d) => (d.cat === "filing" || d.cat === "fundamentals") && (d.tone < 0 || FIL.test(d.headline + " " + d.summary)));
+      if (fil.length) out.push({ sym, name: "Important financial filing change", dir: fil.some((d) => d.tone < 0) ? -1 : 0, inputs: fil.slice(0, 3).map(ev), calc: `${fil.length} filing/fundamentals finding${fil.length > 1 ? "s" : ""} in 14 days that are negative or mention restatements, auditor changes, impairments, weaknesses or new risk factors.` });
+      const news2 = ds.filter((d) => (d.cat === "news" || d.cat === "mover" || d.cat === "company") && d.u >= t - 2 * DAY), base = ds.filter((d) => (d.cat === "news" || d.cat === "mover" || d.cat === "company") && d.u < t - 2 * DAY).length / 6;
+      if (news2.length >= 3 && news2.length >= 2 * Math.max(0.5, base)) out.push({ sym, name: "Elevated company-specific news activity", dir: 0, inputs: news2.slice(0, 4).map(ev), calc: `${news2.length} news/mover findings in the last 2 days vs. about ${(base * 2).toFixed(1)} per 2 days over the previous 12 days (at least 3 and at least double the usual rate).` });
+    }
+    const mac = DISC.filter((d) => (d.cat === "macro" || d.cat === "policy" || d.cat === "market") && d.u >= t - 3 * DAY && d.tone < 0);
+    if (mac.length >= 2) out.push({ sym: null, name: "Increased macroeconomic uncertainty", dir: -1, inputs: mac.slice(0, 4).map(ev), calc: `${mac.length} negative macro, policy or market findings in 3 days (at least 2).` });
+    return { at: t, rule: "Signals are rules over the spider's stored findings; inputs and their sources are listed. They feed research and paper trading only.", items: out.sort((a, b) => b.inputs.length - a.inputs.length) };
+  }
+
   // ------------------------------------------------------------ controls, backup and company timelines
   function setCtrl(c = {}) {
     const C = ST.ctrl, sym = (x) => String(x || "").toUpperCase().trim();
@@ -1171,7 +1197,7 @@ function createSpider(deps) {
   }
 
   const self = {
-    setCtrl, exportData, importData, timeline,
+    setCtrl, exportData, importData, timeline, researchSignals,
     load, save, start, stop, tick, runNow, liveSummary, enqueue, setContext, status, discoveries, getDiscovery, briefings, briefing, packet, signal, traderAdjust, traderView, promptContext, session, marketOpen,
     graph: (o) => require("./intel").graph({ ST, DISC, SP, sectorOf, industryOf, nameOf, held: held(), tracked: tracked(), traderHeld: traderHeld(), MACRO_LINKS, now: now(), ...o }),
     ask: (question, opts = {}) => require("./intel").ask({ question, spider: self, ST, DISC, BIDX, SP, sectorOf, nameOf, held: held(), tracked: tracked(), now: now(), ...opts }),

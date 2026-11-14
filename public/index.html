@@ -1424,6 +1424,11 @@ html.viewonly .api-bal-wrap{display:none!important}
 .an-dr{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)} .an-dr:last-child{border-bottom:0} .an-n{font-family:var(--mono);color:var(--dim);font-size:12px;min-width:14px}
 .an-dr a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px;line-height:1.35} .an-dr a:hover{text-decoration:underline}
 .an-dm{font-size:11.5px;color:var(--dim);margin-top:3px}
+.ap-sigs{margin:18px 0}.aps-h{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}.aps-h span{font-size:12px;color:var(--dim)}
+.aps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:10px;align-items:start}
+.aps-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}.aps-card summary{cursor:pointer;display:flex;gap:6px;align-items:center;flex-wrap:wrap;list-style:none}
+.aps-card summary::-webkit-details-marker{display:none}.aps-n{margin-left:auto;font-size:11px;color:var(--dim)}.aps-card em{font-style:normal;color:var(--dim);font-size:11.5px}
+.aps-c{font-size:12.5px;color:var(--muted);margin:8px 0 4px}.aps-card ul{margin:4px 0 8px;padding-left:18px;font-size:12.5px}.aps-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
 .ov-row{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:0 0 18px} @media (max-width:1180px){.ov-row{grid-template-columns:1fr 1fr}.ov-radar{grid-column:1/-1}} @media (max-width:760px){.ov-row{grid-template-columns:1fr}}
 html.viewonly #ovRadar{display:none} .ov-radar{background:linear-gradient(180deg,#07121a,#05090d);border-color:rgba(56,225,255,.18)} .ov-radar .rd-b{display:flex;gap:14px;align-items:center;margin-top:8px}
 .ov-radar canvas{width:170px;flex:0 0 170px;aspect-ratio:1;cursor:pointer} .ov-radar .rd-list{flex:1;min-width:0;max-height:180px;margin:0}
@@ -1693,6 +1698,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <aside class="ap-hold" id="apNote"></aside>
       </div>
       <div class="apx" id="apMore"></div>
+      <section class="ap-sigs" id="apSig" hidden></section>
       <p class="ap-lede ap-about">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close. Every bust starts a new test run.</p>
     </section>
 
@@ -2080,7 +2086,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
-  if(t==="aitrade"){ apLoadView(); }
+  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
@@ -5135,6 +5141,22 @@ $("bestBuys")&&$("bestBuys").addEventListener("click",e=>{ if(e.target.closest("
 setInterval(()=>{ if(S.tab==="data"&&!document.hidden) loadBestBuys(true); },15*60e3);
 
 /* ---------- Clicking a headline opens the in-site reader (public/reader.js) ---------- */
+
+/* ---------- AI vs S&P: the spider's research signals (rules over stored findings, with inputs and sources) ---------- */
+async function apSignals(){
+  const el=$("apSig"); if(!el||VIEW) return; if(S._sigAt&&Date.now()-S._sigAt<120e3) return; S._sigAt=Date.now();
+  let j; try{ j=await api("/api/web/signals"); }catch{ el.hidden=true; return; }
+  const it=j.items||[]; el.hidden=false;
+  const arrow=d=>d>0?'<b class="up">▲</b>':d<0?'<b class="down">▼</b>':'<b class="dim">◆</b>';
+  el.innerHTML=`<div class="aps-h"><h2 class="h">Spider research signals</h2><span>${esc(j.traderUse||"")}</span></div>
+    ${it.length?`<div class="aps-grid">${it.slice(0,12).map(g=>`<details class="aps-card"><summary>${arrow(g.dir)} <b>${esc(g.name)}</b>${g.sym?` <button type="button" class="tg" data-ap-open="${esc(g.sym)}">${esc(g.sym)}</button>`:" <em>market-wide</em>"}<span class="aps-n">${g.inputs.length} input${g.inputs.length>1?"s":""}</span></summary>
+      <p class="aps-c"><b>Rule:</b> ${esc(g.calc)}</p><ul>${g.inputs.map(x=>`<li>${esc(x.headline)} <em>${esc(x.cat)}${x.kind&&x.kind!=="fact"?" · "+esc(x.kind):""} · ${esc(ago(x.at))}${(x.sources||[]).map(s=>s.url?` · <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.name)}</a>`:" · "+esc(s.name)).join("")}</em></li>`).join("")}</ul>
+      ${g.history==="quant:ev"?`<button type="button" class="ov-go" data-gotab="quant" data-scroll="qm-ev">How this stock has reacted to past earnings →</button>`:""}</details>`).join("")}</div>`
+      :'<p class="dim" style="margin:6px 0 0">No signals right now: none of the rules fire on the spider\'s findings for your holdings, watchlist or the bots\' positions.</p>'}
+    <p class="aps-foot">${esc(j.rule||"")} No confidence percentages: each signal shows the findings it rests on.</p>`;
+}
+setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apSignals(); },20e3);
+document.addEventListener("click",e=>{ const t=e.target.closest("#apSig [data-ap-open]"); if(t){ e.preventDefault(); openQuote(t.dataset.apOpen); } });
 /* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
 async function anQuotes(){
   const syms=[...INDEXES.map(x=>x[0]),...SECTORS.map(x=>x[0]),...S.port.map(h=>h.symbol)];

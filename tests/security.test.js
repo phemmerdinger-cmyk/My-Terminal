@@ -32,7 +32,7 @@ test("the demo is public, compressed and sends security headers", async () => {
   assert.match(await r.text(), /Market Desk|MARKET/i);
 });
 test("private APIs are blocked for visitors, public data APIs are open", async () => {
-  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health", "/api/quanttrader/run"]) {
+  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health", "/api/quanttrader/run", "/api/web/control", "/api/web/export", "/api/web/import", "/api/web/timeline?symbol=AAPL", "/api/web/signals"]) {
     const r = await get(p); assert.equal(r.status, 401, p); assert.equal((await r.json()).code, "private");
   }
   assert.equal((await get("/api/health")).status, 200);
@@ -69,4 +69,14 @@ test("Claude spending is capped by a dollar budget (default $4, $1/day) and need
 test("the data-integrity status is public and honest when sources are unreachable", async () => {
   const r = await get("/api/pub/integrity/status"); assert.equal(r.status, 200);
   const j = await r.json(); assert.ok(["current", "delayed", "stale", "unavailable"].includes(j.status)); assert.ok(Array.isArray(j.rows));
+});
+
+test("the in-site reader only fetches allowlisted public-domain hosts over https", async () => {
+  for (const u of ["file:///etc/passwd", "http://www.federalreserve.gov/x", "https://user:pw@www.sec.gov/x", "https://www.sec.gov:8443/x", "gopher://x"]) {
+    const r = await get("/api/article?url=" + encodeURIComponent(u)); assert.equal(r.status, 400, u);
+  }
+  // a host that isn't allowlisted is never fetched for full text: only metadata, no paragraphs
+  for (const u of ["https://169.254.169.254/latest/meta-data", "https://localhost/admin", "https://example.com/story"]) {
+    const j = await (await get("/api/article?url=" + encodeURIComponent(u))).json(); assert.equal(j.full, false, u); assert.deepEqual(j.paragraphs, [], u);
+  }
 });

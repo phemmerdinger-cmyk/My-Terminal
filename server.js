@@ -2867,6 +2867,7 @@ async function webRoute(req, res, u) {
     return send(res, 202, { started: true, slot });
   }
   if (p === "summary") return send(res, 200, await SPIDER.liveSummary());
+  if (p === "signals") return send(res, 200, { ...SPIDER.researchSignals({ symbols: parseList(qp("symbols"), 40) }), traderWeight: SPIDER_W, traderUse: SPIDER_W > 0 ? `The swing bot adds at most ±${SPIDER_W.toFixed(2)} to a stock's ranking score from the spider's insider, earnings and sector-news findings (paper money only).` : "The bots don't use spider research right now (SPIDER_TRADER_WEIGHT is 0)." });
   if (p === "control") { // pause/resume, frequency, monitored companies and sectors, job types, notifications
     if (req.method === "POST") { let b = {}; try { b = await readBody(req); } catch { return send(res, 400, { error: "bad data" }); } return send(res, 200, SPIDER.setCtrl(b || {})); }
     return send(res, 200, SPIDER.status().ctrl);
@@ -3045,6 +3046,13 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/system/health") return send(res, 200, await systemHealth()); // owner-only (not public)
       if (u.pathname === "/api/pub/macro") return send(res, 200, await macroData());
+      if (u.pathname === "/api/pub/events") { // earnings-release dates (8-K Item 2.02) with SEC acceptance times, for event studies
+        const [sym] = parseList(u.searchParams.get("symbol"), 1); if (!sym) return send(res, 400, { error: "symbol required" });
+        try { const id = await secCik(sym), r = (await secSubs(id.cik)).filings.recent, ev = [];
+          for (let i = 0; i < r.form.length; i++) if ((r.form[i] === "8-K" || r.form[i] === "6-K") && /2\.02/.test(r.items[i] || "")) ev.push({ accepted: r.acceptanceDateTime[i] || null, filed: r.filingDate[i], url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]) });
+          return send(res, 200, { symbol: sym, name: id.name, source: "SEC EDGAR submissions (8-K Item 2.02: results of operations)", events: ev.slice(0, 40) });
+        } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
       if (u.pathname === "/api/pub/filings") {
         const syms = [...new Set(String(u.searchParams.get("symbols") || "").toUpperCase().split(",").map((x) => x.trim()).filter((x) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(x)))];
         try { return send(res, 200, await latestFilings(syms)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
