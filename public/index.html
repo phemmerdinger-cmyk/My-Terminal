@@ -42,6 +42,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <script src="/fin.js?v=3"></script>
 <script src="/data.js"></script>
 <script src="/news-intel.js" defer></script> <script src="/reader.js" defer></script>
+<link rel="stylesheet" href="/studio.css">
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root{
@@ -1825,6 +1826,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- THE WEB: autonomous research Spider (rendered by /web.js) -->
     <section id="tab-web" class="pad tw" hidden></section>
+    <section id="tab-studio" class="pad fx" hidden></section>
     <section id="tab-health" class="pad fx" hidden></section>
     <section id="tab-backtest" class="pad fx" hidden></section>
     <section id="tab-quant" class="pad fx" hidden></section>
@@ -1928,7 +1930,7 @@ const PALETTE = ["#2f80ed","#0fbf7d","#ff9e1b","#8b5cf6","#e11d48","#14b8a6","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","health","backtest","quant"];
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","studio","health","backtest","quant"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
@@ -1936,7 +1938,7 @@ const NAV=[
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
-  ["web",[["web","Command center"],["health","System health"]]],
+  ["web",[["web","Command center"],["studio","Intelligence Studio"],["health","System health"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -2075,7 +2077,7 @@ setInterval(tick,1000); tick();
 
 /* ---------- tabs ---------- */
 function setTab(t){
-  if(VIEW&&(t==="predict"||t==="web"||t==="health")) t="news";
+  if(VIEW&&(t==="predict"||t==="web"||t==="studio"||t==="health")) t="news";
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
@@ -2095,6 +2097,7 @@ function setTab(t){
   if(t==="predict"){ renderPredict(); refreshUsage(); }
   if(typeof webOpen==="function"){ if(t==="web") webOpen(); else webClose(); }
   if(t==="health"&&typeof hlOpen==="function") hlOpen();
+  if(t==="studio"&&typeof studioOpen==="function") studioOpen();
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
@@ -5254,5 +5257,7 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
 <script src="/quant-ui.js"></script>
 <script src="/qmath.js"></script>
 <script src="/quant-lab.js"></script>
+<script src="/studio-core.js"></script>
+<script src="/studio.js"></script>
 </body>
 </html>
