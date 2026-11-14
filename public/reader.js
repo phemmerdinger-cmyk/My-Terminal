@@ -30,7 +30,7 @@
       <button data-ra="save" title="Save this article (S)">☆ Save</button><button data-ra="focus" title="Full-screen reading">⤢ Focus</button><button data-ra="right" title="Show or hide intelligence">◧</button>
       <a class="rdr-orig" target="_blank" rel="noopener noreferrer">Original ↗</a><button data-ra="close" class="rdr-x" title="Close (Esc)">✕</button></div></div>
     <div class="rdr-grid"><aside class="rdr-l"><div class="rdr-lh"><input id="rdrQ" placeholder="Search headlines, tickers…" autocomplete="off">
-        <div class="rdr-f">${[["all", "All"], ["mine", "My stocks"], ["breaking", "Breaking"], ["official", "Official"], ["saved", "★ Saved"]].map(([k, l]) => `<button data-rf="${k}">${l}</button>`).join("")}</div></div><div class="rdr-list" id="rdrList"></div></aside>
+        <div class="rdr-f">${[["all", "All"], ["priority", "For you"], ["mine", "My stocks"], ["breaking", "Breaking"], ["official", "Official"], ["saved", "★ Saved"]].map(([k, l]) => `<button data-rf="${k}">${l}</button>`).join("")}</div></div><div class="rdr-list" id="rdrList"></div></aside>
       <main class="rdr-c"><div class="rdr-prog"><i id="rdrProg"></i></div><div class="rdr-scroll" id="rdrScroll"><article class="rdr-art" id="rdrArt"></article></div></main>
       <aside class="rdr-r" id="rdrIntel"></aside></div>`;
   document.body.appendChild(box);
@@ -54,14 +54,16 @@
     else if (R.filter === "official") list = list.filter((i) => i.source === "official");
     const qq = R.q.trim().toLowerCase();
     if (qq) list = list.filter((i) => (i.title + " " + (i.summary || "") + " " + (i.tickers || []).join(" ")).toLowerCase().includes(qq));
+    if (R.filter === "priority" && window.MDNewsIntel) list = window.MDNewsIntel.prioritize(list, { portfolios: S.pfs, holdings: S.port, watchlist: S.wl, now: Date.now() });
     if (R.cur && !list.some((i) => i.id === R.cur.id)) list.unshift(R.cur);
-    return list.sort((a, b) => (R.filter === "saved" ? 0 : (b.time || 0) - (a.time || 0))).slice(0, 300);
+    return (R.filter === "priority" || R.filter === "saved" ? list : list.sort((a, b) => (b.time || 0) - (a.time || 0))).slice(0, 300);
   }
   function renderList() {
     R.list = pool();
     $r("#rdrList").innerHTML = R.list.length ? R.list.map((i) => { const s = src(i), br = breaking(i);
+      const relevance = R.filter === "priority" && window.MDNewsIntel ? (i._priority || window.MDNewsIntel.explain(i, { portfolios: S.pfs, holdings: S.port, watchlist: S.wl })) : null;
       return `<button class="rdr-row${R.cur && R.cur.id === i.id ? " on" : ""}" data-rid="${esc(i.id)}"><span class="rdr-meta"><i style="--c:${s.c}">${esc(i.source === "official" ? i.agency || "Official" : s.short || s.name)}</i>${esc(short(i.time))}${br ? `<b class="rdr-br">${esc(br)}</b>` : ""}${R.saved[i.id] ? '<b class="rdr-sv">★</b>' : ""}</span>
-        <span class="rdr-t">${esc(cleanT(i.title))}</span><span class="rdr-tk">${esc(cat(i))}${(i.tickers || []).slice(0, 4).map((t) => ` · <em>${esc(t)}</em>`).join("")}</span></button>`; }).join("")
+        <span class="rdr-t">${esc(cleanT(i.title))}</span><span class="rdr-tk">${esc(cat(i))}${(i.tickers || []).slice(0, 4).map((t) => ` · <em>${esc(t)}</em>`).join("")}</span>${relevance ? `<span class="rdr-prio">${esc(relevance.level)} · ${esc(relevance.reasons.join(" · "))}</span>` : ""}</button>`; }).join("")
       : `<p class="rdr-empty">${R.filter === "saved" ? "Nothing saved yet. Press ☆ Save on an article to keep it here." : "No headlines match."}</p>`;
     const on = $r(".rdr-row.on"); if (on) on.scrollIntoView({ block: "nearest" });
   }
@@ -91,7 +93,7 @@
     out.push(`${pub} reports: “${cleanT(i.title)}”${i.time ? ` (${when(i.time)})` : ""}.`);
     for (const t of tk) { const x = q(t); if (!x) continue; const pos = x.high52 && x.low52 && x.high52 > x.low52 ? Math.round(((x.price - x.low52) / (x.high52 - x.low52)) * 100) : null;
       out.push(`${t} is trading at $${fmt(x.price)}, ${x.changePct >= 0 ? "up" : "down"} ${Math.abs(x.changePct).toFixed(2)}% today${pos != null ? `, ${pos}% of the way between its 52-week low and high` : ""}.`); }
-    const spx = q("^GSPC"); if (spx && tk.length) { const t0 = q(tk[0]); if (t0) { const d = t0.changePct - spx.changePct; if (Math.abs(d) >= 1) out.push(`That is ${Math.abs(d).toFixed(1)} points ${d > 0 ? "better" : "worse"} than the S&P 500 (${pct(spx.changePct)}), so the move is specific to the company rather than the whole market.`); } }
+    const spx = q("^GSPC"); if (spx && tk.length) { const t0 = q(tk[0]); if (t0) { const d = t0.changePct - spx.changePct; if (Math.abs(d) >= 1) out.push(`That is ${Math.abs(d).toFixed(1)} points ${d > 0 ? "better" : "worse"} than the S&P 500 (${pct(spx.changePct)}), which differs from the broad market; the comparison alone does not establish why.`); } }
     const also = (i.also || []).length; if (also) out.push(`${also + 1} outlets are covering the same story, which usually means it is getting wide attention.`);
     if (rel.length) { const p = rel.filter((x) => x.mood > 0).length, n = rel.filter((x) => x.mood < 0).length; out.push(`${rel.length} related headline${rel.length > 1 ? "s" : ""} in the feed; the tone of that coverage is ${p > n ? "mostly positive" : n > p ? "mostly negative" : "mixed"}.`); }
     if (S.earn && !S.earn.error) for (const t of tk) { const e = [...(S.earn.yours || []), ...(S.earn.notable || [])].find((x) => x.symbol === t); if (e) out.push(`${t} reports earnings on ${e.date}${e.time ? ` (${e.time})` : ""}.`); }
@@ -124,11 +126,13 @@
   // ------------------------------------------------------------ intelligence (right)
   function renderIntel(rel) {
     const i = R.cur, a = R.art, tk = [...new Set(i.tickers || [])].slice(0, 6), paras = (a && a.paragraphs) || [], f = factors(i, paras);
+    const relevance = window.MDNewsIntel ? window.MDNewsIntel.explain(i, { portfolios: S.pfs, holdings: S.port, watchlist: S.wl }) : null;
     const held = []; for (const pf of S.pfs || []) for (const h of pf.holdings || []) if (tk.includes(h.symbol)) { const x = q(h.symbol), px = x ? x.price : h.cost; held.push({ pf: pf.name, sym: h.symbol, sh: h.shares, val: h.shares * (px || 0), day: x && x.change != null ? h.shares * x.change : null }); }
     const tk2 = tk.length ? tk : [];
     $r("#rdrIntel").innerHTML = `
       ${tk2.length ? `<section><h4>Affected tickers</h4>${tk2.map((t) => { const x = q(t); return `<button class="rdr-tick" data-rq="${esc(t)}"><b>${esc(t)}</b>${x ? `<span>$${fmt(x.price)}</span><i class="${cls(x.changePct)}">${pct(x.changePct)}</i>` : "<span>open research →</span>"}</button>`; }).join("")}</section>` : `<section><h4>Affected tickers</h4><p class="dim">No company is named in this story${i.source === "official" ? "; it is an economy-wide release" : ""}.</p></section>`}
       ${tk2.some((t) => q(t)) ? `<section><h4>Metrics</h4><table class="rdr-m">${tk2.slice(0, 3).map((t) => { const x = q(t); if (!x) return ""; const pos = x.high52 > x.low52 ? Math.round(((x.price - x.low52) / (x.high52 - x.low52)) * 100) : null; return `<tr><th>${esc(t)}</th><td>day ${pct(x.changePct)}</td><td>${x.low52 ? `52w $${fmt(x.low52, 0)}–$${fmt(x.high52, 0)}` : ""}</td><td>${pos != null ? pos + "% of range" : ""}</td></tr>`; }).join("")}</table></section>` : ""}
+      ${relevance ? `<section><h4>Why this story appears</h4><p><b>${esc(relevance.level)}</b> relevance · ${esc(relevance.reasons.join(" · "))}</p><p class="dim">Ranked using holdings, watchlist, source coverage and recency—not a predicted price move.</p></section>` : ""}
       <section><h4>Your exposure</h4>${held.length ? held.map((h) => `<p><b>${esc(h.sym)}</b> in ${esc(h.pf)}: ${h.sh} sh · ${$m(h.val)}${h.day != null ? ` · <span class="${cls(h.day)}">${h.day >= 0 ? "+" : "−"}${$m(Math.abs(h.day)).replace("−", "")} today</span>` : ""}</p>`).join("") : `<p class="dim">${tk2.length ? "You don't hold these." : "Nothing in your portfolios is named."}${tk2.some((t) => (S.wl || []).includes(t)) ? " On your watchlist." : ""}</p>`}</section>
       ${f.bull.length || f.bear.length ? `<section><h4>Possible bullish / bearish factors <em>keyword rules on the text we can show</em></h4>${f.bull.map((x) => `<p class="rdr-bu">▲ ${esc(x)}</p>`).join("")}${f.bear.map((x) => `<p class="rdr-be">▼ ${esc(x)}</p>`).join("")}</section>` : ""}
       <section><h4>Related news</h4>${rel.length ? rel.map((x) => `<button class="rdr-rel" data-rid="${esc(x.id)}">${esc(cleanT(x.title))}<em>${esc(src(x).short || src(x).name)} · ${esc(short(x.time))}</em></button>`).join("") : '<p class="dim">No closely related headlines in the feed.</p>'}</section>
@@ -156,7 +160,7 @@
   function openReader(i) { if (!i) return; R.open = true; box.hidden = false; document.body.classList.add("rdr-open"); show(i); }
   function close() { R.open = false; box.hidden = true; document.body.classList.remove("rdr-open"); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
   function step(d) { const k = R.list.findIndex((x) => R.cur && x.id === R.cur.id); const n = R.list[k + d]; if (n) show(n); }
-  const findItem = (id) => (S._feedMap && S._feedMap.get(id)) || R.list.find((x) => x.id === id) || ((S.news && S.news.items) || []).find((x) => x.id === id) || R.saved[id];
+  const findItem = (id) => R.list.find((x) => x.id === id) || (S._feedMap && S._feedMap.get(id)) || ((S.news && S.news.items) || []).find((x) => x.id === id) || R.saved[id];
 
   box.addEventListener("click", (e) => {
     const rt = e.target.closest("[data-rt]"); if (rt) { R.tab = rt.dataset.rt; applyLayout(); return; }
