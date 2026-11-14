@@ -102,7 +102,10 @@
     el.querySelector(".mds-presets").onclick = (e) => { const b = e.target.closest("[data-mspreset]"); if (!b) return; const p = SCENARIOS[+b.dataset.mspreset]; E.market = p[1]; E.tech = p[2]; E.custom = p[3]; renderScenario(); };
     byId("mdsResearchReload").onclick = () => fetchResearch(true);
     byId("mdsGraphForm").onsubmit = (e) => { e.preventDefault(); E.focus = String(byId("mdsFocus").value || "").trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,"").slice(0,12); fetchGraph(); };
-    byId("mdsGraphOut").onclick = (e) => { const hit = e.target.closest("[data-msnode], [data-msedge]"); if (!hit) return;
+    byId("mdsGraphOut").onclick = (e) => {
+      const example=e.target.closest("[data-msgraph-example]");
+      if(example){E.focus=example.dataset.msgraphExample;byId("mdsFocus").value=E.focus;fetchGraph();return;}
+      const hit = e.target.closest("[data-msnode], [data-msedge]"); if (!hit) return;
       if (hit.dataset.msnode) { const n = (E.graph && E.graph.nodes || []).find((n) => n.id === hit.dataset.msnode); if (!n) return;
         byId("mdsGraphDetail").textContent = n.label + " — " + (n.sub || n.type) + ". " + (n.id.startsWith("co:") ? "Select Explore connections to center this company." : "Related through stored Spider data.");
         if (n.id.startsWith("co:")) { E.focus = n.id.slice(3); byId("mdsFocus").value = E.focus; fetchGraph(); }
@@ -276,7 +279,11 @@
     for (const [k, val] of [["Market",E.market],["Tech",E.tech],["Custom",E.custom]]) { byId("mds"+k).value = val; byId("mds"+k+"Val").textContent = pct(val); }
     const snap = Core.holdings(activePf(), S.quotes, E.sec), res = Core.shockPortfolio(snap, E);
     const out = byId("mdsScenarioOut");
-    if (!snap.rows.length) { out.innerHTML = `<p class="mds-empty">No currently priced positions in this portfolio. Open Portfolio to add holdings or let the quotes load.${snap.unpriced.length ? " Missing: " + clean(snap.unpriced.join(", ")) : ""}</p>`; return; }
+    if (!snap.rows.length) { out.innerHTML = `<p class="mds-empty">No currently priced positions in this portfolio. Add holdings or let prices load.${snap.unpriced.length ? " Missing: " + clean(snap.unpriced.join(", ")) : ""}</p>
+      <div class="mds-example-panel"><h4>Illustrative scenario: a 12% market decline</h4><p>A purely hypothetical $10,000 equity portfolio exposed to a uniform −12% shock would lose $1,200 and finish at $8,800. This is an arithmetic example, <b>not</b> your holdings or a market prediction.</p>
+      <div class="mds-examples"><button type="button" data-msdemo-pf>Open my portfolio</button></div></div>`;
+      const b=out.querySelector("[data-msdemo-pf]");if(b)b.onclick=()=>setTab("portfolio");
+      return; }
     const curr = (v) => fmt(v);
     out.innerHTML = `<div class="mds-kpis"><div><small>Priced positions</small><strong>${snap.rows.length} / ${snap.totalPositions}</strong></div><div><small>Quoted exposure</small><strong>${curr(res.before)}</strong></div><div><small>Scenario P&amp;L</small><strong class="${res.pnl < 0 ? "mds-down" : "mds-up"}">${curr(res.pnl)}</strong></div><div><small>Scenario return</small><strong class="${res.pnl < 0 ? "mds-down" : "mds-up"}">${pct(res.pct)}</strong></div></div>
       ${res.partial ? `<p class="mds-warning">Partial result — no valid quote for ${clean(res.unpriced.join(", "))}; excluded from totals. This is not the whole portfolio.</p>` : ""}
@@ -309,24 +316,26 @@
       const url = link(d.verifiedUrl), evidenceKind = d.kind || (d.facts || []).some((f) => f.kind === "fact") ? (d.kind || "mixed") : "interpretation";
       return `<article class="mds-find"><div class="mds-find-meta"><span>${clean(d.cat || "research")}</span><span>${clean(d.evidenceStatus)} · ${d.sourceCount} source(s)</span><span>${age(d.u || d.t)} · importance ${Math.round(+d.importance || 0)}/100</span></div>
         <strong>${clean(d.headline)}</strong><p>${clean(d.summary || "")}</p><div class="mds-find-foot"><span>Related: ${clean(d.matched.join(", ") || "market-wide")}</span><span>Evidence: ${clean(evidenceKind)}</span>${url ? `<a target="_blank" rel="noopener noreferrer" href="${clean(url)}">Original source ↗</a>` : ""}</div></article>`;
-    }).join("")}</div>` : '<p class="mds-empty">No recent spider research found for your holdings or watchlist, or the research endpoint is unavailable. THE WEB can start an owner-authorized scan.</p>';
+    }).join("")}</div>` : '<p class="mds-empty">No recent Spider findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Look at NVDA earnings and filings, AMD sector momentum, or JPM rate sensitivity in THE WEB. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Explore companies in THE WEB →</button></div></div>';
+    const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("web");
     const trader = E.trader, el = byId("mdsTraderOut"); if (!el) return;
     el.innerHTML = trader ? `<div class="mds-connect"><h3>Spider ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. The Spider never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
     const b=el.querySelector("[data-msgo2]"); if (b) b.onclick=()=>setTab("aitrade");
   }
+  function graphExampleChoices() { return '<div class="mds-example-panel"><h4>Start with a company</h4><p>Use these real tickers to request Spider connections. The chart stays empty when there is no research data.</p><div class="mds-examples"><button type="button" data-msgraph-example="NVDA">Explore NVDA</button><button type="button" data-msgraph-example="MSFT">Explore MSFT</button><button type="button" data-msgraph-example="JPM">Explore JPM</button></div></div>'; }
   async function fetchGraph() {
     const out=byId("mdsGraphOut"); if (!out) return;
     out.innerHTML = '<p class="mds-empty">Loading graph recorded by the Spider…</p>';
     const focus = E.focus || (activePf() && (activePf().holdings || []).find((h) => +h.shares > 0)?.symbol) || (S.wl || [])[0] || "";
     E.focus = focus; byId("mdsFocus").value = focus;
     try { E.graph = await api("/api/web/graph" + (focus ? "?focus=" + encodeURIComponent("co:" + focus) : "")); renderGraph(); }
-    catch (e) { out.innerHTML = '<p class="mds-empty">The graph is unavailable: ' + clean(e.message || "Spider not connected") + '.</p>'; }
+    catch (e) { out.innerHTML = '<p class="mds-empty">The graph is unavailable: ' + clean(e.message || "Spider not connected") + '.</p>'+graphExampleChoices(); }
   }
   function renderGraph() {
     const host = byId("mdsGraphOut"); if (!host || !E.graph) return;
     const data = E.graph, nodes = (data.nodes || []).slice(0, 28), centerId = "co:" + (E.focus || "");
     const center = nodes.find((n) => n.id === centerId) || nodes[0];
-    if (!center) { host.innerHTML='<p class="mds-empty">No source-linked network data yet. Let THE WEB research your holdings first.</p>'; return; }
+    if (!center) { host.innerHTML='<p class="mds-empty">No source-linked network data yet. The chart is populated only from actual Spider connections.</p>' + graphExampleChoices(); return; }
     const others = nodes.filter((n) => n !== center);
     const coord = { [center.id]: [450,220] };
     others.forEach((n, i) => { const a = 2 * Math.PI * i / Math.max(1, others.length) - Math.PI/2;
@@ -352,7 +361,8 @@
         <strong>${clean(r.strategy || "Saved strategy")}</strong><p>${clean(r.universe || "")}</p>
         <div class="mds-metrics"><span>CAGR <b>${pct(Number(r.cagr)*100)}</b></span><span>Sharpe <b>${Number.isFinite(r.sharpe)?r.sharpe.toFixed(2):"—"}</b></span><span>Max DD <b>${pct(Number(r.mdd)*100)}</b></span></div>
         <ul>${v.reasons.map((s)=>`<li>${clean(s)}</li>`).join("")}</ul></article>`;
-      }).join("")}</div>` : '<p class="mds-empty">No saved strategy experiments on this device. The existing Backtest Lab already supports trading costs, walk-forward and out-of-sample evaluation; run an experiment there to populate this audit.</p>';
+      }).join("")}</div>` : '<p class="mds-empty">No saved quant experiments on this device yet. Performance metrics appear here only after a real historical simulation runs.</p><div class="mds-example-panel"><h4>Start with a tested model</h4><p>Example: compare six-month momentum, 50/200-day trend following and RSI 30/55. Each is already implemented in the strategy library.</p><div class="mds-examples"><button type="button" data-ms-example-strategies>Open 14 strategies →</button></div></div>';
+    const starter=host.querySelector("[data-ms-example-strategies]");if(starter)starter.onclick=()=>mode("strategies");
   }
   async function ask(question) {
     const out=byId("mdsAskOut"); if(!out) return;
@@ -381,8 +391,9 @@
   function renderAlerts() {
     const host=byId("mdsAlertOut"); if(!host) return;
     byId("mdsAlertFreshness").textContent = Core.freshness(S.lastOk,Date.now()).label + " (terminal fetch, not exchange timestamp). Alerts run only while this browser is open; no guaranteed 24/7 monitoring.";
-    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No alerts have been recorded on this device. Configure thresholds above; only new qualifying events are logged.</p>';
+    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No real alerts recorded yet. Nothing has crossed the configured thresholds while this browser was monitoring.</p><div class="mds-example-panel"><h4>Example alert settings</h4><p>Price move: 3% daily change on a currently updated holding. Spider discovery: importance 80/100 or higher on an owned ticker. This does not create sample alerts.</p><div class="mds-examples"><button type="button" data-ms-alert-example>Use these thresholds</button></div></div>';
     host.querySelectorAll("[data-mssym]").forEach((b)=>b.onclick=()=>{if(typeof openQuote==="function")openQuote(b.dataset.mssym);else setTab("research");});
+    const example=host.querySelector("[data-ms-alert-example]");if(example)example.onclick=()=>{opts.priceMove=3;opts.importance=80;byId("mdsMove").value=3;byId("mdsImp").value=80;preferences();renderAlerts();};
   }
   window.studioOpen=function(){
     menu();E.initialized=true;
