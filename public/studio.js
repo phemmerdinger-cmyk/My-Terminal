@@ -3,7 +3,7 @@
  * Never trades, never calls paid models, never claims a scenario is a forecast. */
 (function () {
   "use strict";
-  const Core = window.MDStudioCore;
+  const Core = window.MDStudioCore, STRAT = window.MDStrategyLibrary;
   if (!Core || typeof S === "undefined") return;
   const byId = (s) => document.getElementById(s);
   const clean = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -15,8 +15,8 @@
   const LS = { options: "md_studio_opts_v1", seen: "md_studio_seen_v1", events: "md_studio_alerts_v1" };
   const defaults = { price: true, research: true, priceMove: 5, importance: 75, density: "comfortable", color: "cyan", motion: "system" };
   const opts = { ...defaults, ...safeStorage.get(LS.options, {}) };
-  const E = { mounted: false, tab: "scenario", pf: null, market: -15, tech: -5, custom: 0, symbol: "NVDA",
-    sec: {}, research: [], trader: null, graph: null, focus: null, loading: false, initialized: false, seen: safeStorage.get(LS.seen, {}), events: safeStorage.get(LS.events, []), fetched: 0, graphInfo: "" };
+  const E = { mounted: false, tab: "strategies", pf: null, market: -15, tech: -5, custom: 0, symbol: "NVDA",
+    sec: {}, research: [], trader: null, graph: null, focus: null, loading: false, initialized: false, seen: safeStorage.get(LS.seen, {}), events: safeStorage.get(LS.events, []), fetched: 0, graphInfo: "", strategyResults: safeStorage.get("md_studio_strategy_results_v1", {}), strategyBusy: false, strategyHistory: new Map(), strategyAuto: false };
   const SCENARIOS = [
     ["Broad selloff", -20, 0, 0], ["Tech-specific stress", -8, -25, 0],
     ["Single-stock shock", 0, 0, -30], ["Broad rally", 12, 5, 0], ["Reset", 0, 0, 0]
@@ -36,12 +36,24 @@
     const el = byId("tab-studio");
     if (E.mounted && byId("mdsModes")) return;
     E.mounted = true;
-    el.innerHTML = `<header class="mds-hero"><div class="mds-eyebrow">◈ THE WEB / RESEARCH OPERATIONS</div><h1>Intelligence Studio <span class="mds-beacon" aria-hidden="true"></span></h1>
-      <p>Connect market research to your own positions and risk decisions. All calculations run locally; analysis is evidence-linked and hypothetical, never an order.</p>
-      <div class="mds-hero-actions"><button type="button" data-msgo="web">◉ Open full Spider graph</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest lab</button><button type="button" data-msgo="health">▤ System Health</button></div></header>
+    el.innerHTML = `<div class="mds-hero">
+      <div class="mds-hero-copy"><div class="mds-eyebrow">◈ THE WEB / RESEARCH OPERATIONS</div>
+      <div class="mds-title-line"><h1>Intelligence Studio</h1><span class="mds-beacon" aria-label="Studio ready"></span></div>
+      <p>Portfolio intelligence, researched connections and quant strategies in one workspace. All projections are hypothetical and no orders are placed.</p></div>
+      <div class="mds-hero-actions" aria-label="Connected terminal tools"><button type="button" data-msgo="web">◉ Spider network</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest Lab</button><button type="button" data-msgo="health">▤ System Health</button></div>
+      </div>
       <div class="mds-nav" id="mdsModes" role="tablist" aria-label="Intelligence Studio modules">
-        ${[["scenario","Shock simulator"],["research","Research bridge"],["graph","Knowledge network"],["quant","Quant audit"],["ask","Ask Spider"],["alerts","Smart alerts"],["settings","Appearance"]].map(([id,n])=>`<button type="button" data-msmode="${id}" role="tab" aria-selected="false">${n}</button>`).join("")}</div>
+        ${[["strategies","Strategies"],["scenario","Shock simulator"],["research","Research bridge"],["graph","Knowledge network"],["quant","Quant audit"],["ask","Ask Spider"],["alerts","Smart alerts"],["settings","Appearance"]].map(([id,n])=>`<button type="button" data-msmode="${id}" role="tab" aria-selected="false">${n}</button>`).join("")}</div>
       <div id="mdsFeedback" class="mds-feedback" aria-live="polite"></div>
+      <section id="mdsStrategies" data-mspanel="strategies" class="mds-panel" hidden>
+        <div class="mds-intro"><h2>Strategy research lab <span class="mds-section-tag">14 executable models</span></h2>
+          <p>Explore different investing rules, then compare their actual historical backtests. Every figure appears only after downloading price data and calculating performance — never from preset sample returns.</p></div>
+        <div class="mds-strategy-toolbar"><label for="mdsStrategyFilter">Filter family</label><select class="field" id="mdsStrategyFilter"><option value="all">All models</option><option value="trend">Trend &amp; momentum</option><option value="reversal">Mean reversion &amp; RSI</option><option value="factors">Multi-factor</option><option value="allocation">Portfolio allocation</option></select>
+          <button type="button" id="mdsRunSamples" class="mds-strategy-primary">▶ Run 5 examples</button><button type="button" id="mdsRunAll">Run all 14 backtests</button></div>
+        <div id="mdsStrategyProgress" class="mds-strategy-progress" role="status" aria-live="polite">Historical results will appear beneath each strategy once calculated.</div>
+        <div id="mdsStrategyCards" class="mds-strategy-grid"></div>
+        <p class="mds-caption">Same 5-year window, SPY benchmark and $10,000 simulated capital; 5 bps spread, 5 bps slippage, 0 commission, and a 2% cash floor. This is research, not live trading. Survivorship bias and free data availability affect backtest reliability.</p>
+      </section>
       <section id="mdsScenario" data-mspanel="scenario" class="mds-panel">
         <div class="mds-intro"><h2>Portfolio shock simulator</h2><p>Test <b>synthetic</b> scenarios, not price predictions or historical replays. P&amp;L is computed from the available quoted positions; missing quotes are excluded and clearly reported.</p></div>
         <div class="mds-controls"><label>Portfolio<select class="field" id="mdsPf"></select></label><label>Single-stock override<input id="mdsSym" class="field" placeholder="NVDA" maxlength="12"></label></div>
@@ -68,20 +80,32 @@
         <div class="mds-toolbar"><label><input type="checkbox" id="mdsPriceOn"> Monitor quoted price moves</label><label><input type="checkbox" id="mdsResearchOn"> Monitor important Spider findings</label><button id="mdsAlertClear" type="button">Clear history</button></div>
         <p id="mdsAlertFreshness" class="mds-caption"></p><div id="mdsAlertOut"></div></section>
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Customize your terminal</h2><p>Settings apply to this device only; motion respects your operating-system preference unless reduced motion is selected.</p></div>
+        <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
         <div class="mds-controls"><label>Information density<select class="field" id="mdsDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
           <label>Accent theme<select class="field" id="mdsAccent"><option value="cyan">Cyber cyan</option><option value="amber">Terminal amber</option></select></label>
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
-        <p class="mds-caption">Existing features, navigation and your portfolio data remain unchanged by these display settings.</p></section>`;
+        <div class="mds-settings-note"><span class="mds-settings-symbol">◈</span><div><strong>Visual preferences only</strong><p>Your portfolios, watchlist, saved backtests, research findings and paper-trading controls remain untouched.</p></div></div></section>`;
     el.querySelectorAll("[data-msgo]").forEach((b) => b.onclick = () => { if (typeof setTab === "function") setTab(b.dataset.msgo); });
     byId("mdsModes").onclick = (e) => { const b = e.target.closest("[data-msmode]"); if (b) mode(b.dataset.msmode); };
+    byId("mdsStrategyFilter").onchange = renderStrategies;
+    byId("mdsRunSamples").onclick = () => runStrategyBatch(5);
+    byId("mdsRunAll").onclick = () => runStrategyBatch(14);
+    byId("mdsStrategyCards").onclick = (e) => {
+      const btn = e.target.closest("[data-ms-strategy], [data-ms-report]");
+      if (!btn) return;
+      if (btn.dataset.msStrategy) runStrategy(btn.dataset.msStrategy);
+      if (btn.dataset.msReport) fullStrategyReport(btn.dataset.msReport);
+    };
     byId("mdsPf").onchange = (e) => { E.pf = e.target.value; renderScenario(); };
     byId("mdsSym").onchange = (e) => { E.symbol = String(e.target.value || "").toUpperCase().replace(/[^A-Z0-9.\-]/g,"").slice(0,12); renderScenario(); };
     for (const [k, p] of [["Market","market"],["Tech","tech"],["Custom","custom"]]) byId("mds"+k).oninput = (e) => { E[p] = Number(e.target.value); renderScenario(); };
     el.querySelector(".mds-presets").onclick = (e) => { const b = e.target.closest("[data-mspreset]"); if (!b) return; const p = SCENARIOS[+b.dataset.mspreset]; E.market = p[1]; E.tech = p[2]; E.custom = p[3]; renderScenario(); };
     byId("mdsResearchReload").onclick = () => fetchResearch(true);
     byId("mdsGraphForm").onsubmit = (e) => { e.preventDefault(); E.focus = String(byId("mdsFocus").value || "").trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,"").slice(0,12); fetchGraph(); };
-    byId("mdsGraphOut").onclick = (e) => { const hit = e.target.closest("[data-msnode], [data-msedge]"); if (!hit) return;
+    byId("mdsGraphOut").onclick = (e) => {
+      const example=e.target.closest("[data-msgraph-example]");
+      if(example){E.focus=example.dataset.msgraphExample;byId("mdsFocus").value=E.focus;fetchGraph();return;}
+      const hit = e.target.closest("[data-msnode], [data-msedge]"); if (!hit) return;
       if (hit.dataset.msnode) { const n = (E.graph && E.graph.nodes || []).find((n) => n.id === hit.dataset.msnode); if (!n) return;
         byId("mdsGraphDetail").textContent = n.label + " — " + (n.sub || n.type) + ". " + (n.id.startsWith("co:") ? "Select Explore connections to center this company." : "Related through stored Spider data.");
         if (n.id.startsWith("co:")) { E.focus = n.id.slice(3); byId("mdsFocus").value = E.focus; fetchGraph(); }
@@ -101,12 +125,152 @@
     E.tab = next;
     document.querySelectorAll("#mdsModes [data-msmode]").forEach((b) => { const on = b.dataset.msmode === next; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
     document.querySelectorAll("#tab-studio [data-mspanel]").forEach((p) => { p.hidden = p.dataset.mspanel !== next; });
+    if (next === "strategies") renderStrategies();
     if (next === "scenario") renderScenario();
     if (next === "research") { renderResearch(); if (Date.now() - E.fetched > 90000) fetchResearch(); }
     if (next === "graph") { if (!E.graph) fetchGraph(); else renderGraph(); }
     if (next === "quant") renderQuant();
     if (next === "alerts") renderAlerts();
   }
+
+  // Source-linked, actually computed backtests. No embedded or random performance claims.
+  const STRATEGY_STORAGE = "md_studio_strategy_results_v1";
+  const STRATEGY_INITIAL = "md_studio_strategy_autorun_v1";
+  function strategyNum(n, digits=1) { return Number.isFinite(n) ? (n >= 0 ? "+" : "−") + Math.abs(n * 100).toFixed(digits) + "%" : "—"; }
+  function strategyCurve(points) {
+    if (!Array.isArray(points) || points.length < 2 || !points.every((n)=>Number.isFinite(n) && n > 0)) return "";
+    const lo=Math.min(...points),hi=Math.max(...points),delta=Math.max(.0001,hi-lo);
+    const d=points.map((v,i)=>(i ? "L" : "M") + (i/(points.length-1)*288).toFixed(1) + " " + (70-60*(v-lo)/delta).toFixed(1)).join(" ");
+    const rising=points[points.length-1]>=points[0];
+    return '<svg class="mds-sparkline" viewBox="0 0 288 80" preserveAspectRatio="none" role="img" aria-label="Historical simulated equity path"><path d="' + d + '" stroke="' + (rising?"#4de5b0":"#ff808e") + '" fill="none" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+  }
+  function renderStrategies() {
+    const host=byId("mdsStrategyCards"); if (!host || !STRAT) return;
+    const filter=byId("mdsStrategyFilter").value;
+    const list=STRAT.CATALOG.filter((x)=>filter==="all"||x.category===filter);
+    const state=E.strategyResults || {};
+    host.innerHTML = list.map((item) => {
+      const r=state[item.id], ok=r && r.status==="done" && r.result && r.to===STRAT.makeSpec(item).to;
+      const error=r && r.status==="error", busy=r && r.status==="running" && E.strategyBusy;
+      return `<article class="mds-strategy-card"><div class="mds-strategy-top"><span class="mds-strategy-family">${clean(item.category)}</span><span class="mds-strategy-state ${ok?"is-done":error?"is-error":""}">${ok?"✓ HISTORICAL":error?"DATA UNAVAILABLE":busy?"CALCULATING":"NOT RUN"}</span></div>
+        <h3>${clean(item.title)}</h3><p>${clean(item.summary)}</p>
+        <div class="mds-strategy-rule"><span>ENTRY / ALLOCATION RULE</span><strong>${clean(item.trigger)}</strong></div>
+        <p class="mds-strategy-universe">Universe: ${clean(item.universe.join(" · "))}</p>
+        ${ok ? `<div class="mds-strategy-numbers"><div><small>Total return</small><b class="${r.result.totalReturn>=0?"mds-up":"mds-down"}">${strategyNum(r.result.totalReturn)}</b></div>
+        <div><small>CAGR</small><b>${strategyNum(r.result.cagr)}</b></div><div><small>Sharpe</small><b>${Number.isFinite(r.result.sharpe)?r.result.sharpe.toFixed(2):"—"}</b></div>
+        <div><small>Max drawdown</small><b class="mds-down">${strategyNum(r.result.maxDrawdown)}</b></div></div>
+        ${strategyCurve(r.result.curve)}
+        <p class="mds-strategy-computed">Ending value ${fmt(r.result.finalValue)} · ${r.result.trades} orders · ${age(r.at)}</p>` :
+         error ? `<p class="mds-warning">${clean(r.error || "Missing historical prices.")}</p>` :
+         '<div class="mds-strategy-no-result">Run to calculate real historical returns.</div>'}
+        <div class="mds-strategy-actions"><button type="button" data-ms-strategy="${clean(item.id)}" ${E.strategyBusy?"disabled":""}>${ok?"↻ Recalculate":"▶ Run backtest"}</button>
+        <button type="button" data-ms-report="${clean(item.id)}" ${E.strategyBusy?"disabled":""}>${ok?"Full report ↗":"Open in Backtest Lab ↗"}</button></div>
+      </article>`;
+    }).join("");
+    const progress=byId("mdsStrategyProgress");
+    if(progress && !E.strategyBusy){
+      const num=STRAT.CATALOG.filter((item)=>state[item.id]&&state[item.id].status==="done"&&state[item.id].to===STRAT.makeSpec(item).to).length;
+      progress.textContent=num+" of "+STRAT.CATALOG.length+" strategy examples have actual historical results on this device. This is a fixed five-year backtest, not a live trading signal.";
+    }
+    for(const id of ["mdsRunSamples","mdsRunAll"]){const b=byId(id);if(b)b.disabled=E.strategyBusy;}
+  }
+  async function strategyHistory(spec) {
+    if (!window.MD || typeof window.MD.hist!=="function") throw new Error("Free historical-price provider is not available");
+    const pad = new Date(Date.parse(spec.from + "T00:00:00Z") - 420*864e5).toISOString().slice(0,10);
+    const symbols=[...new Set([...spec.universe,spec.benchmark])], data={}, failures=[];
+    for(let i=0;i<symbols.length;i+=3)await Promise.all(symbols.slice(i,i+3).map(async (sym)=>{
+      const key=sym+"|"+pad+"|"+spec.to;
+      try {
+        if(!E.strategyHistory.has(key)){
+          const h=await window.MD.hist(sym,pad,spec.to);
+          if(!Array.isArray(h.t)||h.t.length<252||!Array.isArray(h.close)||h.close.length!==h.t.length)
+            throw new Error("insufficient historical observations");
+          E.strategyHistory.set(key,{t:h.t,close:h.close,adj:h.adj});
+        }
+        data[sym]=E.strategyHistory.get(key);
+      } catch(e){failures.push(sym+": "+String(e.message||e).slice(0,80));}
+    }));
+    if(failures.length)throw new Error("History unavailable for "+failures.join("; ")+". No partial-performance substitution.");
+    return data;
+  }
+  function saveStrategyResult(item, r, spec) {
+    const m=r.metrics;
+    const take=35,curve=[];
+    for(let i=0;i<take;i++) curve.push(r.equity[Math.round(i*(r.equity.length-1)/(take-1))]);
+    E.strategyResults[item.id]={status:"done",at:Date.now(),from:spec.from,to:spec.to,
+      result:{totalReturn:m.totalReturn,cagr:m.cagr,sharpe:m.sharpe,maxDrawdown:m.maxDrawdown,finalValue:m.finalValue,
+        trades:r.trades.length,curve,benchmarkReturn:r.benchMetrics.totalReturn}};
+    safeStorage.set(STRATEGY_STORAGE,E.strategyResults);
+    try {
+      const runs=JSON.parse(localStorage.getItem("md_qb_runs")||"[]");
+      if(Array.isArray(runs)){
+        const existing=runs.filter(x=>!(x.studioId===item.id && x.to===spec.to));
+        existing.unshift({at:Date.now(),kind:"backtest",strategy:item.title,studioId:item.id,title:item.title,
+          universe:spec.universe.join(", "),params:Object.entries(spec.params).map(([k,v])=>k+" "+v).join(", "),
+          from:spec.from,to:spec.to,costs:spec.costs,cagr:m.cagr,sharpe:m.sharpe,
+          mdd:m.maxDrawdown,vol:m.vol,var95:m.var95});
+        localStorage.setItem("md_qb_runs",JSON.stringify(existing.slice(0,25)));
+      }
+    }catch{}
+  }
+  async function computeStrategy(item) {
+    const spec=STRAT.makeSpec(item), now=Date.now();
+    E.strategyResults[item.id]={status:"running",at:now,to:spec.to};
+    renderStrategies();
+    try {
+      const series=await strategyHistory(spec);
+      const result=window.QUANT.run({...spec,series,from:Date.parse(spec.from+"T00:00:00Z")/1000,to:Date.parse(spec.to+"T23:59:59Z")/1000});
+      if(!result||result.dates.length<252||!Number.isFinite(result.metrics.finalValue)||!Number.isFinite(result.metrics.cagr))
+        throw new Error("Insufficient data or non-finite performance; results not saved.");
+      saveStrategyResult(item,result,spec);
+      return true;
+    }catch(e){
+      E.strategyResults[item.id]={status:"error",at:Date.now(),to:spec.to,error:String(e.message||e).slice(0,240)};
+      safeStorage.set(STRATEGY_STORAGE,E.strategyResults);
+      return false;
+    }finally{renderStrategies();}
+  }
+  async function runStrategy(id) {
+    if(!STRAT || E.strategyBusy)return;
+    const item=STRAT.CATALOG.find(x=>x.id===id);if(!item)return;
+    E.strategyBusy=true;
+    try{
+      const status=byId("mdsStrategyProgress");
+      if(status) status.textContent="Calculating "+item.title+" from real historical data…";
+      await computeStrategy(item);
+    }finally{E.strategyBusy=false;renderStrategies();}
+  }
+  async function runStrategyBatch(count) {
+    if(!STRAT || E.strategyBusy || window.__VISITOR || (typeof VIEW!=="undefined"&&VIEW))return;
+    E.strategyBusy=true;
+    try{
+      const list=STRAT.CATALOG.slice(0,count), status=byId("mdsStrategyProgress");let done=0,failed=0;
+      for(let i=0;i<list.length;i++){
+        if(status)status.textContent="Calculating real backtests: "+(i+1)+" / "+list.length+" · "+list[i].title+"…";
+        // Allow progress to paint between potentially expensive CPU simulations.
+        await new Promise(r=>setTimeout(r,20));
+        if(await computeStrategy(list[i]))done++;else failed++;
+      }
+      if(status)status.textContent="Finished "+done+" historical backtests"+(failed?" · "+failed+" could not load required data":"")+". Every successful result was saved on this device.";
+    }finally{E.strategyBusy=false;renderStrategies();}
+  }
+  function fullStrategyReport(id) {
+    if(!STRAT||E.strategyBusy)return;
+    const item=STRAT.CATALOG.find(x=>x.id===id);if(!item)return;
+    try{sessionStorage.setItem("md_qb_pending_spec_v1",JSON.stringify(STRAT.makeSpec(item)));}
+    catch{return toast("Unable to pass the strategy to Backtest Lab on this device.");}
+    setTab("backtest");
+  }
+  function firstStrategyExamples() {
+    if(E.strategyAuto||!STRAT||window.__VISITOR||(typeof VIEW!=="undefined"&&VIEW))return;
+    E.strategyAuto=true;
+    let completed=false;
+    try{completed=!!localStorage.getItem(STRATEGY_INITIAL);}catch{return;}
+    if(completed)return;
+    try{localStorage.setItem(STRATEGY_INITIAL,String(Date.now()));}catch{return;}
+    setTimeout(()=>{if(S.tab==="studio"&&E.tab==="strategies")runStrategyBatch(5);},350);
+  }
+
   function renderScenario() {
     if (!E.mounted) return;
     const options = portfolios().map((p) => `<option value="${clean(p.id)}"${p.id === (activePf() || {}).id ? " selected" : ""}>${clean(p.name)}</option>`).join("");
@@ -115,7 +279,11 @@
     for (const [k, val] of [["Market",E.market],["Tech",E.tech],["Custom",E.custom]]) { byId("mds"+k).value = val; byId("mds"+k+"Val").textContent = pct(val); }
     const snap = Core.holdings(activePf(), S.quotes, E.sec), res = Core.shockPortfolio(snap, E);
     const out = byId("mdsScenarioOut");
-    if (!snap.rows.length) { out.innerHTML = `<p class="mds-empty">No currently priced positions in this portfolio. Open Portfolio to add holdings or let the quotes load.${snap.unpriced.length ? " Missing: " + clean(snap.unpriced.join(", ")) : ""}</p>`; return; }
+    if (!snap.rows.length) { out.innerHTML = `<p class="mds-empty">No currently priced positions in this portfolio. Add holdings or let prices load.${snap.unpriced.length ? " Missing: " + clean(snap.unpriced.join(", ")) : ""}</p>
+      <div class="mds-example-panel"><h4>Illustrative scenario: a 12% market decline</h4><p>A purely hypothetical $10,000 equity portfolio exposed to a uniform −12% shock would lose $1,200 and finish at $8,800. This is an arithmetic example, <b>not</b> your holdings or a market prediction.</p>
+      <div class="mds-examples"><button type="button" data-msdemo-pf>Open my portfolio</button></div></div>`;
+      const b=out.querySelector("[data-msdemo-pf]");if(b)b.onclick=()=>setTab("portfolio");
+      return; }
     const curr = (v) => fmt(v);
     out.innerHTML = `<div class="mds-kpis"><div><small>Priced positions</small><strong>${snap.rows.length} / ${snap.totalPositions}</strong></div><div><small>Quoted exposure</small><strong>${curr(res.before)}</strong></div><div><small>Scenario P&amp;L</small><strong class="${res.pnl < 0 ? "mds-down" : "mds-up"}">${curr(res.pnl)}</strong></div><div><small>Scenario return</small><strong class="${res.pnl < 0 ? "mds-down" : "mds-up"}">${pct(res.pct)}</strong></div></div>
       ${res.partial ? `<p class="mds-warning">Partial result — no valid quote for ${clean(res.unpriced.join(", "))}; excluded from totals. This is not the whole portfolio.</p>` : ""}
@@ -148,24 +316,26 @@
       const url = link(d.verifiedUrl), evidenceKind = d.kind || (d.facts || []).some((f) => f.kind === "fact") ? (d.kind || "mixed") : "interpretation";
       return `<article class="mds-find"><div class="mds-find-meta"><span>${clean(d.cat || "research")}</span><span>${clean(d.evidenceStatus)} · ${d.sourceCount} source(s)</span><span>${age(d.u || d.t)} · importance ${Math.round(+d.importance || 0)}/100</span></div>
         <strong>${clean(d.headline)}</strong><p>${clean(d.summary || "")}</p><div class="mds-find-foot"><span>Related: ${clean(d.matched.join(", ") || "market-wide")}</span><span>Evidence: ${clean(evidenceKind)}</span>${url ? `<a target="_blank" rel="noopener noreferrer" href="${clean(url)}">Original source ↗</a>` : ""}</div></article>`;
-    }).join("")}</div>` : '<p class="mds-empty">No recent spider research found for your holdings or watchlist, or the research endpoint is unavailable. THE WEB can start an owner-authorized scan.</p>';
+    }).join("")}</div>` : '<p class="mds-empty">No recent Spider findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Look at NVDA earnings and filings, AMD sector momentum, or JPM rate sensitivity in THE WEB. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Explore companies in THE WEB →</button></div></div>';
+    const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("web");
     const trader = E.trader, el = byId("mdsTraderOut"); if (!el) return;
     el.innerHTML = trader ? `<div class="mds-connect"><h3>Spider ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. The Spider never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
     const b=el.querySelector("[data-msgo2]"); if (b) b.onclick=()=>setTab("aitrade");
   }
+  function graphExampleChoices() { return '<div class="mds-example-panel"><h4>Start with a company</h4><p>Use these real tickers to request Spider connections. The chart stays empty when there is no research data.</p><div class="mds-examples"><button type="button" data-msgraph-example="NVDA">Explore NVDA</button><button type="button" data-msgraph-example="MSFT">Explore MSFT</button><button type="button" data-msgraph-example="JPM">Explore JPM</button></div></div>'; }
   async function fetchGraph() {
     const out=byId("mdsGraphOut"); if (!out) return;
     out.innerHTML = '<p class="mds-empty">Loading graph recorded by the Spider…</p>';
     const focus = E.focus || (activePf() && (activePf().holdings || []).find((h) => +h.shares > 0)?.symbol) || (S.wl || [])[0] || "";
     E.focus = focus; byId("mdsFocus").value = focus;
     try { E.graph = await api("/api/web/graph" + (focus ? "?focus=" + encodeURIComponent("co:" + focus) : "")); renderGraph(); }
-    catch (e) { out.innerHTML = '<p class="mds-empty">The graph is unavailable: ' + clean(e.message || "Spider not connected") + '.</p>'; }
+    catch (e) { out.innerHTML = '<p class="mds-empty">The graph is unavailable: ' + clean(e.message || "Spider not connected") + '.</p>'+graphExampleChoices(); }
   }
   function renderGraph() {
     const host = byId("mdsGraphOut"); if (!host || !E.graph) return;
     const data = E.graph, nodes = (data.nodes || []).slice(0, 28), centerId = "co:" + (E.focus || "");
     const center = nodes.find((n) => n.id === centerId) || nodes[0];
-    if (!center) { host.innerHTML='<p class="mds-empty">No source-linked network data yet. Let THE WEB research your holdings first.</p>'; return; }
+    if (!center) { host.innerHTML='<p class="mds-empty">No source-linked network data yet. The chart is populated only from actual Spider connections.</p>' + graphExampleChoices(); return; }
     const others = nodes.filter((n) => n !== center);
     const coord = { [center.id]: [450,220] };
     others.forEach((n, i) => { const a = 2 * Math.PI * i / Math.max(1, others.length) - Math.PI/2;
@@ -191,7 +361,8 @@
         <strong>${clean(r.strategy || "Saved strategy")}</strong><p>${clean(r.universe || "")}</p>
         <div class="mds-metrics"><span>CAGR <b>${pct(Number(r.cagr)*100)}</b></span><span>Sharpe <b>${Number.isFinite(r.sharpe)?r.sharpe.toFixed(2):"—"}</b></span><span>Max DD <b>${pct(Number(r.mdd)*100)}</b></span></div>
         <ul>${v.reasons.map((s)=>`<li>${clean(s)}</li>`).join("")}</ul></article>`;
-      }).join("")}</div>` : '<p class="mds-empty">No saved strategy experiments on this device. The existing Backtest Lab already supports trading costs, walk-forward and out-of-sample evaluation; run an experiment there to populate this audit.</p>';
+      }).join("")}</div>` : '<p class="mds-empty">No saved quant experiments on this device yet. Performance metrics appear here only after a real historical simulation runs.</p><div class="mds-example-panel"><h4>Start with a tested model</h4><p>Example: compare six-month momentum, 50/200-day trend following and RSI 30/55. Each is already implemented in the strategy library.</p><div class="mds-examples"><button type="button" data-ms-example-strategies>Open 14 strategies →</button></div></div>';
+    const starter=host.querySelector("[data-ms-example-strategies]");if(starter)starter.onclick=()=>mode("strategies");
   }
   async function ask(question) {
     const out=byId("mdsAskOut"); if(!out) return;
@@ -220,14 +391,17 @@
   function renderAlerts() {
     const host=byId("mdsAlertOut"); if(!host) return;
     byId("mdsAlertFreshness").textContent = Core.freshness(S.lastOk,Date.now()).label + " (terminal fetch, not exchange timestamp). Alerts run only while this browser is open; no guaranteed 24/7 monitoring.";
-    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No alerts have been recorded on this device. Configure thresholds above; only new qualifying events are logged.</p>';
+    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No real alerts recorded yet. Nothing has crossed the configured thresholds while this browser was monitoring.</p><div class="mds-example-panel"><h4>Example alert settings</h4><p>Price move: 3% daily change on a currently updated holding. Spider discovery: importance 80/100 or higher on an owned ticker. This does not create sample alerts.</p><div class="mds-examples"><button type="button" data-ms-alert-example>Use these thresholds</button></div></div>';
     host.querySelectorAll("[data-mssym]").forEach((b)=>b.onclick=()=>{if(typeof openQuote==="function")openQuote(b.dataset.mssym);else setTab("research");});
+    const example=host.querySelector("[data-ms-alert-example]");if(example)example.onclick=()=>{opts.priceMove=3;opts.importance=80;byId("mdsMove").value=3;byId("mdsImp").value=80;preferences();renderAlerts();};
   }
+  window.studioSelectMode=function(next){menu();if(["strategies","scenario","research","graph","quant","ask","alerts","settings"].includes(next))mode(next);};
   window.studioOpen=function(){
     menu();E.initialized=true;
     if (!E.pf) E.pf=S.pfActive;
     if (!E.focus) E.focus=(activePf() && (activePf().holdings || []).find((h)=>+h.shares>0)?.symbol) || (S.wl || [])[0] || "NVDA";
     mode(E.tab);
+    if (E.tab === "strategies") firstStrategyExamples();
     if (!Object.keys(E.sec).length) fetch("/sp500.json").then((r)=>r.json()).then((j)=>{E.sec=Object.fromEntries((j.rows||[]).map((r)=>[r[0],r[2]]));renderScenario();}).catch(()=>{});
     if(Date.now()-E.fetched>90000)fetchResearch();
     scanAlerts();

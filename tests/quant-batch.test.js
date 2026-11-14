@@ -79,7 +79,9 @@ test("production UI uses actual data provider, saves five metrics and links to d
   assert.ok(ui.includes('window.MD.hist(sym, pad, spec.to)'));
   assert.ok(ui.includes('QB.batchDetails.set'));
   assert.ok(ui.includes('remember(item.spec, result, "backtest")'));
-  assert.ok(ui.includes('window.qbOpen = function () { shell(); maybeAutoFive(); };'));
+  assert.ok(ui.includes('window.qbOpen = function () {'));
+  assert.ok(ui.includes('const pending=studioSpec();'));
+  assert.ok(ui.includes('if(pending){fillStudioSpec(pending);go("run");}else maybeAutoFive();'));
   assert.ok(ui.includes('Missing tickers are not silently dropped.'));
   assert.ok(ui.includes('data-batchview'));
 });
