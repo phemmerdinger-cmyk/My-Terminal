@@ -1546,9 +1546,12 @@ async function syncPut(code, doc) {
 const AP_FILE = path.join(require("os").tmpdir(), "autopilot-v2.json");
 const AP_KEY = "pft:autopilot:v2";
 const AP_RISK_SLOTS = 8; // 80% risk: 8 of the 10 equal slots go to high-volatility names
-const AP_START = 10_000, AP_BUST = process.env.AP_TEST_BUST ? 9_990 : 1_000, AP_SLOTS = 10, AP_SLIP = 0.0005, AP_HOLD_MIN = 60 * 60e3;
+// One-time reset of all three paper bots: when BOT_RESET_ID changes, each account restarts at its starting value on
+// the next server start (the old run is kept in its test-run history) and browser backups from before can't restore it.
+const BOT_RESET_ID = "2026-11-16-all-30k";
+const AP_START = 30_000, AP_BUST = process.env.AP_TEST_BUST ? 29_990 : 3_000, AP_SLOTS = 10, AP_SLIP = 0.0005, AP_HOLD_MIN = 60 * 60e3;
 const AP_FALLBACK = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","TSLA","BRK-B","JPM","LLY","V","UNH","XOM","MA","COST","HD","PG","JNJ","WMT","NFLX","ABBV","BAC","CRM","ORCL","AMD","KO","MRK","CVX","PEP","ADBE","TMO","LIN","MCD","CSCO","ACN","ABT","WFC","GE","QCOM","INTU","CAT","TXN","DIS","IBM"];
-const apFresh = () => ({ v: 2, run: 1, runs: [], start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], lastRebalance: "", updated: Date.now() });
+const apFresh = () => ({ v: 2, resetId: BOT_RESET_ID, run: 1, runs: [], start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], lastRebalance: "", updated: Date.now() });
 let AP = apFresh(), apBusy = false, apLoaded = false, apLastScore = 0, apLastPlan = 0, apSig = null;
 const apBase = new Map(); // per-symbol daily inputs (moving averages, 3-month-ago price, name matcher)
 const etParts = (d = new Date()) => {
@@ -1559,15 +1562,24 @@ function apFix() {
   if (!AP || AP.v !== 2) AP = apFresh();
   AP.run = AP.run || 1; AP.runs = AP.runs || []; AP.intraday = AP.intraday || []; AP.equity = AP.equity || []; AP.trades = AP.trades || []; AP.recent = AP.recent || {};
 }
+// The one-time reset (see BOT_RESET_ID). Returns true if it reset, so the caller saves.
+function apResetCheck() {
+  if (AP.resetId === BOT_RESET_ID) return false;
+  const runs = AP.runs || [], busy = AP.firstTrade || AP.trades.length;
+  if (busy) { const v = AP.cash + Object.entries(AP.positions || {}).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost || 0), 0), vals = [10_000, ...AP.equity.map((p) => p.v), v];
+    runs.unshift({ run: AP.run, start: AP.firstTrade || AP.start, end: Date.now(), startValue: 10_000, endValue: +v.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: AP.trades.length, days: AP.equity.length, spxRet: null, busted: false, reason: "Reset — all three bots restarted at $30,000" }); }
+  AP = { ...apFresh(), run: busy ? AP.run + 1 : AP.run, runs };
+  return true;
+}
 async function apLoad() {
   try {
     if (UP_URL && UP_TOKEN) {
       const r = await fetch(`${UP_URL}/get/${AP_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) });
-      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apFix(); apLoaded = true; return; }
+      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apFix(); if (apResetCheck()) await apSave(); apLoaded = true; return; }
     }
   } catch {}
   try { AP = JSON.parse(fs.readFileSync(AP_FILE, "utf8")); } catch {}
-  apFix(); apLoaded = true;
+  apFix(); if (apResetCheck()) await apSave(); apLoaded = true;
 }
 async function apSave() {
   AP.updated = Date.now();
@@ -1951,9 +1963,10 @@ async function apView() {
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 2 || typeof doc.cash !== "number" || !doc.positions || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
+  if (doc.resetId !== BOT_RESET_ID) return { ok: false, error: "backup is from before the reset" };
   const mine = AP.trades.length + (AP.runs || []).length * 1e4, theirs = doc.trades.length + (doc.runs || []).length * 1e4;
   if (theirs < mine || (AP.trades.length && doc.updated <= AP.updated)) return { ok: false, error: "server copy is newer" };
-  const keep = ["run", "runs", "start", "cash", "positions", "trades", "equity", "intraday", "lastRebalance", "lastScan", "spx0", "firstTrade", "recent", "updated"];
+  const keep = ["resetId", "run", "runs", "start", "cash", "positions", "trades", "equity", "intraday", "lastRebalance", "lastScan", "spx0", "firstTrade", "recent", "updated"];
   AP = apFresh(); for (const k of keep) if (doc[k] !== undefined) AP[k] = doc[k];
   AP.trades = AP.trades.slice(0, 1500); AP.equity = (AP.equity || []).slice(-2000); AP.runs = (AP.runs || []).slice(0, 200); apFix();
   apSave(); return { ok: true };
@@ -1989,13 +2002,22 @@ const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN",
 const DT_MAXPOS = DT_UNIVERSE.length;
 let dtThrottleUntil = 0; // if the free data source starts refusing, drop to the first 50 stocks for 10 minutes
 const dtTally = () => ({ n: 0, wins: 0, gw: 0, gl: 0, longs: 0, shorts: 0, longPnl: 0, shortPnl: 0, costs: 0, traded: 0, Rsum: 0, held: 0, kinds: {} });
-const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), brain: DTB.fresh(), pend: {}, updated: Date.now() });
+const dtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), brain: DTB.fresh(), pend: {}, updated: Date.now() });
+function dtResetCheck() {
+  if (DT.resetId === BOT_RESET_ID) return false;
+  const runs = DT.runs || [], busy = DT.firstTrade || (DT.trades && DT.trades.length);
+  if (busy) { const v = DT.cash + Object.values(DT.positions || {}).reduce((a, p) => a + (p.dir === "long" ? 1 : -1) * p.shares * p.entry, 0), vals = [DT_START, ...(DT.equity || []).map((p) => p.v), v];
+    runs.unshift({ run: DT.run || 1, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +v.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n || 0 : 0, days: (DT.equity || []).length, spxRet: null, busted: false, reason: "Reset — all three bots restarted at $30,000 (new self-learning style)" }); }
+  DT = { ...dtFresh(), run: busy ? (DT.run || 1) + 1 : DT.run || 1, runs };
+  return true;
+}
 let DT = dtFresh(), dtLoaded = false, dtBusy = false, dtTickN = 0;
 const dtPx = {}, dtSeq = { n: 0 };
 async function dtLoad() {
-  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { DT = { ...dtFresh(), ...JSON.parse(j.result) }; DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {}; dtLoaded = true; return; } } } catch {}
-  try { DT = { ...dtFresh(), ...JSON.parse(fs.readFileSync(DT_FILE, "utf8")) }; } catch {}
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); DT = { ...dtFresh(), ...raw, resetId: raw.resetId }; } DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {}; if (dtResetCheck()) await dtSave(); dtLoaded = true; return; } } } catch {}
+  try { const raw = JSON.parse(fs.readFileSync(DT_FILE, "utf8")); DT = { ...dtFresh(), ...raw, resetId: raw.resetId }; } catch {}
   DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {};
+  if (dtResetCheck()) await dtSave();
   dtLoaded = true;
 }
 async function dtSave() {
@@ -2243,6 +2265,7 @@ async function dtView() {
 }
 function dtRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
+  if (doc.resetId !== BOT_RESET_ID) return { ok: false, error: "backup is from before the reset" };
   const mine = DT.trades.length + DT.runs.length * 1e4, theirs = doc.trades.length + (doc.runs || []).length * 1e4;
   if (theirs < mine || (DT.trades.length && doc.updated <= DT.updated)) return { ok: false, error: "server copy is newer" };
   DT = { ...dtFresh(), ...doc, trades: doc.trades.slice(0, 2000) }; DT.brain = DTB.fix(DT.brain); DT.pend = {}; dtSave(); return { ok: true };
@@ -2255,12 +2278,21 @@ setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60
 // at the latest daily close (5 bps per side). Paper money only. Rules live in quant-trader.js.
 const QTC = require("./quant-trader.js"), QMS = require("./public/qmath.js");
 const QT_FILE = path.join(require("os").tmpdir(), "quanttrader-v1.json"), QT_KEY = "pft:quanttrader:v1";
-const qtFresh = () => ({ v: 1, start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
+const qtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, runs: [], start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
 let QT = qtFresh(), qtLoaded = false, qtBusy = false; const qtPx = {};
 async function qtLoad() {
-  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { QT = { ...qtFresh(), ...JSON.parse(j.result) }; qtLoaded = true; return; } } } catch {}
-  try { QT = { ...qtFresh(), ...JSON.parse(fs.readFileSync(QT_FILE, "utf8")) }; } catch {}
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } if (qtResetCheck()) await qtSave(); qtLoaded = true; return; } } } catch {}
+  try { const raw = JSON.parse(fs.readFileSync(QT_FILE, "utf8")); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } catch {}
+  if (qtResetCheck()) await qtSave();
   qtLoaded = true;
+}
+function qtResetCheck() {
+  if (QT.resetId === BOT_RESET_ID) return false;
+  const runs = Array.isArray(QT.runs) ? QT.runs : [], busy = QT.firstTrade || (QT.trades && QT.trades.length);
+  if (busy) { const v = QT.cash + Object.values(QT.positions || {}).reduce((a, p) => a + p.shares * p.cost, 0);
+    runs.unshift({ start: QT.firstTrade || QT.start, end: Date.now(), startValue: 10_000, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length, reason: "Reset — all three bots restarted at $30,000" }); }
+  QT = { ...qtFresh(), runs };
+  return true;
 }
 async function qtSave() {
   QT.updated = Date.now(); const body = JSON.stringify(QT);

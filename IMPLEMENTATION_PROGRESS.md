@@ -23,6 +23,9 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Sizing by edge after costs (0.15×–2× a slice), half size into earnings / after −3% day, portfolio guard: gross ≤ 4×, |net| ≤ 1.5× (0.75× under stress). Brain persists in the DT doc and survives busts.
 - Offline replay (synthetic 100 stocks × 390 min): 38,800 trades, ~3.5 ms per minute of decisions.
 
+### All bots reset to $30,000 (2026-11-16)
+- `BOT_RESET_ID` in server.js: on the first start with a new id, the swing bot, day trader and Quant trader each archive the old run (test-run history; Quant gets a `runs` list) and restart at $30,000 together. Backups from before the reset are refused by `apRestore`/`dtRestore`. Swing bust line is now $3,000 (still a 90% loss). `QT_START` = 30000.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
