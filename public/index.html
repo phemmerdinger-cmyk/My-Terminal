@@ -330,7 +330,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 /* app-like phone layout */
 nav.tabs .ti{display:none}
 /* two-level navigation: 4 sections, each with its own pages */
-nav.tabs button[data-group]{font-weight:600}
+nav.tabs button[data-group]{font-weight:600} nav.tabs button[data-group="web"]{font-family:inherit;font-size:inherit;font-weight:600;font-style:normal;letter-spacing:inherit;text-transform:none}
 nav.tabs .tsep{width:1px;background:var(--line2);margin:10px 8px;flex:none}
 .subtabs{display:flex;gap:2px;align-items:stretch}
 .subtabs button{background:none;border:0;padding:12px 12px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;font-size:13px}
@@ -1505,7 +1505,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
   <button data-group="quant"><span class="ti">∑</span>Quant</button>
   <button data-group="ailab" class="lab"><span class="ti">🤖</span>AI Lab</button>
-  <button data-group="web" title="Intelligence Studio and System Health"><span class="ti">🕸</span>Intelligence</button>
+  <button data-group="web" class="nav-standard" title="Intelligence Studio and System Health"><span class="ti">🕸</span>Intelligence</button>
   <span class="tsep" aria-hidden="true"></span>
   <div class="subtabs" id="subtabs" role="tablist"></div>
 </nav>
