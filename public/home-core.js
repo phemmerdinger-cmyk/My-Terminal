@@ -1,4 +1,4 @@
-/* Home: pure, zero-API-cost logic (portfolio summary, relevance-ranked briefing, daily priorities,
+/* Home: pure, zero-API-cost logic (portfolio summary, relevance-ranked briefing, trading-bot scoreboard,
  * layout model, hypothetical 1-year risk). Every briefing item carries its source and timestamp; nothing is
  * estimated when data is missing. Relevance scores are personal-priority measures, not forecasts. */
 (function (root, factory) {
@@ -128,34 +128,27 @@
       .map((x) => ({ ...x, score: Math.round(x.score) }));
   }
 
-  // ---------------------------------------------------------------- priorities
-  function priorities({ summary, earnings, news, watchlist, limits = {}, shift = [], now = Date.now() } = {}) {
-    const maxPos = limits.maxPosition || 25, maxSec = limits.maxSector || 40, out = [];
-    const ctx = context(summary, watchlist);
-    if (earnings && Array.isArray(earnings.yours)) for (const e of earnings.yours) {
-      const s = up(e.symbol), days = Math.round((Date.parse(e.date + "T12:00:00Z") - now) / DAY); if (!(days >= 0 && days <= 7)) continue;
-      if (ctx.hold.has(s)) out.push({ id: "earn:" + s, sev: days <= 2 ? "high" : "med", title: `${s} earnings ${days === 0 ? "today" : days === 1 ? "tomorrow" : "in " + days + " days"}`, detail: `You hold ${s}. Review your thesis and position size before ${e.date}.`, go: "research", sym: s });
-      else if (ctx.wl.has(s)) out.push({ id: "earn:" + s, sev: "low", title: `${s} (watchlist) reports ${e.date}`, detail: "A company you follow reports soon.", go: "research", sym: s });
+  // ---------------------------------------------------------------- trading bots (AI vs S&P 500)
+  // One row per paper bot from the live scoreboard (/api/pub/botslive): value, return since its start, the S&P 500 over
+  // the same period (from the S&P level at the bot's first trade), and the lead in dollars. No S&P start yet → null.
+  const BOTS = [["swing", "Swing bot"], ["day", "Day trader"], ["quant", "Quant trader"]];
+  function botBoard(snap) {
+    if (!snap || typeof snap !== "object") return { rows: [], total: null };
+    const spx = Number.isFinite(snap.spx) ? snap.spx : null, rows = [];
+    for (const [k, name] of BOTS) {
+      const b = snap[k]; if (!b || !Number.isFinite(b.value) || !(b.start > 0)) continue;
+      const ret = b.value / b.start - 1, spxRet = spx && b.spx0 > 0 ? spx / b.spx0 - 1 : null;
+      rows.push({ k, name, value: b.value, start: b.start, ret, spxRet, lead: spxRet == null ? null : b.value - b.start * (1 + spxRet), started: b.spx0 > 0 });
     }
-    for (const n of (news && news.items) || []) {
-      if (n.source !== "official" || !/SEC/i.test(n.agency || "") || !n.time || now - n.time > 7 * DAY) continue;
-      const s = up((n.tickers || [])[0]); if (!ctx.hold.has(s) && !ctx.wl.has(s)) continue;
-      out.push({ id: "filing:" + (n.id || n.link), sev: ctx.hold.has(s) ? "med" : "low", title: n.title, detail: `New SEC filing (${new Date(n.time).toISOString().slice(0, 10)}).`, url: n.link, go: "fin", sym: s });
-    }
-    if (summary) {
-      for (const r of summary.rows) if (r.weight != null && r.weight > maxPos) out.push({ id: "conc:" + r.symbol, sev: r.weight > maxPos * 1.5 ? "high" : "med", title: `${r.symbol} is ${r.weight.toFixed(1)}% of ${summary.name}`, detail: `Above your ${maxPos}% single-position limit.`, go: "risk" });
-      for (const s of summary.sectors) if (s.weight > maxSec && s.sector !== "Other / unclassified") out.push({ id: "sec:" + s.sector, sev: "med", title: `${s.sector} is ${s.weight.toFixed(1)}% of the portfolio`, detail: `Above your ${maxSec}% sector limit.`, go: "risk" });
-      for (const r of summary.rows) if (r.dayPct != null && Math.abs(r.dayPct) >= 5) out.push({ id: "move:" + r.symbol, sev: "med", title: `${r.symbol} moved ${r.dayPct >= 0 ? "+" : ""}${r.dayPct.toFixed(1)}% today`, detail: "Check the news behind the move.", go: "research", sym: r.symbol });
-      if (summary.unpriced.length) out.push({ id: "unpriced", sev: "low", title: `${summary.unpriced.length} holding${summary.unpriced.length > 1 ? "s" : ""} without a live quote`, detail: summary.unpriced.join(", ") + " — excluded from value and weights.", go: "portfolio" });
-    }
-    for (const x of shift || []) out.push({ id: "shift:" + x.sector, sev: "low", title: `${x.sector} exposure ${x.delta > 0 ? "rose" : "fell"} ${Math.abs(x.delta).toFixed(1)} pts since your last visit`, detail: `${x.from.toFixed(1)}% → ${x.to.toFixed(1)}%.`, go: "portfolio" });
-    const rank = { high: 0, med: 1, low: 2 }, seen = new Set();
-    return out.filter((p) => !seen.has(p.id) && seen.add(p.id)).sort((a, b) => rank[a.sev] - rank[b.sev]);
+    if (!rows.length) return { rows, total: null };
+    const value = rows.reduce((x, r) => x + r.value, 0), start = rows.reduce((x, r) => x + r.start, 0), all = rows.every((r) => r.spxRet != null);
+    const spxValue = all ? rows.reduce((x, r) => x + r.start * (1 + r.spxRet), 0) : null;
+    return { rows, total: { value, start, ret: value / start - 1, spxRet: spxValue == null ? null : spxValue / start - 1, lead: spxValue == null ? null : value - spxValue } };
   }
 
   // ---------------------------------------------------------------- layout
   const WIDGETS = [
-    { id: "priorities", title: "Daily priorities", span: 1 },
+    { id: "trading", title: "AI vs S&P 500 · trading bots", span: 3, first: true },
     { id: "briefing", title: "Personal briefing", span: 2 },
     { id: "portfolio", title: "Portfolio command", span: 1 },
     { id: "allocation", title: "Allocation & concentration", span: 1 },
@@ -166,7 +159,7 @@
   function normalizeLayout(l) {
     const ids = new Set(WIDGETS.map((w) => w.id)), seen = new Set(), out = [];
     for (const x of Array.isArray(l) ? l : []) if (x && ids.has(x.id) && !seen.has(x.id)) { seen.add(x.id); out.push({ id: x.id, span: [1, 2, 3].includes(x.span) ? x.span : 1, hidden: !!x.hidden }); }
-    for (const w of WIDGETS) if (!seen.has(w.id)) out.push({ id: w.id, span: w.span, hidden: false });
+    for (const w of WIDGETS) if (!seen.has(w.id)) { const x = { id: w.id, span: w.span, hidden: false }; if (w.first && out.length) out.unshift(x); else out.push(x); } // a new headline module goes on top of saved layouts
     return out;
   }
   function moveWidget(l, id, to) {
@@ -178,5 +171,5 @@
   const resizeWidget = (l, id) => normalizeLayout(l).map((x) => x.id === id ? { ...x, span: x.span % 3 + 1 } : x);
   const toggleWidget = (l, id, hidden) => normalizeLayout(l).map((x) => x.id === id ? { ...x, hidden: hidden == null ? !x.hidden : !!hidden } : x);
 
-  return { summarize, exposureShift, risk, briefing, priorities, WIDGETS, defaultLayout, normalizeLayout, moveWidget, resizeWidget, toggleWidget };
+  return { summarize, exposureShift, risk, briefing, botBoard, WIDGETS, defaultLayout, normalizeLayout, moveWidget, resizeWidget, toggleWidget };
 });

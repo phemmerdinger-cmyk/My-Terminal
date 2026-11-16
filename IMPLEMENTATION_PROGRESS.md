@@ -26,6 +26,13 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### All bots reset to $30,000 (2026-11-16)
 - `BOT_RESET_ID` in server.js: on the first start with a new id, the swing bot, day trader and Quant trader each archive the old run (test-run history; Quant gets a `runs` list) and restart at $30,000 together. Backups from before the reset are refused by `apRestore`/`dtRestore`. Swing bust line is now $3,000 (still a 90% loss). `QT_START` = 30000.
 
+### Home: trading bots replace Daily priorities (2026-11-16)
+- `priorities` removed (core, widget, CSS, test). New top widget `trading` ("AI vs S&P 500 · trading bots"): swing, day and Quant bots — value, return, the S&P over each bot's own run, lead in $, combined total — from `/api/pub/botslive` (now includes Quant + run/trades/hit-rate extras), polled every 10 s while Home is visible. Pure `botBoard()` in home-core (tested). Saved layouts get the new widget on top; clicking a bot opens it on AI vs S&P 500.
+- "Strategy drawdown" / "thesis contradiction" priorities from Known limitations no longer apply.
+
+### Day trader leverage raised to 6× (2026-11-16, owner's choice: same $30,000, higher risk)
+- `DT_LEV = 6` (gross cap; was 4×, above a real broker's 4× PDT limit — labeled on the page), slice = 0.75 × DT_LEV × equity ÷ stocks, `DT_NET = 2.25` net cap (half under stress).
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
