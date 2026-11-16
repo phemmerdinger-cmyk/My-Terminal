@@ -81,3 +81,13 @@ test("evidence tilt: strong news picks the side over a weak chart, agreeing evid
   const t3 = B.evidenceTilt("long", 0.01, 0.02, 0.1); assert.deepEqual(t3, { dir: "long", mult: 1, backed: false, flipped: false });
   assert.ok(B.evidenceTilt("long", 0.01, 0.02, 1).mult <= 2.5);
 });
+
+test("quantScores: cross-sectional factor scores within −1…+1; a steady winner ranks above a steady loser", () => {
+  const mk = (g, wob = 0.004, n = 300, seed = 1) => { let s = seed, p = 100; return Array.from({ length: n }, () => { s = (s * 16807) % 2147483647; p *= 1 + g + ((s / 2147483647) - 0.5) * wob; return p; }); };
+  const closes = { WIN: mk(0.002, 0.004, 300, 3), LOSE: mk(-0.002, 0.004, 300, 5), A: mk(0, 0.01, 300, 7), B: mk(0.0005, 0.02, 300, 9), C: mk(-0.0005, 0.015, 300, 11), SHORT: mk(0, 0.01, 50, 13) };
+  const Q = B.quantScores(closes, mk(0.0003, 0.008, 300, 17));
+  assert.ok(Q.WIN.score > Q.LOSE.score); assert.ok(Q.WIN.score > 0 && Q.LOSE.score < 0);
+  assert.equal(Q.SHORT, undefined, "too little history → left out, not estimated");
+  for (const x of Object.values(Q)) { assert.ok(x.score >= -1 && x.score <= 1); assert.ok(Object.values(x.z).every((z) => Math.abs(z) <= 3)); }
+  assert.deepEqual(B.quantScores({ A: closes.A }, null), {}, "needs a cross-section");
+});

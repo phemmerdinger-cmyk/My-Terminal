@@ -2075,6 +2075,9 @@ const DT_SECTOR_EXTRA = { COIN: "XLF", HOOD: "XLF", SOFI: "XLF", SQ: "XLF", ARM:
 const dtSectorEtf = (sym) => DT_SECTOR_EXTRA[sym] || (() => { const r = SP500.find((x) => x[0] === sym || x[0] === sym.replace("-", ".")); return r ? DT_SECTOR_ETF[r[2]] : null; })();
 const DT_REGIME = { "Risk-on trend": 0.4, "Choppy / late-cycle": 0, Correction: -0.4, "Risk-off / high volatility": -0.8 };
 const DT_GRADE = { A: 1, B: 0.5, C: 0, D: -0.5, F: -1 };
+// Quant Lab factor analysis for all 100 stocks, once a day from a year of daily closes (DTB.quantScores, qmath.js math)
+let DTQ = { day: null, by: {}, t: 0 };
+const DT_QF = { mom12: "12-1 month momentum", residual: "residual momentum vs the S&P", mom3: "3-month momentum", lowvol: "low volatility", trend: "200-day trend", reversal: "short-term reversal", sharpe: "6-month Sharpe ratio" };
 async function dtResearch() {
   if (dtrBusy) return; dtrBusy = true;
   try {
@@ -2099,6 +2102,10 @@ async function dtResearch() {
     const qRank = qd && Array.isArray(qd.ranked) ? Object.fromEntries(qd.ranked.map((x) => [x.s, x])) : {}, qTarget = (qd && qd.target) || {};
     const own = [...DT_UNIVERSE.filter((s) => !/^(SPY|QQQ|IWM|DIA)$/.test(s)).slice(0, 24), ...Object.keys(DT.positions).slice(0, 8)];
     const news = await apNewsPool([...new Set(own)]);
+    if (DTQ.day !== t.day) { // daily: the Quant Lab's factor analysis across the whole universe
+      const qc = {}; for (const sym of DT_UNIVERSE) { try { const h = await history(sym, "1y"); qc[sym] = h.candles.map((c) => c.close).filter((x) => x > 0); } catch {} }
+      const sc = DTB.quantScores(qc, qc.SPY); if (Object.keys(sc).length >= 20) DTQ = { day: t.day, by: sc, t: Date.now() };
+    }
     const by = {};
     for (const sym of DT_UNIVERSE) {
       let base = apBase.get(sym); if (!base || base.day !== t.day) { try { base = await apBaseFor(sym, t.day); await new Promise((r) => setTimeout(r, 120)); } catch { base = null; } }
@@ -2116,10 +2123,14 @@ async function dtResearch() {
       const hg = AP_HEALTH.get(sym); if (hg && hg.grade) add(0.1, DT_GRADE[hg.grade] || 0, `financial health grade ${hg.grade} (SEC filings)`);
       // other sections, kept as their own inputs so the brain can weigh each one separately
       let spider = 0, spiderWhy = null; try { const sg = SPIDER ? SPIDER.signal(sym, { trader: true }) : null; if (sg && sg.n) { spider = clamp(sg.score * sg.conf * 2, -1, 1); spiderWhy = sg.reasons[0] ? sg.reasons[0].replace(/^[▲▼] /, "") : null; } } catch {}
-      const swing = swPct(sym), qr = qRank[sym], quant = qr ? clamp(qr.score / 2 + (qTarget[sym] > 0 ? 0.3 : 0), -1, 1) : 0;
+      // quant: the factor analysis (65%) plus the Quant trader's own ranking and holdings where it covers the stock (35%)
+      const swing = swPct(sym), qr = qRank[sym], qf = DTQ.by[sym], qt = qr ? clamp(qr.score / 2 + (qTarget[sym] > 0 ? 0.3 : 0), -1, 1) : 0;
+      const quant = clamp((qf ? 0.65 * qf.score : 0) + (qr ? 0.35 * qt : 0) / (qf ? 1 : 0.35), -1, 1);
+      const quantWhy = qf && Math.abs(qf.score) >= 0.2 && qf.lead ? `quant: ${qf.z[qf.lead] >= 0 ? "strong" : "weak"} ${DT_QF[qf.lead]} (z ${qf.z[qf.lead] >= 0 ? "+" : ""}${qf.z[qf.lead]})` : null;
       const etf = /^(SPY|QQQ|IWM|DIA)$/.test(sym) ? null : dtSectorEtf(sym), secDay = etf && q[etf] && !q[etf].error ? q[etf].changePct : null;
       const sector = secDay != null ? clamp((secDay - spyDay) / 1.5, -1, 1) : 0;
       const research = clamp(parts.reduce((a, x) => a + x.w * x.v, 0), -1, 1), lean = clamp(research + 0.2 * market.lean, -1, 1);
+      if (quantWhy) parts.push({ w: 1, v: quant * 0.15, label: quantWhy });
       if (Math.abs(spider) >= 0.15 && spiderWhy) parts.push({ w: 1, v: spider * 0.2, label: `Spider: ${spiderWhy.slice(0, 80)}` });
       const reasons = parts.filter((x) => x.label && Math.abs(x.w * x.v) >= 0.03).sort((a, b) => Math.abs(b.w * b.v) - Math.abs(a.w * a.v)).map((x) => x.label);
       const catalyst = earn && earn.kind === "beat" ? 1 : earn && earn.kind === "miss" ? -1 : Math.abs(n.score) >= 1.5 ? Math.sign(n.score) : 0;
@@ -2144,8 +2155,8 @@ function dtDecide(bars, sym, ctx) {
   if (!f) return null;
   DT.pend[sym] = { t: f.t, c: f.c, a: f.a, x: f.x.map((v) => +v.toFixed(4)) }; // scored and learned from at the next bar
   const costAtr = (f.c * (2 * DT_COST + DT_FEE_SHORT / 2)) / f.a, d = DTB.decide(DT.brain, f, { costAtr, mom: f.x[0] });
-  // evidence: the research inputs (news, earnings, analysts, financial health) plus the Spider's findings
-  const ev = info ? clamp(info.research + 0.5 * (info.spider || 0), -1, 1) : 0, tilt = DTB.evidenceTilt(d.dir, d.mu, DT.brain.absMu, ev);
+  // evidence: the research inputs (news, earnings, analysts, financial health) plus the Spider's findings and the quant factors
+  const ev = info ? clamp(info.research + 0.5 * (info.spider || 0) + 0.3 * (info.quant || 0), -1, 1) : 0, tilt = DTB.evidenceTilt(d.dir, d.mu, DT.brain.absMu, ev);
   if (tilt.flipped) d.dir = tilt.dir;
   let sizeX = d.sizeX * tilt.mult; const brakes = [];
   // an earnings report today/tomorrow is a coin flip unless the evidence backs this side
@@ -2269,7 +2280,8 @@ async function dtView() {
   const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
   Object.assign(st, { trades: T.n * 2, closed: T.n, winRate: T.n ? T.wins / T.n : null, avgWin: T.wins ? T.gw / T.wins : null, avgLoss: T.n - T.wins ? -T.gl / (T.n - T.wins) : null, profitFactor: T.gl > 0 ? T.gw / T.gl : null, grossWins: T.gw, grossLosses: T.gl, costs: T.costs, traded: T.traded, avgR: T.n ? T.Rsum / T.n : null, avgHold: T.n ? T.held / T.n : null, longs: T.longs, shorts: T.shorts, longPnl: T.longPnl, shortPnl: T.shortPnl,
     bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })) });
-  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
+  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, quantFactors: { day: DTQ.day, t: DTQ.t, weights: DTB.QW, labels: DT_QF, top: Object.entries(DTQ.by).sort((a, b) => b[1].score - a[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })), bottom: Object.entries(DTQ.by).sort((a, b) => a[1].score - b[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })) },
+    research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
     status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute, sized by a self-learning forecast` : "Market closed — flat overnight, back at the opening bell",
     model: DTB.scorecard(DT.brain), pend: undefined,
     rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388, lev: DT_LEV, net: DT_NET } };

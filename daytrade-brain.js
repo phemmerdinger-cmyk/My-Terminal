@@ -19,7 +19,7 @@
 // model's typical edge. A trade whose edge doesn't clear its costs still happens (the bot keeps its pace) but at a
 // minimum size, so costs stay small where it has nothing to say.
 "use strict";
-const DTC = require("./daytrade-core.js");
+const DTC = require("./daytrade-core.js"), QM = require("./public/qmath.js");
 
 const FEATURES = [
   // key, label (for the trade log), group (the "setup" a trade is filed under), starting weight
@@ -38,12 +38,12 @@ const FEATURES = [
   ["research", "news, earnings, analysts & financial health", "research", 0.03],
   ["spider", "THE WEB Spider's findings", "spider", 0.02],
   ["swing", "the swing bot's ranking", "consensus", 0.01],
-  ["quant", "the Quant trader's ranking", "consensus", 0.01],
+  ["quant", "quant factors (momentum, residual momentum, low volatility, trend, reversal, Sharpe) + the Quant trader's ranking", "quant", 0.015],
   ["sector", "its sector vs the S&P today", "relative", 0.01],
   ["macro", "market regime & macro × beta", "tape", 0.01],
 ];
 const KEYS = FEATURES.map((f) => f[0]), PRIOR = FEATURES.map((f) => f[3]);
-const GROUP = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Order flow", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus" };
+const GROUP = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Order flow", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus", quant: "Quant factors" };
 const LR = 0.002, BETA2 = 0.99, EPS = 1e-8, L2 = 0.02, HUBER = 2, EW = 0.002; // EW: ~500-sample memory for the scorecard
 const MIN_X = 0.15, MAX_X = 2; // size multiplier range
 
@@ -197,6 +197,38 @@ function guard(shares, px, dir, book, eq, { grossCap = 4, netCap = 1.5 } = {}) {
   return Math.max(1, max);
 }
 
+// Daily quant factor analysis for the whole universe, with the Quant Lab's math (public/qmath.js), cross-sectionally:
+//   mom12   12-1 month momentum (skips the latest month)            residual  3-month return net of beta × S&P (alpha momentum)
+//   mom3    3-month momentum                                        lowvol    − 6-month annualized volatility
+//   trend   distance above/below the 200-day average                reversal  − 5-day return (short-term mean reversion)
+//   sharpe  6-month Sharpe ratio
+// closes: { SYM: daily closes, oldest → newest }, spy: SPY daily closes. Each factor becomes a z-score across the
+// stocks (clipped ±3), weighted into one score, then scaled to −1…+1. Stocks with < 130 days of history are left out.
+const QW = { mom12: 0.25, residual: 0.2, mom3: 0.1, lowvol: 0.15, trend: 0.1, reversal: 0.1, sharpe: 0.1 };
+function quantScores(closes, spy) {
+  const raw = {}, rS = spy && spy.length > 130 ? QM.returns(spy.slice(-127)) : null, spy63 = spy && spy.length > 64 ? spy[spy.length - 1] / spy[spy.length - 64] - 1 : null;
+  for (const [s, c] of Object.entries(closes || {})) {
+    if (!Array.isArray(c) || c.length < 130 || !(c[c.length - 1] > 0)) continue;
+    const n = c.length, last = c[n - 1], ret = (a, b) => (c[n - 1 - b] > 0 && c[n - 1 - a] > 0 ? c[n - 1 - b] / c[n - 1 - a] - 1 : NaN);
+    const r = QM.returns(c.slice(-127)), vol = QM.sd(r) * Math.sqrt(QM.DAYS), m200 = c.slice(-Math.min(200, n)).reduce((a, b) => a + b, 0) / Math.min(200, n);
+    const beta = rS && r.length === rS.length ? QM.beta(r, rS) : 1, m3 = ret(63, 0);
+    raw[s] = { mom12: n > 253 ? ret(252, 21) : ret(n - 1, 21), residual: spy63 != null && isFinite(beta) ? m3 - beta * spy63 : NaN, mom3: m3, lowvol: -vol, trend: last / m200 - 1, reversal: -ret(5, 0), sharpe: QM.sharpe(r) };
+  }
+  const syms = Object.keys(raw), out = {};
+  if (syms.length < 5) return out;
+  const zs = {};
+  for (const k of Object.keys(QW)) {
+    const v = syms.map((s) => raw[s][k]).filter((x) => isFinite(x)), m = QM.mean(v), sd = QM.sd(v) || 1;
+    zs[k] = Object.fromEntries(syms.map((s) => [s, isFinite(raw[s][k]) ? clip((raw[s][k] - m) / sd, -3, 3) : 0]));
+  }
+  for (const s of syms) {
+    const score = Object.entries(QW).reduce((a, [k, w]) => a + w * zs[k][s], 0);
+    const top = Object.keys(QW).map((k) => [k, QW[k] * zs[k][s]]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    out[s] = { score: clip(score / 1.5, -1, 1), z: Object.fromEntries(Object.keys(QW).map((k) => [k, +zs[k][s].toFixed(2)])), lead: top ? top[0] : null, raw: raw[s] };
+  }
+  return out;
+}
+
 // Market breadth per minute: (stocks above their VWAP − stocks below) ÷ stocks counted, from every stock's bars.
 // Returns t → −1…+1 (0 when fewer than `min` stocks have a bar at that minute). Index ETFs are left out.
 function breadthMap(list, min = 20) {
@@ -214,4 +246,4 @@ function scorecard(b) {
     weights: FEATURES.map(([k, label, g], i) => ({ k, label, group: GROUP[g], prior: PRIOR[i], w: +b.w[i].toFixed(4) })) };
 }
 
-module.exports = { FEATURES, KEYS, PRIOR, GROUP, MIN_X, MAX_X, fresh, fix, features, predict, learn, step, decide, evidenceTilt, guard, breadthMap, scorecard, autocorr, betaOf, ic };
+module.exports = { FEATURES, KEYS, PRIOR, GROUP, MIN_X, MAX_X, fresh, fix, features, predict, learn, step, decide, evidenceTilt, guard, breadthMap, quantScores, QW, scorecard, autocorr, betaOf, ic };
