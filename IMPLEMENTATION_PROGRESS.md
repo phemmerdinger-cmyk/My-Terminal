@@ -36,6 +36,9 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Day trader: evidence first (2026-11-16, owner: "quick profits backed by news and earnings")
 - `evidenceTilt()` in daytrade-brain.js (tested): evidence = research lean (news/earnings/analysts/health) + ½ Spider. |e| ≥ 0.4 picks the side when the forecast is weak; agreeing evidence ×(1+1.5|e|) up to 2.5×, opposing down to 0.25×. Earnings-due half size only when unbacked. Trade log says "backed by: …".
 
+### Day trader: Quant Lab factor analysis (2026-11-16)
+- `quantScores()` in daytrade-brain.js (tested, qmath.js math): daily cross-sectional z-scores for all 100 stocks — 12-1 momentum, residual momentum vs SPY (beta-adjusted), 3-month momentum, low vol, 200-day trend, 5-day reversal, 6-month Sharpe. The `quant` feature = 65% factors + 35% Quant trader ranking (where covered); also +0.3 into the evidence tilt. `/api/daytrader` `quantFactors` → "📐 Quant factor analysis" card.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
