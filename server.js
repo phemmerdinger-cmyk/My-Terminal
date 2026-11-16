@@ -2823,6 +2823,31 @@ async function macroData() {
 // It only READS the trading bots' state; it has no access to apTrade/dtOpen and never places trades.
 const { createSpider } = require("./web/spider.js");
 const { createStore: createWebStore } = require("./web/store.js");
+// ---------------------------------------------------------------- DESK: the owner's personal data (Home layouts,
+// Investor DNA, theses, journal, …). One JSON doc, last-writer-wins by `updated`. Same free storage as THE WEB.
+const DESK_STORE = createWebStore({ url: UP_URL, token: UP_TOKEN, prefix: "pft:desk:v1:" });
+const DESK_KEYS = new Set(["home", "dna", "theses", "journal", "alerts", "tournaments", "learning", "pitches", "workspaces", "memory", "prefs"]);
+function deskValidate(doc) {
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return "bad data";
+  if (!Number.isFinite(doc.updated) || doc.updated <= 0 || doc.updated > Date.now() + 5 * 60e3) return "bad timestamp";
+  if (!doc.data || typeof doc.data !== "object" || Array.isArray(doc.data)) return "bad data";
+  for (const k of Object.keys(doc.data)) if (!DESK_KEYS.has(k)) return "unknown section: " + String(k).slice(0, 40);
+  return null;
+}
+async function deskRoute(req, res) {
+  try {
+    if (req.method === "GET") { const doc = await DESK_STORE.get("doc"); return send(res, 200, { doc: doc || null, durable: DESK_STORE.durable }); }
+    if (req.method === "PUT") {
+      let doc; try { doc = await readBody(req, 800_000); } catch { return send(res, 413, { error: "Too much data" }); }
+      const bad = deskValidate(doc); if (bad) return send(res, 400, { error: bad });
+      const cur = await DESK_STORE.get("doc");
+      if (cur && cur.updated > doc.updated && !/[?&]force=1/.test(req.url)) return send(res, 409, { error: "newer", doc: cur });
+      await DESK_STORE.set("doc", { updated: doc.updated, data: doc.data });
+      return send(res, 200, { ok: true, durable: DESK_STORE.durable });
+    }
+    return send(res, 405, { error: "method not allowed" });
+  } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+}
 const SPIDER_W = Math.max(0, Math.min(0.15, process.env.SPIDER_TRADER_WEIGHT != null ? +process.env.SPIDER_TRADER_WEIGHT || 0 : 0.05));
 const SPIDER = process.env.SPIDER_OFF ? null : createSpider({
   store: createWebStore({ url: UP_URL, token: UP_TOKEN }),
@@ -3135,6 +3160,7 @@ async function handle(req, res) {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
         return openStream(req, res, parseList(u.searchParams.get("symbols"), 60));
       }
+      if (u.pathname === "/api/desk") return deskRoute(req, res); // owner-only (not in PUBLIC_API): personal layouts, profile, research
       if (u.pathname === "/api/sync") {
         const code = String(u.searchParams.get("code") || "");
         if (code.length < 6 || code.length > 80) return send(res, 400, { error: "Sync code must be 6 to 80 characters" });
