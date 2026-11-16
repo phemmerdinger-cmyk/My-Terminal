@@ -170,6 +170,18 @@ function decide(brain, f, { costAtr = 0, mom = 0 } = {}) {
   const against = f.x.map((v, i) => ({ i, c: v * brain.w[i] * sgn })).filter((z) => z.c < 0).sort((p, q) => p.c - q.c)[0];
   return { dir, mu, edge, sizeX, kind: lead[2], reasons, against: against && -against.c > 0.002 ? FEATURES[against.i][1] : null, ic: ic(brain) };
 }
+// Evidence tilt: lean on the research (news, earnings beats/misses, analysts, financial health, Spider findings).
+//   evidence −1…+1. Strong evidence (|e| ≥ 0.4) picks the side when the chart forecast is weak (|mu| < typical);
+//   evidence that agrees with the side scales size up to 2.5×; evidence against it scales it down to 0.25×.
+//   Returns { dir, mult, backed: true when the trade has evidence behind it, flipped: true when evidence picked the side }.
+function evidenceTilt(dir, mu, absMu, e) {
+  e = clip(e, -1, 1); const strong = Math.abs(e) >= 0.4, weak = Math.abs(mu) < Math.max(absMu, 0.005);
+  let d = dir, flipped = false;
+  if (strong && weak && (e > 0 ? "long" : "short") !== dir) { d = e > 0 ? "long" : "short"; flipped = true; }
+  const s = d === "long" ? 1 : -1, m = Math.abs(e);
+  if (m < 0.15) return { dir: d, mult: 1, backed: false, flipped };
+  return Math.sign(e) === s ? { dir: d, mult: 1 + 1.5 * m, backed: true, flipped } : { dir: d, mult: Math.max(0.25, 1 - m), backed: false, flipped };
+}
 // Rolling information coefficient (correlation of forecast and outcome over ~the last 500 predictions).
 const ic = (b) => (b.mm > 0 && b.yy > 0 ? b.my / Math.sqrt(b.mm * b.yy) : 0);
 
@@ -202,4 +214,4 @@ function scorecard(b) {
     weights: FEATURES.map(([k, label, g], i) => ({ k, label, group: GROUP[g], prior: PRIOR[i], w: +b.w[i].toFixed(4) })) };
 }
 
-module.exports = { FEATURES, KEYS, PRIOR, GROUP, MIN_X, MAX_X, fresh, fix, features, predict, learn, step, decide, guard, breadthMap, scorecard, autocorr, betaOf, ic };
+module.exports = { FEATURES, KEYS, PRIOR, GROUP, MIN_X, MAX_X, fresh, fix, features, predict, learn, step, decide, evidenceTilt, guard, breadthMap, scorecard, autocorr, betaOf, ic };

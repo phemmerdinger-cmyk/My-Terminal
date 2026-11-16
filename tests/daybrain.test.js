@@ -74,3 +74,10 @@ test("fix: garbage → fresh brain; saved brain keeps its weights; missing featu
   const b = B.fresh(); b.w[0] = 0.3; b.n = 5; const f = B.fix(JSON.parse(JSON.stringify(b))); assert.equal(f.w[0], 0.3); assert.equal(f.n, 5);
   const short = { ...b, w: [0.1] }; assert.equal(B.fix(short).w[1], B.PRIOR[1]);
 });
+
+test("evidence tilt: strong news picks the side over a weak chart, agreeing evidence sizes up, opposing sizes down", () => {
+  const t1 = B.evidenceTilt("short", -0.001, 0.02, 0.8); assert.equal(t1.dir, "long"); assert.ok(t1.flipped); assert.ok(t1.backed); assert.ok(Math.abs(t1.mult - 2.2) < 1e-9);
+  const t2 = B.evidenceTilt("short", -0.05, 0.02, 0.8); assert.equal(t2.dir, "short", "a strong chart forecast keeps its side"); assert.ok(Math.abs(t2.mult - 0.25) < 1e-9); assert.ok(!t2.backed);
+  const t3 = B.evidenceTilt("long", 0.01, 0.02, 0.1); assert.deepEqual(t3, { dir: "long", mult: 1, backed: false, flipped: false });
+  assert.ok(B.evidenceTilt("long", 0.01, 0.02, 1).mult <= 2.5);
+});
