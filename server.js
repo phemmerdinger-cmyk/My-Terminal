@@ -1968,7 +1968,7 @@ setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60
 // Starts with $30,000 so it is above the $25,000 pattern-day-trader minimum; falling under $25,000 would lock a
 // real account out of day trading, so that counts as a bust and a fresh $30,000 run starts.
 // Data: free 1-minute Yahoo bars (every symbol every minute); all rules live in daytrade-core.js.
-const DTC = require("./daytrade-core.js");
+const DTC = require("./daytrade-core.js"), DTB = require("./daytrade-brain.js");
 const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY = "pft:daytrader:v1";
 // Max-speed day trader: every stock, every minute. At each 1-minute close it closes the trade it opened a minute ago and
 // opens a fresh one — long or short — in whichever direction the last bar points. 100 stocks × ~388 minutes ≈ 39,000
@@ -1976,6 +1976,10 @@ const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY =
 // slice of 4× day-trading buying power, a stop one average 1-minute range away and a target 1.2 ranges away inside
 // the minute. Every trade pays 0.005% of its size going in and again coming out (spread + slippage); shorts pay 0.01%
 // more to borrow. No daily loss stop — it trades until the close, or until a bust (under $25,000) starts a new run.
+// The decision each minute comes from a self-learning model (daytrade-brain.js) that reads every part of the site —
+// chart, market tape, News/earnings/analysts/financial health, THE WEB Spider, the swing bot's and Quant trader's
+// rankings, sector strength and the Macro page — and learns from every stock's next minute. It still trades every stock
+// every minute; conviction sets the size, and a portfolio guard caps gross (4×) and net exposure.
 const DT_START = 30_000, DT_PDT = 25_000, DT_FEE_SHORT = 0.0001, DT_COST = 0.00005, DT_HOLD = 1;
 const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA",
   "UBER", "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB", "GOOG", "BRK-B", "LLY", "V",
@@ -1985,12 +1989,13 @@ const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN",
 const DT_MAXPOS = DT_UNIVERSE.length;
 let dtThrottleUntil = 0; // if the free data source starts refusing, drop to the first 50 stocks for 10 minutes
 const dtTally = () => ({ n: 0, wins: 0, gw: 0, gl: 0, longs: 0, shorts: 0, longPnl: 0, shortPnl: 0, costs: 0, traded: 0, Rsum: 0, held: 0, kinds: {} });
-const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), updated: Date.now() });
+const dtFresh = () => ({ v: 1, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), brain: DTB.fresh(), pend: {}, updated: Date.now() });
 let DT = dtFresh(), dtLoaded = false, dtBusy = false, dtTickN = 0;
 const dtPx = {}, dtSeq = { n: 0 };
 async function dtLoad() {
-  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { DT = { ...dtFresh(), ...JSON.parse(j.result) }; dtLoaded = true; return; } } } catch {}
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { DT = { ...dtFresh(), ...JSON.parse(j.result) }; DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {}; dtLoaded = true; return; } } } catch {}
   try { DT = { ...dtFresh(), ...JSON.parse(fs.readFileSync(DT_FILE, "utf8")) }; } catch {}
+  DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {};
   dtLoaded = true;
 }
 async function dtSave() {
@@ -2028,22 +2033,45 @@ function dtExit(sym, px, why, t) {
   const k = (T.kinds[p.kind || "other"] = T.kinds[p.kind || "other"] || { n: 0, wins: 0, pnl: 0 }); k.n++; if (pnl > 0) k.wins++; k.pnl += pnl;
   dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(5), R: +R.toFixed(2), held, cost: +(cost + (p.cost0 || 0)).toFixed(2), entry: p.entry, dir: p.dir });
 }
-const DT_KIND = { pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum", "research-long": "News & research (bullish)", "research-short": "News & research (bearish)" };
+const DT_KIND = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Order flow", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus",
+  pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum", "research-long": "News & research (bullish)", "research-short": "News & research (bearish)" };
 // ---- research for the day trader: the same inputs the swing bot uses, refreshed every 10 minutes ----
 // For each stock: news headlines (the five outlets, trending, Smart Money, its own Yahoo feed), earnings (beat or miss
 // in the last few days, or reporting today/tomorrow), analyst ratings, its 50- and 200-day trend and how it's doing
 // today against the S&P 500; plus the whole market's mood (S&P today, VIX fear index, S&P vs its 200-day average).
 // Becomes a lean from −1 (bearish) to +1 (bullish) with the reasons attached.
+// Every other section of the site is read here too: Financials (health grade from SEC filings), THE WEB Spider's
+// findings, the swing bot's ranking, the Quant trader's ranking and regime, the Heatmap's sector moves, and the Macro
+// page (yield curve, Sahm rule). The brain (daytrade-brain.js) learns how much each one is worth minute by minute.
 let DTR = { t: 0, by: {}, market: null }, dtrBusy = false;
+const DTP = {}; // prior-day bar per stock (for liquidity levels and gaps)
+const DT_SECTOR_ETF = { "Information Technology": "XLK", Financials: "XLF", "Health Care": "XLV", Energy: "XLE", Industrials: "XLI", "Consumer Discretionary": "XLY", "Consumer Staples": "XLP", Utilities: "XLU", Materials: "XLB", "Communication Services": "XLC", "Real Estate": "XLRE" };
+const DT_SECTOR_EXTRA = { COIN: "XLF", HOOD: "XLF", SOFI: "XLF", SQ: "XLF", ARM: "SMH", TSM: "SMH", ASML: "SMH", MRVL: "SMH", SMCI: "SMH", MU: "SMH", SHOP: "XLK", SNOW: "XLK", NET: "XLK", DDOG: "XLK", ZS: "XLK", MDB: "XLK", TEAM: "XLK", MSTR: "XLK", MARA: "XLK", RBLX: "XLC", SNAP: "XLC", RIVN: "XLY", LCID: "XLY", NIO: "XLY", DKNG: "XLY", UBER: "XLI", PLTR: "XLK" };
+const dtSectorEtf = (sym) => DT_SECTOR_EXTRA[sym] || (() => { const r = SP500.find((x) => x[0] === sym || x[0] === sym.replace("-", ".")); return r ? DT_SECTOR_ETF[r[2]] : null; })();
+const DT_REGIME = { "Risk-on trend": 0.4, "Choppy / late-cycle": 0, Correction: -0.4, "Risk-off / high volatility": -0.8 };
+const DT_GRADE = { A: 1, B: 0.5, C: 0, D: -0.5, F: -1 };
 async function dtResearch() {
   if (dtrBusy) return; dtrBusy = true;
   try {
     const t = etParts(), cal = await apEarnings();
-    const q = (await getQuotes([...DT_UNIVERSE, "SPY", "^VIX", "^GSPC"])).quotes, spyDay = (q.SPY && q.SPY.changePct) || 0;
+    const etfs = [...new Set([...Object.values(DT_SECTOR_ETF), "SMH"])];
+    const q = (await getQuotes([...DT_UNIVERSE, ...etfs, "SPY", "^VIX", "^GSPC"])).quotes, spyDay = (q.SPY && q.SPY.changePct) || 0;
     const vix = q["^VIX"] && !q["^VIX"].error ? q["^VIX"].price : null;
     let below200 = false; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((c) => c.close); below200 = cl[cl.length - 1] < sma(cl, 200); } catch {}
     const mk = clamp(spyDay / 1.5, -1, 1) * 0.6 + (vix != null ? (vix >= 30 ? -0.4 : vix >= 22 ? -0.2 : vix <= 14 ? 0.1 : 0) : 0) + (below200 ? -0.15 : 0.05);
-    const market = { lean: clamp(mk, -1, 1), spyDay, vix, below200 };
+    // the rest of the site's view of the market: Quant regime, swing-bot defense mode, Spider stress, Macro page
+    const qd = QT && QT.decisions && QT.decisions[0], qReg = qd ? qd.regime : null;
+    let spStress = null; try { const tv = SPIDER ? SPIDER.traderView() : null; spStress = tv && tv.stress ? tv.stress : null; } catch {}
+    const mac = cache.get("macro:all"); if (!mac || !mac.data) macroData().catch(() => {});
+    const lastOf = (id) => { const se = mac && mac.data && mac.data.series ? mac.data.series.find((x) => x.id === id) : null, r = se && se.data && se.data[se.data.length - 1]; return r == null ? null : Array.isArray(r) ? r[1] : r.v != null ? r.v : null; };
+    const curve = lastOf("T10Y3M"), sahm = lastOf("SAHMREALTIME");
+    const stress = (apSig && apSig.stress) || spStress || (vix != null && vix >= 30 ? `VIX at ${vix.toFixed(1)}` : null);
+    const regime = clamp(0.55 * clamp(mk, -1, 1) + 0.25 * (DT_REGIME[qReg] || 0) + (apSig && apSig.riskOff ? -0.1 : 0) + (stress ? -0.2 : 0) + (curve != null && curve < 0 ? -0.05 : 0) + (sahm != null && sahm >= 0.5 ? -0.15 : 0), -1, 1);
+    const market = { lean: clamp(mk, -1, 1), spyDay, vix, below200, regime: +regime.toFixed(3), quantRegime: qReg, swingRiskOff: !!(apSig && apSig.riskOff), stress: stress || null, curve, sahm };
+    // the swing bot's latest ranking, as a percentile among the stocks it has scored
+    const swVals = Object.values(apScoreOf).filter(isFinite).sort((a, b) => a - b);
+    const swPct = (sym) => { const v = apScoreOf[sym]; if (v == null || swVals.length < 10) return 0; return (swVals.filter((x) => x <= v).length / swVals.length - 0.5) * 2; };
+    const qRank = qd && Array.isArray(qd.ranked) ? Object.fromEntries(qd.ranked.map((x) => [x.s, x])) : {}, qTarget = (qd && qd.target) || {};
     const own = [...DT_UNIVERSE.filter((s) => !/^(SPY|QQQ|IWM|DIA)$/.test(s)).slice(0, 24), ...Object.keys(DT.positions).slice(0, 8)];
     const news = await apNewsPool([...new Set(own)]);
     const by = {};
@@ -2060,52 +2088,65 @@ async function dtResearch() {
       add(0.1, adj != null ? clamp(adj / 1.5, -1, 1) : 0, adj != null ? `analysts ${adj >= 1 ? "strongly positive" : adj >= 0.4 ? "positive" : adj <= -0.2 ? "negative" : "mixed"}` : null);
       add(0.1, trend, base ? (trend > 0 ? "above its 50- & 200-day averages" : trend < 0 ? "below its 50- & 200-day averages" : "mixed long-term trend") : null);
       add(0.15, clamp((day - spyDay) / 3, -1, 1), Math.abs(day - spyDay) >= 1 ? `${day - spyDay >= 0 ? "beating" : "lagging"} the S&P today (${day >= 0 ? "+" : ""}${day.toFixed(1)}%)` : null);
-      const lean = clamp(parts.reduce((a, x) => a + x.w * x.v, 0) + 0.2 * market.lean, -1, 1);
+      const hg = AP_HEALTH.get(sym); if (hg && hg.grade) add(0.1, DT_GRADE[hg.grade] || 0, `financial health grade ${hg.grade} (SEC filings)`);
+      // other sections, kept as their own inputs so the brain can weigh each one separately
+      let spider = 0, spiderWhy = null; try { const sg = SPIDER ? SPIDER.signal(sym, { trader: true }) : null; if (sg && sg.n) { spider = clamp(sg.score * sg.conf * 2, -1, 1); spiderWhy = sg.reasons[0] ? sg.reasons[0].replace(/^[▲▼] /, "") : null; } } catch {}
+      const swing = swPct(sym), qr = qRank[sym], quant = qr ? clamp(qr.score / 2 + (qTarget[sym] > 0 ? 0.3 : 0), -1, 1) : 0;
+      const etf = /^(SPY|QQQ|IWM|DIA)$/.test(sym) ? null : dtSectorEtf(sym), secDay = etf && q[etf] && !q[etf].error ? q[etf].changePct : null;
+      const sector = secDay != null ? clamp((secDay - spyDay) / 1.5, -1, 1) : 0;
+      const research = clamp(parts.reduce((a, x) => a + x.w * x.v, 0), -1, 1), lean = clamp(research + 0.2 * market.lean, -1, 1);
+      if (Math.abs(spider) >= 0.15 && spiderWhy) parts.push({ w: 1, v: spider * 0.2, label: `Spider: ${spiderWhy.slice(0, 80)}` });
       const reasons = parts.filter((x) => x.label && Math.abs(x.w * x.v) >= 0.03).sort((a, b) => Math.abs(b.w * b.v) - Math.abs(a.w * a.v)).map((x) => x.label);
-      by[sym] = { lean: +lean.toFixed(3), reasons: reasons.slice(0, 3), news: +n.score.toFixed(2), headline: n.top[0] || null, earn, adj: adj == null ? null : +adj.toFixed(2), trend, day: +day.toFixed(2), soon: !!(earn && earn.kind === "soon") };
+      const catalyst = earn && earn.kind === "beat" ? 1 : earn && earn.kind === "miss" ? -1 : Math.abs(n.score) >= 1.5 ? Math.sign(n.score) : 0;
+      if (!DTP[sym] || DTP[sym].d !== t.day) { try { DTP[sym] = { d: t.day, v: await dtPrev(sym, t.day) }; } catch { DTP[sym] = { d: t.day, v: null }; } }
+      by[sym] = { lean: +lean.toFixed(3), research: +research.toFixed(3), spider: +spider.toFixed(3), swing: +swing.toFixed(3), quant: +quant.toFixed(3), sector: +sector.toFixed(3), sectorEtf: etf, catalyst, grade: hg && hg.grade ? hg.grade : null,
+        reasons: reasons.slice(0, 3), news: +n.score.toFixed(2), headline: n.top[0] || null, earn, adj: adj == null ? null : +adj.toFixed(2), trend, day: +day.toFixed(2), soon: !!(earn && earn.kind === "soon") };
     }
     DTR = { t: Date.now(), by, market };
     BOTDIAG.day.research = { t: DTR.t, n: Object.keys(by).length };
   } catch (e) { diagErr("day", "research: " + (e.message || e)); } finally { dtrBusy = false; }
 }
-// Direction for the next minute = the 1-minute chart signal combined with the research lean.
-//   chart: one of the scalper patterns (strength 1) or simply the direction of the minute that just closed (0.4)
-//   research: lean −1…+1 counts 1.2× — strong news or an earnings beat/miss overrules a single minute's wiggle
-// Size grows with agreement: chart and research pointing the same way → up to 1.33× a normal slice; disagreeing or
-// reporting earnings today/tomorrow (a coin flip) → as little as half.
-function dtDecide(bars, sym) {
+// Direction for the next minute: the brain's forecast (daytrade-brain.js) from the chart, the market tape and every
+// research input above. It always picks a side — the bot trades every stock every minute — and the forecast's edge
+// after trading costs sets the size (minimum 15% of a normal slice when the edge doesn't cover costs, up to 2×).
+// Extra brakes: half size into an earnings report today/tomorrow, half size after a −3% day.
+function dtDecide(bars, sym, ctx) {
   const reg = bars.filter((x) => x.m >= DTC.OPEN), b = reg[reg.length - 1]; if (!b || reg.length < 3) return null;
-  const a = DTC.atr(reg, 14) || b.c * 0.001, cl = reg.map((x) => x.c);
-  const sig = DTC.scalpSignal(bars);
-  const mDir = sig ? (sig.dir === "long" ? 1 : -1) : b.c > b.o ? 1 : b.c < b.o ? -1 : (DTC.ema(cl, 9) >= DTC.ema(cl, 20) ? 1 : -1);
-  const chart = (sig ? 1 : 0.4) * mDir, info = DTR.by[sym], lean = info ? info.lean : 0, total = chart + 1.2 * lean;
-  const dir = total > 0 ? "long" : total < 0 ? "short" : mDir > 0 ? "long" : "short", sgn = dir === "long" ? 1 : -1;
-  const agree = Math.sign(chart) === Math.sign(lean) || Math.abs(lean) < 0.05;
-  const sizeX = clamp((0.6 + Math.abs(total) * 0.6) * (agree ? 1 : 0.75) * (info && info.soon ? 0.5 : 1), 0.5, 1.33);
-  const chartWhy = sig ? sig.why : `last minute closed ${b.c > b.o ? "up" : b.c < b.o ? "down" : "flat"}`;
-  const resWhy = info && info.reasons.length ? info.reasons.join("; ") : "no strong news, earnings or trend signal";
-  const ruled = Math.sign(total) !== mDir ? " — research overruled the chart" : "";
-  const kind = Math.abs(1.2 * lean) > Math.abs(chart) ? (lean > 0 ? "research-long" : "research-short") : sig ? sig.kind : "momentum";
-  const d = Math.max(a, b.c * 0.0005), t = Math.max(a * 1.2, b.c * 0.0006);
-  return { dir, kind, sizeX, score: Math.abs(total), why: `${chartWhy} · research ${lean >= 0 ? "+" : ""}${lean.toFixed(2)}: ${resWhy}${ruled}`, entry: b.c, stop: b.c - sgn * d, target: b.c + sgn * t, at: b.t };
+  const info = DTR.by[sym] || null, mk = DTR.market || {};
+  const f = DTB.features(bars, { spy: ctx.spy, breadth: ctx.breadth(b.t), prev: DTP[sym] && DTP[sym].v, info, market: mk.regime || 0 });
+  if (!f) return null;
+  DT.pend[sym] = { t: f.t, c: f.c, a: f.a, x: f.x.map((v) => +v.toFixed(4)) }; // scored and learned from at the next bar
+  const costAtr = (f.c * (2 * DT_COST + DT_FEE_SHORT / 2)) / f.a, d = DTB.decide(DT.brain, f, { costAtr, mom: f.x[0] });
+  let sizeX = d.sizeX; const brakes = [];
+  if (info && info.soon) { sizeX *= 0.5; brakes.push("earnings due — half size"); }
+  if (DT.day && DT.day.startEq && DT.day.pnl / DT.day.startEq <= -0.03) { sizeX *= 0.5; brakes.push("down 3%+ today — half size"); }
+  const sgn = d.dir === "long" ? 1 : -1, a = f.a, stop = Math.max(a, b.c * 0.0005), tgt = Math.max(a * 1.2, b.c * 0.0006);
+  const why = `forecast ${d.mu >= 0 ? "+" : ""}${d.mu.toFixed(3)} ATR (${d.edge > 0 ? "clears" : "doesn't clear"} costs) · for: ${d.reasons.join(", ") || "no strong input"}${d.against ? ` · against: ${d.against}` : ""}${info && info.reasons.length ? ` · research: ${info.reasons[0]}` : ""}${brakes.length ? ` · ${brakes.join(", ")}` : ""}`;
+  return { dir: d.dir, kind: d.kind, sizeX, score: Math.abs(d.mu), mu: d.mu, why, entry: b.c, stop: b.c - sgn * stop, target: b.c + sgn * tgt, at: b.t };
 }
+// Gross and net exposure of the open book right now.
+function dtBook() { let gross = 0, net = 0; for (const [s, p] of Object.entries(DT.positions)) { const v = p.shares * (dtPx[s] || p.entry); gross += v; net += (p.dir === "long" ? 1 : -1) * v; } return { gross, net }; }
 function dtOpen(sym, idea, b, nSyms) {
   const eq = dtEquity(); if (eq <= 0) return;
-  const px = idea.entry, shares = DTC.size(eq, px, idea.stop, 1, ((3 * eq) / nSyms) * (idea.sizeX || 1)); if (shares < 1) return; // a slice of buying power: 3×/N, up to 1.33× that when chart and research agree (max 4×)
+  const px = idea.entry, want = DTC.size(eq, px, idea.stop, 1, ((3 * eq) / nSyms) * (idea.sizeX || 1)); // a slice of buying power: 3×/N, scaled by conviction
+  const stressed = !!(DTR.market && DTR.market.stress), shares = DTB.guard(want < 1 ? 1 : want, px, idea.dir, dtBook(), eq, { grossCap: 4, netCap: stressed ? 0.75 : 1.5 });
+  if (shares < 1) return;
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   DT.positions[sym] = { dir: idea.dir, shares, entry: px, stop: idea.stop, stop0: idea.stop, target: idea.target, setup: DT_KIND[idea.kind], kind: idea.kind, at: b.t * 1000 + 60e3, why: `${sym}: ${idea.why}`, cost0, bars: 0 };
   DT.cash += (idea.dir === "long" ? -1 : 1) * shares * px - cost0; DT.day.trades++;
   if (!DT.firstTrade) DT.firstTrade = Date.now();
   dtLog({ t: b.t * 1000 + 60e3, side: idea.dir === "long" ? "BUY" : "SHORT", sym, shares, price: +px.toFixed(2), amount: +(shares * px).toFixed(2), setup: DT_KIND[idea.kind], why: `${sym}: ${idea.why}`, stop: +idea.stop.toFixed(2), target: +idea.target.toFixed(2), cost: +cost0.toFixed(2), dir: idea.dir });
 }
-// One new 1-minute bar for a stock: close the trade opened at the last close (stop or target inside the bar, else at
-// this close), then open the next one at this close.
-function dtBar(sym, b, bars, nSyms, canOpen) {
+// One new 1-minute bar for a stock: score and learn from last minute's forecast, close the trade opened at the last
+// close (stop or target inside the bar, else at this close), then forecast and open the next one at this close.
+function dtBar(sym, b, bars, nSyms, canOpen, ctx, day) {
   dtPx[sym] = b.c;
+  const pd = DT.pend[sym];
+  if (pd && b.t > pd.t) { if (b.t - pd.t <= 180 && pd.a > 0) DTB.learn(DT.brain, pd.x, (b.c - pd.c) / pd.a, day); delete DT.pend[sym]; }
   const p = DT.positions[sym];
   if (p) { const ex = DTC.scalpManage(p, b, DT_HOLD); if (ex) dtExit(sym, ex.px, ex.why === "Stop hit" || ex.why === "Target hit" ? ex.why : "Closed after one minute", b.t + 60); }
-  if (!canOpen) return;
-  const idea = dtDecide(bars, sym); if (idea) dtOpen(sym, idea, b, nSyms);
+  if (!canOpen) { dtDecide(bars, sym, ctx); return; } // still forecast (and learn) for stocks it can't trade right now
+  const idea = dtDecide(bars, sym, ctx); if (idea) dtOpen(sym, idea, b, nSyms);
 }
 async function dtTick() {
   if (dtBusy) return; dtBusy = true;
@@ -2126,6 +2167,9 @@ async function dtTick() {
     const all = []; for (let i = 0; i < syms.length; i += 8) all.push(...(await Promise.all(syms.slice(i, i + 8).map(one)))); // 8 at a time
     if (fails > syms.length * 0.2) { dtThrottleUntil = Date.now() + 10 * 60e3; diagErr("day", `data source refused ${fails} of ${syms.length} requests — trading the first 50 stocks for 10 minutes`); }
     DT.orders = [];
+    // market-wide context for the brain: SPY's closed 1-minute bars and breadth (share of stocks above VWAP) per minute
+    const spyBars = (all.find(([s]) => s === "SPY") || [])[1] || [];
+    const ctx = { spy: new Map(spyBars.filter((b) => b.t <= now - 60 && b.m >= DTC.OPEN).map((b) => [b.t, b.c])), breadth: DTB.breadthMap(all.map(([s, bs]) => [s, bs ? bs.filter((b) => b.t <= now - 60) : null])) };
     for (const [sym, bars] of all) {
       if (!bars) continue;
       const done = bars.filter((b) => b.t <= now - 60 && b.m >= DTC.OPEN);
@@ -2133,11 +2177,13 @@ async function dtTick() {
       if (!DT.lastBar[sym]) DT.lastBar[sym] = done[done.length - 1].t - 60; // a stock new to the list starts now, not from 9:30
       const fresh = done.filter((b) => b.t > DT.lastBar[sym]).slice(-5); // catch up at most 5 missed minutes
       for (const b of fresh) {
-        const upTo = done.filter((x) => x.t <= b.t), canOpen = uni.includes(sym) && b.m >= DTC.OPEN && b.m < 15 * 60 + 58;
-        dtBar(sym, b, upTo, uni.length, canOpen);
+        const upTo = bars.filter((x) => x.t <= b.t), canOpen = uni.includes(sym) && b.m >= DTC.OPEN && b.m < 15 * 60 + 58; // pre-market bars kept for the levels
+        dtBar(sym, b, upTo, uni.length, canOpen, ctx, t.day);
       }
       DT.lastBar[sym] = done[done.length - 1].t;
     }
+    DTB.step(DT.brain); // one learning step from this minute's outcomes across every stock
+    BOTDIAG.day.model = { n: DT.brain.n, steps: DT.brain.steps };
     BOTDIAG.day.signals = DT.tally ? DT.tally.n : 0;
     // daily loss limit and end of day
     const eq = dtEquity();
@@ -2157,7 +2203,7 @@ async function dtTick() {
       DT.orders = []; for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "Account fell below $25,000 — a real account would be locked out of day trading");
       const vals = [DT_START, ...DT.equity.map((p) => p.v)];
       DT.runs.unshift({ run: DT.run, start: DT.firstTrade || DT.start, end: nowMs, startValue: DT_START, endValue: +dtEquity().toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals, dtEquity()).toFixed(2), trades: DT.tally ? DT.tally.n : DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spx ? +((spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: true, reason: "PDT lock (< $25,000)" });
-      DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs };
+      DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs, brain: DT.brain }; // a new run keeps what the brain has learned
     }
     await dtSave();
   } catch (e) { console.error("daytrader", e.message); diagErr("day", e); } finally { dtBusy = false; BOTDIAG.day.lastTick = Date.now(); }
@@ -2190,15 +2236,16 @@ async function dtView() {
   const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
   Object.assign(st, { trades: T.n * 2, closed: T.n, winRate: T.n ? T.wins / T.n : null, avgWin: T.wins ? T.gw / T.wins : null, avgLoss: T.n - T.wins ? -T.gl / (T.n - T.wins) : null, profitFactor: T.gl > 0 ? T.gw / T.gl : null, grossWins: T.gw, grossLosses: T.gl, costs: T.costs, traded: T.traded, avgR: T.n ? T.Rsum / T.n : null, avgHold: T.n ? T.held / T.n : null, longs: T.longs, shorts: T.shorts, longPnl: T.longPnl, shortPnl: T.shortPnl,
     bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })) });
-  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons })) }, durable: !!(UP_URL && UP_TOKEN),
-    status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute` : "Market closed — flat overnight, back at the opening bell",
+  return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
+    status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute, sized by a self-learning forecast` : "Market closed — flat overnight, back at the opening bell",
+    model: DTB.scorecard(DT.brain), pend: undefined,
     rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388 } };
 }
 function dtRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
   const mine = DT.trades.length + DT.runs.length * 1e4, theirs = doc.trades.length + (doc.runs || []).length * 1e4;
   if (theirs < mine || (DT.trades.length && doc.updated <= DT.updated)) return { ok: false, error: "server copy is newer" };
-  DT = { ...dtFresh(), ...doc, trades: doc.trades.slice(0, 2000) }; dtSave(); return { ok: true };
+  DT = { ...dtFresh(), ...doc, trades: doc.trades.slice(0, 2000) }; DT.brain = DTB.fix(DT.brain); DT.pend = {}; dtSave(); return { ok: true };
 }
 setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
 
