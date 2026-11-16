@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # Market Desk — notes for Claude
 
 Read `IMPLEMENTATION_PROGRESS.md` first (what's done, what's next), then `docs/ARCH-MAP.md` (where things live). Read `docs/ARCHITECTURE.md` only for the feature-ownership rules of the page you're touching.
