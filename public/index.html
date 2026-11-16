@@ -1527,7 +1527,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <div><b>Quant backtest lab</b><span>Momentum, mean-reversion, moving-average, RSI, multi-factor and risk-parity strategies tested with trading costs, no look-ahead, out-of-sample and walk-forward validation.</span></div>
     <div><b>Risk &amp; stress testing</b><span>Value at Risk, expected shortfall, correlations, concentration, and what 2008, 2020 and 2022 — or a hypothetical shock — would do to a portfolio.</span></div>
     <div><b>Macro dashboard</b><span>Fed funds, inflation, jobs, GDP, the yield curve and recession signals from FRED, the Treasury and the BLS.</span></div>
-    <div><b>AI vs. S&amp;P 500 experiment</b><span>A $10,000 paper account traded all day by rules Claude designed (news, earnings, momentum, analyst ratings), measured against the index with full trade analytics.</span></div>
+    <div><b>AI vs. S&amp;P 500 experiment</b><span>Paper accounts starting at $30,000 traded all day by rules Claude designed (news, earnings, momentum, analyst ratings), measured against the index with full trade analytics.</span></div>
     <div><b>Live markets</b><span>Streaming prices, a ranked news front page, an S&amp;P 500 heatmap and market analysis.</span></div>
   </div>
   <details class="vo-method"><summary>Methods &amp; technology</summary>
@@ -1704,7 +1704,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       </div>
       <div class="apx" id="apMore"></div>
       <section class="ap-sigs" id="apSig" hidden></section>
-      <p class="ap-lede ap-about">Two paper-money trading bots, both with rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close — with a self-learning forecast that reads every section of the site deciding the side and the size. Every bust starts a new test run.</p>
+      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close — with a self-learning forecast that reads every section of the site deciding the side and the size. Every bust starts a new test run.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3224,7 +3224,7 @@ function apChart(eq,startV,spx0,intra){
   const line=(arr,c,w)=>`<polyline fill="none" stroke="${c}" stroke-width="${w}" vector-effect="non-scaling-stroke" points="${arr.map((v,i)=>v==null?"":`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(" ")}"/>`;
   const tl=p=>label?new Date(p.t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):p.d;
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(startV)}" y2="${Y(startV)}" stroke="var(--line2)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>${line(b,"#8a93a3",2)}${line(a,"#ff9f43",2.5)}</svg>
-  <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot ${$m(a[a.length-1])}</span>${b[b.length-1]!=null?`<span><i style="background:#8a93a3"></i>S&amp;P 500 ${$m(b[b.length-1])}</span>`:""}<span>dashed line = the $10,000 start · ${label?"today, ":""}${esc(tl(pts[0]))} → ${esc(tl(pts[pts.length-1]))}</span></div>`;
+  <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot ${$m(a[a.length-1])}</span>${b[b.length-1]!=null?`<span><i style="background:#8a93a3"></i>S&amp;P 500 ${$m(b[b.length-1])}</span>`:""}<span>dashed line = the $30,000 start · ${label?"today, ":""}${esc(tl(pts[0]))} → ${esc(tl(pts[pts.length-1]))}</span></div>`;
 }
 /* (superseded by apPerf) side-by-side difference: who's ahead over time, and returns compared period by period */
 function apSeries(d){
@@ -3259,7 +3259,7 @@ function apDiffCharts(d){
   return `<div class="ap-two">
     <div class="bt-card"><h4>The gap <em>AI minus S&amp;P, in dollars</em></h4><div class="ap-gapnow ${cls(last)}">${last>=0?"AI ahead by ":"S&amp;P ahead by "}${$m(Math.abs(last))}</div>${gapSvg}
       <div class="ap-leg"><span><i style="background:#21c37a"></i>AI ahead</span><span><i style="background:#ff6b6b"></i>S&amp;P ahead</span><span>${esc(lab(intra?pts[0].t:pts[0].d))} → ${esc(lab(intra?pts.at(-1).t:pts.at(-1).d))}</span></div></div>
-    <div class="bt-card"><h4>Returns side by side <em>same $10,000, same days</em></h4>${rows}
+    <div class="bt-card"><h4>Returns side by side <em>same $30,000, same days</em></h4>${rows}
       <div class="ap-leg"><span><i style="background:#ff9f43"></i>AI bot</span><span><i style="background:#8a93a3"></i>S&amp;P 500</span></div></div>
   </div>`;
 }
@@ -3495,12 +3495,12 @@ function apRender(d){
     <li><b>Pace — about 2 trades a day (~14 a week):</b> once a day it swaps its weakest holding for a better-ranked stock in the same group (a sell and a buy = 2 trades), and catches up later in the week if it's behind. Never more than 4 trades a day or 14 in 7 days from swaps, swaps at least 90 minutes apart, and nothing bought less than an hour ago is swapped. Stop-losses and bad-news sells always happen right away, whatever the pace.</li>
     <li><b>Sells on:</b> very bad news or an earnings miss. High-risk picks get room to swing — sold at −15% from the buy price or −20% from their high, or when they fall below both their 50- and 200-day averages. Safe picks: −8%, −10% from the high, or below the 200-day average.</li>
     <li><b>Market filters:</b> S&amp;P below its 200-day average → 80% invested. Market stress (VIX 35+, S&amp;P down 3%+ in a day, or a black-swan headline) → 50% invested and no new buys.</li>
-    <li><b>Busting:</b> if the account falls below $1,000 (a 90% loss) the run ends, is saved below as a test run, and a new run starts with a fresh $10,000.</li>
-    <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. The S&amp;P 500 side is the same $10,000 put into the index on the run's first day.</li>
+    <li><b>Busting:</b> if the account falls below $3,000 (a 90% loss) the run ends, is saved below as a test run, and a new run starts with a fresh $30,000.</li>
+    <li>Fills at the live price plus 0.05% slippage, no commissions, fractional shares. The S&amp;P 500 side is the same $30,000 put into the index on the run's first day.</li>
   </ul>
   <p class="ap-note" style="margin:10px 0 0">${d.durable?"Saved in permanent storage.":"The server forgets its copy when the site updates; your signed-in browser keeps a backup and puts it back automatically."}</p></div>
   </details>
-  <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${busts} bust${busts===1?"":"s"} so far`:"no busts yet — every bust starts a new $10,000 run"}</em></h4>
+  <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${busts} bust${busts===1?"":"s"} so far`:"no busts yet — every bust starts a new $30,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
   apWirePerf(d);
 }
@@ -3553,7 +3553,7 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$10,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, self-learning`,dy)+card("quant","📐","Quant trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$10,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, self-learning`,dy)+card("quant","📐","Quant trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
   liveApply(false);
 }
 function dtRender(d){
@@ -3649,7 +3649,7 @@ function qtRender(d){
     <li><b>Selection:</b> ranks ${(d.rules&&d.rules.universe||[]).length} liquid stocks and sector ETFs on momentum and low volatility; buys the top ${d.rules?d.rules.top:8} that are above their 200-day average.</li>
     <li><b>Sizing:</b> risk parity on 6 months of daily returns, max ${d.rules?Math.round(d.rules.maxW*100):20}% per name; the defensive sleeve (${esc((d.rules&&d.rules.defensive||[]).join(", "))}) is sized the same way.</li>
     <li><b>Risk control:</b> the whole book is scaled to a ${d.rules?Math.round(d.rules.volTarget*100):15}% annual volatility target; unused risk sits in T-bills (BIL).</li>
-    <li><b>Trading:</b> only weight changes above ${d.rules?(d.rules.minTrade*100).toFixed(1):1.5}% are traded, at the latest daily close, paying ${d.rules?(d.rules.cost*1e4).toFixed(0):5} bps per side. Starts with $10,000.</li></ul></div></details>`;
+    <li><b>Trading:</b> only weight changes above ${d.rules?(d.rules.minTrade*100).toFixed(1):1.5}% are traded, at the latest daily close, paying ${d.rules?(d.rules.cost*1e4).toFixed(0):5} bps per side. Starts with $30,000.</li></ul></div></details>`;
 }
 async function apBackup(kind,d){
   if(window.__VISITOR) return false;
@@ -3731,7 +3731,7 @@ function liveChart(){ // the "Live" strip was removed: it only drew while the pa
   $("apLive").classList.toggle("off",!L.open);
   if(h.length<2){ svg.innerHTML=""; return; }
   const sw=BOTS.d.swing, dy=BOTS.d.day;
-  const S=[["s",hs,sw?sw.startValue:10000,"#a7afbd",true],["v",hs,sw?sw.startValue:10000,"#ff9f43",false],["v",hd,dy?dy.startValue:30000,"#a8cb81",false]]
+  const S=[["s",hs,sw?sw.startValue:30000,"#a7afbd",true],["v",hs,sw?sw.startValue:30000,"#ff9f43",false],["v",hd,dy?dy.startValue:30000,"#a8cb81",false]]
     .map(([k,arr,start,c,dash])=>({c,dash,v:arr.map(p=>p[k]==null?null:p[k]/start-1)})).filter(x=>x.v.filter(v=>v!=null).length>=2);
   const vals=S.flatMap(x=>x.v).filter(v=>v!=null); if(!vals.length){ svg.innerHTML=""; return; }
   let lo=Math.min(...vals), hi=Math.max(...vals); const pad=Math.max((hi-lo)*0.15,0.0002); lo-=pad; hi+=pad;

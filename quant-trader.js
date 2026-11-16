@@ -15,7 +15,7 @@ const QT_EQUITY = ["SPY", "QQQ", "IWM", "XLK", "XLF", "XLV", "XLE", "XLI", "XLY"
 const QT_DEFENSIVE = ["IEF", "TLT", "GLD"];
 const QT_CASH = "BIL";
 const QT_SIGNALS = ["HYG"]; // credit gauge for the regime (with IEF)
-const QT_START = 10000, QT_COST = 0.0005, QT_MIN_TRADE = 0.015, QT_MAX_W = 0.2, QT_TOP = 8, QT_VOL_TARGET = 0.15;
+const QT_START = 30000, QT_COST = 0.0005, QT_MIN_TRADE = 0.015, QT_MAX_W = 0.2, QT_TOP = 8, QT_VOL_TARGET = 0.15;
 const SPLIT = { "Risk-on trend": 1.0, "Choppy / late-cycle": 0.7, Correction: 0.4, "Risk-off / high volatility": 0.1 };
 
 const z = (a) => { const v = a.filter(isFinite), m = QM.mean(v), s = QM.sd(v) || 1; return a.map((x) => (isFinite(x) ? (x - m) / s : 0)); };
