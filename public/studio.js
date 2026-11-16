@@ -37,7 +37,7 @@
     if (E.mounted && byId("mdsModes")) return;
     E.mounted = true;
     el.innerHTML = `<div class="mds-hero">
-      <div class="mds-hero-copy"><div class="mds-eyebrow">◈ THE WEB / RESEARCH OPERATIONS</div>
+      <div class="mds-hero-copy"><div class="mds-eyebrow">◈ INTELLIGENCE / RESEARCH OPERATIONS</div>
       <div class="mds-title-line"><h1>Intelligence Studio</h1><span class="mds-beacon" aria-label="Studio ready"></span></div>
       <p>Portfolio intelligence, researched connections and quant strategies in one workspace. All projections are hypothetical and no orders are placed.</p></div>
       <div class="mds-hero-actions" aria-label="Connected terminal tools"><button type="button" data-msgo="web">◉ Spider network</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest Lab</button><button type="button" data-msgo="health">▤ System Health</button></div>

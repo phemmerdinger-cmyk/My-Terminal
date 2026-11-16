@@ -1505,7 +1505,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
   <button data-group="quant"><span class="ti">∑</span>Quant</button>
   <button data-group="ailab" class="lab"><span class="ti">🤖</span>AI Lab</button>
-  <button data-group="web" title="THE WEB · autonomous research"><span class="ti">🕸</span>THE WEB</button>
+  <button data-group="web" title="Intelligence Studio and System Health"><span class="ti">🕸</span>Intelligence</button>
   <span class="tsep" aria-hidden="true"></span>
   <div class="subtabs" id="subtabs" role="tablist"></div>
 </nav>
@@ -1572,7 +1572,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="ov-row">
         <div class="an-card ov-card"><div class="ov-h"><h2 class="h" id="ovPfH">Your portfolio today</h2><button type="button" class="ov-go" data-gotab="portfolio">Portfolio →</button></div><div id="ovPf"></div></div>
         <div class="an-card ov-card ov-radar" id="ovRadar"></div>
-        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest research · THE WEB</h2><button type="button" class="ov-go" data-gotab="web">THE WEB →</button></div><div id="ovWeb"></div></div>
+        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest research · THE WEB</h2><button type="button" class="ov-go" data-gotab="studio">Intelligence Studio →</button></div><div id="ovWeb"></div></div>
       </div>
       <div class="bb" id="bestBuys"></div>
       <div class="mk-grid" style="margin-bottom:24px">
@@ -1944,7 +1944,7 @@ const NAV=[
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
-  ["web",[["web","Command center"],["studio","Intelligence Studio"],["health","System health"]]],
+  ["web",[["studio","Intelligence Studio"],["health","System health"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -2083,7 +2083,8 @@ setInterval(tick,1000); tick();
 
 /* ---------- tabs ---------- */
 function setTab(t){
-  if(VIEW&&(t==="predict"||t==="web"||t==="studio"||t==="health")) t="news";
+  if(t==="web") t="studio";
+  if(VIEW&&(t==="predict"||t==="studio"||t==="health")) t="news";
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
@@ -2109,7 +2110,7 @@ function setTab(t){
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1)==="web"?"studio":location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
@@ -5020,7 +5021,7 @@ renderNotif(); renderToolbar(); renderWL();
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?location.hash.slice(1):location.hash==="#charts"?"research":VIEW?"news":"home");
+setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?(location.hash.slice(1)==="web"?"studio":location.hash.slice(1)):location.hash==="#charts"?"research":VIEW?"news":"home");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";
