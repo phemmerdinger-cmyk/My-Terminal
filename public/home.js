@@ -58,10 +58,27 @@
   }
 
   // ---------------------------------------------------------------- widgets
-  function wPriorities(s) {
-    const L = C.priorities({ summary: s, earnings: M.earn, news: S.news, watchlist: S.wl, limits: limits(), shift: M.shift });
-    if (!L.length) return `<p class="mc-empty">Nothing needs your attention right now: no earnings within 7 days, no new filings on your names, and no limit breaches${M.earn ? "" : " (earnings calendar still loading)"}.</p>`;
-    return `<ol class="mc-pri">${L.slice(0, 12).map((p) => `<li class="sev-${p.sev}"><span class="mc-sev" aria-label="${p.sev} priority">${p.sev === "high" ? "HIGH" : p.sev === "med" ? "MED" : "LOW"}</span><div><button type="button" class="mc-link" data-mc-go="${h(p.go)}"${p.sym ? ` data-mc-sym="${h(p.sym)}"` : ""}>${h(p.title)}</button><small>${h(p.detail)}${p.url ? ` · <a href="${h(p.url)}" target="_blank" rel="noopener">source ↗</a>` : ""}</small></div></li>`).join("")}</ol>`;
+  // AI vs S&P 500: the three paper bots from the live scoreboard (/api/pub/botslive, public, polled while Home is open)
+  async function loadBots() {
+    if (M.botsBusy) return; M.botsBusy = true;
+    try { const r = await fetch("/api/pub/botslive", { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); M.bots = await r.json(); M.botsErr = null; M.botsAt = Date.now(); }
+    catch (e) { M.botsErr = String(e.message || e); } finally { M.botsBusy = false; }
+    if (S.tab === "home") { const w = el() && el().querySelector('[data-mc-id="trading"] .mc-wb'); if (w) w.innerHTML = wTrading(); else render(); }
+  }
+  function wTrading() {
+    if (!M.bots) return M.botsErr ? `<p class="mc-empty">Trading bots unavailable right now (${h(M.botsErr)}).</p>` : `<div class="mc-skel"></div><div class="mc-skel"></div>`;
+    const B = C.botBoard(M.bots), sn = M.bots, ICON = { swing: "🤖", day: "⚡", quant: "📐" };
+    if (!B.rows.length) return `<p class="mc-empty">No bot data yet.</p>`;
+    const extra = (r) => { const b = sn[r.k] || {};
+      if (r.k === "swing") return `${b.n || 0} holding${b.n === 1 ? "" : "s"} · run #${b.run || 1}`;
+      if (r.k === "day") return `${(b.tradesToday || 0).toLocaleString()} trades today${b.hitRate != null ? ` · forecast right ${(b.hitRate * 100).toFixed(1)}%` : ""} · run #${b.run || 1}`;
+      return b.error ? `waiting for data` : `${b.n || 0} holdings${b.regime ? ` · ${h(b.regime)}` : ""}`; };
+    const lead = (x) => x == null ? `<span class="mc-note">S&amp;P starts at first trade</span>` : `<b class="${cl(x)}">${x >= 0 ? "+" : "−"}${money(Math.abs(x)).replace(/^−/, "")}</b>`;
+    const T = B.total;
+    return `<table class="mc-tbl"><thead><tr><th>Bot</th><th>Value</th><th>Return</th><th>S&amp;P same period</th><th>vs S&amp;P</th></tr></thead><tbody>
+      ${B.rows.map((r) => `<tr><td><button type="button" class="mc-link" data-mc-go="aitrade" data-mc-bot="${r.k}">${ICON[r.k]} ${h(r.name)}</button><small class="mc-note" style="display:block">${extra(r)}</small></td><td>${money(r.value)}</td><td class="${cl(r.ret)}">${pc(r.ret * 100)}</td><td class="${r.spxRet == null ? "" : cl(r.spxRet)}">${r.spxRet == null ? "—" : pc(r.spxRet * 100)}</td><td>${lead(r.lead)}</td></tr>`).join("")}
+      <tr><td><b>All three</b><small class="mc-note" style="display:block">${money(T.start)} started</small></td><td><b>${money(T.value)}</b></td><td class="${cl(T.ret)}"><b>${pc(T.ret * 100)}</b></td><td class="${T.spxRet == null ? "" : cl(T.spxRet)}">${T.spxRet == null ? "—" : pc(T.spxRet * 100)}</td><td>${lead(T.lead)}</td></tr></tbody></table>
+      <p class="mc-note">Paper money only (simulated trades). ${sn.open ? "Market open · live prices" : "Market closed · last prices"}, updated ${ago(M.botsAt)}. S&amp;P column = the index over each bot's own run. <button type="button" class="mc-link" data-mc-go="aitrade">Open AI vs S&amp;P 500 →</button></p>`;
   }
   function wBriefing(s) {
     if (!S.news && !M.earn) return `<div class="mc-skel"></div><div class="mc-skel"></div><div class="mc-skel"></div>`;
@@ -120,7 +137,7 @@
       ${filings.length ? `<h4>Recent SEC filings (holdings)</h4><ul class="mc-list">${filings.map((n) => `<li><a href="${h(n.link)}" target="_blank" rel="noopener">${h(n.title)}</a> <small>${h(when(n.time))}</small></li>`).join("")}</ul>` : ""}
       <p class="mc-note">Source: ${h(e.source || "earnings calendar")}, updated ${ago(e.updated)}. Economic releases live in <button type="button" class="mc-link" data-mc-go="macro">Macro →</button></p>`;
   }
-  const BODY = { priorities: wPriorities, briefing: wBriefing, portfolio: wPortfolio, allocation: wAllocation, risk: wRisk, catalysts: wCatalysts };
+  const BODY = { trading: wTrading, briefing: wBriefing, portfolio: wPortfolio, allocation: wAllocation, risk: wRisk, catalysts: wCatalysts };
 
   // ---------------------------------------------------------------- shell
   function toolbar() {
@@ -162,6 +179,7 @@
     root.addEventListener("click", (e) => {
       const b = e.target.closest("button,[data-mc-go]"); if (!b) return;
       const w = b.closest("[data-mc-id]"), id = w && w.dataset.mcId;
+      if (b.dataset.mcBot) { try { localStorage.setItem("md_bot", b.dataset.mcBot); } catch {} if (typeof BOTS !== "undefined") BOTS.sel = b.dataset.mcBot; }
       if (b.dataset.mcGo) { if (b.dataset.mcSym && typeof openQuote === "function" && b.dataset.mcGo === "research") openQuote(b.dataset.mcSym); else setTab(b.dataset.mcGo); return; }
       if (b.dataset.mcMove && id) return act((l) => C.moveWidget(l, id, b.dataset.mcMove));
       if (b.hasAttribute("data-mc-size") && id) return act((l) => C.resizeWidget(l, id));
@@ -192,8 +210,8 @@
     root.addEventListener("dragend", () => { M.drag = null; root.querySelectorAll(".dragging").forEach((x) => x.classList.remove("dragging")); });
   }
   window.homeOpen = function () {
-    if (!M.mounted) { M.mounted = true; bind(); visit(); save(); }
-    render(); loadSide(); loadRisk();
+    if (!M.mounted) { M.mounted = true; bind(); visit(); save(); setInterval(() => { if (S.tab === "home" && !document.hidden) loadBots(); }, 10e3); }
+    render(); loadSide(); loadRisk(); loadBots();
   };
   if (S.tab === "home") window.homeOpen(); // the first setTab() ran before this file loaded
   window.homeLive = function () { if (S.tab === "home") { render(); if (!M.riskKey) loadRisk(); } };

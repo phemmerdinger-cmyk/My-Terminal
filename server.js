@@ -1992,7 +1992,10 @@ const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY =
 // The decision each minute comes from a self-learning model (daytrade-brain.js) that reads every part of the site —
 // chart, market tape, News/earnings/analysts/financial health, THE WEB Spider, the swing bot's and Quant trader's
 // rankings, sector strength and the Macro page — and learns from every stock's next minute. It still trades every stock
-// every minute; conviction sets the size, and a portfolio guard caps gross (4×) and net exposure.
+// every minute; conviction sets the size, and a portfolio guard caps gross (DT_LEV×) and net exposure.
+// Leverage: up to DT_LEV × the account in total (a real broker's pattern-day-trader limit is 4×; the owner chose 6× for
+// higher risk). A normal slice is 0.75 × DT_LEV × equity ÷ stocks, scaled by conviction; net tilt ≤ DT_NET × equity.
+const DT_LEV = 6, DT_NET = 2.25;
 const DT_START = 30_000, DT_PDT = 25_000, DT_FEE_SHORT = 0.0001, DT_COST = 0.00005, DT_HOLD = 1;
 const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA",
   "UBER", "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB", "GOOG", "BRK-B", "LLY", "V",
@@ -2150,8 +2153,8 @@ function dtDecide(bars, sym, ctx) {
 function dtBook() { let gross = 0, net = 0; for (const [s, p] of Object.entries(DT.positions)) { const v = p.shares * (dtPx[s] || p.entry); gross += v; net += (p.dir === "long" ? 1 : -1) * v; } return { gross, net }; }
 function dtOpen(sym, idea, b, nSyms) {
   const eq = dtEquity(); if (eq <= 0) return;
-  const px = idea.entry, want = DTC.size(eq, px, idea.stop, 1, ((3 * eq) / nSyms) * (idea.sizeX || 1)); // a slice of buying power: 3×/N, scaled by conviction
-  const stressed = !!(DTR.market && DTR.market.stress), shares = DTB.guard(want < 1 ? 1 : want, px, idea.dir, dtBook(), eq, { grossCap: 4, netCap: stressed ? 0.75 : 1.5 });
+  const px = idea.entry, want = DTC.size(eq, px, idea.stop, 1, ((0.75 * DT_LEV * eq) / nSyms) * (idea.sizeX || 1)); // a slice of buying power, scaled by conviction
+  const stressed = !!(DTR.market && DTR.market.stress), shares = DTB.guard(want < 1 ? 1 : want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: stressed ? DT_NET / 2 : DT_NET });
   if (shares < 1) return;
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   DT.positions[sym] = { dir: idea.dir, shares, entry: px, stop: idea.stop, stop0: idea.stop, target: idea.target, setup: DT_KIND[idea.kind], kind: idea.kind, at: b.t * 1000 + 60e3, why: `${sym}: ${idea.why}`, cost0, bars: 0 };
@@ -2261,7 +2264,7 @@ async function dtView() {
   return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
     status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute, sized by a self-learning forecast` : "Market closed — flat overnight, back at the opening bell",
     model: DTB.scorecard(DT.brain), pend: undefined,
-    rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388 } };
+    rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388, lev: DT_LEV, net: DT_NET } };
 }
 function dtRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
@@ -2358,7 +2361,7 @@ const blOpenish = () => { const t = etParts(); return !(t.wd === "Sat" || t.wd =
 async function blRefresh() {
   if (BL.busy) return; BL.busy = true;
   try {
-    const syms = [...new Set([...Object.keys(AP.positions), ...Object.keys(DT.positions), "^GSPC"])];
+    const syms = [...new Set([...Object.keys(AP.positions), ...Object.keys(DT.positions), ...Object.keys(QT.positions || {}), "^GSPC"])];
     for (let i = 0; i < syms.length; i += 150) {
       const j = await yget(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms.slice(i, i + 150).join(","))}&fields=regularMarketPrice,regularMarketTime`);
       for (const q of (j.quoteResponse && j.quoteResponse.result) || []) if (q.regularMarketPrice != null) BL.px[q.symbol] = { p: q.regularMarketPrice, t: (q.regularMarketTime || 0) * 1000 || Date.now() };
@@ -2383,7 +2386,10 @@ function botsLive() {
   const dyV = DT.cash + Object.entries(DT.positions).reduce((a, [sym, p]) => a + (p.dir === "long" ? 1 : -1) * p.shares * blPx(sym, dtPx[sym] || p.entry), 0);
   BL.snap = { t: Date.now(), pricesAt: BL.t || null, open: blOpenish(), spx,
     swing: { value: r2(swV), start: AP_START, spx0: AP.spx0 || null, cash: r2(AP.cash), pos: sw },
-    day: { value: r2(dyV), start: DT_START, spx0: DT.spx0 || null, cash: r2(DT.cash), pos: dy } };
+    day: { value: r2(dyV), start: DT_START, spx0: DT.spx0 || null, cash: r2(DT.cash), pos: dy, run: DT.run, since: DT.firstTrade || null, tradesToday: DT.day && DT.day.d === etParts().day ? DT.day.closed || 0 : 0, hitRate: DT.brain && DT.brain.day && DT.brain.day.scored ? +(DT.brain.day.hits / DT.brain.day.scored).toFixed(4) : null },
+    quant: (() => { const qp = Object.entries(QT.positions || {}).map(([sym, p]) => [sym, r2(p.shares * blPx(sym, qtPx[sym] || p.cost))]); const d = QT.decisions && QT.decisions[0];
+      return { value: r2(QT.cash + qp.reduce((a, x) => a + x[1], 0)), start: QTC.QT_START, spx0: QT.spx0 || null, cash: r2(QT.cash), n: qp.length, since: QT.firstTrade || null, regime: d ? d.regime : null, error: QT.lastError || null }; })() };
+  BL.snap.swing.run = AP.run; BL.snap.swing.since = AP.firstTrade || null; BL.snap.swing.n = sw.length;
   BL.snapT = Date.now(); return BL.snap;
 }
 

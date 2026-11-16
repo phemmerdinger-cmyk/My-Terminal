@@ -60,19 +60,23 @@ test("briefing adds earnings and spider items only for followed names, with sour
   const sp = L.find((x) => x.kind === "spider"); assert.equal(sp.url, "https://sec.test/1"); assert.match(sp.nature, /interpretation/);
   assert.ok(!L.some((x) => x.title === "Unsourced"));
 });
-test("priorities flag earnings, concentration, sector limits, filings and missing quotes", () => {
-  const s = C.summarize(pf, quotes, sectors, NOW);
-  const P = C.priorities({ summary: s, watchlist: [], now: NOW, limits: { maxPosition: 25, maxSector: 40 },
-    earnings: { yours: [{ symbol: "NVDA", date: "2026-11-17" }] },
-    news: { items: [{ id: "f", title: "MSFT 8-K", link: "https://sec.test", source: "official", agency: "SEC", time: NOW - 864e5, tickers: ["MSFT"] }] } });
-  const ids = P.map((p) => p.id);
-  for (const id of ["earn:NVDA", "conc:NVDA", "sec:Information Technology", "unpriced"]) assert.ok(ids.includes(id), id);
-  assert.ok(ids.some((x) => x.startsWith("filing:")));
-  assert.equal(P[0].sev, "high");
-  assert.ok(P.every((p) => p.go), "every priority links into the terminal");
+test("botBoard: each bot vs the S&P over its own run, plus the combined total", () => {
+  const B = C.botBoard({ spx: 6600, swing: { value: 31500, start: 30000, spx0: 6000 }, day: { value: 29000, start: 30000, spx0: 6600 }, quant: { value: 30000, start: 30000, spx0: null } });
+  assert.equal(B.rows.length, 3);
+  const sw = B.rows[0]; assert.equal(sw.name, "Swing bot"); assert.ok(Math.abs(sw.ret - 0.05) < 1e-12); assert.ok(Math.abs(sw.spxRet - 0.1) < 1e-12); assert.ok(Math.abs(sw.lead - (31500 - 33000)) < 1e-9);
+  assert.equal(B.rows[1].spxRet, 0); assert.equal(B.rows[1].lead, -1000);
+  assert.equal(B.rows[2].spxRet, null, "no S&P start before the first trade — not estimated"); assert.equal(B.rows[2].lead, null);
+  assert.equal(B.total.value, 90500); assert.equal(B.total.start, 90000); assert.equal(B.total.spxRet, null, "total vs S&P only when every bot has one");
+  assert.deepEqual(C.botBoard(null), { rows: [], total: null });
+  assert.equal(C.botBoard({ spx: 1, swing: { value: NaN, start: 1 } }).rows.length, 0);
+});
+test("layout: a new top module goes first in saved layouts; the old priorities module is dropped", () => {
+  const L = C.normalizeLayout([{ id: "priorities", span: 1 }, { id: "briefing", span: 2 }, { id: "risk", span: 1 }]);
+  assert.equal(L[0].id, "trading"); assert.ok(!L.some((x) => x.id === "priorities")); assert.equal(L.length, C.WIDGETS.length);
+  assert.equal(C.defaultLayout()[0].id, "trading");
 });
 test("layout: normalize, move, resize, hide/restore", () => {
-  let L = C.normalizeLayout([{ id: "risk", span: 9 }, { id: "bogus" }, { id: "risk" }]);
+  let L = C.normalizeLayout([{ id: "risk", span: 9 }, { id: "bogus" }, { id: "risk" }, { id: "trading", span: 2 }]);
   assert.equal(L[0].id, "risk"); assert.equal(L[0].span, 1); assert.equal(L.length, C.WIDGETS.length);
   L = C.moveWidget(L, "risk", "down"); assert.equal(L[1].id, "risk");
   L = C.moveWidget(L, "risk", 0); assert.equal(L[0].id, "risk");
