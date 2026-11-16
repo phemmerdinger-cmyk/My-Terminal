@@ -17,6 +17,12 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 
 Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for visitor/forged cookie). `npm test` → 132 pass. Browser smoke (Playwright + local Chrome, `/tmp/smoke.py` not committed): render, persistence across reload, server copy, demo mode, mobile layout.
 
+### Day trader — self-learning brain (AI vs S&P 500)
+- Same pace as before (every stock, every minute, ~38,800 trades/day), but the side and size now come from `daytrade-brain.js` (pure, tested in `tests/daybrain.test.js`): 18 features — chart (1/5/15-min momentum, VWAP distance, EMA trend, order flow, per-stock autocorrelation, sweeps/gap-and-go via `daytrade-core.js`, patterns), tape (beta-adjusted RS vs SPY, SPY last minute × beta, breadth), and the rest of the site (News/earnings/analysts/Financials health grade, Spider `signal(sym,{trader:true})`, swing-bot score percentile `apScoreOf`, Quant trader ranking + regime, sector ETF vs SPY, Macro page yield curve/Sahm, VIX).
+- Online linear forecaster: Huber error, one RMSprop step per minute on the averaged gradient, L2 pull toward starting weights. Prequential scorecard (hit rate, IC) → `/api/daytrader` `model`, shown as "🧠 The forecast model" card.
+- Sizing by edge after costs (0.15×–2× a slice), half size into earnings / after −3% day, portfolio guard: gross ≤ 4×, |net| ≤ 1.5× (0.75× under stress). Brain persists in the DT doc and survives busts.
+- Offline replay (synthetic 100 stocks × 390 min): 38,800 trades, ~3.5 ms per minute of decisions.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
