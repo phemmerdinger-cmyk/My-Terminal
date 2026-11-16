@@ -33,6 +33,9 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Day trader leverage raised to 10× (2026-11-16, owner's choice: same $30,000, higher risk)
 - `DT_LEV = 10` (gross cap; was 6×, before that 4×, above a real broker's 4× PDT limit — labeled on the page), slice = 0.75 × DT_LEV × equity ÷ stocks, `DT_NET = 3.75` net cap (half under stress).
 
+### Day trader: evidence first (2026-11-16, owner: "quick profits backed by news and earnings")
+- `evidenceTilt()` in daytrade-brain.js (tested): evidence = research lean (news/earnings/analysts/health) + ½ Spider. |e| ≥ 0.4 picks the side when the forecast is weak; agreeing evidence ×(1+1.5|e|) up to 2.5×, opposing down to 0.25×. Earnings-due half size only when unbacked. Trade log says "backed by: …".
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.

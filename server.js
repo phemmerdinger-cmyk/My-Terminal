@@ -2134,7 +2134,9 @@ async function dtResearch() {
 // Direction for the next minute: the brain's forecast (daytrade-brain.js) from the chart, the market tape and every
 // research input above. It always picks a side — the bot trades every stock every minute — and the forecast's edge
 // after trading costs sets the size (minimum 15% of a normal slice when the edge doesn't cover costs, up to 2×).
-// Extra brakes: half size into an earnings report today/tomorrow, half size after a −3% day.
+// Evidence first: strong research (news, earnings, analysts, financial health, Spider) picks the side when the chart is
+// unclear, sizes up to 2.5× when it backs the trade and down to 0.25× when it's against it.
+// Brakes: half size into an earnings report today/tomorrow unless the evidence backs the side; half size after a −3% day.
 function dtDecide(bars, sym, ctx) {
   const reg = bars.filter((x) => x.m >= DTC.OPEN), b = reg[reg.length - 1]; if (!b || reg.length < 3) return null;
   const info = DTR.by[sym] || null, mk = DTR.market || {};
@@ -2142,12 +2144,18 @@ function dtDecide(bars, sym, ctx) {
   if (!f) return null;
   DT.pend[sym] = { t: f.t, c: f.c, a: f.a, x: f.x.map((v) => +v.toFixed(4)) }; // scored and learned from at the next bar
   const costAtr = (f.c * (2 * DT_COST + DT_FEE_SHORT / 2)) / f.a, d = DTB.decide(DT.brain, f, { costAtr, mom: f.x[0] });
-  let sizeX = d.sizeX; const brakes = [];
-  if (info && info.soon) { sizeX *= 0.5; brakes.push("earnings due — half size"); }
+  // evidence: the research inputs (news, earnings, analysts, financial health) plus the Spider's findings
+  const ev = info ? clamp(info.research + 0.5 * (info.spider || 0), -1, 1) : 0, tilt = DTB.evidenceTilt(d.dir, d.mu, DT.brain.absMu, ev);
+  if (tilt.flipped) d.dir = tilt.dir;
+  let sizeX = d.sizeX * tilt.mult; const brakes = [];
+  // an earnings report today/tomorrow is a coin flip unless the evidence backs this side
+  if (info && info.soon && !tilt.backed) { sizeX *= 0.5; brakes.push("earnings due without supporting evidence — half size"); }
   if (DT.day && DT.day.startEq && DT.day.pnl / DT.day.startEq <= -0.03) { sizeX *= 0.5; brakes.push("down 3%+ today — half size"); }
   const sgn = d.dir === "long" ? 1 : -1, a = f.a, stop = Math.max(a, b.c * 0.0005), tgt = Math.max(a * 1.2, b.c * 0.0006);
-  const why = `forecast ${d.mu >= 0 ? "+" : ""}${d.mu.toFixed(3)} ATR (${d.edge > 0 ? "clears" : "doesn't clear"} costs) · for: ${d.reasons.join(", ") || "no strong input"}${d.against ? ` · against: ${d.against}` : ""}${info && info.reasons.length ? ` · research: ${info.reasons[0]}` : ""}${brakes.length ? ` · ${brakes.join(", ")}` : ""}`;
-  return { dir: d.dir, kind: d.kind, sizeX, score: Math.abs(d.mu), mu: d.mu, why, entry: b.c, stop: b.c - sgn * stop, target: b.c + sgn * tgt, at: b.t };
+  const evWhy = info && info.reasons.length ? info.reasons.slice(0, 2).join("; ") : null;
+  const lead = tilt.flipped ? `trading the evidence (${ev >= 0 ? "+" : ""}${ev.toFixed(2)}) over a weak chart` : `forecast ${d.mu >= 0 ? "+" : ""}${d.mu.toFixed(3)} ATR (${d.edge > 0 ? "clears" : "doesn't clear"} costs) · for: ${d.reasons.join(", ") || "no strong input"}${d.against ? ` · against: ${d.against}` : ""}`;
+  const why = `${lead}${evWhy ? ` · ${tilt.backed ? "backed by" : Math.abs(ev) >= 0.15 ? "evidence disagrees" : "research"}: ${evWhy}` : ""}${tilt.backed ? ` · size ×${tilt.mult.toFixed(1)}` : ""}${brakes.length ? ` · ${brakes.join(", ")}` : ""}`;
+  return { dir: d.dir, kind: tilt.flipped ? "research" : d.kind, sizeX, score: Math.abs(d.mu), mu: d.mu, why, entry: b.c, stop: b.c - sgn * stop, target: b.c + sgn * tgt, at: b.t };
 }
 // Gross and net exposure of the open book right now.
 function dtBook() { let gross = 0, net = 0; for (const [s, p] of Object.entries(DT.positions)) { const v = p.shares * (dtPx[s] || p.entry); gross += v; net += (p.dir === "long" ? 1 : -1) * v; } return { gross, net }; }
