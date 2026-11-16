@@ -1993,9 +1993,9 @@ const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY =
 // chart, market tape, News/earnings/analysts/financial health, THE WEB Spider, the swing bot's and Quant trader's
 // rankings, sector strength and the Macro page — and learns from every stock's next minute. It still trades every stock
 // every minute; conviction sets the size, and a portfolio guard caps gross (DT_LEV×) and net exposure.
-// Leverage: up to DT_LEV × the account in total (a real broker's pattern-day-trader limit is 4×; the owner chose 6× for
+// Leverage: up to DT_LEV × the account in total (a real broker's pattern-day-trader limit is 4×; the owner chose 10× for
 // higher risk). A normal slice is 0.75 × DT_LEV × equity ÷ stocks, scaled by conviction; net tilt ≤ DT_NET × equity.
-const DT_LEV = 6, DT_NET = 2.25;
+const DT_LEV = 10, DT_NET = 3.75;
 const DT_START = 30_000, DT_PDT = 25_000, DT_FEE_SHORT = 0.0001, DT_COST = 0.00005, DT_HOLD = 1;
 const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA",
   "UBER", "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB", "GOOG", "BRK-B", "LLY", "V",

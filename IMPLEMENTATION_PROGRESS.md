@@ -30,8 +30,8 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - `priorities` removed (core, widget, CSS, test). New top widget `trading` ("AI vs S&P 500 · trading bots"): swing, day and Quant bots — value, return, the S&P over each bot's own run, lead in $, combined total — from `/api/pub/botslive` (now includes Quant + run/trades/hit-rate extras), polled every 10 s while Home is visible. Pure `botBoard()` in home-core (tested). Saved layouts get the new widget on top; clicking a bot opens it on AI vs S&P 500.
 - "Strategy drawdown" / "thesis contradiction" priorities from Known limitations no longer apply.
 
-### Day trader leverage raised to 6× (2026-11-16, owner's choice: same $30,000, higher risk)
-- `DT_LEV = 6` (gross cap; was 4×, above a real broker's 4× PDT limit — labeled on the page), slice = 0.75 × DT_LEV × equity ÷ stocks, `DT_NET = 2.25` net cap (half under stress).
+### Day trader leverage raised to 10× (2026-11-16, owner's choice: same $30,000, higher risk)
+- `DT_LEV = 10` (gross cap; was 6×, before that 4×, above a real broker's 4× PDT limit — labeled on the page), slice = 0.75 × DT_LEV × equity ÷ stocks, `DT_NET = 3.75` net cap (half under stress).
 
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
