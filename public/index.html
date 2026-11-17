@@ -2123,7 +2123,7 @@ function setTab(t){
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1)==="web"?"studio":location.hash.slice(1); if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1)==="web"?"studio":location.hash.slice(1); if(h==="home") setTab("data"); else if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
