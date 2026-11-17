@@ -1969,7 +1969,7 @@ const NAV_LAST={};
 function navSync(t){
   const g=groupOf(t); NAV_LAST[g]=t;
   document.querySelectorAll("#tabs [data-group]").forEach(b=>b.classList.toggle("on",b.dataset.group===g));
-  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&k==="predict"));
+  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||!!STUDIO_ROUTES[k])));
   const html=items.map(([k,label,c])=>`<button role="tab" data-tab="${k}" class="${c||""} ${k===t?"on":""}" aria-selected="${k===t}">${esc(label)}${k==="news"?'<span class="k" id="newsCount'+'"></span>':""}</button>`).join("");
   for(const id of ["subtabs","subtabsM"]){ const el=$(id); el.innerHTML=html.replace(' id="newsCount"',id==="subtabs"?' id="newsCount"':""); }
   if(window.__nc&&$("newsCount")) $("newsCount").textContent=window.__nc;
