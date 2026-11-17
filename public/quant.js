@@ -1,6 +1,6 @@
 /* Quantitative backtesting engine — runs in the browser (Backtest lab) and in Node (tests).
    Design rules that keep results honest:
-   • No look-ahead: a signal on day t uses prices up to and including day t's close; the trade executes at day t+1's close.
+   • Signals use completed daily closes; orders require observed closing prices from a later session.
    • Trading calendar = the benchmark's actual trading days (exchange holidays are simply absent from the data).
    • Prices: dividend- and split-adjusted closes (total return) when the source provides them, otherwise raw closes (flagged).
    • Costs on every trade: commission + half the bid-ask spread + slippage, in basis points of traded value.
@@ -11,26 +11,50 @@
 (function (root, factory) { if (typeof module === "object" && module.exports) module.exports = factory(); else root.QUANT = factory(); })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
   const DAYS = 252;
+  const EXECUTION_SESSIONS = 5;
   const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
   const sd = (a) => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1)); };
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
   // ---------------------------------------------------------------- data alignment
+  // A bar cached during the current US session can still be provisional after the market closes.
+  function currentSessionDate(asOf) {
+    const formatter = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" });
+    const parts = Object.fromEntries(formatter.formatToParts(asOf).map(({ type, value }) => [type, value]));
+    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) / 1000;
+  }
+
   // series: { SYM: { t:[unix s], close:[], adj:[] | null } } → aligned arrays on the benchmark's trading days
-  function align(series, bench, fromT = -Infinity, toT = Infinity) {
+  function align(series, bench, fromT = -Infinity, toT = Infinity, asOf = Date.now()) {
     const B = series[bench]; if (!B || !B.t || !B.t.length) throw new Error(`No price history for the benchmark ${bench}.`);
     const day = (t) => Math.floor(t / 86400);
-    const dates = B.t.filter((t) => t >= fromT - 400 * 86400 && t <= toT); // keep ~400 days before the start for indicators
-    const px = {}, raw = {}, adjusted = {}, gaps = {};
+    const before = currentSessionDate(asOf);
+    const dates = B.t.filter((t) => t >= fromT - 400 * 86400 && t <= toT && t < before); // keep ~400 days before the start for indicators
+    const start = dates.findIndex((t) => t >= fromT);
+    if (start < 0) throw new Error("No completed benchmark sessions in the requested date range.");
+    const px = {}, raw = {}, observed = {}, adjusted = {}, gaps = {};
     for (const [s, S] of Object.entries(series)) {
       const m = new Map(), r = new Map(); const useAdj = !!(S.adj && S.adj.some((x) => x != null));
       S.t.forEach((t, i) => { const v = useAdj && S.adj[i] != null ? S.adj[i] : S.close[i]; if (v != null && v > 0) { m.set(day(t), v); r.set(day(t), S.close[i]); } });
-      let last = null, lastI = -1, miss = 0; px[s] = []; raw[s] = []; adjusted[s] = useAdj;
-      dates.forEach((t, i) => { const d = day(t); if (m.has(d)) { last = m.get(d); lastI = i; px[s].push(last); raw[s].push(r.get(d)); } else if (last != null && i - lastI <= 5) { px[s].push(last); raw[s].push(null); miss++; } else { px[s].push(null); raw[s].push(null); } });
+      let last = null, lastI = -1, miss = 0;
+      px[s] = []; raw[s] = []; observed[s] = []; adjusted[s] = useAdj;
+      dates.forEach((t, i) => {
+        const d = day(t), value = m.get(d) ?? null;
+        observed[s].push(value);
+        raw[s].push(r.get(d) ?? null);
+        if (value != null) {
+          last = value; lastI = i;
+          px[s].push(value);
+        } else if (last != null && i - lastI <= 5) {
+          px[s].push(last);
+          miss++;
+        } else {
+          px[s].push(null);
+        }
+      });
       gaps[s] = miss;
     }
-    const start = Math.max(0, dates.findIndex((t) => t >= fromT));
-    return { dates, px, raw, adjusted, gaps, start };
+    return { dates, px, raw, observed, adjusted, gaps, start };
   }
 
   // ---------------------------------------------------------------- indicators (cached per symbol)
@@ -106,39 +130,60 @@
     const [i0, i1] = range || [A.start, A.dates.length - 1];
     const cost = ((spec.costs.commissionBps || 0) + (spec.costs.spreadBps || 0) / 2 + (spec.costs.slippageBps || 0)) / 1e4;
     const maxW = clamp(spec.limits.maxWeight || 1, 0.01, 1), minCash = clamp(spec.limits.minCash || 0, 0, 0.99), rfD = (spec.rf || 0) / DAYS;
-    let cash = spec.initial, pending = null, lastKey = null, lastSig = "", costs = 0, traded = 0;
+    let cash = spec.initial, pending = null, lastKey = null, lastSig = "", costs = 0, traded = 0, expired = 0;
     const sh = {}, avg = {}, lastPx = {}, eq = [], trades = [], closed = [], expo = [];
     const price = (s, i) => { const v = A.px[s][i]; if (v != null) lastPx[s] = v; return v != null ? v : lastPx[s]; };
     for (let i = i0; i <= i1; i++) {
       if (i > i0) cash *= 1 + rfD;
       for (const s of Object.keys(A.px)) price(s, i);
-      // 1) execute yesterday's decision at today's close (no look-ahead)
-      if (pending) {
+      // Carried prices can mark holdings, but a rebalance needs a real close for every leg.
+      const symbols = pending ? [...new Set([...Object.keys(sh), ...Object.keys(pending.w).filter((s) => pending.w[s] > 0)])] : [];
+      if (pending && symbols.every((s) => A.observed[s]?.[i] != null)) {
         const V = cash + Object.entries(sh).reduce((a, [s, n]) => a + n * (lastPx[s] || 0), 0);
-        let w = Object.fromEntries(Object.entries(pending.w).filter(([s, v]) => v > 0 && A.px[s][i] != null));
+        const w = Object.fromEntries(Object.entries(pending.w).filter(([, value]) => value > 0));
         for (const s in w) w[s] = Math.min(w[s], maxW);
         const tot = Object.values(w).reduce((a, b) => a + b, 0); if (tot > 1 - minCash) for (const s in w) w[s] *= (1 - minCash) / tot;
-        const orders = [...new Set([...Object.keys(sh), ...Object.keys(w)])].map((s) => ({ s, p: lastPx[s], d: (w[s] || 0) * V - (sh[s] || 0) * (lastPx[s] || 0) })).filter((o) => o.p && Math.abs(o.d) > Math.max(1, V * 0.0005));
+        const orders = symbols.map((s) => {
+          const p = A.observed[s][i];
+          return { s, p, d: (w[s] || 0) * V - (sh[s] || 0) * p };
+        }).filter((o) => Math.abs(o.d) > Math.max(1, V * 0.0005));
         for (const o of orders.filter((o) => o.d < 0).concat(orders.filter((o) => o.d > 0))) { // sells first, then buys
           let val = o.d; if (val > 0) val = Math.min(val, Math.max(0, cash / (1 + cost))); if (Math.abs(val) < 1) continue;
           const n = val / o.p, fee = Math.abs(val) * cost;
-          if (n < 0) { const q = Math.min(-n, sh[o.s] || 0), pnl = (o.p - (avg[o.s] || o.p)) * q - fee; closed.push({ s: o.s, pnl, ret: avg[o.s] ? o.p / avg[o.s] - 1 : 0, t: A.dates[i] }); sh[o.s] = (sh[o.s] || 0) - q; cash += q * o.p - fee; if (sh[o.s] < 1e-9) { delete sh[o.s]; delete avg[o.s]; } }
-          else { avg[o.s] = ((avg[o.s] || 0) * (sh[o.s] || 0) + n * o.p) / ((sh[o.s] || 0) + n); sh[o.s] = (sh[o.s] || 0) + n; cash -= n * o.p + fee; }
+          if (n < 0) {
+            const q = Math.min(-n, sh[o.s] || 0);
+            const basis = (avg[o.s] || o.p) * q;
+            const proceeds = q * o.p - fee, pnl = proceeds - basis;
+            closed.push({ s: o.s, pnl, ret: basis ? pnl / basis : 0, t: A.dates[i] });
+            sh[o.s] -= q;
+            cash += proceeds;
+            if (sh[o.s] < 1e-9) { delete sh[o.s]; delete avg[o.s]; }
+          } else {
+            const before = sh[o.s] || 0;
+            const buyCost = n * o.p + fee;
+            avg[o.s] = ((avg[o.s] || 0) * before + buyCost) / (before + n);
+            sh[o.s] = before + n;
+            cash -= buyCost;
+          }
           costs += fee; traded += Math.abs(val);
           trades.push({ t: A.dates[i], sym: o.s, side: n > 0 ? "BUY" : "SELL", shares: +Math.abs(n).toFixed(4), price: +o.p.toFixed(4), value: +Math.abs(val).toFixed(2), cost: +fee.toFixed(2), why: pending.why, signalDate: pending.t });
         }
         pending = null;
+      } else if (pending && i - pending.index >= EXECUTION_SESSIONS) {
+        pending = null;
+        lastSig = "";
+        expired++;
       }
       const V = cash + Object.entries(sh).reduce((a, [s, n]) => a + n * (lastPx[s] || 0), 0);
       eq.push(V); expo.push(V ? 1 - cash / V : 0);
-      // 2) decide using data through today's close; execute tomorrow
+      // A fresh strategy decision supersedes any outstanding rebalance.
       if (i < i1) {
         const key = S.freq === "daily" ? i : S.freq === "once" ? (i === i0 ? "x" : "x") : periodKey(A.dates[i], S.freq);
         const due = S.freq === "once" ? i === i0 : S.freq === "daily" ? true : key !== lastKey;
-        if (due) { lastKey = key; const w = S.target(i, ctx); if (w) { const sig = JSON.stringify(Object.keys(w).sort()); if (!S.changeOnly || sig !== lastSig || i === i0) { pending = { w, t: A.dates[i], why: `${strat.name}: ${Object.keys(w).length ? Object.entries(w).map(([s, v]) => `${s} ${(v * 100).toFixed(0)}%`).join(", ") : "all cash"}` }; lastSig = sig; } } }
+        if (due) { lastKey = key; const w = S.target(i, ctx); if (w) { const sig = JSON.stringify(Object.keys(w).sort()); if (!S.changeOnly || sig !== lastSig || i === i0) { pending = { w, t: A.dates[i], index: i, why: `${strat.name}: ${Object.keys(w).length ? Object.entries(w).map(([s, v]) => `${s} ${(v * 100).toFixed(0)}%`).join(", ") : "all cash"}` }; lastSig = sig; } } }
       }
     }
-    return { dates: A.dates.slice(i0, i1 + 1), equity: eq, exposure: expo, trades, closed, costs, traded, params: P };
+    return { dates: A.dates.slice(i0, i1 + 1), equity: eq, exposure: expo, trades, closed, costs, traded, expired, params: P };
   }
 
   // ---------------------------------------------------------------- metrics
@@ -179,7 +224,7 @@
     const lim = limitations(A, spec, R);
     return { kind: "backtest", label: "Backtested — hypothetical results from historical data", strategy: STRATEGIES[spec.strategy].name, params: R.params, dates: R.dates, equity: R.equity, bench, metrics: m, benchMetrics: mb,
       monthly: monthly(R.dates, R.equity), benchMonthly: monthly(R.dates, bench), trades: R.trades, limitations: lim,
-      assumptions: { execution: "Signals use data through each day's close; trades execute at the next trading day's close.", prices: "Dividend- and split-adjusted closing prices (total return)", calendar: "The benchmark's actual trading days", costs: spec.costs, limits: spec.limits, rf: spec.rf, initial: spec.initial } };
+       assumptions: { execution: "Signals use completed daily closes. A rebalance needs observed prices for every leg at a later close and expires after five trading sessions.", prices: "Dividend- and split-adjusted closing prices (total return)", calendar: "The benchmark's completed trading days", costs: spec.costs, limits: spec.limits, rf: spec.rf, initial: spec.initial } };
   }
   function limitations(A, spec, R) {
     const L = ["Survivorship bias: the universe is today's tickers; companies that were delisted or went bankrupt aren't in the free price data, which tends to flatter results.",
@@ -187,7 +232,8 @@
     const noAdj = spec.universe.filter((s) => A.px[s] && !A.adjusted[s]); if (noAdj.length) L.push(`No adjusted prices for ${noAdj.join(", ")}: dividends are not included for them.`);
     const late = spec.universe.filter((s) => A.px[s] && A.px[s][A.start] == null); if (late.length) L.push(`${late.join(", ")} started trading after the start date and only enter once data exists.`);
     const missing = spec.universe.filter((s) => !A.px[s]); if (missing.length) L.push(`No data at all for ${missing.join(", ")} — excluded.`);
-    const gappy = Object.entries(A.gaps).filter(([, n]) => n > 10).map(([s]) => s); if (gappy.length) L.push(`Some missing days were filled with the previous close (up to 5 days) for ${gappy.join(", ")}.`);
+    const gappy = Object.entries(A.gaps).filter(([, n]) => n > 10).map(([s]) => s); if (gappy.length) L.push(`Indicators carried the previous close across up to five missing sessions for ${gappy.join(", ")}. These marks were ineligible for execution.`);
+    if (R.expired) L.push(`Rebalances expired while waiting for observed closes: ${R.expired}.`);
     if (A.dates.length - A.start < DAYS) L.push("Less than one year of data: annualized figures are unreliable.");
     return L;
   }

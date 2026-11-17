@@ -6,7 +6,7 @@
 //      keeping only names above their 200-day average
 //   4. sizes the picks by risk parity on a 6-month covariance matrix (each ≤ 20%), sizes the defensive sleeve the same way
 //   5. scales risk down to a 15% annualized volatility target, parking the rest in T-bills (BIL)
-//   6. trades only weight changes above 1.5% of the account, paying 5 bps per side
+//   6. queues eligible weight changes for the next regular-session open, paying 5 bps per side
 // Paper money only. Pure functions here; server.js supplies prices and keeps the account.
 const QM = require("./public/qmath.js");
 const PCC = require("./putcall-core.js");
@@ -63,4 +63,62 @@ function orders(target, holdings, prices, value) {
   return out.sort((a, b) => (a.side === b.side ? 0 : a.side === "SELL" ? -1 : 1)); // sells first
 }
 
-module.exports = { decide, orders, QT_EQUITY, QT_DEFENSIVE, QT_CASH, QT_SIGNALS, QT_START, QT_COST, QT_MIN_TRADE, QT_MAX_W, QT_TOP, QT_VOL_TARGET, SPLIT };
+// Exchange holidays come from the same calendar used by the swing and day traders.
+function nextTradingDay(day, holidays) {
+  const date = new Date(day + "T12:00:00Z");
+  do {
+    date.setUTCDate(date.getUTCDate() + 1);
+    day = date.toISOString().slice(0, 10);
+  } while (date.getUTCDay() === 0 || date.getUTCDay() === 6 || holidays.has(day));
+  return day;
+}
+
+function openingPrice(bars, openTime) {
+  const bar = bars.find((row) => row.t === openTime);
+  return bar && Number.isFinite(bar.o) && bar.o > 0 ? bar.o : null;
+}
+
+const entryFee = (position) => position.entryFee ?? position.shares * position.cost * QT_COST;
+
+// The legacy ledger charged the entry fee against cash but excluded it from closed P&L.
+function closedPnl(trade) {
+  if (trade.pnl == null || trade.entryFee != null) return trade.pnl;
+  const basis = trade.value * (1 - QT_COST) - trade.pnl;
+  return +(trade.pnl - Math.max(0, basis) * QT_COST).toFixed(2);
+}
+
+function fillOrders(book, queued, prices, time, reason) {
+  if (queued.some((o) => !Number.isFinite(prices[o.sym]) || prices[o.sym] <= 0)) throw new Error("Opening prices unavailable for the complete rebalance");
+  const positions = { ...book.positions }, trades = [];
+  let cash = book.cash;
+  for (const order of queued) {
+    const sym = order.sym, price = prices[sym];
+    const original = positions[sym] || { shares: 0, cost: price, entryFee: 0 };
+    const position = { ...original, entryFee: entryFee(original) };
+    const sale = order.side === "SELL";
+    const available = sale ? position.shares : cash / ((1 + QT_COST) * price);
+    const shares = Math.min(order.shares, available);
+    const value = shares * price, fee = value * QT_COST;
+    if (shares <= 0 || (!sale && value < 1)) continue;
+    const trade = { t: time, side: order.side, sym, shares: +shares.toFixed(4), price, value: +value.toFixed(2), cost: fee, why: reason, w: +order.to.toFixed(4) };
+    if (sale) {
+      const buyFee = position.entryFee * shares / position.shares;
+      trade.entryFee = buyFee;
+      trade.pnl = +((price - position.cost) * shares - fee - buyFee).toFixed(2);
+      position.shares -= shares;
+      position.entryFee -= buyFee;
+      cash += value - fee;
+    } else {
+      position.cost = (position.cost * position.shares + value) / (position.shares + shares);
+      position.shares += shares;
+      position.entryFee += fee;
+      cash -= value + fee;
+    }
+    if (position.shares < 1e-6) delete positions[sym];
+    else positions[sym] = position;
+    trades.push(trade);
+  }
+  return { cash: Math.max(0, cash), positions, trades };
+}
+
+module.exports = { decide, orders, nextTradingDay, openingPrice, fillOrders, entryFee, closedPnl, QT_EQUITY, QT_DEFENSIVE, QT_CASH, QT_SIGNALS, QT_START, QT_COST, QT_MIN_TRADE, QT_MAX_W, QT_TOP, QT_VOL_TARGET, SPLIT };

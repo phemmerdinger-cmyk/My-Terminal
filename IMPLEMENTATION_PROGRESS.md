@@ -3,6 +3,13 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Paper execution audit and capital reset (2026-11-17)
+- Swing uses prior-session daily indicators and fills queued orders against a fresh, later print with a 7.5 bp adverse allowance.
+- Day fills strictly after the decision at a scheduled completed minute's open. Missing bars expire, ambiguous stop/target bars take the stop first, and the model scores the corresponding open-to-close return. New fills use 5 bp per side plus 1 bp for short entries.
+- Quant freezes share orders using finalized daily inputs, fills against the following session's opening data, and accounts for entry and exit costs in closed-trade P&L.
+- Backtest Lab values positions using carried marks while requiring observed completed bars for fills. Rebalances with unavailable prices expire after five benchmark sessions, and closed-trade P&L includes both legs' costs.
+- The three deployed paper accounts restart at $30,000 under a new reset marker and archive their earlier trades. Market data quotes and modeled fills cannot establish actual broker slippage.
+
 ### Phase 0 — audit
 - `CLAUDE.md`, `docs/ARCH-MAP.md` (concise map). Existing `docs/ARCHITECTURE.md` = feature-ownership rules.
 - Already present (extend, don't rebuild): Quant Lab strategy tournament + walk-forward backtests, Intelligence Studio browser alerts, Spider research memory (versioned discoveries, sources, fact/interpretation, timelines, export/import), knowledge graph `/api/web/graph`, command palette `#cmd` (search only), military-green theme.
