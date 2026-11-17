@@ -43,6 +43,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
 <script src="/data.js"></script>
 <script src="/news-intel.js" defer></script> <script src="/reader.js" defer></script>
 <link rel="stylesheet" href="/studio.css">
+<link rel="stylesheet" href="/market-charts.css">
 <link rel="stylesheet" href="/quant-batch.css">
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
@@ -1584,7 +1585,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="ov-row">
         <div class="an-card ov-card"><div class="ov-h"><h2 class="h" id="ovPfH">Your portfolio today</h2><button type="button" class="ov-go" data-gotab="portfolio">Portfolio →</button></div><div id="ovPf"></div></div>
         <div class="an-card ov-card ov-radar" id="ovRadar"></div>
-        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest Spider research</h2><button type="button" class="ov-go" data-gotab="studio-research">Spider research →</button></div><div id="ovWeb"></div></div>
+        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest market intelligence</h2><button type="button" class="ov-go" data-gotab="studio-research">Market intelligence →</button></div><div id="ovWeb"></div></div>
       </div>
       <div class="bb" id="bestBuys"></div>
       <div class="mk-grid" style="margin-bottom:24px">
@@ -1959,10 +1960,10 @@ const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","a
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data health"],["studio-settings","Appearance"]]],
-  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["studio-research","Spider research"],["studio-graph","Knowledge network"]]],
+  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["studio-research","Market intelligence"],["studio-graph","Market charts"]]],
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"],["studio-scenario","Shock simulator"],["studio-alerts","Smart alerts"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"],["studio-strategies","Strategy library"],["studio-quant","Validation audit"]]],
-  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"],["studio-ask","Ask Spider"]]],
+  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"],["studio-ask","Research assistant"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -3634,7 +3635,7 @@ function dtRender(d){
       <b>The market tape</b> — its strength against the S&amp;P after adjusting for its beta, the S&amp;P's last minute, and breadth (how many of the 100 stocks are above their VWAP).
       <b>The rest of the site</b> (refreshed every 10 minutes) — News, Smart Money and trending headlines; earnings beats, misses and upcoming reports; analyst ratings; the Financials health grade from SEC filings; THE WEB Spider's findings (insider buying, earnings-release tone, sector patterns); the swing bot's ranking; <b>quant factor analysis</b> with the Quant Lab's math on a year of daily prices for every stock (12-1 month momentum, residual momentum vs the S&amp;P, 3-month momentum, low volatility, 200-day trend, short-term reversal, Sharpe ratio) blended with the Quant trader's ranking and market regime; the Heatmap's sector move vs the S&amp;P; and the Macro page (yield curve, Sahm recession rule) plus the VIX.</li>
     <li><b>How it decides:</b> a forecast model turns those inputs into the expected move over the next minute. It learns online: a minute later it scores its forecast for every stock and nudges each input's weight toward what actually worked (one averaged step per minute, about 39,000 outcomes a day, pulled back toward sensible starting weights so it can't run away on noise). The sign of the forecast picks long or short.</li>
-    <li><b>Research as a veto, not a trigger:</b> news, earnings, analysts, the health grade, Spider research and quant factors can block a trade (strong evidence the other way) or shrink it, but never pick the side or make it bigger — those inputs have no calibrated track record at a one-minute horizon.</li>
+    <li><b>Research as a veto, not a trigger:</b> news, earnings, analysts, the health grade, market research and quant factors can block a trade (strong evidence the other way) or shrink it, but never pick the side or make it bigger — those inputs have no calibrated track record at a one-minute horizon.</li>
     <li><b>Each trade:</b> risks ${((d.rules.riskPct||0.0025)*100).toFixed(2)}% of the account to its stop (one average 1-minute range away), each position at most ${Math.round((d.rules.posX||0.5)*100)}% of the account; total exposure at most ${d.rules.lev}× (gross) and ${d.rules.net}× (net) — the 4× is a real broker's day-trading limit. Half size into an earnings report.</li>
     <li><b>Daily loss limit:</b> down ${((d.rules.dailyLoss||0.01)*100).toFixed(0)}% on the day (realized + open) → no new trades until tomorrow; it keeps forecasting and learning. Everything is flat by 4:00 PM. If the server was asleep or the data stopped for more than 5 minutes, open trades are closed at the first price after reconnecting — missed minutes are never replayed as if they had been watched.</li>
     <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}.</li>
@@ -5202,7 +5203,7 @@ async function apSignals(){
   let j; try{ j=await api("/api/web/signals"); }catch{ el.hidden=true; return; }
   const it=j.items||[]; el.hidden=false;
   const arrow=d=>d>0?'<b class="up">▲</b>':d<0?'<b class="down">▼</b>':'<b class="dim">◆</b>';
-  el.innerHTML=`<div class="aps-h"><h2 class="h">Spider research signals</h2><span>${esc(j.traderUse||"")}</span></div>
+  el.innerHTML=`<div class="aps-h"><h2 class="h">Market intelligence signals</h2><span>${esc(j.traderUse||"")}</span></div>
     ${it.length?`<div class="aps-grid">${it.slice(0,12).map(g=>`<details class="aps-card"><summary>${arrow(g.dir)} <b>${esc(g.name)}</b>${g.sym?` <button type="button" class="tg" data-ap-open="${esc(g.sym)}">${esc(g.sym)}</button>`:" <em>market-wide</em>"}<span class="aps-n">${g.inputs.length} input${g.inputs.length>1?"s":""}</span></summary>
       <p class="aps-c"><b>Rule:</b> ${esc(g.calc)}</p><ul>${g.inputs.map(x=>`<li>${esc(x.headline)} <em>${esc(x.cat)}${x.kind&&x.kind!=="fact"?" · "+esc(x.kind):""} · ${esc(ago(x.at))}${(x.sources||[]).map(s=>s.url?` · <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.name)}</a>`:" · "+esc(s.name)).join("")}</em></li>`).join("")}</ul>
       ${g.history==="quant:ev"?`<button type="button" class="ov-go" data-gotab="quant" data-scroll="qm-ev">How this stock has reacted to past earnings →</button>`:""}</details>`).join("")}</div>`
@@ -5373,6 +5374,7 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
 <script src="/studio-core.js"></script>
 <script src="/studio-strategies.js"></script>
 <script src="/studio.js"></script>
+<script src="/market-charts.js"></script>
 <script src="/desk-store.js"></script>
 <script src="/empty-examples.js"></script>
 </body>
