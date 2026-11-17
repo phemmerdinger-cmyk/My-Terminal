@@ -2625,9 +2625,9 @@ function blPx(sym, fallback) {
 // modeled costs; risk measures beside it; a trader past the shared drawdown limit is ineligible. Paper money only.
 const COMP = require("./competition-core.js");
 const TRADERS = {
-  swing: { name: "Sarah Chen", initials: "SC", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
-  quant: { name: "Daniel Brooks", initials: "DB", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
-  day: { name: "Alex Morgan", initials: "AM", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
+  swing: { name: "Peter Swing", initials: "PS", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
+  quant: { name: "Peter Quant", initials: "PQ", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
+  day: { name: "Peter Day", initials: "PD", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {
