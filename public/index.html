@@ -1480,7 +1480,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <link rel="stylesheet" href="/web.css">
 <link rel="stylesheet" href="/reader.css">
 <link rel="stylesheet" href="/health.css">
-<link rel="stylesheet" href="/home.css">
 <link rel="stylesheet" href="/quant.css">
 <link rel="stylesheet" href="/orange-theme.css?v=3">
 </head>
@@ -1514,7 +1513,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <div class="tape"><div class="tape-inner" id="tape"></div></div>
 
 <nav class="tabs" id="tabs">
-  <button data-group="home" title="Home · your personalized overview"><span class="ti">◈</span>Home</button>
   <button data-group="markets"><span class="ti">📈</span>Markets</button>
   <button data-group="research"><span class="ti">🔎</span>Research</button>
   <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
@@ -1846,7 +1844,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
 
     <!-- THE WEB: autonomous research Spider (rendered by /web.js) -->
-    <section id="tab-home" class="pad mc" hidden aria-label="Home"></section>
     <section id="tab-web" class="pad tw" hidden></section>
     <section id="tab-studio" class="pad fx" hidden></section>
     <section id="tab-health" class="pad fx" hidden></section>
@@ -1952,10 +1949,9 @@ const PALETTE = ["#91bd5f","#0fbf7d","#ff9e1b","#abcd85","#e11d48","#69913b","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["home","news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","studio","health","backtest","quant"];
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","studio","health","backtest","quant"];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
-  ["home",[["home","Home"]]],
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
   ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
   ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
@@ -2101,6 +2097,7 @@ setInterval(tick,1000); tick();
 /* ---------- tabs ---------- */
 function setTab(t){
   if(t==="web") t="studio";
+  if(t==="home") t="data"; // legacy Home bookmarks open Markets Overview
   if(VIEW&&(t==="predict"||t==="studio"||t==="health")) t="news";
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
@@ -2122,7 +2119,6 @@ function setTab(t){
   if(typeof webOpen==="function"){ if(t==="web") webOpen(); else webClose(); }
   if(t==="health"&&typeof hlOpen==="function") hlOpen();
   if(t==="studio"&&typeof studioOpen==="function") studioOpen();
-  if(t==="home"&&typeof homeOpen==="function") homeOpen();
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
@@ -2139,7 +2135,6 @@ async function loadQuotes(){
     renderTape(); renderWL(prev); renderMovers(); checkAlerts();
     if(S.tab==="data") renderData();
     if(S.tab==="portfolio") renderPortfolio();
-    if(S.tab==="home"&&window.homeLive) homeLive();
     if(S.tab==="signals"&&typeof sigLive==="function") sigLive();
     if(S.tab==="research"&&S.rq.sym) renderResearchHead();
     if(S.tab==="research"&&S.rq.sub==="compare"){ renderMinis(); }
@@ -2157,7 +2152,7 @@ async function loadNews(){
     const old=new Map((S.news?.items||[]).map(i=>[i.id,i._new]));
     j.items.forEach(i=>{ if(old.get(i.id)) i._new=old.get(i.id); });
     if(!S.firstLoad && fresh.length){ fresh.forEach(i=>i._new=Date.now()); notify(fresh.filter(i=>i.tickers.length)); }
-    S.news=j; S.firstLoad=false; S.lastOk=Date.now(); S.newsAt=Date.now(); if(S.tab==="home"&&window.homeLive) setTimeout(homeLive,0); if(S.tab==="analysis"&&typeof anRender==="function") setTimeout(anRender,0);
+    S.news=j; S.firstLoad=false; S.lastOk=Date.now(); S.newsAt=Date.now(); if(S.tab==="analysis"&&typeof anRender==="function") setTimeout(anRender,0);
     renderFeed(); renderStatus(); renderWL(); tick();
     if(S.tab==="data") renderData();
   }catch(e){
@@ -5059,7 +5054,7 @@ renderNotif(); renderToolbar(); renderWL();
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?(location.hash.slice(1)==="web"?"studio":location.hash.slice(1)):location.hash==="#charts"?"research":VIEW?"news":"home");
+setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?(location.hash.slice(1)==="web"?"studio":location.hash.slice(1)):location.hash==="#charts"?"research":location.hash==="#home"?"data":VIEW?"news":"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";
@@ -5370,8 +5365,6 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
 <script src="/studio-strategies.js"></script>
 <script src="/studio.js"></script>
 <script src="/desk-store.js"></script>
-<script src="/home-core.js"></script>
-<script src="/home.js"></script>
 <script src="/empty-examples.js"></script>
 </body>
 </html>
