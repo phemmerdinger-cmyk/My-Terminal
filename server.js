@@ -2496,8 +2496,10 @@ setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60
 // universe on momentum and low volatility, sizes by risk parity, targets 15% volatility, and trades the differences
 // at the latest daily close (5 bps per side). Paper money only. Rules live in quant-trader.js.
 const QTC = require("./quant-trader.js"), QMS = require("./public/qmath.js");
+// One-time Quant-only capital reset; include the global marker so future all-bot resets still work.
+const QT_RESET_ID = `${BOT_RESET_ID}:quant-30k-2026-11-16-1`;
 const QT_FILE = path.join(require("os").tmpdir(), "quanttrader-v1.json"), QT_KEY = "pft:quanttrader:v1";
-const qtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, runs: [], start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
+const qtFresh = () => ({ v: 1, resetId: QT_RESET_ID, runs: [], start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
 let QT = qtFresh(), qtLoaded = false, qtBusy = false; const qtPx = {};
 async function qtLoad() {
   try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } const c1 = qtResetCheck(), c2 = await qtVersionCheck(); if (c1 || c2) await qtSave(); qtLoaded = true; return; } } } catch {}
@@ -2520,10 +2522,10 @@ async function qtVersionCheck() {
   return true;
 }
 function qtResetCheck() {
-  if (QT.resetId === BOT_RESET_ID) return false;
+  if (QT.resetId === QT_RESET_ID) return false;
   const runs = Array.isArray(QT.runs) ? QT.runs : [], busy = QT.firstTrade || (QT.trades && QT.trades.length);
   if (busy) { const v = QT.cash + Object.values(QT.positions || {}).reduce((a, p) => a + p.shares * p.cost, 0);
-    runs.unshift({ start: QT.firstTrade || QT.start, end: Date.now(), startValue: 10_000, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length, reason: "Reset — all three bots restarted at $30,000" }); }
+    runs.unshift({ start: QT.firstTrade || QT.start, end: Date.now(), startValue: 10_000, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length, reason: "Manual reset — Quant Trader restarted at $30,000" }); }
   QT = { ...qtFresh(), runs };
   return true;
 }
