@@ -11,7 +11,7 @@
 | Sync | `/api/sync?code=` (Upstash or temp dir) — client `SYNC_KEYS` in index.html |
 | THE WEB / Spider | `webRoute` → `/api/web/*` (status, discoveries, briefings, graph, timeline, control, export/import, ask) backed by `web/spider.js` + `web/store.js` (`createStore`: Upstash if `UPSTASH_REDIS_REST_URL/TOKEN`, else tmp) |
 | Desk (new, Phase 1) | `/api/desk` owner-only doc store for personal data (layouts, DNA, theses, journal…) via `createStore` prefix `pft:desk:v1:` |
-| Paper bots | `daytrade-core.js` (setups), `daytrade-brain.js` (day trader's self-learning forecast + sizing), `quant-trader.js`, autopilot in server.js |
+| Paper bots | `putcall-core.js` (Zweig contrarian put/call, `/api/pub/putcall`), `daytrade-core.js` (setups), `daytrade-brain.js` (day trader's self-learning forecast + sizing), `quant-trader.js`, autopilot in server.js |
 
 ## Client (`public/`)
 | File | Role |

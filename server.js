@@ -1613,6 +1613,89 @@ async function apMarketOpen() {
 const NYSE_HOLIDAYS = new Set(["2026-01-01", "2026-01-19", "2026-02-16", "2026-04-03", "2026-05-25", "2026-06-19", "2026-07-03", "2026-09-07", "2026-11-26", "2026-12-25",
   "2027-01-01", "2027-01-18", "2027-02-15", "2027-03-26", "2027-05-31", "2027-06-18", "2027-07-05", "2027-09-06", "2027-11-25", "2027-12-24"]);
 const NYSE_EARLY = new Set(["2026-11-27", "2026-12-24", "2027-11-26"]);
+// ---------------------------------------------------------------- Zweig put/call ratio (contrarian sentiment for all three bots)
+// Source: Cboe's free daily market statistics (EQUITY put/call ratio, end of day; today's figure is provisional until the
+// close). If Cboe can't be reached, a labeled proxy: put vs call volume on the nearest expiry of ten mega-cap stocks
+// (Yahoo option chains). Pure logic + the contrarian rules in putcall-core.js. Never estimated: no data → no tilt.
+const PCC = require("./putcall-core.js");
+const PC_FILE = path.join(require("os").tmpdir(), "putcall-v1.json"), PC_KEY = "pft:putcall:v1";
+const PC_PROXY = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX"];
+let PC = { cboe: {}, proxy: {}, miss: {}, at: 0, err: null, loaded: false }, pcBusy = false, pcView = null;
+async function pcLoad() {
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${PC_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) Object.assign(PC, JSON.parse(j.result)); } } catch {}
+  if (!Object.keys(PC.cboe).length) { try { Object.assign(PC, JSON.parse(fs.readFileSync(PC_FILE, "utf8"))); } catch {} }
+  PC.cboe = PC.cboe || {}; PC.proxy = PC.proxy || {}; PC.miss = PC.miss || {}; PC.loaded = true;
+}
+async function pcSave() {
+  const body = JSON.stringify({ cboe: PC.cboe, proxy: PC.proxy, miss: PC.miss, at: PC.at });
+  try { fs.writeFileSync(PC_FILE, body); } catch {}
+  if (UP_URL && UP_TOKEN) { try { await fetch(`${UP_URL}/set/${PC_KEY}`, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}` }, body, signal: AbortSignal.timeout(8000) }); } catch {} }
+}
+// trading days, newest first, going back `n` weekdays (holidays simply come back empty and are skipped)
+function pcDays(n) {
+  const out = []; const d = new Date(etParts().day + "T12:00:00Z");
+  for (let i = 0; out.length < n && i < n * 2; i++) { const wd = d.getUTCDay(), k = d.toISOString().slice(0, 10); if (wd && wd < 6 && !NYSE_HOLIDAYS.has(k)) out.push(k); d.setUTCDate(d.getUTCDate() - 1); }
+  return out;
+}
+async function pcFetchDay(day) {
+  for (const u of [`https://cdn.cboe.com/data/us/options/market_statistics/daily/${day}_daily_options`, `https://www.cboe.com/us/options/market_statistics/daily/?dt=${day}`]) {
+    try {
+      const r = await fetch(u, { headers: { "User-Agent": UA, Accept: "application/json,text/html", Referer: "https://www.cboe.com/us/options/market_statistics/daily/" }, signal: AbortSignal.timeout(12000) });
+      if (!r.ok) continue; const txt = await r.text();
+      const v = PCC.parseCboe(txt); if (v) return v;
+    } catch {}
+  }
+  return null;
+}
+async function pcProxyToday() {
+  const chains = [];
+  for (const s of PC_PROXY) { try { const j = await yget(`https://query2.finance.yahoo.com/v7/finance/options/${s}`); const o = j && j.optionChain && j.optionChain.result && j.optionChain.result[0] && j.optionChain.result[0].options && j.optionChain.result[0].options[0]; if (o) chains.push(o); } catch {} await new Promise((r) => setTimeout(r, 250)); }
+  return chains.length >= 6 ? PCC.chainRatio(chains, 20000) : null;
+}
+async function pcRefresh() {
+  if (pcBusy) return; pcBusy = true;
+  try {
+    if (!PC.loaded) await pcLoad();
+    const t = etParts(), today = t.day; let got = 0, tries = 0;
+    // past days newest-first, today last (and only after 10 AM ET) so a pre-open page that still shows yesterday is caught as a duplicate
+    const days = [...pcDays(260).filter((d) => d !== today), ...(t.min >= 10 * 60 ? [today] : [])].filter((d) => d <= today);
+    for (const d of days) {
+      const isToday = d === today, have = PC.cboe[d];
+      if (have && !have.prov) continue;
+      if (!isToday && !have && PC.miss[d] && Date.now() - PC.miss[d] < 7 * 864e5) continue; // holiday / not published: retry weekly
+      if (tries >= 40 && !isToday) continue; tries++;
+      const v = await pcFetchDay(d);
+      // a page identical to another stored day is Cboe falling back to its latest data (holiday / not yet published)
+      const dup = v && Object.entries(PC.cboe).some(([k, x]) => k !== d && x.equity === v.equity && x.total === v.total && x.index === v.index);
+      if (v && !dup) { PC.cboe[d] = { ...v, prov: isToday && t.min < 16 * 60 + 30 ? 1 : 0, at: Date.now() }; delete PC.miss[d]; got++; }
+      else if (!isToday) PC.miss[d] = Date.now();
+      if (tries === 3 && !got && !Object.keys(PC.cboe).length) break; // Cboe unreachable — don't hammer it
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    // fallback proxy, one reading per trading day (kept so the proxy builds its own history)
+    const wk = !(t.wd === "Sat" || t.wd === "Sun") && !NYSE_HOLIDAYS.has(today);
+    if (wk && t.min >= 10 * 60 && (!PC.proxy[today] || PC.proxy[today].prov) && Object.keys(PC.cboe).filter((d) => !PC.cboe[d].prov).length < 10) {
+      const r = await pcProxyToday(); if (r) PC.proxy[today] = { v: +r.ratio.toFixed(3), calls: r.calls, puts: r.puts, prov: t.min < 16 * 60 ? 1 : 0, at: Date.now() };
+    }
+    for (const k of Object.keys(PC.miss)) if (Date.now() - PC.miss[k] > 30 * 864e5) delete PC.miss[k];
+    PC.at = Date.now(); PC.err = Object.keys(PC.cboe).length ? null : "Cboe daily statistics unreachable from the server";
+    pcView = null; await pcSave();
+  } catch (e) { PC.err = e.message; } finally { pcBusy = false; }
+}
+// The current Zweig reading (cached until the next refresh). Prefers Cboe; the proxy only when Cboe has < 10 days.
+function pcState() {
+  if (pcView) return pcView;
+  const cb = Object.keys(PC.cboe).sort().map((d) => ({ d, v: PC.cboe[d].equity }));
+  const px = Object.keys(PC.proxy).sort().map((d) => ({ d, v: PC.proxy[d].v }));
+  let z = PCC.zweig(cb), source = "Cboe equity put/call ratio (daily market statistics)";
+  if (!z.ok && px.length >= 10) { z = PCC.zweig(px, { bands: { fearHi: 1.0, fear: 0.8, greed: 0.5, greedLo: 0.4 } }); source = "Proxy: put ÷ call volume, nearest expiry, 10 mega-cap stocks (Yahoo option chains)"; }
+  const lastD = cb.length ? cb[cb.length - 1].d : null, lastC = lastD ? PC.cboe[lastD] : null;
+  pcView = { ...z, source, total: lastC ? lastC.total : null, index: lastC ? lastC.index : null, provisional: !!(lastC && lastC.prov), updated: PC.at || null, error: PC.err,
+    rule: "Contrarian (Martin Zweig): more puts than usual = the crowd expects a fall = bullish; more calls than usual = the crowd expects a rise = bearish. 10-day average, judged against its own history; a turn back from an extreme is the signal." };
+  return pcView;
+}
+const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
+setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
 const BOTDIAG = { market: {}, swing: { errors: [] }, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
@@ -1787,7 +1870,7 @@ async function apScore(live) {
   // defense mode needs the market to agree: a scary headline alone (often opinion pieces) isn't enough
   const marketShaky = (vix && vix.price >= 25) || (spx && spx.day != null && spx.day <= -1.5);
   const stress = (vix && (vix.price >= 35 || vix.changePct >= 25)) ? `VIX fear index at ${vix.price.toFixed(1)}` : spx && spx.day <= -3 ? `S&P 500 down ${spx.day.toFixed(1)}% today` : news.swan && marketShaky ? `Black-swan headline with the market under stress: “${news.swan.slice(0, 110)}”` : null;
-  return { list: out, riskOff, stress, macro: news.macro, vix: vix && vix.price, spyDay };
+  return { list: out, riskOff, stress, macro: news.macro, vix: vix && vix.price, spyDay, putcall: pcBrief() };
 }
 // Trading pace: about 2 trades a day, ~14 a week. A "swap" (sell the weakest holding, buy a better-ranked stock) is
 // 2 trades. One swap is allowed per day while fewer than 2 trades have happened today; a second only if the week is
@@ -1823,12 +1906,14 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.rank > (risk ? 25 : 35) && !cool(sym)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the live rankings`);
   }
   // 80% risk profile: fully invested normally; still cuts back when the whole market breaks down
-  const exposure = sc.stress ? 0.5 : sc.riskOff ? 0.8 : 0.99;
+  // Zweig put/call (contrarian): stays more invested when the crowd is loaded with puts, keeps some cash when it's loaded with calls
+  const pcT = PCC.exposureTilt(sc.stress ? 0.5 : sc.riskOff ? 0.8 : 0.99, sc.putcall, { stress: !!sc.stress, riskOff: sc.riskOff });
+  const exposure = pcT.exposure;
   const target = (val() * exposure) / AP_SLOTS;
   // 2) trims
   for (const [sym, p] of Object.entries(st.positions)) {
     const x = by[sym]; if (!x) continue; const v = p.shares * x.px;
-    if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
+    if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : pcT.note ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
   }
   if (sc.stress) return;
   const ok = (x, sl) => x.sleeve === sl && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
@@ -1842,6 +1927,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (x.spider && x.spider.note) bits.push(x.spider.note.replace(/^Spider: /, "Spider research: "));
     bits.push(`${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months`);
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
+    if (sc.putcall && sc.putcall.signal === "BUY") bits.push("Zweig put/call buy signal (crowd heavy in puts — contrarian bullish)");
     return `Ranked #${x.rank}: ` + bits.join(", ");
   };
   for (const sl of ["risk", "safe"]) {
@@ -1872,7 +1958,7 @@ function apSummary(end, busted, spxNow) {
 }
 function apSignals(sc) {
   const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null });
-  return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix,
+  return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix, putcall: sc.putcall || null,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
     earnings: sc.list.filter((x) => x.earn).sort((a, b) => (a.earn.kind === "soon") - (b.earn.kind === "soon")).slice(0, 12).map(pick) };
@@ -2086,7 +2172,8 @@ async function dtResearch() {
     const q = (await getQuotes([...DT_UNIVERSE, ...etfs, "SPY", "^VIX", "^GSPC"])).quotes, spyDay = (q.SPY && q.SPY.changePct) || 0;
     const vix = q["^VIX"] && !q["^VIX"].error ? q["^VIX"].price : null;
     let below200 = false; try { const h = await history("^GSPC", "1y"); const cl = h.candles.map((c) => c.close); below200 = cl[cl.length - 1] < sma(cl, 200); } catch {}
-    const mk = clamp(spyDay / 1.5, -1, 1) * 0.6 + (vix != null ? (vix >= 30 ? -0.4 : vix >= 22 ? -0.2 : vix <= 14 ? 0.1 : 0) : 0) + (below200 ? -0.15 : 0.05);
+    const pcb = pcBrief(), pcLean = PCC.marketLean(pcb); // Zweig put/call: crowd heavy in puts → lean long, heavy in calls → lean short
+    const mk = clamp(spyDay / 1.5, -1, 1) * 0.6 + (vix != null ? (vix >= 30 ? -0.4 : vix >= 22 ? -0.2 : vix <= 14 ? 0.1 : 0) : 0) + (below200 ? -0.15 : 0.05) + pcLean;
     // the rest of the site's view of the market: Quant regime, swing-bot defense mode, Spider stress, Macro page
     const qd = QT && QT.decisions && QT.decisions[0], qReg = qd ? qd.regime : null;
     let spStress = null; try { const tv = SPIDER ? SPIDER.traderView() : null; spStress = tv && tv.stress ? tv.stress : null; } catch {}
@@ -2095,7 +2182,7 @@ async function dtResearch() {
     const curve = lastOf("T10Y3M"), sahm = lastOf("SAHMREALTIME");
     const stress = (apSig && apSig.stress) || spStress || (vix != null && vix >= 30 ? `VIX at ${vix.toFixed(1)}` : null);
     const regime = clamp(0.55 * clamp(mk, -1, 1) + 0.25 * (DT_REGIME[qReg] || 0) + (apSig && apSig.riskOff ? -0.1 : 0) + (stress ? -0.2 : 0) + (curve != null && curve < 0 ? -0.05 : 0) + (sahm != null && sahm >= 0.5 ? -0.15 : 0), -1, 1);
-    const market = { lean: clamp(mk, -1, 1), spyDay, vix, below200, regime: +regime.toFixed(3), quantRegime: qReg, swingRiskOff: !!(apSig && apSig.riskOff), stress: stress || null, curve, sahm };
+    const market = { lean: clamp(mk, -1, 1), spyDay, vix, below200, regime: +regime.toFixed(3), quantRegime: qReg, swingRiskOff: !!(apSig && apSig.riskOff), stress: stress || null, curve, sahm, putcall: pcb.ok ? { score: pcb.score, ma10: pcb.ma10, zone: pcb.zone, signal: pcb.signal, lean: pcLean } : null };
     // the swing bot's latest ranking, as a percentile among the stocks it has scored
     const swVals = Object.values(apScoreOf).filter(isFinite).sort((a, b) => a - b);
     const swPct = (sym) => { const v = apScoreOf[sym]; if (v == null || swVals.length < 10) return 0; return (swVals.filter((x) => x <= v).length / swVals.length - 0.5) * 2; };
@@ -2334,10 +2421,10 @@ async function qtTick(force) {
     const syms = [...new Set([...QTC.QT_EQUITY, ...QTC.QT_DEFENSIVE, QTC.QT_CASH, ...QTC.QT_SIGNALS])], series = {};
     await Promise.allSettled(syms.map(async (s) => { try { series[s] = await longHistory(s, from, to, "1d"); } catch {} }));
     if (!series.SPY) throw new Error("SPY history unavailable");
-    const A = QMS.align(series), D = QTC.decide(A.px), prices = {};
+    const A = QMS.align(series), D = QTC.decide(A.px, { putcall: pcBrief() }), prices = {};
     for (const s of Object.keys(series)) { const c = series[s].close; prices[s] = c[c.length - 1]; qtPx[s] = prices[s]; }
     const value = qtValue(prices), hold = Object.fromEntries(Object.entries(QT.positions).map(([s, p]) => [s, p.shares]));
-    const ords = QTC.orders(D.w, hold, prices, value), now = Date.now(), why = `${D.regime} · ${Math.round(D.split * 100)}% equity sleeve · vol ${(D.vol * 100).toFixed(1)}%`;
+    const ords = QTC.orders(D.w, hold, prices, value), now = Date.now(), why = `${D.regime} · ${Math.round(D.split * 100)}% equity sleeve${D.pcTilt ? ` (Zweig put/call ${D.pcTilt > 0 ? "+" : "−"}${Math.round(Math.abs(D.pcTilt) * 100)}%)` : ""} · vol ${(D.vol * 100).toFixed(1)}%`;
     for (const o of ords) {
       const p = QT.positions[o.sym] || { shares: 0, cost: o.price };
       if (o.side === "SELL") { const sh = Math.min(o.shares, p.shares), val = sh * o.price, fee = val * QTC.QT_COST; QT.cash += val - fee; const pnl = (o.price - p.cost) * sh - fee; p.shares -= sh;
@@ -3205,6 +3292,7 @@ async function handle(req, res) {
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(true); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
       if (u.pathname === "/api/pub/botslive") return send(res, 200, botsLive());
+      if (u.pathname === "/api/pub/putcall") { if (!PC.loaded) await pcLoad(); return send(res, 200, pcState()); }
       if (u.pathname === "/api/daytrader/restore" && req.method === "POST") { if (!dtLoaded) await dtLoad(); let doc = null; try { doc = await readBody(req); } catch {} return send(res, 200, dtRestore(doc)); }
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
         if (!apLoaded) await apLoad();

@@ -1430,6 +1430,11 @@ html.viewonly .api-bal-wrap{display:none!important}
 .aps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:10px;align-items:start}
 .aps-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}.aps-card summary{cursor:pointer;display:flex;gap:6px;align-items:center;flex-wrap:wrap;list-style:none}
 .aps-card summary::-webkit-details-marker{display:none}.aps-n{margin-left:auto;font-size:11px;color:var(--dim)}.aps-card em{font-style:normal;color:var(--dim);font-size:11.5px}
+.pc-row{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:14px;align-items:stretch}@media(max-width:720px){.pc-row{grid-template-columns:1fr}}
+.pc-big{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}.pc-big .pc-num{font-size:30px;letter-spacing:-.02em;display:block}.pc-big small{display:block;color:var(--dim);font-size:11.5px}
+.pc-zone{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.pc-chart{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}.pc-chart svg{width:100%;height:120px;display:block}
+.pc-use{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}.pc-use li{margin:2px 0}
 .aps-c{font-size:12.5px;color:var(--muted);margin:8px 0 4px}.aps-card ul{margin:4px 0 8px;padding-left:18px;font-size:12.5px}.aps-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
 .ov-row{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:0 0 18px} @media (max-width:1180px){.ov-row{grid-template-columns:1fr 1fr}.ov-radar{grid-column:1/-1}} @media (max-width:760px){.ov-row{grid-template-columns:1fr}}
 html.viewonly #ovRadar{display:none} .ov-radar{background:linear-gradient(180deg,#07121a,#05090d);border-color:rgba(158,197,114,.18)} .ov-radar .rd-b{display:flex;gap:14px;align-items:center;margin-top:8px}
@@ -1703,6 +1708,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <aside class="ap-hold" id="apNote"></aside>
       </div>
       <div class="apx" id="apMore"></div>
+      <section class="ap-sigs" id="apPc" hidden></section>
       <section class="ap-sigs" id="apSig" hidden></section>
       <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close — with a self-learning forecast that reads every section of the site deciding the side and the size. Every bust starts a new test run.</p>
     </section>
@@ -2095,7 +2101,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
-  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); }
+  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
@@ -5183,6 +5189,30 @@ async function apSignals(){
     <p class="aps-foot">${esc(j.rule||"")} No confidence percentages: each signal shows the findings it rests on.</p>`;
 }
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apSignals(); },20e3);
+/* ---------- AI vs S&P: Zweig put/call ratio (contrarian sentiment the three bots use; server: putcall-core.js) ---------- */
+async function apPutCall(){
+  const el=$("apPc"); if(!el) return; if(S._pcAt&&Date.now()-S._pcAt<5*60e3) return; S._pcAt=Date.now();
+  let z; try{ z=await api("/api/pub/putcall"); }catch{ el.hidden=true; return; }
+  el.hidden=false;
+  const head=`<div class="aps-h"><h2 class="h">Put/call ratio · Marty Zweig's contrarian gauge</h2><span>More puts = the crowd expects a drop → bullish. More calls = the crowd expects a rise → bearish.</span></div>`;
+  if(!z.ok){ el.innerHTML=head+`<p class="dim" style="margin:6px 0 0">Unavailable: ${esc(z.why||z.error||"no put/call data yet")}. The bots ignore this signal until there is real data.</p>`; return; }
+  const cls=z.score>0?"up":z.score<0?"down":"dim";
+  const pts=(z.ma||[]).slice(-120), vs=pts.map(p=>p.v), lo=Math.min(...vs), hi=Math.max(...vs), W=600,H=120, X=i=>pts.length>1?i/(pts.length-1)*W:0, Y=v=>hi>lo?H-6-(v-lo)/(hi-lo)*(H-12):H/2;
+  const line=pts.map((p,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join("");
+  const sig=z.signal==="BUY"?'<b class="up">BUY signal</b> — fear peaked and is fading':z.signal==="SELL"?'<b class="down">SELL signal</b> — greed peaked and is fading':"No reversal signal";
+  el.innerHTML=head+`<div class="pc-row">
+    <div class="pc-big"><small>10-day average · ${esc(z.basis==="percentile"?Math.round(z.pct*100)+"th percentile of "+(z.ma||[]).length+" days":"fixed bands (building history)")}</small><b class="pc-num ${cls}">${z.ma10.toFixed(2)}</b>
+      <small>Latest day ${esc(z.d)}: ${z.ratio.toFixed(2)}${z.provisional?" (provisional, intraday)":""}${z.ma20!=null?` · 20-day ${z.ma20.toFixed(2)}`:""}${z.total!=null?` · total ${z.total.toFixed(2)}`:""}</small>
+      <span class="pc-zone">${esc(z.zone)}</span>
+      <small style="margin-top:8px">Crowd: <b>${esc(z.crowd)}</b> → contrarian read: <b class="${cls}">${esc(z.lean)}</b> (score ${z.score>0?"+":""}${z.score.toFixed(2)})</small>
+      <small style="margin-top:4px">${sig}</small></div>
+    <div class="pc-chart"><small class="dim">10-day average of the put/call ratio — higher = more fear</small>${pts.length>1?`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="10-day put/call average"><path d="${line}" fill="none" stroke="var(--orange)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`:'<p class="dim">Chart appears once there are more days of data.</p>'}</div></div>
+    <ul class="pc-use"><li><b>Swing bot:</b> crowd heavy in puts while the S&amp;P is below its 200-day → stays up to 95% invested instead of 80%; crowd heavy in calls in an uptrend → keeps up to 15% cash. Never overrides defense mode.</li>
+      <li><b>Quant trader:</b> equity sleeve nudged up to ±10% at extremes (not in risk-off).</li>
+      <li><b>Day trader:</b> adds up to ±0.25 to its market lean (long bias on fear, short bias on greed).</li></ul>
+    <p class="aps-foot">Source: ${esc(z.source)}. ${esc(z.rule)} Updated ${z.updated?esc(ago(z.updated)):"—"}.</p>`;
+}
+setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apPutCall(); },5*60e3);
 document.addEventListener("click",e=>{ const t=e.target.closest("#apSig [data-ap-open]"); if(t){ e.preventDefault(); openQuote(t.dataset.apOpen); } });
 /* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
 async function anQuotes(){

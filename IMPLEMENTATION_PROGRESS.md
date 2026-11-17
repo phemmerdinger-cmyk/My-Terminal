@@ -39,6 +39,13 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Day trader: Quant Lab factor analysis (2026-11-16)
 - `quantScores()` in daytrade-brain.js (tested, qmath.js math): daily cross-sectional z-scores for all 100 stocks — 12-1 momentum, residual momentum vs SPY (beta-adjusted), 3-month momentum, low vol, 200-day trend, 5-day reversal, 6-month Sharpe. The `quant` feature = 65% factors + 35% Quant trader ranking (where covered); also +0.3 into the evidence tilt. `/api/daytrader` `quantFactors` → "📐 Quant factor analysis" card.
 
+### Zweig put/call ratio for all three bots (2026-11-16)
+- `putcall-core.js` (UMD, tested in `tests/putcall.test.js`): Marty Zweig's contrarian reading — more puts than usual = crowd bearish = **bullish**; more calls = crowd bullish = **bearish**. 10-day average of the Cboe EQUITY put/call ratio, ranked against its own history (≥60 days, up to a year; fixed bands before that). A turn back from an extreme = BUY/SELL signal. Score −1…+1 (+ = bullish).
+- server.js: daily Cboe market statistics (free), backfilled ~40 days per 30-min run up to a year, persisted (Upstash or tmp, key `pft:putcall:v1`). Today's figure is marked provisional. Fallback only when Cboe has <10 days: labeled proxy from Yahoo option-chain volume (10 mega-caps, nearest expiry). No data → no tilt.
+- Swing bot: `exposureTilt` — fear + S&P below 200-day → up to 95% invested (not 80%); euphoria in an uptrend → up to 15% cash; never overrides defense mode. Buy reasons mention a BUY signal. Quant trader: `decide(px, {putcall})` nudges the equity sleeve ±10% (not in risk-off), shown in the trade reason. Day trader: ±0.25 added to the market lean.
+- Public `/api/pub/putcall` → "Put/call ratio · Marty Zweig's contrarian gauge" card on AI vs S&P 500 (10-day avg, zone, crowd vs contrarian read, signal, chart, how each bot uses it, source).
+- Not verified against live Cboe from the dev sandbox (no network): check the card after deploy; if it says unavailable, Cboe is blocking Render and the proxy takes over after 10 trading days.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
