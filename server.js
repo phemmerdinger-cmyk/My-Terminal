@@ -2598,6 +2598,45 @@ function blPx(sym, fallback) {
   if (f && (!a || fT > a.t) && Date.now() - fT < 120e3) return f.p;
   return a ? a.p : fallback;
 }
+// ---------------------------------------------------------------- Three-Trader Challenge leaderboard (competition-core.js)
+// Same windows for all three: today, week, month, quarter, lifetime of the current runs. Ranked by net profit after
+// modeled costs; risk measures beside it; a trader past the shared drawdown limit is ineligible. Paper money only.
+const COMP = require("./competition-core.js");
+const TRADERS = {
+  swing: { name: "Sarah Chen", initials: "SC", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
+  quant: { name: "Daniel Brooks", initials: "DB", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
+  day: { name: "Alex Morgan", initials: "AM", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
+};
+let LB = { t: 0, v: null };
+async function leaderboard() {
+  if (LB.v && Date.now() - LB.t < 30e3) return LB.v;
+  if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
+  const live = botsLive(), today = etParts().day, spxNow = live.spx || null;
+  const series = (pts, value) => { const m = new Map(); for (const p of pts || []) if (p && p.d && p.v > 0) m.set(p.d, { d: p.d, v: p.v, spx: p.spx != null ? p.spx : p.s }); if (value > 0) m.set(today, { d: today, v: value, spx: spxNow || (m.get(today) || {}).spx }); return [...m.values()].sort((a, b) => (a.d < b.d ? -1 : 1)); };
+  const sells = (tr) => (tr || []).filter((t) => t.side === "SELL" && t.pnl != null).map((t) => t.pnl);
+  const pf = (p) => { const w = p.filter((x) => x > 0).reduce((a, b) => a + b, 0), l = -p.filter((x) => x <= 0).reduce((a, b) => a + b, 0); return l > 0 ? w / l : null; };
+  const T = DT.tally || {}, dBook = dtBook();
+  const bots = {
+    swing: { value: live.swing.value, start: AP_START, spx0: AP.spx0, eq: AP.equity, run: AP.run, since: AP.firstTrade, strategy: AP.strategy, trades: AP.trades.length, costs: AP.trades.reduce((a, t) => a + (t.cost || 0), 0), pnls: sells(AP.trades), exposure: live.swing.value > 0 ? 1 - AP.cash / live.swing.value : null,
+      latest: AP.trades[0] ? `${AP.trades[0].side} ${AP.trades[0].sym}: ${(AP.trades[0].why || "").slice(0, 140)}` : AP.plan && AP.plan.orders && AP.plan.orders.length ? `Planned for the open: ${AP.plan.orders.length} orders` : "No trades yet", thesis: apSig ? (apSig.stress ? `Defense mode — ${apSig.stress}` : apSig.riskOff ? "S&P below its 200-day average — keeping 20% cash" : `Holding ${Object.keys(AP.positions).length} names; top-ranked now: ${(apSig.top || []).slice(0, 3).map((x) => x.sym).join(", ")}`) : null },
+    quant: { value: live.quant.value, start: QTC.QT_START, spx0: QT.spx0, eq: QT.equity, run: (QT.runs || []).length + 1, since: QT.firstTrade, strategy: QT.strategy, trades: (QT.trades || []).length, costs: (QT.trades || []).reduce((a, t) => a + (t.value || 0) * QTC.QT_COST, 0), pnls: sells(QT.trades), exposure: live.quant.value > 0 ? 1 - (QT.cash + ((QT.positions || {}).BIL ? QT.positions.BIL.shares * (qtPx.BIL || QT.positions.BIL.cost) : 0)) / live.quant.value : null,
+      latest: QT.decisions && QT.decisions[0] ? `${QT.decisions[0].d}: ${QT.decisions[0].trades} trades · ${QT.decisions[0].regime} · ${Math.round(QT.decisions[0].split * 100)}% equity sleeve` : "No decision yet", thesis: QT.decisions && QT.decisions[0] ? `Regime "${QT.decisions[0].regime}"; ex-ante volatility ${(QT.decisions[0].vol * 100).toFixed(1)}% vs a 15% target` : null },
+    day: { value: live.day.value, start: DT_START, spx0: DT.spx0, eq: DT.equity, run: DT.run, since: DT.firstTrade, strategy: DT.strategy, trades: T.n || 0, costs: T.costs || 0, agg: T, exposure: live.day.value > 0 ? dBook.gross / live.day.value : null,
+      latest: DT.trades[0] ? `${DT.trades[0].side} ${DT.trades[0].sym}: ${(DT.trades[0].why || "").slice(0, 140)}` : "No trades yet in this run", thesis: DT.day ? `${DT.day.qualified || 0} of ${DT.day.forecasts || 0} forecasts cleared costs today${DT.day.halted ? " · daily loss limit hit" : ""}` : null },
+  };
+  const out = { t: Date.now(), today, spxNow, limits: COMP.LIMITS, periods: COMP.PERIODS.map(([k, label]) => ({ k, label })), boards: {}, traders: {} };
+  for (const [k, b] of Object.entries(bots)) {
+    const s = series(b.eq, b.value), life = COMP.windowStats(s, { start: b.start, today, days: null, spx0: b.spx0 });
+    const E = b.agg ? RISK.expectancy(b.agg.n || 0, (b.agg.gw || 0) - (b.agg.gl || 0), b.agg.sq || 0) : RISK.expectancyOf(b.pnls);
+    const wins = b.agg ? b.agg.wins || 0 : b.pnls.filter((x) => x > 0).length, closed = b.agg ? b.agg.n || 0 : b.pnls.length;
+    out.traders[k] = { ...TRADERS[k], key: k, strategy: STRATS[k], run: b.run, since: b.since || null, value: b.value, start: b.start, trades: b.trades, closed, costs: +b.costs.toFixed(2),
+      winRate: closed ? wins / closed : null, profitFactor: b.agg ? (b.agg.gl > 0 ? b.agg.gw / b.agg.gl : null) : pf(b.pnls), expectancy: E, exposure: b.exposure, latest: b.latest, thesis: b.thesis, lifeDrawdown: life.ok ? life.maxDrawdown : null };
+  }
+  for (const [pk, , days] of COMP.PERIODS) {
+    out.boards[pk] = COMP.rank(Object.keys(bots).map((k) => ({ key: k, lifeDrawdown: out.traders[k].lifeDrawdown, stats: COMP.windowStats(series(bots[k].eq, bots[k].value), { start: bots[k].start, today, days, spx0: bots[k].spx0 }) })));
+  }
+  LB = { t: Date.now(), v: out }; return out;
+}
 function botsLive() {
   BL.want = Date.now();
   if (BL.snap && Date.now() - BL.snapT < 1000) return BL.snap;
@@ -3412,6 +3451,7 @@ async function handle(req, res) {
         return send(res, 200, { bot, strategy: STRATS[bot], runs: await archiveList(bot, 30, u.searchParams.get("full") === "1") });
       }
       if (u.pathname === "/api/pub/strategies") return send(res, 200, STRATS);
+      if (u.pathname === "/api/pub/leaderboard") return send(res, 200, await leaderboard());
       if (u.pathname === "/api/pub/putcall") { if (!PC.loaded) await pcLoad(); return send(res, 200, pcState()); }
       if (u.pathname === "/api/daytrader/restore" && req.method === "POST") { if (!dtLoaded) await dtLoad(); let doc = null; try { doc = await readBody(req); } catch {} return send(res, 200, dtRestore(doc)); }
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)

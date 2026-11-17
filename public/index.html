@@ -1431,6 +1431,16 @@ html.viewonly .api-bal-wrap{display:none!important}
 .aps-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}.aps-card summary{cursor:pointer;display:flex;gap:6px;align-items:center;flex-wrap:wrap;list-style:none}
 .aps-card summary::-webkit-details-marker{display:none}.aps-n{margin-left:auto;font-size:11px;color:var(--dim)}.aps-card em{font-style:normal;color:var(--dim);font-size:11.5px}
 .pc-row{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:14px;align-items:stretch}@media(max-width:720px){.pc-row{grid-template-columns:1fr}}
+.lb{margin:0 0 18px}.lb-h{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;margin-bottom:10px}.lb-h h2{margin:0}
+.lb-seg{display:flex;gap:4px;flex-wrap:wrap}.lb-seg button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:4px 11px;font:inherit;font-size:12px;cursor:pointer}.lb-seg button.on{border-color:var(--orange);color:var(--text)}
+.lb-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}@media(max-width:900px){.lb-grid{grid-template-columns:1fr}}
+.lb-card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel);cursor:pointer;text-align:left;font:inherit;color:inherit;display:block;width:100%}.lb-card:hover{border-color:var(--orange)}
+.lb-card.first{box-shadow:inset 0 0 0 1px var(--orange)}.lb-top{display:flex;gap:10px;align-items:center}
+.lb-av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:700;letter-spacing:.04em;border:1px solid var(--orange);color:var(--orange);background:rgba(135,159,85,.08);flex:none}
+.lb-name b{display:block;font-size:15px}.lb-name small{color:var(--dim);font-size:11.5px}.lb-place{margin-left:auto;font-size:22px;font-weight:700;color:var(--orange)}.lb-place.x{font-size:11px;color:var(--down);font-weight:600;text-align:right}
+.lb-big{margin:10px 0 2px;font-size:24px;font-weight:700;letter-spacing:-.02em}.lb-sub{font-size:12px;color:var(--muted)}
+.lb-kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:10px 0 0;font-size:12px}.lb-kv span{color:var(--dim)}.lb-kv b{font-weight:600;text-align:right}
+.lb-note{font-size:11.5px;color:var(--dim);margin:8px 0 0;line-height:1.45}.lb-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
 .pc-big{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}.pc-big .pc-num{font-size:30px;letter-spacing:-.02em;display:block}.pc-big small{display:block;color:var(--dim);font-size:11.5px}
 .pc-zone{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
 .pc-chart{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}.pc-chart svg{width:100%;height:120px;display:block}
@@ -1702,6 +1712,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
+      <section class="lb" id="apLb"><div class="ap-empty"><span class="spin"></span> Loading the leaderboard…</div></section>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
@@ -2101,7 +2112,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
-  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); }
+  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); apLeaderboard(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
@@ -5195,6 +5206,43 @@ async function apSignals(){
     <p class="aps-foot">${esc(j.rule||"")} No confidence percentages: each signal shows the findings it rests on.</p>`;
 }
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apSignals(); },20e3);
+/* ---------- AI vs S&P: Three-Trader Challenge leaderboard (server: competition-core.js, /api/pub/leaderboard) ---------- */
+var LBV=LBV||{p:"life",d:null}; // var: setTab may run before this line during start-up
+async function apLeaderboard(){
+  if(!LBV) LBV={p:"life",d:null};
+  const el=$("apLb"); if(!el) return;
+  try{ LBV.d=await api("/api/pub/leaderboard"); }catch(e){ console.warn("leaderboard:",e&&e.message); if(!LBV.d){ el.innerHTML='<p class="dim">Leaderboard unavailable right now.</p>'; return; } }
+  lbRender();
+}
+function lbRender(){
+  const el=$("apLb"), j=LBV.d; if(!el||!j) return;
+  const P=j.periods.find(x=>x.k===LBV.p)||j.periods[j.periods.length-1], board=j.boards[P.k]||[];
+  const $$=v=>(v<0?"−":"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}), pc=v=>v==null?"—":(v>=0?"+":"")+(v*100).toFixed(2)+"%", num=(v,d=2)=>v==null?"—":v.toFixed(d);
+  const card=r=>{ const t=j.traders[r.key], st=r.stats||{}, E=t.expectancy||{};
+    return `<button type="button" class="lb-card${r.place===1?" first":""}" data-lb="${r.key}"><div class="lb-top"><div class="lb-av" aria-hidden="true">${esc(t.initials)}</div><div class="lb-name"><b>${esc(t.name)}</b><small>${esc(t.role)} · ${esc(t.strategy.id)} v${t.strategy.version} · run #${t.run}</small></div>
+      ${r.place?`<div class="lb-place">#${r.place}</div>`:r.eligible?"":`<div class="lb-place x">Ineligible<br>${esc(r.ineligible.join("; "))}</div>`}</div>
+      ${st.ok?`<div class="lb-big ${cls(st.profit)}">${$$(st.profit)}</div><div class="lb-sub"><span class="${cls(st.ret)}">${pc(st.ret)}</span> vs S&amp;P ${pc(st.spxRet)}${st.alpha==null?"":` · <span class="${cls(st.alpha)}">${pc(st.alpha)} vs index</span>`}</div>`
+        :`<div class="lb-big dim">—</div><div class="lb-sub">${esc(st.why||"no data")}</div>`}
+      <div class="lb-kv"><span>Account value</span><b>${$$(t.value)}</b>
+        <span>Max drawdown (${esc(P.label.toLowerCase())})</span><b class="${st.maxDrawdown<0?"down":""}">${st.ok?pc(st.maxDrawdown):"—"}</b>
+        <span>Sharpe / Sortino</span><b>${st.ok?`${num(st.sharpe)} / ${num(st.sortino)}`:"—"}</b>
+        <span>Volatility (annualized)</span><b>${st.ok&&st.vol!=null?pc(st.vol):"—"}</b>
+        <span>Trades · win rate</span><b>${t.trades.toLocaleString()} · ${t.winRate==null?"—":Math.round(t.winRate*100)+"%"}</b>
+        <span>Expectancy per closed trade</span><b class="${E.mean==null?"":cls(E.mean)}">${E.mean==null?"—":$$(E.mean)}${E.lo!=null?` <small class="dim">(${$$(E.lo)} to ${$$(E.hi)})</small>`:""}</b>
+        <span>Profit factor</span><b>${num(t.profitFactor)}</b>
+        <span>Modeled costs (run)</span><b>${$$(t.costs)}</b>
+        <span>Invested now</span><b>${t.exposure==null?"—":Math.round(t.exposure*100)+"%"}</b></div>
+      <p class="lb-note">${st.ok?esc(st.confidence):""}${t.thesis?` · ${esc(t.thesis)}`:""}</p>
+      <p class="lb-note"><b>Latest:</b> ${esc(t.latest||"—")}</p></button>`; };
+  el.innerHTML=`<div class="lb-h"><h2 class="h">Three-Trader Challenge · leaderboard</h2><div class="lb-seg">${j.periods.map(x=>`<button type="button" data-lbp="${x.k}" class="${x.k===P.k?"on":""}">${esc(x.label)}</button>`).join("")}</div></div>
+    <div class="lb-grid">${board.map(card).join("")}</div>
+    <p class="lb-foot">Paper money, forward results only — no backtests mixed in. Ranked by net profit after modeled costs over the same dates for all three, measured from each trader's value at the last close before the window (or its $30,000 start). A drawdown beyond ${Math.round(j.limits.maxDrawdown*100)}% makes a trader ineligible. Sharpe, Sortino and the beat-the-S&amp;P test need 20+ trading days; annualized figures need 60. Initials stand in for portraits. Updated ${esc(ago(j.t))}.</p>`;
+}
+document.addEventListener("click",e=>{
+  const p=e.target.closest("#apLb [data-lbp]"); if(p){ LBV.p=p.dataset.lbp; lbRender(); return; }
+  const c=e.target.closest("#apLb [data-lb]"); if(c){ const b=document.querySelector(`#apSwitch [data-bot="${c.dataset.lb}"]`); if(b){ b.click(); b.scrollIntoView({behavior:"smooth",block:"start"}); } }
+});
+setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apLeaderboard(); },60e3);
 /* ---------- AI vs S&P: Zweig put/call ratio (contrarian sentiment the three bots use; server: putcall-core.js) ---------- */
 async function apPutCall(){
   const el=$("apPc"); if(!el) return; if(S._pcAt&&Date.now()-S._pcAt<5*60e3) return; S._pcAt=Date.now();

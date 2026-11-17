@@ -55,6 +55,10 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - "Order flow" relabeled "candle pressure (OHLC proxy)".
 - Next (directive phases 3–8): central risk engine across bots, walk-forward validation + research registry for each strategy, Daniel's macro (FRED/ALFRED vintages) model vs simple baselines, Sarah's setup scoring trained out of sample, competition leaderboard + Investment Committee view, trader profiles/portraits, trade replay.
 
+### Three-Trader Challenge leaderboard (2026-11-16)
+- `competition-core.js` (tested): same-window stats per trader (profit, return, S&P and alpha over identical dates, max drawdown, vol, Sharpe/Sortino ≥20 days, annualized/Calmar ≥60 days, t-stat vs S&P), ranking by net profit, 20% drawdown limit → ineligible.
+- `/api/pub/leaderboard` + cards at the top of AI vs S&P 500 (Alex/Daniel/Sarah, initials as portraits, period switch Today/Week/Month/Quarter/Lifetime, expectancy with 95% range, costs, exposure, latest decision); clicking a card opens that bot.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
