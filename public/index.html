@@ -1962,13 +1962,13 @@ const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data Health"],["studio-settings","Appearance"]]],
   ["research",[["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
   ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
-  ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"],["studio-strategies","Strategy Library"],["studio-quant","Validation Audit"]]],
+  ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"]]],
   ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
 ];
-const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
+const groupOf=t=>(t==="studio-strategies"||t==="studio-quant")?"quant":(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
 function navSync(t){
-  const g=groupOf(t); NAV_LAST[g]=t;
+  const g=groupOf(t); if(NAV.find(([key])=>key===g)[1].some(([k])=>k===t)) NAV_LAST[g]=t; // hidden advanced tools never replace Quant Lab navigation
   document.querySelectorAll("#tabs [data-group]").forEach(b=>b.classList.toggle("on",b.dataset.group===g));
   const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||!!STUDIO_ROUTES[k])));
   const html=items.map(([k,label,c])=>`<button role="tab" data-tab="${k}" class="${c||""} ${k===t?"on":""}" aria-selected="${k===t}">${esc(label)}${k==="news"?'<span class="k" id="newsCount'+'"></span>':""}</button>`).join("");
@@ -2130,7 +2130,7 @@ function setTab(t){
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
-$("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
+$("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(g==="quant"?"quant":NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
 window.addEventListener("hashchange",()=>{const raw=location.hash.slice(1); const h=({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[raw]||raw; if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
