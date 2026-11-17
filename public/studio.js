@@ -54,23 +54,20 @@
         <div class="mds-controls mds-sliders">${[["Market","Broad-market shock"],["Tech","Technology-sector extra shock"],["Custom","Selected-stock extra shock"]].map(([k,n])=>`<label>${n}<div class="mds-slide"><input type="range" id="mds${k}" min="-80" max="80" step="1"><output id="mds${k}Val"></output></div></label>`).join("")}</div>
         <div id="mdsScenarioOut" aria-live="polite"></div></section>
       <section id="mdsResearch" data-mspanel="research" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Research → portfolio → trading experiments</h2><p>Spider discoveries are ranked by holdings, importance, source evidence and recency. These are research leads, not trading signals.</p></div>
+        <div class="mds-intro"><h2>Market Intelligence</h2><p>Company and market research ranked by portfolio relevance, evidence quality, impact and freshness. Findings inform research, not automatic trade decisions.</p></div>
         <div class="mds-toolbar"><button type="button" id="mdsResearchReload">↻ Refresh research</button><button type="button" data-msgo="aitrade">Inspect paper AI Trader</button><span id="mdsResearchAge"></span></div><div id="mdsResearchOut"></div><div id="mdsTraderOut"></div></section>
-      <section id="mdsGraph" data-mspanel="graph" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Knowledge network explorer</h2><p>A focused preview of the existing Spider knowledge graph. Edges show the recorded reason for each connection; this is not a causal model.</p></div>
-        <form id="mdsGraphForm" class="mds-toolbar"><label for="mdsFocus">Focus company</label><input id="mdsFocus" class="field" placeholder="NVDA" maxlength="12"><button type="submit">Explore connections</button></form>
-        <div id="mdsGraphOut" class="mds-graph" role="group" aria-label="Interactive company relationship graph"></div><p id="mdsGraphDetail" class="mds-graph-detail" aria-live="polite">Select a node or connection to inspect its reason.</p></section>
+      <section id="mdsGraph" data-mspanel="graph" class="mds-panel" hidden><div id="mdcHost"></div></section>
       <section id="mdsQuant" data-mspanel="quant" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Quant validation audit</h2><p>Read your actual saved Backtest Lab experiments and their assumptions. Validation flags are descriptive, not statistical proof of future returns.</p></div><div class="mds-toolbar"><button type="button" data-msgo="backtest">Run a new backtest</button><button type="button" data-msgo="quant">Open Monte Carlo / factors</button></div><div id="mdsQuantOut"></div></section>
       <section id="mdsAsk" data-mspanel="ask" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Ask the Spider — $0 inference</h2><p>Questions run through your existing <b>rules-based</b> Spider assistant and stored research. Claude is <b>not</b> called; no API key or credits are used. Answers cite available evidence and acknowledge gaps.</p></div>
-        <div class="mds-ask-suggestions">${["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What is the spider seeing in the market today?","What is the AI Trader reading from research?"].map((s,i)=>`<button type="button" data-msquestion="${i}">${clean(s)}</button>`).join("")}</div>
+        <div class="mds-intro"><h2>Market Research Assistant</h2><p>Ask questions about market developments, holdings, or financial research using available source-linked evidence. This assistant is <b>rules-based</b>, not a paid AI model; Claude is not called and the feature costs $0 in model usage.</p></div>
+        <div class="mds-ask-suggestions">${["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What major risks are emerging in the market today?","What is the AI Trader reading from research?"].map((s,i)=>`<button type="button" data-msquestion="${i}">${clean(s)}</button>`).join("")}</div>
         <form id="mdsAskForm" class="mds-ask"><textarea id="mdsQuestion" rows="3" maxlength="600" placeholder="Ask about holdings, companies, filings or market risks…" required></textarea><button type="submit">Research answer</button></form>
         <div id="mdsAskOut" role="status" aria-live="polite"></div></section>
       <section id="mdsAlerts" data-mspanel="alerts" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Explainable smart alerts</h2><p>Alerts are calculated in your browser while the site is open, based on quote changes and new, important Spider findings affecting your holdings. No push service, paid API, background guarantees or automatic trading.</p></div>
-        <div class="mds-controls"><label>Daily move threshold (%)<input type="number" id="mdsMove" class="field" min="1" max="50" step="1"></label><label>Spider importance minimum (30–100)<input type="number" id="mdsImp" class="field" min="30" max="100" step="5"></label></div>
-        <div class="mds-toolbar"><label><input type="checkbox" id="mdsPriceOn"> Monitor quoted price moves</label><label><input type="checkbox" id="mdsResearchOn"> Monitor important Spider findings</label><button id="mdsAlertClear" type="button">Clear history</button></div>
+        <div class="mds-intro"><h2>Explainable smart alerts</h2><p>Alerts are calculated in your browser while the site is open, based on quote changes and new, important market research affecting your holdings. No push service, paid API, background guarantees or automatic trading.</p></div>
+        <div class="mds-controls"><label>Daily move threshold (%)<input type="number" id="mdsMove" class="field" min="1" max="50" step="1"></label><label>Research importance minimum (30–100)<input type="number" id="mdsImp" class="field" min="30" max="100" step="5"></label></div>
+        <div class="mds-toolbar"><label><input type="checkbox" id="mdsPriceOn"> Monitor quoted price moves</label><label><input type="checkbox" id="mdsResearchOn"> Monitor important market findings</label><button id="mdsAlertClear" type="button">Clear history</button></div>
         <p id="mdsAlertFreshness" class="mds-caption"></p><div id="mdsAlertOut"></div></section>
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
@@ -93,17 +90,8 @@
     for (const [k, p] of [["Market","market"],["Tech","tech"],["Custom","custom"]]) byId("mds"+k).oninput = (e) => { E[p] = Number(e.target.value); renderScenario(); };
     el.querySelector(".mds-presets").onclick = (e) => { const b = e.target.closest("[data-mspreset]"); if (!b) return; const p = SCENARIOS[+b.dataset.mspreset]; E.market = p[1]; E.tech = p[2]; E.custom = p[3]; renderScenario(); };
     byId("mdsResearchReload").onclick = () => fetchResearch(true);
-    byId("mdsGraphForm").onsubmit = (e) => { e.preventDefault(); E.focus = String(byId("mdsFocus").value || "").trim().toUpperCase().replace(/[^A-Z0-9.\-]/g,"").slice(0,12); fetchGraph(); };
-    byId("mdsGraphOut").onclick = (e) => {
-      const example=e.target.closest("[data-msgraph-example]");
-      if(example){E.focus=example.dataset.msgraphExample;byId("mdsFocus").value=E.focus;fetchGraph();return;}
-      const hit = e.target.closest("[data-msnode], [data-msedge]"); if (!hit) return;
-      if (hit.dataset.msnode) { const n = (E.graph && E.graph.nodes || []).find((n) => n.id === hit.dataset.msnode); if (!n) return;
-        byId("mdsGraphDetail").textContent = n.label + " — " + (n.sub || n.type) + ". " + (n.id.startsWith("co:") ? "Select Explore connections to center this company." : "Related through stored Spider data.");
-        if (n.id.startsWith("co:")) { E.focus = n.id.slice(3); byId("mdsFocus").value = E.focus; fetchGraph(); }
-      } else { const n = (E.graph && E.graph.edges || [])[+hit.dataset.msedge]; if (n) byId("mdsGraphDetail").textContent = n.why || "No reason recorded."; } };
     byId("mdsAskForm").onsubmit = (e) => { e.preventDefault(); ask(byId("mdsQuestion").value); };
-    const prompts = ["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What is the spider seeing in the market today?","What is the AI Trader reading from research?"];
+    const prompts = ["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What major risks are emerging in the market today?","What is the AI Trader reading from research?"];
     el.querySelector(".mds-ask-suggestions").onclick = (e) => { const b = e.target.closest("[data-msquestion]"); if (!b) return; byId("mdsQuestion").value = prompts[+b.dataset.msquestion]; ask(byId("mdsQuestion").value); };
     for (const [id,k] of [["mdsMove","priceMove"],["mdsImp","importance"]]) byId(id).onchange = (e) => { const v = +e.target.value; opts[k] = k === "priceMove" ? Math.max(1, Math.min(50, v || 5)) : Math.max(30, Math.min(100, v || 75)); preferences(); renderAlerts(); };
     for (const [id,k] of [["mdsPriceOn","price"],["mdsResearchOn","research"]]) byId(id).onchange = (e) => { opts[k] = !!e.target.checked; preferences(); renderAlerts(); };
@@ -119,7 +107,7 @@
     if (next === "strategies") renderStrategies();
     if (next === "scenario") renderScenario();
     if (next === "research") { renderResearch(); if (Date.now() - E.fetched > 90000) fetchResearch(); }
-    if (next === "graph") { if (!E.graph) fetchGraph(); else renderGraph(); }
+    if (next === "graph" && window.MDMarketCharts) window.MDMarketCharts.open();
     if (next === "quant") renderQuant();
     if (next === "alerts") renderAlerts();
   }
@@ -294,7 +282,7 @@
         api("/api/web/trader")
       ]);
       if (d.status === "fulfilled") { E.research = d.value.items || []; E.fetched = Date.now(); }
-      else if (byId("mdsResearchAge")) byId("mdsResearchAge").textContent = "Spider research unavailable: " + String(d.reason && d.reason.message || "sign in first");
+      else if (byId("mdsResearchAge")) byId("mdsResearchAge").textContent = "Market intelligence unavailable: " + String(d.reason && d.reason.message || "sign in first");
       if (t.status === "fulfilled") E.trader = t.value;
     } finally { E.loading = false; renderResearch(); scanAlerts(); }
   }
@@ -307,40 +295,11 @@
       const url = link(d.verifiedUrl), evidenceKind = d.kind || (d.facts || []).some((f) => f.kind === "fact") ? (d.kind || "mixed") : "interpretation";
       return `<article class="mds-find"><div class="mds-find-meta"><span>${clean(d.cat || "research")}</span><span>${clean(d.evidenceStatus)} · ${d.sourceCount} source(s)</span><span>${age(d.u || d.t)} · importance ${Math.round(+d.importance || 0)}/100</span></div>
         <strong>${clean(d.headline)}</strong><p>${clean(d.summary || "")}</p><div class="mds-find-foot"><span>Related: ${clean(d.matched.join(", ") || "market-wide")}</span><span>Evidence: ${clean(evidenceKind)}</span>${url ? `<a target="_blank" rel="noopener noreferrer" href="${clean(url)}">Original source ↗</a>` : ""}</div></article>`;
-    }).join("")}</div>` : '<p class="mds-empty">No recent Spider findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Look at NVDA earnings and filings, AMD sector momentum, or JPM rate sensitivity in THE WEB. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Explore companies in THE WEB →</button></div></div>';
+    }).join("")}</div>` : '<p class="mds-empty">No recent source-linked market findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Compare NVDA, AMD or JPM with market benchmarks in Market Charts. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Open Market Charts →</button></div></div>';
     const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("studio-graph");
     const trader = E.trader, el = byId("mdsTraderOut"); if (!el) return;
-    el.innerHTML = trader ? `<div class="mds-connect"><h3>Spider ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. The Spider never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
+    el.innerHTML = trader ? `<div class="mds-connect"><h3>Market intelligence ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. Research never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
     const b=el.querySelector("[data-msgo2]"); if (b) b.onclick=()=>setTab("aitrade");
-  }
-  function graphExampleChoices() { return '<div class="mds-example-panel"><h4>Start with a company</h4><p>Use these real tickers to request Spider connections. The chart stays empty when there is no research data.</p><div class="mds-examples"><button type="button" data-msgraph-example="NVDA">Explore NVDA</button><button type="button" data-msgraph-example="MSFT">Explore MSFT</button><button type="button" data-msgraph-example="JPM">Explore JPM</button></div></div>'; }
-  async function fetchGraph() {
-    const out=byId("mdsGraphOut"); if (!out) return;
-    out.innerHTML = '<p class="mds-empty">Loading graph recorded by the Spider…</p>';
-    const focus = E.focus || (activePf() && (activePf().holdings || []).find((h) => +h.shares > 0)?.symbol) || (S.wl || [])[0] || "";
-    E.focus = focus; byId("mdsFocus").value = focus;
-    try { E.graph = await api("/api/web/graph" + (focus ? "?focus=" + encodeURIComponent("co:" + focus) : "")); renderGraph(); }
-    catch (e) { out.innerHTML = '<p class="mds-empty">The graph is unavailable: ' + clean(e.message || "Spider not connected") + '.</p>'+graphExampleChoices(); }
-  }
-  function renderGraph() {
-    const host = byId("mdsGraphOut"); if (!host || !E.graph) return;
-    const data = E.graph, nodes = (data.nodes || []).slice(0, 28), centerId = "co:" + (E.focus || "");
-    const center = nodes.find((n) => n.id === centerId) || nodes[0];
-    if (!center) { host.innerHTML='<p class="mds-empty">No source-linked network data yet. The chart is populated only from actual Spider connections.</p>' + graphExampleChoices(); return; }
-    const others = nodes.filter((n) => n !== center);
-    const coord = { [center.id]: [450,220] };
-    others.forEach((n, i) => { const a = 2 * Math.PI * i / Math.max(1, others.length) - Math.PI/2;
-      const ring = i % 3 === 0 ? 165 : i % 3 === 1 ? 260 : 205;
-      coord[n.id] = [450 + Math.cos(a)*ring*1.4,220+Math.sin(a)*ring*.77]; });
-    const edges = (data.edges || []).filter((e) => coord[e.a] && coord[e.b]).slice(0,110);
-    const typedColor = { portfolio:"#d7abef", holding:"#45e7b5", watch:"#f9b849", company:"#7dd3fc", sector:"#61a1ff", industry:"#8f9db0", discovery:"#ed709a", macro:"#aaa4ff", trader:"#ffa773", event:"#f5d36a" };
-    host.innerHTML = `<svg viewBox="0 0 900 440" role="img" aria-label="Source-linked graph centered on ${clean(center.label)}" preserveAspectRatio="xMidYMid meet">
-      <defs><radialGradient id="mdsGlow"><stop stop-color="#32d9d6" stop-opacity=".20"/><stop offset="1" stop-color="#32d9d6" stop-opacity="0"/></radialGradient></defs>
-      <circle cx="450" cy="220" r="175" fill="url(#mdsGlow)"/>
-      ${edges.map((e,i)=>`<line data-msedge="${(data.edges || []).indexOf(e)}" x1="${coord[e.a][0]}" y1="${coord[e.a][1]}" x2="${coord[e.b][0]}" y2="${coord[e.b][1]}" stroke="#4f728a" stroke-opacity=".45" stroke-width="1.8"><title>${clean(e.why || e.type)}</title></line>`).join("")}
-      ${nodes.map((n)=>{const [x,y]=coord[n.id];return `<g data-msnode="${clean(n.id)}" tabindex="0" role="button" aria-label="${clean(n.label)}" style="cursor:pointer"><circle cx="${x}" cy="${y}" r="${n===center?21:10}" fill="${typedColor[n.type] || "#8aafc4"}" fill-opacity=".82" stroke="#10151b" stroke-width="2"/><text x="${x}" y="${y+(n===center?39:25)}" fill="#dfe7f0" font-size="${n===center?17:12}" font-family="sans-serif" text-anchor="middle">${clean(n.label).slice(0,26)}</text><title>${clean(n.sub || n.type)}</title></g>`;}).join("")}
-      </svg><p class="mds-caption">${nodes.length} visible nodes / ${edges.length} visible links. Tap any node; links have an evidence reason. Open THE WEB for the full interactive network.</p>`;
-    host.querySelectorAll("[data-msnode]").forEach((n)=>n.onkeydown=(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();n.click();}});
   }
   function renderQuant() {
     const host=byId("mdsQuantOut");if (!host) return;
@@ -361,7 +320,7 @@
     out.textContent="Spider is checking saved research and citations…";
     try{
       const r=await api("/api/web/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,useClaude:false})});
-      out.innerHTML = '<div class="mds-answer"><h3>Spider research answer <small>rules-based · $0 model cost</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
+      out.innerHTML = '<div class="mds-answer"><h3>Research answer <small>rules-based · $0 model cost</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
       byId("mdsAnswerText").textContent=r.answer || "No sourced answer available.";
       const c=byId("mdsAnswerCites");
       if(r.citations && r.citations.length)c.innerHTML='<h4>Evidence cited</h4>'+r.citations.slice(0,12).map((d,i)=>`<div class="mds-cite">[${i+1}] ${clean(d.headline || d.title || d.id || "Finding")}${(d.sources||[]).filter((s)=>link(s.url)).slice(0,2).map((s)=>` · <a href="${clean(s.url)}" target="_blank" rel="noopener noreferrer">${clean(s.name)}</a>`).join("")}</div>`).join("");
@@ -382,7 +341,7 @@
   function renderAlerts() {
     const host=byId("mdsAlertOut"); if(!host) return;
     byId("mdsAlertFreshness").textContent = Core.freshness(S.lastOk,Date.now()).label + " (terminal fetch, not exchange timestamp). Alerts run only while this browser is open; no guaranteed 24/7 monitoring.";
-    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No real alerts recorded yet. Nothing has crossed the configured thresholds while this browser was monitoring.</p><div class="mds-example-panel"><h4>Example alert settings</h4><p>Price move: 3% daily change on a currently updated holding. Spider discovery: importance 80/100 or higher on an owned ticker. This does not create sample alerts.</p><div class="mds-examples"><button type="button" data-ms-alert-example>Use these thresholds</button></div></div>';
+    host.innerHTML=E.events.length ? `<div class="mds-findings">${E.events.slice(0,45).map((a)=>`<article class="mds-find"><div class="mds-find-meta"><span>${clean(a.kind)}</span><span>${age(a.time)}</span></div><strong>${clean(a.title)}</strong><p>${clean(a.detail || "")}</p>${a.symbol?`<button type="button" data-mssym="${clean(a.symbol)}">Research ${clean(a.symbol)} →</button>`:""}</article>`).join("")}</div>` : '<p class="mds-empty">No alerts recorded yet. Nothing has crossed the configured thresholds while this browser was monitoring.</p><div class="mds-example-panel"><h4>Example alert settings</h4><p>Price move: 3% daily change on a currently updated holding. Spider discovery: importance 80/100 or higher on an owned ticker. This does not create sample alerts.</p><div class="mds-examples"><button type="button" data-ms-alert-example>Use these thresholds</button></div></div>';
     host.querySelectorAll("[data-mssym]").forEach((b)=>b.onclick=()=>{if(typeof openQuote==="function")openQuote(b.dataset.mssym);else setTab("research");});
     const example=host.querySelector("[data-ms-alert-example]");if(example)example.onclick=()=>{opts.priceMove=3;opts.importance=80;byId("mdsMove").value=3;byId("mdsImp").value=80;preferences();renderAlerts();};
   }
