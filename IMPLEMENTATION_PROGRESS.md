@@ -46,6 +46,15 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Public `/api/pub/putcall` → "Put/call ratio · Marty Zweig's contrarian gauge" card on AI vs S&P 500 (10-day avg, zone, crowd vs contrarian read, signal, chart, how each bot uses it, source).
 - Not verified against live Cboe from the dev sandbox (no network): check the card after deploy; if it says unavailable, Cboe is blocking Render and the proxy takes over after 10 trading days.
 
+### Three-Trader Challenge — Phase 1 audit + Phase 2 reliability (2026-11-16)
+- Audit (live data, Nov 16 after the $30k reset): day trader 16,315 trades, −$1,293, of which modeled costs $1,234 (≈ flat before costs); avg forecast 0.034 ATR vs round-trip cost ≈ 0.083 (long) / 0.167 (short) ATR. Swing bot: a single-stock headline ("Helus Pharma stock tumbles 21%") tripped market defense mode 10 min after buying; rank sells within 1–4 h. Quant: one day, tracking the market.
+- `risk-core.js` (tested, `tests/risk-core.test.js`): market-wide swan filter, stale-quote check, Alex's net-edge qualification rule, daily loss limit, expectancy with 95% interval, swing rank-exit rule, strategy-version check, data-gap minutes.
+- Strategy registry `STRATS` in server.js (Alex `alex-intraday` v2, Sarah `sarah-swing` v2, Daniel `daniel-macro-quant` v2). A version change archives the run (full records) to `pft:archive:v1:<bot>` (Upstash list + tmp file) and starts a new $30,000 run. Busts archive too (swing no longer wipes trades). Public `/api/pub/archive?bot=`, `/api/pub/strategies`.
+- Alex v2: trades only when |forecast| > round-trip costs + 50% buffer; 1 bp/side costs + 1 bp borrow; 0.25% risk per trade, ≤0.5× equity per position, 4× gross / 2× net; 1% daily loss halt; evidence can veto/shrink only; gaps > 5 min close trades at the reconnect price, only the newest bar can open; 5,000-record log; daily aggregates; research scorecard (all forecasts vs qualified, net of costs, in ATR) on the page.
+- Sarah v2: rank sells/swaps only at the opening re-score after ≥2 days held; no trades/stops on quotes older than 15 min in session.
+- "Order flow" relabeled "candle pressure (OHLC proxy)".
+- Next (directive phases 3–8): central risk engine across bots, walk-forward validation + research registry for each strategy, Daniel's macro (FRED/ALFRED vintages) model vs simple baselines, Sarah's setup scoring trained out of sample, competition leaderboard + Investment Committee view, trader profiles/portraits, trade replay.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.

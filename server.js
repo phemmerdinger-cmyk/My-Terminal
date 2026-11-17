@@ -1549,6 +1549,42 @@ const AP_RISK_SLOTS = 8; // 80% risk: 8 of the 10 equal slots go to high-volatil
 // One-time reset of all three paper bots: when BOT_RESET_ID changes, each account restarts at its starting value on
 // the next server start (the old run is kept in its test-run history) and browser backups from before can't restore it.
 const BOT_RESET_ID = "2026-11-16-all-30k";
+// ---- Strategy registry + experiment archive (risk-core.js) ----
+// Every run belongs to one strategy version. When the version in this file changes, the bot's current run is archived
+// with its full records (never edited afterwards) and a new $30,000 run starts under the new version. Busts are archived
+// the same way. Archives live in Upstash lists (pft:archive:v1:<bot>) when configured, plus a local file.
+const RISK = require("./risk-core.js");
+const STRATS = {
+  swing: { id: "sarah-swing", version: 2, trader: "Sarah Chen", since: "2026-11-17",
+    hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
+    changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "No trades on quotes older than 15 minutes during the session", "Zweig put/call exposure tilt"],
+    params: { slots: 10, riskSlots: 8, slipPerSide: 0.0005, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 15 } },
+  day: { id: "alex-intraday", version: 2, trader: "Alex Morgan", since: "2026-11-17",
+    hypothesis: "An online 1-minute return forecaster (daytrade-brain.js) has a real but small edge; trading only the minutes where the forecast clears round-trip costs plus a buffer can be net positive. If none qualify, the bot stays in research mode.",
+    changes: ["Trades only when expected edge > costs + 50% buffer (was: every stock every minute)", "Risk 0.25% of equity per trade, 4× gross (Reg-T day-trading limit; was 10×)", "Daily loss limit 1% → no new trades that day", "Costs 1 bp per side (was 0.5 bp) + 1 bp short borrow", "Research evidence can veto or shrink a trade, never pick its side or upsize it", "Data gaps > 5 minutes close open trades at the first bar after the gap instead of replaying unseen minutes", "Keeps 5,000 trade records + per-day aggregates"],
+    params: { costPerSide: 0.0001, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 4, netCap: 2, dailyLoss: 0.01, maxGapMin: 5 } },
+  quant: { id: "daniel-macro-quant", version: 2, trader: "Daniel Brooks", since: "2026-11-17",
+    hypothesis: "A regime-aware, risk-parity allocation across liquid ETFs and mega-caps (12-1 momentum, 3-month momentum, low volatility, 200-day trend filter, 15% vol target) beats the S&P on a risk-adjusted basis after 5 bps costs.",
+    changes: ["Zweig put/call nudges the equity sleeve ±10% at sentiment extremes"],
+    params: { cost: 0.0005, minTrade: 0.015, maxW: 0.2, top: 8, volTarget: 0.15 } },
+};
+const ARCH_KEY = (bot) => `pft:archive:v1:${bot}`, ARCH_FILE = (bot) => path.join(require("os").tmpdir(), `archive-v1-${bot}.jsonl`);
+async function upCmd(cmd) {
+  if (!(UP_URL && UP_TOKEN)) return null;
+  const r = await fetch(UP_URL, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify(cmd), signal: AbortSignal.timeout(8000) });
+  return (await r.json()).result;
+}
+async function archivePush(bot, rec) {
+  const body = JSON.stringify({ ...rec, archivedAt: Date.now() });
+  try { fs.appendFileSync(ARCH_FILE(bot), body + "\n"); } catch {}
+  try { await upCmd(["LPUSH", ARCH_KEY(bot), body]); } catch {}
+}
+async function archiveList(bot, n = 30, full = false) {
+  let rows = null;
+  try { const r = await upCmd(["LRANGE", ARCH_KEY(bot), 0, n - 1]); if (Array.isArray(r)) rows = r; } catch {}
+  if (!rows) { try { rows = fs.readFileSync(ARCH_FILE(bot), "utf8").trim().split("\n").filter(Boolean).reverse().slice(0, n); } catch { rows = []; } }
+  return rows.map((x) => { try { const o = JSON.parse(x); if (!full) { delete o.tradeLog; delete o.equity; delete o.daily; delete o.decisions; } return o; } catch { return null; } }).filter(Boolean);
+}
 const AP_START = 30_000, AP_BUST = process.env.AP_TEST_BUST ? 29_990 : 3_000, AP_SLOTS = 10, AP_SLIP = 0.0005, AP_HOLD_MIN = 60 * 60e3;
 const AP_FALLBACK = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","AVGO","TSLA","BRK-B","JPM","LLY","V","UNH","XOM","MA","COST","HD","PG","JNJ","WMT","NFLX","ABBV","BAC","CRM","ORCL","AMD","KO","MRK","CVX","PEP","ADBE","TMO","LIN","MCD","CSCO","ACN","ABT","WFC","GE","QCOM","INTU","CAT","TXN","DIS","IBM"];
 const apFresh = () => ({ v: 2, resetId: BOT_RESET_ID, run: 1, runs: [], start: Date.now(), cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], lastRebalance: "", updated: Date.now() });
@@ -1575,11 +1611,24 @@ async function apLoad() {
   try {
     if (UP_URL && UP_TOKEN) {
       const r = await fetch(`${UP_URL}/get/${AP_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) });
-      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apFix(); if (apResetCheck()) await apSave(); apLoaded = true; return; }
+      const j = await r.json(); if (j.result) { AP = JSON.parse(j.result); apFix(); const c1 = apResetCheck(), c2 = await apVersionCheck(); if (c1 || c2) await apSave(); apLoaded = true; return; }
     }
   } catch {}
   try { AP = JSON.parse(fs.readFileSync(AP_FILE, "utf8")); } catch {}
-  apFix(); if (apResetCheck()) await apSave(); apLoaded = true;
+  apFix(); const c1 = apResetCheck(), c2 = await apVersionCheck(); if (c1 || c2) await apSave(); apLoaded = true;
+}
+// Strategy registry: a new swing-strategy version archives the current run (full trades + equity) and starts a new one.
+async function apVersionCheck() {
+  if (!RISK.versionChanged(AP.strategy, STRATS.swing)) return false;
+  const busy = AP.firstTrade || AP.trades.length;
+  if (busy) {
+    const last = AP.equity[AP.equity.length - 1], v = last && last.v > 0 ? last.v : AP.cash + Object.entries(AP.positions || {}).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost || 0), 0);
+    const rec = { ...apSummary(v, false, last && last.spx), endValue: +v.toFixed(2), strategy: AP.strategy || { id: "sarah-swing", version: 1, note: "before the strategy registry" }, reason: `Strategy change → ${STRATS.swing.id} v${STRATS.swing.version}`, marked: "positions valued at last known prices" };
+    await archivePush("swing", { ...rec, tradeLog: AP.trades, equity: AP.equity });
+    AP = { ...apFresh(), run: AP.run + 1, runs: [rec, ...(AP.runs || [])] };
+  }
+  AP.strategy = { id: STRATS.swing.id, version: STRATS.swing.version, since: Date.now() };
+  return true;
 }
 async function apSave() {
   AP.updated = Date.now();
@@ -1728,7 +1777,7 @@ const AP_POS2 = /\b(beats?|tops?|topped|crush(es|ed)?|smash(es|ed)?) (\w+ )?(est
 const AP_POS1 = /\b(jumps?|jumped|rall(y|ies|ied)|gains?|climbs?|rises?|rose|higher|strong(er)?|buyback|approv(al|ed|es)|wins?|won|partnership|outperform|bullish|boost(s|ed)?|expands?|breakthrough|beats?)\b/i;
 const AP_NEG2 = /\b(miss(es|ed)? (\w+ )?(estimates|expectations|forecasts?|views?)|cuts? (its |full-year )?(guidance|outlook|forecast)|lowers? (its )?(guidance|outlook|forecast)|downgrade[sd]?|plunge[sd]?|plummet(s|ed)?|tumble[sd]?|crash(es|ed)?|fraud|bankrupt\w*|chapter 11|sec (charges|probe|investigation)|recall(s|ed)?|guidance cut|profit warning)\b/i;
 const AP_NEG1 = /\b(falls?|fell|drops?|dropped|slides?|slid|slump(s|ed)?|sinks?|sank|lower|weak(er|ness)?|probe|investigation|lawsuit|sues?|sued|layoffs?|warns?|warning|fined|delay(s|ed)?|halt(s|ed)?|bearish|concerns?|antitrust|misses?)\b/i;
-const AP_SWAN = [/circuit breaker/i, /(market|trading)[- ]wide halt|exchange (halted|outage)/i, /flash crash/i, /bank run|run on (the )?bank/i, /emergency (rate|interest[- ]rate) cut|emergency (fed|central bank) (meeting|action)/i, /sovereign default|debt default/i, /declares? war|invasion of|act of war/i, /nuclear (attack|strike|detonation)|martial law/i, /worst (day|week|selloff|sell-off|crash) since (19\d\d|20[01]\d)/i, /(stocks?|markets?|dow|s&p|nasdaq) (crash|plunge|tumble|plummet)s? .{0,20}([3-9]|\d{2,})(\.\d)?%/i, /black swan/i];
+// Market-wide black-swan headline rules live in risk-core.js (RISK.isMarketSwan).
 function apTone(title) {
   const s = (AP_POS2.test(title) ? 2 : AP_POS1.test(title) ? 1 : 0) - (AP_NEG2.test(title) ? 2 : AP_NEG1.test(title) ? 1 : 0);
   return clamp(s, -2, 2);
@@ -1755,7 +1804,7 @@ async function apNewsPool(syms) {
   for (const s of syms) {
     try { const r = await loadSource("yahoo", SOURCES.yahoo.ticker(s), s); r.items.forEach((i) => pool.push({ title: i.title, time: i.time || Date.now(), src: "yahoo", w: 1, sym: s })); } catch {}
   }
-  for (const p of pool) if (!swan && p.dated && p.src !== "smart" && p.src !== "trending" && Date.now() - p.time < 24 * 3600e3 && AP_SWAN.some((re) => re.test(p.title))) swan = p.title;
+  for (const p of pool) if (!swan && p.dated && p.src !== "smart" && p.src !== "trending" && Date.now() - p.time < 24 * 3600e3 && RISK.isMarketSwan(p.title)) swan = p.title;
   const seen = new Set();
   return { pool: pool.filter((p) => { const k = p.title.toLowerCase().slice(0, 90); if (seen.has(k)) return false; seen.add(k); return true; }), macro: clamp(macro, -3, 3), swan };
 }
@@ -1846,6 +1895,7 @@ async function apScore(live) {
   const news = await apNewsPool(own);
   for (const x of out) {
     const qq = q[x.sym]; x.px = qq && !qq.error && qq.price ? qq.price : x.last; x.day = qq && !qq.error ? qq.changePct || 0 : 0;
+    x.stale = live && RISK.staleQuote(qq, Date.now(), true); // no fresh live quote → never bought or sold on rank
     x.mom = x.px / x.past - 1; x.trend = (x.px > x.m50 ? 0.5 : 0) + (x.px > x.m200 ? 0.5 : 0);
     const n = apNewsFor(x.sym, x.re, news.pool); x.news = n.score; x.headlines = n.top;
     x.earn = apEarnFor(x.sym, cal, t.day);
@@ -1903,7 +1953,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.news <= -2.5) apTrade(st, "SELL", sym, p.shares, x.px, `Bad news: “${(x.headlines[0] || "").slice(0, 120)}”`);
     else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
-    else if (x.rank > (risk ? 25 : 35) && !cool(sym)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the live rankings`);
+    else if (x.rank > (risk ? 25 : 35) && !cool(sym) && !x.stale && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the ranking at the opening re-score, after ${Math.floor((now - p.at) / 864e5)} days held`);
   }
   // 80% risk profile: fully invested normally; still cuts back when the whole market breaks down
   // Zweig put/call (contrarian): stays more invested when the crowd is loaded with puts, keeps some cash when it's loaded with calls
@@ -1916,7 +1966,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : pcT.note ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
   }
   if (sc.stress) return;
-  const ok = (x, sl) => x.sleeve === sl && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const ok = (x, sl) => x.sleeve === sl && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
@@ -1935,7 +1985,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (pace.swaps <= 0 || held(sl).length < SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const weakest = held(sl).filter((s) => by[s] && !cool(s)).sort((a, b) => by[a].score - by[b].score)[0];
+      const weakest = held(sl).filter((s) => by[s] && !cool(s) && RISK.rankExitAllowed(now - (st.positions[s].at || now), opening, STRATS.swing.params.rankHoldDays)).sort((a, b) => by[a].score - by[b].score)[0];
       if (!weakest || x.score < by[weakest].score + pace.gap) break;
       apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores higher (#${by[weakest].rank} vs #${x.rank})`);
       pace.swaps--;
@@ -1985,7 +2035,7 @@ async function apTick() {
     let syms = Object.keys(AP.positions), q = syms.length ? (await getQuotes(syms)).quotes : {};
     // stops every minute
     for (const s of syms) {
-      const p = AP.positions[s], x = q[s]; if (!x || x.error || !x.price) continue;
+      const p = AP.positions[s], x = q[s]; if (!x || x.error || !x.price || RISK.staleQuote(x, Date.now(), true)) continue; // stale → wait for a fresh price
       p.peak = Math.max(p.peak || p.cost, x.price); apPx[s] = x.price;
       const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), p.peak * (1 - tr));
       if (x.price <= stop) apTrade(AP, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
@@ -2012,7 +2062,8 @@ async function apTick() {
     // busted: archive this test run and start a new one with a fresh $10,000
     if (eq < AP_BUST) {
       for (const [s, p] of Object.entries(AP.positions)) apTrade(AP, "SELL", s, p.shares, (q[s] && q[s].price) || p.cost, "Account busted — closing everything");
-      AP.runs.unshift(apSummary(AP.cash, true, spx));
+      AP.runs.unshift({ ...apSummary(AP.cash, true, spx), strategy: AP.strategy || null });
+      await archivePush("swing", { ...AP.runs[0], tradeLog: AP.trades, equity: AP.equity });
       Object.assign(AP, { run: AP.run + 1, start: now, cash: AP_START, positions: {}, trades: [], equity: [], intraday: [], recent: {}, spx0: null, firstTrade: null, lastRebalance: "" });
     }
     await apSave();
@@ -2044,7 +2095,8 @@ async function apView() {
     profitFactor: gl > 0 ? gw / gl : wins.length ? null : null, grossWins: gw, grossLosses: gl, maxDrawdown: mdd, tradingDays: eqv.length,
     sharpe: dr.length >= 20 && sd ? (mean / sd) * Math.sqrt(252) : null, turnover: avgEq ? traded / avgEq : null, traded,
     costs: AP.trades.reduce((a, t) => a + (t.cost != null ? t.cost : t.amount * AP_SLIP), 0), totalReturn: ret, benchmarkReturn: spxRet, excessReturn: spxRet != null ? ret - spxRet : null };
-  return { ...AP, diag: { market: BOTDIAG.market, ...BOTDIAG.swing }, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
+  analytics.expectancy = RISK.expectancyOf(sells.map((t) => t.pnl));
+  return { ...AP, strategy: { ...STRATS.swing, active: AP.strategy || null }, diag: { market: BOTDIAG.market, ...BOTDIAG.swing }, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
 }
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
@@ -2081,8 +2133,11 @@ const DT_FILE = path.join(require("os").tmpdir(), "daytrader-v1.json"), DT_KEY =
 // every minute; conviction sets the size, and a portfolio guard caps gross (DT_LEV×) and net exposure.
 // Leverage: up to DT_LEV × the account in total (a real broker's pattern-day-trader limit is 4×; the owner chose 10× for
 // higher risk). A normal slice is 0.75 × DT_LEV × equity ÷ stocks, scaled by conviction; net tilt ≤ DT_NET × equity.
-const DT_LEV = 10, DT_NET = 3.75;
-const DT_START = 30_000, DT_PDT = 25_000, DT_FEE_SHORT = 0.0001, DT_COST = 0.00005, DT_HOLD = 1;
+// Strategy v2 (STRATS.day): trades only when the forecast's expected edge clears costs + a 50% buffer; risk 0.25% of
+// equity per trade (each position ≤ 0.5× equity), 4× gross / 2× net, 1% daily loss limit. Earlier text above describes v1.
+const DTP2 = STRATS.day.params;
+const DT_LEV = DTP2.grossCap, DT_NET = DTP2.netCap, DT_POS_X = 0.5;
+const DT_START = 30_000, DT_PDT = 25_000, DT_FEE_SHORT = DTP2.borrow, DT_COST = DTP2.costPerSide, DT_HOLD = 1;
 const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "AMD", "AVGO", "NFLX", "PLTR", "COIN", "MU", "JPM", "XOM", "BA",
   "UBER", "SMCI", "MSTR", "HOOD", "SOFI", "ARM", "INTC", "SHOP", "CRWD", "SNOW", "RIVN", "MARA", "DKNG", "ORCL", "CRM", "ABNB", "GOOG", "BRK-B", "LLY", "V",
   "MA", "UNH", "COST", "WMT", "HD", "PG", "JNJ", "ABBV", "MRK", "PFE", "KO", "PEP", "MCD", "DIS", "NKE", "SBUX", "BAC", "WFC", "C", "GS",
@@ -2090,8 +2145,11 @@ const DT_UNIVERSE = ["SPY", "QQQ", "IWM", "DIA", "AAPL", "MSFT", "NVDA", "AMZN",
   "ASML", "CVX", "COP", "OXY", "SLB", "CAT", "DE", "GE", "LMT", "RTX", "F", "GM", "LCID", "NIO", "AAL", "DAL", "UAL", "CCL", "RBLX", "SNAP"];
 const DT_MAXPOS = DT_UNIVERSE.length;
 let dtThrottleUntil = 0; // if the free data source starts refusing, drop to the first 50 stocks for 10 minutes
-const dtTally = () => ({ n: 0, wins: 0, gw: 0, gl: 0, longs: 0, shorts: 0, longPnl: 0, shortPnl: 0, costs: 0, traded: 0, Rsum: 0, held: 0, kinds: {} });
-const dtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), brain: DTB.fresh(), pend: {}, updated: Date.now() });
+const dtTally = () => ({ n: 0, wins: 0, gw: 0, gl: 0, sq: 0, longs: 0, shorts: 0, longPnl: 0, shortPnl: 0, costs: 0, traded: 0, Rsum: 0, held: 0, kinds: {} });
+// Research-mode scorecard (no money): for every forecast, the next minute's close-to-close move in ATRs in the forecast's
+// direction minus round-trip costs — for ALL forecasts (the v1 "trade everything" baseline) and for those that QUALIFIED.
+const dtShadow = () => ({ all: { n: 0, sum: 0, sq: 0 }, qual: { n: 0, sum: 0, sq: 0 }, since: Date.now() });
+const dtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, run: 1, runs: [], start: Date.now(), cash: DT_START, positions: {}, orders: [], trades: [], equity: [], intraday: [], spx0: null, firstTrade: null, day: null, lastBar: {}, tally: dtTally(), shadow: dtShadow(), daily: [], brain: DTB.fresh(), pend: {}, updated: Date.now() });
 function dtResetCheck() {
   if (DT.resetId === BOT_RESET_ID) return false;
   const runs = DT.runs || [], busy = DT.firstTrade || (DT.trades && DT.trades.length);
@@ -2103,11 +2161,27 @@ function dtResetCheck() {
 let DT = dtFresh(), dtLoaded = false, dtBusy = false, dtTickN = 0;
 const dtPx = {}, dtSeq = { n: 0 };
 async function dtLoad() {
-  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); DT = { ...dtFresh(), ...raw, resetId: raw.resetId }; } DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {}; if (dtResetCheck()) await dtSave(); dtLoaded = true; return; } } } catch {}
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${DT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); DT = { ...dtFresh(), ...raw, resetId: raw.resetId }; } DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {}; const c1 = dtResetCheck(), c2 = await dtVersionCheck(); if (c1 || c2) await dtSave(); dtLoaded = true; return; } } } catch {}
   try { const raw = JSON.parse(fs.readFileSync(DT_FILE, "utf8")); DT = { ...dtFresh(), ...raw, resetId: raw.resetId }; } catch {}
   DT.brain = DTB.fix(DT.brain); DT.pend = DT.pend || {};
-  if (dtResetCheck()) await dtSave();
+  const c1 = dtResetCheck(), c2 = await dtVersionCheck(); if (c1 || c2) await dtSave();
   dtLoaded = true;
+}
+// Strategy registry: a new day-trader version archives the current run (tally, daily aggregates, kept trades) and starts
+// a new one. The forecaster's learned weights carry over (they are research, not account state).
+async function dtVersionCheck() {
+  if (!RISK.versionChanged(DT.strategy, STRATS.day)) return false;
+  const busy = DT.firstTrade || (DT.trades && DT.trades.length);
+  if (busy) {
+    const last = (DT.equity || [])[DT.equity.length - 1], v = last && last.v > 0 ? last.v : DT.cash, vals = [DT_START, ...(DT.equity || []).map((p) => p.v), v];
+    const rec = { run: DT.run || 1, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +v.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n || 0 : 0, days: (DT.equity || []).length,
+      spxRet: DT.spx0 && last && last.spx ? +((last.spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false, strategy: DT.strategy || { id: "alex-intraday", version: 1, note: "before the strategy registry: every stock every minute, 10× leverage" }, reason: `Strategy change → ${STRATS.day.id} v${STRATS.day.version}` };
+    await archivePush("day", { ...rec, tally: DT.tally, daily: DT.daily || [], equity: DT.equity, tradeLog: DT.trades, model: DTB.scorecard(DT.brain) });
+    DT = { ...dtFresh(), run: (DT.run || 1) + 1, runs: [rec, ...(DT.runs || [])], brain: DT.brain };
+  }
+  DT.shadow = DT.shadow || dtShadow(); DT.daily = DT.daily || [];
+  DT.strategy = { id: STRATS.day.id, version: STRATS.day.version, since: Date.now() };
+  return true;
 }
 async function dtSave() {
   DT.updated = Date.now(); const body = JSON.stringify(DT);
@@ -2132,19 +2206,19 @@ async function dtPrev(sym, today) {
   });
 }
 const dtEquity = () => DT.cash + Object.entries(DT.positions).reduce((a, [s, p]) => a + (p.dir === "long" ? 1 : -1) * p.shares * (dtPx[s] || p.entry), 0);
-function dtLog(x) { DT.trades.unshift({ id: ++dtSeq.n + "-" + Date.now(), t: x.t || Date.now(), ...x, after: +dtEquity().toFixed(2) }); DT.trades = DT.trades.slice(0, 600); }
+function dtLog(x) { DT.trades.unshift({ id: ++dtSeq.n + "-" + Date.now(), t: x.t || Date.now(), ...x, after: +dtEquity().toFixed(2) }); DT.trades = DT.trades.slice(0, 5000); }
 function dtExit(sym, px, why, t) {
   const p = DT.positions[sym]; if (!p) return;
   const cost = p.shares * px * DT_COST, gross = DTC.pnlOf(p, px), pnl = gross - cost - (p.cost0 || 0), R = pnl / (Math.abs(p.entry - p.stop0) * p.shares);
   DT.cash += (p.dir === "long" ? 1 : -1) * p.shares * px - cost; delete DT.positions[sym]; dtPx[sym] = px;
   DT.day.pnl += pnl; DT.day.closed = (DT.day.closed || 0) + 1;
   const T = DT.tally || (DT.tally = dtTally()), held = Math.max(1, Math.round(((t ? t * 1000 : Date.now()) - p.at) / 60000));
-  T.n++; if (pnl > 0) { T.wins++; T.gw += pnl; } else T.gl -= pnl; T.costs += cost + (p.cost0 || 0); T.traded += p.shares * (px + p.entry); T.Rsum += R; T.held += held;
+  T.n++; T.sq = (T.sq || 0) + pnl * pnl; if (pnl > 0) { T.wins++; T.gw += pnl; } else T.gl -= pnl; T.costs += cost + (p.cost0 || 0); T.traded += p.shares * (px + p.entry); T.Rsum += R; T.held += held;
   if (p.dir === "long") { T.longs++; T.longPnl += pnl; } else { T.shorts++; T.shortPnl += pnl; }
   const k = (T.kinds[p.kind || "other"] = T.kinds[p.kind || "other"] || { n: 0, wins: 0, pnl: 0 }); k.n++; if (pnl > 0) k.wins++; k.pnl += pnl;
   dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(5), R: +R.toFixed(2), held, cost: +(cost + (p.cost0 || 0)).toFixed(2), entry: p.entry, dir: p.dir });
 }
-const DT_KIND = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Order flow", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus",
+const DT_KIND = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Candle pressure (OHLC proxy)", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus",
   pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum", "research-long": "News & research (bullish)", "research-short": "News & research (bearish)" };
 // ---- research for the day trader: the same inputs the swing bot uses, refreshed every 10 minutes ----
 // For each stock: news headlines (the five outlets, trending, Smart Money, its own Yahoo feed), earnings (beat or miss
@@ -2240,28 +2314,31 @@ function dtDecide(bars, sym, ctx) {
   const info = DTR.by[sym] || null, mk = DTR.market || {};
   const f = DTB.features(bars, { spy: ctx.spy, breadth: ctx.breadth(b.t), prev: DTP[sym] && DTP[sym].v, info, market: mk.regime || 0 });
   if (!f) return null;
-  DT.pend[sym] = { t: f.t, c: f.c, a: f.a, x: f.x.map((v) => +v.toFixed(4)) }; // scored and learned from at the next bar
   const costAtr = (f.c * (2 * DT_COST + DT_FEE_SHORT / 2)) / f.a, d = DTB.decide(DT.brain, f, { costAtr, mom: f.x[0] });
-  // evidence: the research inputs (news, earnings, analysts, financial health) plus the Spider's findings and the quant factors
+  // v2 qualification rule (risk-core.js): expected edge − round-trip costs − borrow − 50% buffer must be > 0
+  const qual = RISK.netEdge({ mu: d.mu, atrPct: f.a / f.c, costPerSide: DT_COST, borrow: DT_FEE_SHORT, short: d.dir === "short", bufferX: DTP2.bufferX });
+  const roundCost = (2 * DT_COST + (d.dir === "short" ? DT_FEE_SHORT : 0)) / (f.a / f.c); // in ATRs, for the research scorecard
+  DT.pend[sym] = { t: f.t, c: f.c, a: f.a, x: f.x.map((v) => +v.toFixed(4)), s: d.dir === "long" ? 1 : -1, k: +roundCost.toFixed(4), q: qual.ok ? 1 : 0 }; // scored and learned from at the next bar
+  if (DT.day) { DT.day.forecasts = (DT.day.forecasts || 0) + 1; if (qual.ok) DT.day.qualified = (DT.day.qualified || 0) + 1; }
+  if (!qual.ok) return null; // research mode for this stock this minute: the edge doesn't pay for the trade
+  // evidence (news, earnings, analysts, financial health, Spider, quant factors) can veto or shrink — never pick the side or upsize
   const ev = info ? clamp(info.research + 0.5 * (info.spider || 0) + 0.3 * (info.quant || 0), -1, 1) : 0, tilt = DTB.evidenceTilt(d.dir, d.mu, DT.brain.absMu, ev);
-  if (tilt.flipped) d.dir = tilt.dir;
-  let sizeX = d.sizeX * tilt.mult; const brakes = [];
-  // an earnings report today/tomorrow is a coin flip unless the evidence backs this side
-  if (info && info.soon && !tilt.backed) { sizeX *= 0.5; brakes.push("earnings due without supporting evidence — half size"); }
-  if (DT.day && DT.day.startEq && DT.day.pnl / DT.day.startEq <= -0.03) { sizeX *= 0.5; brakes.push("down 3%+ today — half size"); }
+  if (tilt.flipped || (Math.abs(ev) >= 0.4 && Math.sign(ev) !== (d.dir === "long" ? 1 : -1))) return null;
+  let sizeX = Math.min(1, tilt.mult); const brakes = [];
+  if (info && info.soon) { sizeX *= 0.5; brakes.push("earnings due — half size"); }
   const sgn = d.dir === "long" ? 1 : -1, a = f.a, stop = Math.max(a, b.c * 0.0005), tgt = Math.max(a * 1.2, b.c * 0.0006);
   const evWhy = info && info.reasons.length ? info.reasons.slice(0, 2).join("; ") : null;
-  const lead = tilt.flipped ? `trading the evidence (${ev >= 0 ? "+" : ""}${ev.toFixed(2)}) over a weak chart` : `forecast ${d.mu >= 0 ? "+" : ""}${d.mu.toFixed(3)} ATR (${d.edge > 0 ? "clears" : "doesn't clear"} costs) · for: ${d.reasons.join(", ") || "no strong input"}${d.against ? ` · against: ${d.against}` : ""}`;
-  const why = `${lead}${evWhy ? ` · ${tilt.backed ? "backed by" : Math.abs(ev) >= 0.15 ? "evidence disagrees" : "research"}: ${evWhy}` : ""}${tilt.backed ? ` · size ×${tilt.mult.toFixed(1)}` : ""}${brakes.length ? ` · ${brakes.join(", ")}` : ""}`;
-  return { dir: d.dir, kind: tilt.flipped ? "research" : d.kind, sizeX, score: Math.abs(d.mu), mu: d.mu, why, entry: b.c, stop: b.c - sgn * stop, target: b.c + sgn * tgt, at: b.t };
+  const lead = `forecast ${d.mu >= 0 ? "+" : ""}${d.mu.toFixed(3)} ATR vs costs ${qual.cost.toFixed(3)} + buffer ${qual.buffer.toFixed(3)} → net ${qual.net.toFixed(3)} ATR · for: ${d.reasons.join(", ") || "no strong input"}${d.against ? ` · against: ${d.against}` : ""}`;
+  const why = `${lead}${evWhy ? ` · ${tilt.backed ? "backed by" : Math.abs(ev) >= 0.15 ? "evidence disagrees (size cut)" : "research"}: ${evWhy}` : ""}${brakes.length ? ` · ${brakes.join(", ")}` : ""}`;
+  return { dir: d.dir, kind: d.kind, sizeX, score: Math.abs(d.mu), mu: d.mu, net: qual.net, why, entry: b.c, stop: b.c - sgn * stop, target: b.c + sgn * tgt, at: b.t };
 }
 // Gross and net exposure of the open book right now.
 function dtBook() { let gross = 0, net = 0; for (const [s, p] of Object.entries(DT.positions)) { const v = p.shares * (dtPx[s] || p.entry); gross += v; net += (p.dir === "long" ? 1 : -1) * v; } return { gross, net }; }
 function dtOpen(sym, idea, b, nSyms) {
   const eq = dtEquity(); if (eq <= 0) return;
-  const px = idea.entry, want = DTC.size(eq, px, idea.stop, 1, ((0.75 * DT_LEV * eq) / nSyms) * (idea.sizeX || 1)); // a slice of buying power, scaled by conviction
-  const stressed = !!(DTR.market && DTR.market.stress), shares = DTB.guard(want < 1 ? 1 : want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: stressed ? DT_NET / 2 : DT_NET });
-  if (shares < 1) return;
+  const px = idea.entry, want = DTC.size(eq, px, idea.stop, DTP2.riskPct * (idea.sizeX || 1), DT_POS_X * eq); // risk 0.25% of equity to the stop, ≤ 0.5× equity per position
+  const stressed = !!(DTR.market && DTR.market.stress), shares = DTB.guard(want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: stressed ? DT_NET / 2 : DT_NET });
+  if (shares < 1 || want < 1) return;
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   DT.positions[sym] = { dir: idea.dir, shares, entry: px, stop: idea.stop, stop0: idea.stop, target: idea.target, setup: DT_KIND[idea.kind], kind: idea.kind, at: b.t * 1000 + 60e3, why: `${sym}: ${idea.why}`, cost0, bars: 0 };
   DT.cash += (idea.dir === "long" ? -1 : 1) * shares * px - cost0; DT.day.trades++;
@@ -2273,7 +2350,13 @@ function dtOpen(sym, idea, b, nSyms) {
 function dtBar(sym, b, bars, nSyms, canOpen, ctx, day) {
   dtPx[sym] = b.c;
   const pd = DT.pend[sym];
-  if (pd && b.t > pd.t) { if (b.t - pd.t <= 180 && pd.a > 0) DTB.learn(DT.brain, pd.x, (b.c - pd.c) / pd.a, day); delete DT.pend[sym]; }
+  if (pd && b.t > pd.t) {
+    if (b.t - pd.t <= 180 && pd.a > 0) {
+      const y = (b.c - pd.c) / pd.a; DTB.learn(DT.brain, pd.x, y, day);
+      if (pd.s) { const S = DT.shadow || (DT.shadow = dtShadow()), r = y * pd.s - (pd.k || 0); S.all.n++; S.all.sum += r; S.all.sq += r * r; if (pd.q) { S.qual.n++; S.qual.sum += r; S.qual.sq += r * r; } }
+    }
+    delete DT.pend[sym];
+  }
   const p = DT.positions[sym];
   if (p) { const ex = DTC.scalpManage(p, b, DT_HOLD); if (ex) dtExit(sym, ex.px, ex.why === "Stop hit" || ex.why === "Target hit" ? ex.why : "Closed after one minute", b.t + 60); }
   if (!canOpen) { dtDecide(bars, sym, ctx); return; } // still forecast (and learn) for stocks it can't trade right now
@@ -2288,7 +2371,12 @@ async function dtTick() {
     if (!m.open && Object.keys(DT.positions).length && DT.day) { for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "Market closed — flat at the close"); await dtSave(); }
     if (!m.open && !(t.min >= 9 * 60 + 28 && t.min < 9 * 60 + 30 && t.wd !== "Sat" && t.wd !== "Sun")) return;
     if (Date.now() - DTR.t > 10 * 60e3) { const r = dtResearch(); if (!DTR.t) await r; }
-    if (!DT.day || DT.day.d !== t.day) DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, closed: 0, halted: false };
+    if (!DT.day || DT.day.d !== t.day) {
+      if (DT.day && DT.day.d) { DT.daily = DT.daily || []; DT.daily.push({ ...DT.day, endEq: +dtEquity().toFixed(2) }); DT.daily = DT.daily.slice(-400); } // per-day record, kept for the run
+      DT.day = { d: t.day, startEq: dtEquity(), pnl: 0, trades: 0, closed: 0, forecasts: 0, qualified: 0, halted: false };
+    }
+    // 1% daily loss limit (realized + open): no new trades for the rest of the day
+    if (!DT.day.halted && RISK.dailyLossHit(dtEquity() - DT.day.startEq, DT.day.startEq, DTP2.dailyLoss)) { DT.day.halted = true; DT.day.haltedAt = Date.now(); diagErr("day", `daily loss limit hit (${(DTP2.dailyLoss * 100).toFixed(0)}%) — no new trades today`); }
     if (!DT.tally) DT.tally = dtTally();
     const uni = Date.now() < dtThrottleUntil ? DT_UNIVERSE.slice(0, 50) : DT_UNIVERSE;
     const syms = [...new Set([...uni, ...Object.keys(DT.positions)])];
@@ -2306,9 +2394,17 @@ async function dtTick() {
       const done = bars.filter((b) => b.t <= now - 60 && b.m >= DTC.OPEN);
       if (!done.length) continue;
       if (!DT.lastBar[sym]) DT.lastBar[sym] = done[done.length - 1].t - 60; // a stock new to the list starts now, not from 9:30
-      const fresh = done.filter((b) => b.t > DT.lastBar[sym]).slice(-5); // catch up at most 5 missed minutes
+      let fresh = done.filter((b) => b.t > DT.lastBar[sym]);
+      // data gap (server asleep / feed outage): the missed minutes were never seen live, so they are not replayed —
+      // an open trade is closed at the latest price with the gap noted, and trading resumes on the newest bar only
+      if (fresh.length && RISK.gapMinutes(DT.lastBar[sym], fresh[0].t) > DTP2.maxGapMin) {
+        const lb = fresh[fresh.length - 1];
+        if (DT.positions[sym]) dtExit(sym, lb.c, `Data gap of ${RISK.gapMinutes(DT.lastBar[sym], fresh[0].t)} minutes — closed at the first price after reconnecting`, lb.t + 60);
+        delete DT.pend[sym]; fresh = [lb]; BOTDIAG.day.gaps = (BOTDIAG.day.gaps || 0) + 1;
+      } else fresh = fresh.slice(-5); // short catch-up: manage and learn, but only open on the newest bar
+      const newest = done[done.length - 1];
       for (const b of fresh) {
-        const upTo = bars.filter((x) => x.t <= b.t), canOpen = uni.includes(sym) && b.m >= DTC.OPEN && b.m < 15 * 60 + 58; // pre-market bars kept for the levels
+        const upTo = bars.filter((x) => x.t <= b.t), canOpen = uni.includes(sym) && !DT.day.halted && b === newest && now - b.t <= 150 && b.m >= DTC.OPEN && b.m < 15 * 60 + 58; // pre-market bars kept for the levels
         dtBar(sym, b, upTo, uni.length, canOpen, ctx, t.day);
       }
       DT.lastBar[sym] = done[done.length - 1].t;
@@ -2333,8 +2429,9 @@ async function dtTick() {
     if (DT.firstTrade && v < DT_PDT) {
       DT.orders = []; for (const s of Object.keys(DT.positions)) dtExit(s, dtPx[s] || DT.positions[s].entry, "Account fell below $25,000 — a real account would be locked out of day trading");
       const vals = [DT_START, ...DT.equity.map((p) => p.v)];
-      DT.runs.unshift({ run: DT.run, start: DT.firstTrade || DT.start, end: nowMs, startValue: DT_START, endValue: +dtEquity().toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals, dtEquity()).toFixed(2), trades: DT.tally ? DT.tally.n : DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spx ? +((spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: true, reason: "PDT lock (< $25,000)" });
-      DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs, brain: DT.brain }; // a new run keeps what the brain has learned
+      DT.runs.unshift({ run: DT.run, start: DT.firstTrade || DT.start, end: nowMs, startValue: DT_START, endValue: +dtEquity().toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals, dtEquity()).toFixed(2), trades: DT.tally ? DT.tally.n : DT.trades.filter((x) => x.pnl != null).length, days: DT.equity.length, spxRet: DT.spx0 && spx ? +((spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: true, reason: "PDT lock (< $25,000)", strategy: DT.strategy || null });
+      await archivePush("day", { ...DT.runs[0], tally: DT.tally, daily: DT.daily || [], equity: DT.equity, tradeLog: DT.trades, model: DTB.scorecard(DT.brain) });
+      DT = { ...dtFresh(), run: DT.run + 1, runs: DT.runs, brain: DT.brain, strategy: DT.strategy }; // a new run keeps what the brain has learned
     }
     await dtSave();
   } catch (e) { console.error("daytrader", e.message); diagErr("day", e); } finally { dtBusy = false; BOTDIAG.day.lastTick = Date.now(); }
@@ -2366,12 +2463,16 @@ async function dtView() {
   const current = { run: DT.run, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +value.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n : 0, days: DT.equity.length, spxRet: DT.spx0 && spxNow ? +((spxNow / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false };
   const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
   Object.assign(st, { trades: T.n * 2, closed: T.n, winRate: T.n ? T.wins / T.n : null, avgWin: T.wins ? T.gw / T.wins : null, avgLoss: T.n - T.wins ? -T.gl / (T.n - T.wins) : null, profitFactor: T.gl > 0 ? T.gw / T.gl : null, grossWins: T.gw, grossLosses: T.gl, costs: T.costs, traded: T.traded, avgR: T.n ? T.Rsum / T.n : null, avgHold: T.n ? T.held / T.n : null, longs: T.longs, shorts: T.shorts, longPnl: T.longPnl, shortPnl: T.shortPnl,
-    bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })) });
+    bySetup: Object.entries(T.kinds).map(([k, x]) => ({ setup: DT_KIND[k] || k, n: x.n, win: x.wins / x.n, pnl: x.pnl })),
+    expectancy: RISK.expectancy(T.n, T.gw - T.gl, T.sq || 0), grossBeforeCosts: T.gw - T.gl + T.costs });
+  const SH = DT.shadow || dtShadow(), research = { since: SH.since, unit: "ATR (1-minute average range), next-minute close-to-close in the forecast's direction, after round-trip costs",
+    allForecasts: RISK.expectancy(SH.all.n, SH.all.sum, SH.all.sq), qualified: RISK.expectancy(SH.qual.n, SH.qual.sum, SH.qual.sq) };
   return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PDT, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, quantFactors: { day: DTQ.day, t: DTQ.t, weights: DTB.QW, labels: DT_QF, top: Object.entries(DTQ.by).sort((a, b) => b[1].score - a[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })), bottom: Object.entries(DTQ.by).sort((a, b) => a[1].score - b[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })) },
     research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
-    status: open ? `Max speed — ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks, a new trade in each every minute, sized by a self-learning forecast` : "Market closed — flat overnight, back at the opening bell",
+    status: open ? (DT.day && DT.day.halted ? "Daily loss limit hit — no new trades today (still forecasting and learning)" : `Scanning ${BOTDIAG.day.universe || DT_UNIVERSE.length} stocks every minute — trades only when the forecast clears costs + buffer (${DT.day ? DT.day.qualified || 0 : 0} of ${DT.day ? DT.day.forecasts || 0 : 0} forecasts qualified today)`) : "Market closed — flat overnight, back at the opening bell",
+    strategy: { ...STRATS.day, active: DT.strategy || null }, researchMode: research, daily: (DT.daily || []).slice(-30),
     model: DTB.scorecard(DT.brain), pend: undefined,
-    rules: { maxPos: DT_MAXPOS, cost: DT_COST, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388, lev: DT_LEV, net: DT_NET } };
+    rules: { maxPos: DT_MAXPOS, cost: DT_COST, borrow: DT_FEE_SHORT, hold: DT_HOLD, ceiling: DT_UNIVERSE.length * 388, lev: DT_LEV, net: DT_NET, riskPct: DTP2.riskPct, posX: DT_POS_X, dailyLoss: DTP2.dailyLoss, bufferX: DTP2.bufferX } };
 }
 function dtRestore(doc) {
   if (!doc || typeof doc !== "object" || doc.v !== 1 || typeof doc.cash !== "number" || !Array.isArray(doc.trades)) return { ok: false, error: "bad data" };
@@ -2391,10 +2492,24 @@ const QT_FILE = path.join(require("os").tmpdir(), "quanttrader-v1.json"), QT_KEY
 const qtFresh = () => ({ v: 1, resetId: BOT_RESET_ID, runs: [], start: Date.now(), cash: QTC.QT_START, positions: {}, trades: [], equity: [], decisions: [], spx0: null, firstTrade: null, lastDay: null, lastError: null, updated: Date.now() });
 let QT = qtFresh(), qtLoaded = false, qtBusy = false; const qtPx = {};
 async function qtLoad() {
-  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } if (qtResetCheck()) await qtSave(); qtLoaded = true; return; } } } catch {}
+  try { if (UP_URL && UP_TOKEN) { const r = await fetch(`${UP_URL}/get/${QT_KEY}`, { headers: { Authorization: `Bearer ${UP_TOKEN}` }, signal: AbortSignal.timeout(8000) }); const j = await r.json(); if (j.result) { { const raw = JSON.parse(j.result); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } const c1 = qtResetCheck(), c2 = await qtVersionCheck(); if (c1 || c2) await qtSave(); qtLoaded = true; return; } } } catch {}
   try { const raw = JSON.parse(fs.readFileSync(QT_FILE, "utf8")); QT = { ...qtFresh(), ...raw, resetId: raw.resetId }; } catch {}
-  if (qtResetCheck()) await qtSave();
+  const c1 = qtResetCheck(), c2 = await qtVersionCheck(); if (c1 || c2) await qtSave();
   qtLoaded = true;
+}
+// Strategy registry: a new Quant-trader version archives the run (marked at the last recorded value, not at cost) and starts a new one.
+async function qtVersionCheck() {
+  if (!RISK.versionChanged(QT.strategy, STRATS.quant)) return false;
+  const busy = QT.firstTrade || (QT.trades && QT.trades.length);
+  if (busy) {
+    const last = (QT.equity || [])[QT.equity.length - 1], v = last && last.v > 0 ? last.v : QT.cash + Object.values(QT.positions || {}).reduce((a, p) => a + p.shares * p.cost, 0);
+    const rec = { start: QT.firstTrade || QT.start, end: Date.now(), startValue: QTC.QT_START, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length,
+      spxRet: QT.spx0 && last && last.s ? +((last.s / QT.spx0 - 1) * 100).toFixed(2) : null, strategy: QT.strategy || { id: "daniel-macro-quant", version: 1, note: "before the strategy registry" }, reason: `Strategy change → ${STRATS.quant.id} v${STRATS.quant.version}`, marked: last ? "last recorded daily value" : "cost basis (no recorded value)" };
+    await archivePush("quant", { ...rec, tradeLog: QT.trades, equity: QT.equity, decisions: QT.decisions });
+    QT = { ...qtFresh(), runs: [rec, ...(Array.isArray(QT.runs) ? QT.runs : [])] };
+  }
+  QT.strategy = { id: STRATS.quant.id, version: STRATS.quant.version, since: Date.now() };
+  return true;
 }
 function qtResetCheck() {
   if (QT.resetId === BOT_RESET_ID) return false;
@@ -2451,7 +2566,7 @@ async function qtView() {
   for (const s of syms) if (q[s] && q[s].price) qtPx[s] = q[s].price;
   const value = qtValue({}), positions = syms.map((s) => { const p = QT.positions[s], price = qtPx[s] || p.cost; return { sym: s, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, weight: (p.shares * price) / value }; }).sort((a, b) => b.value - a.value);
   const t = etParts(), open = !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 570 && t.min < 960;
-  return { ...QT, kind: "quant", value, startValue: QTC.QT_START, spxNow: q["^GSPC"] && q["^GSPC"].price, positions, rawPositions: QT.positions, marketOpen: open, latest: QT.decisions[0] || null,
+  return { ...QT, kind: "quant", strategy: { ...STRATS.quant, active: QT.strategy || null }, value, startValue: QTC.QT_START, spxNow: q["^GSPC"] && q["^GSPC"].price, positions, rawPositions: QT.positions, marketOpen: open, latest: QT.decisions[0] || null,
     rules: { universe: QTC.QT_EQUITY, defensive: QTC.QT_DEFENSIVE, cash: QTC.QT_CASH, top: QTC.QT_TOP, maxW: QTC.QT_MAX_W, volTarget: QTC.QT_VOL_TARGET, minTrade: QTC.QT_MIN_TRADE, cost: QTC.QT_COST, split: QTC.SPLIT },
     status: QT.lastError ? `Waiting for data: ${QT.lastError}` : QT.lastDay ? `Rebalances once a day after the close · last decision ${QT.lastDay}` : "Making its first allocation…" };
 }
@@ -3292,6 +3407,11 @@ async function handle(req, res) {
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(true); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
       if (u.pathname === "/api/pub/botslive") return send(res, 200, botsLive());
+      if (u.pathname === "/api/pub/archive") { // finished experiments per bot (busts, resets, strategy changes) — never edited
+        const bot = u.searchParams.get("bot"); if (!["swing", "day", "quant"].includes(bot)) return send(res, 400, { error: "bot must be swing, day or quant" });
+        return send(res, 200, { bot, strategy: STRATS[bot], runs: await archiveList(bot, 30, u.searchParams.get("full") === "1") });
+      }
+      if (u.pathname === "/api/pub/strategies") return send(res, 200, STRATS);
       if (u.pathname === "/api/pub/putcall") { if (!PC.loaded) await pcLoad(); return send(res, 200, pcState()); }
       if (u.pathname === "/api/daytrader/restore" && req.method === "POST") { if (!dtLoaded) await dtLoad(); let doc = null; try { doc = await readBody(req); } catch {} return send(res, 200, dtRestore(doc)); }
       if (u.pathname === "/api/autopilot/restore" && req.method === "POST") { // owner-only (signed-in cookie checked above)
