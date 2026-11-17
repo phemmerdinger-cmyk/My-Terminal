@@ -127,7 +127,7 @@ history, too few holdings, errors). The math lives in `public/qmath.js` and is c
 - **Markets:** Data health and Appearance & workspace.
 - **Research:** Market Intelligence (source-linked company and market findings) and Market Charts (indexed performance, drawdowns, and rolling realized volatility using free adjusted historical closes).
 - **Portfolio:** The Shock simulator and Smart alerts.
-- **Quant:** Strategy library (14 models) and the Quant validation audit.
+- **Quant:** Restored original two-tab navigation: Quant Lab and Backtest Lab. The advanced Strategy Library and Validation Audit remain available via their direct legacy links without changing the primary Quant interface.
 - **AI Lab:** Research Assistant (rules-based, source-linked Q&A; no paid model calls).
 - The former **Intelligence** navigation section was removed; the old relationship-node map was replaced with useful financial charts. Old `#studio` and `#web` links redirect to the strategy library and Market Charts, respectively.
 
