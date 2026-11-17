@@ -1,0 +1,37 @@
+/* Market Charts — charts, not a node/connection map. Uses the terminal's dark/military-green palette. */
+.mdc-head{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap}
+.mdc-head h2{font-size:clamp(25px,2.8vw,34px);letter-spacing:-.035em;margin:5px 0 9px;color:#eef5e8}
+.mdc-head p{font-size:13px;line-height:1.7;color:#b4c7a5;max-width:700px;margin:0}
+.mdc-kicker{font:700 10px var(--mono,monospace);letter-spacing:.15em;color:#a6d179}
+.mdc-source{font:10px var(--mono,monospace);border:1px solid #506343;padding:8px 10px;border-radius:8px;color:#b5cf9a;background:#18251a;white-space:nowrap}
+.mdc-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:15px 0;padding:17px;border:1px solid #3f5138;background:#101b1a;border-radius:13px}
+.mdc-controls>label{display:flex;flex-direction:column;gap:7px;color:#b8cbaa;font-size:11px;font-weight:700;flex:1 1 170px;max-width:250px}
+.mdc-controls .field{min-height:40px;background:#0d1618;border:1px solid #546c40;color:#edf7e9;min-width:0;width:100%;border-radius:8px;padding:9px}
+.mdc-ranges{display:flex;align-items:end;gap:4px;margin:0;padding:0;border:0;min-width:215px;flex:1 1 215px}
+.mdc-ranges legend{font-size:11px;font-weight:700;color:#b8cbaa;padding:0;margin-bottom:7px}
+.mdc-ranges button,.mdc-apply{font-size:12px;min-height:40px;padding:8px 12px;cursor:pointer;border-radius:7px;border:1px solid #465c39;background:#202b23;color:#c9d9be;flex:1}
+.mdc-ranges button.on{border-color:#a6d17a;background:#394f32;color:#f0f8e9;font-weight:800}
+.mdc-apply{flex:0 1 auto;padding:10px 17px;border-color:#9ac570;color:#08110a;background:#9fc978;font-weight:800;white-space:nowrap}
+.mdc-ranges button:hover,.mdc-apply:hover{filter:brightness(1.14)}
+.mdc-status{font-size:11px;min-height:19px;color:#a7bd97;line-height:1.6;padding:0 2px;margin-bottom:12px}
+.mdc-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0}
+.mdc-kpi{border:1px solid #415636;background:#13221e;border-radius:12px;padding:16px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.mdc-kpi span{font-size:11px;color:#a8bc97}
+.mdc-kpi strong{font-size:clamp(19px,2vw,27px);font-family:var(--mono,monospace);font-variant-numeric:tabular-nums;color:#eef6e6;overflow-wrap:anywhere}
+.mdc-kpi small{font-size:10px;color:#91a687;line-height:1.4}
+.mdc-charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mdc-chart{border:1px solid #3e5137;background:#101b20;border-radius:13px;padding:18px;min-width:0;overflow:hidden}
+.mdc-chart-wide{grid-column:1 / -1}
+.mdc-chart-title{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:17px}
+.mdc-chart-title h3{font-size:15px;color:#f1f5eb;margin:0;letter-spacing:-.02em}
+.mdc-chart-title span{font-size:10px;color:#a0b592}
+.mdc-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px;font:11px var(--mono,monospace);color:#d6e3cb}
+.mdc-legend span{display:inline-flex;gap:6px;align-items:center}
+.mdc-legend i{display:inline-block;width:9px;height:9px;border-radius:50%}
+.mdc-svgwrap svg{width:100%;height:auto;max-height:340px;min-height:175px;display:block;touch-action:pan-y}
+.mdc-svgwrap svg text{font-family:var(--mono,monospace)}
+.mdc-readout{font:11px var(--mono,monospace);min-height:18px;color:#b7cdab;line-height:1.65;border-top:1px solid #263a2c;margin-top:4px;padding-top:9px;overflow-wrap:anywhere}
+.mdc-loading,.mdc-unavailable{padding:40px 14px;text-align:center;color:#9daf93;font-size:12px}
+.mdc-method{color:#97ac8b;line-height:1.65;font-size:11px;margin:17px 3px 0}
+@media(max-width:950px){.mdc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.mdc-charts{grid-template-columns:1fr}.mdc-chart-wide{grid-column:auto}.mdc-chart{padding:12px}.mdc-controls{padding:12px}.mdc-source{white-space:normal}.mdc-kpis{gap:7px}.mdc-kpi{padding:12px}.mdc-ranges{width:100%;flex:1 1 100%}.mdc-apply{flex:1 1 100%}}
