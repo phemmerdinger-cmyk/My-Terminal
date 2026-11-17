@@ -1959,11 +1959,11 @@ const STUDIO_ROUTES = {
 const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
-  ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data health"],["studio-settings","Appearance"]]],
-  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["studio-research","Market intelligence"],["studio-graph","Market charts"]]],
-  ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"],["studio-scenario","Shock simulator"],["studio-alerts","Smart alerts"]]],
-  ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"],["studio-strategies","Strategy library"],["studio-quant","Validation audit"]]],
-  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"],["studio-ask","Research assistant"]]],
+  ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data Health"],["studio-settings","Appearance"]]],
+  ["research",[["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
+  ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
+  ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"],["studio-strategies","Strategy Library"],["studio-quant","Validation Audit"]]],
+  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
