@@ -2525,7 +2525,7 @@ function qtResetCheck() {
   if (QT.resetId === QT_RESET_ID) return false;
   const runs = Array.isArray(QT.runs) ? QT.runs : [], busy = QT.firstTrade || (QT.trades && QT.trades.length);
   if (busy) { const v = QT.cash + Object.values(QT.positions || {}).reduce((a, p) => a + p.shares * p.cost, 0);
-    runs.unshift({ start: QT.firstTrade || QT.start, end: Date.now(), startValue: 10_000, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length, reason: "Manual reset — Quant Trader restarted at $30,000" }); }
+    runs.unshift({ start: QT.firstTrade || QT.start, end: Date.now(), startValue: QTC.QT_START, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length, reason: "Manual reset — Quant Trader restarted at $30,000" }); }
   QT = { ...qtFresh(), runs };
   return true;
 }
