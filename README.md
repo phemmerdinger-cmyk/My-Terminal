@@ -26,7 +26,7 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
 | **AI vs. S&P 500** (AI Lab) | A rules-based $10,000 paper-trading bot (no API cost) racing the index, with trade analytics and test runs. |
 | **Prediction accuracy** (AI Lab) | Grades saved Claude predictions with non-overlapping outcome bands, calibration and sample sizes. |
-| **🕸 THE WEB** | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, a brain-style intelligence network and an "Ask the Spider" chat with citations, and shares research with AI Trader. Rules-based and free. |
+| **🕸 THE WEB** | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, source-linked financial research and a rules-based Research Assistant with citations, and shares research with AI Trader. Rules-based and free. |
 | **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
 **Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".
@@ -125,11 +125,11 @@ history, too few holdings, errors). The math lives in `public/qmath.js` and is c
 
 ## Distributed research tools and system health
 - **Markets:** Data health and Appearance & workspace.
-- **Research:** Spider research and the Knowledge network explorer.
+- **Research:** Market Intelligence (source-linked company and market findings) and Market Charts (indexed performance, drawdowns, and rolling realized volatility using free adjusted historical closes).
 - **Portfolio:** The Shock simulator and Smart alerts.
 - **Quant:** Strategy library (14 models) and the Quant validation audit.
-- **AI Lab:** Ask Spider (rules-based and free).
-- The former **Intelligence** navigation section was removed; its independent tools remain available through the sections above. Old `#studio` and `#web` links redirect to relevant tools.
+- **AI Lab:** Research Assistant (rules-based, source-linked Q&A; no paid model calls).
+- The former **Intelligence** navigation section was removed; the old relationship-node map was replaced with useful financial charts. Old `#studio` and `#web` links redirect to the strategy library and Market Charts, respectively.
 
 ## Data integrity and system health
 - **Data Integrity Engine** (`data/integrity.js`): every company's SEC figures are checked on the Financials and DCF pages — Assets = Liabilities + Equity, liabilities + equity components, operating + investing + financing cash flow = change in cash, gross profit and EPS consistency, sign checks, an independent re-computation of the ratios the site shows, fiscal-period and filing identification, currency, recency, merged duplicate periods, restatements (from the SEC's own filing history) and revisions (changes since the last time the site checked).
