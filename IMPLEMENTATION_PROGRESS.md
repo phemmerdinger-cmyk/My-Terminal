@@ -63,7 +63,7 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - `ratio-core.js` (tested against the Unit 6 Sage Inc. DuPont workbook): profitability (gross/operating/net margin, ROE, 3-step DuPont), leverage (D/E, D/A, A/E, LT debt/capital — total liabilities as "debt", as in the units), efficiency (AR/inventory/asset turnover on average balances, DSO/DIO/DPO, cash conversion cycle), valuation (P/E, P/S, P/B, PEG, P/CF, EV/EBITDA, dividend yield). `score()` = 75% rank vs peers scored at the same time + 25% better/worse than the prior year, per family, −1…+1; needs ≥ 8 peers.
 - SEC tags added: `payables` (AccountsPayableCurrent…), `dividends` (PaymentsOfDividends…).
 - Sarah v3: +0.08 × ratio score in the ranking; buy reasons cite the strongest/weakest ratio. Daniel v3: +0.25 × ratio score in the stock ranking (ETFs 0). Both weights are fixed priors, labeled in STRATS, to be tested out of sample. Alex unchanged (annual ratios have no 1-minute signal).
-- Leaderboard portraits: `public/traders/*.jpg` (from the owner's screenshot).
+- Leaderboard portraits removed at the owner's request (2026-11-17).
 
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
