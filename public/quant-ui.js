@@ -23,7 +23,7 @@
   function shell() {
     const el = $("tab-backtest"); if (el.dataset.ready) return; el.dataset.ready = "1";
     const today = new Date().toISOString().slice(0, 10), ten = new Date(Date.now() - 10 * 365.25 * 864e5).toISOString().slice(0, 10);
-    el.innerHTML = `<div class="fx-head"><div><div class="fx-kick">∑ QUANT</div><h1>Backtest lab</h1>
+    el.innerHTML = `<div class="fx-head"><div><div class="fx-kick">∑ QUANT</div><h1>Backtest Lab</h1>
       <p class="fx-sub">Test rule-based strategies on historical prices with trading costs, position limits and no look-ahead, then check whether the result survives data it was never tuned on. Results are <b>backtested</b> — hypothetical — and kept separate from AI Trader's <b>paper-traded</b> results and live <b>market-observed</b> prices.</p></div></div>
       <div class="qb-grid"><form class="fx-card qb-form" id="qbForm" autocomplete="off">
         <label>Strategy<select class="field" id="qbStrat">${Object.entries(Q.STRATEGIES).map(([k, s]) => `<option value="${k}">${esc(s.name)}</option>`).join("")}</select></label>
