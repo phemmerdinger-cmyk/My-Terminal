@@ -39,7 +39,7 @@
     // Render only the selected tool within its destination section; no stand-alone Intelligence hub.
     el.innerHTML = `<div id="mdsFeedback" class="mds-feedback" aria-live="polite"></div>
       <section id="mdsStrategies" data-mspanel="strategies" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Strategy research lab <span class="mds-section-tag">14 executable models</span></h2>
+        <div class="mds-intro"><h2>Strategy Research Lab <span class="mds-section-tag">14 executable models</span></h2>
           <p>Explore different investing rules, then compare their actual historical backtests. Every figure appears only after downloading price data and calculating performance — never from preset sample returns.</p></div>
         <div class="mds-strategy-toolbar"><label for="mdsStrategyFilter">Filter family</label><select class="field" id="mdsStrategyFilter"><option value="all">All models</option><option value="trend">Trend &amp; momentum</option><option value="reversal">Mean reversion &amp; RSI</option><option value="factors">Multi-factor</option><option value="allocation">Portfolio allocation</option></select>
           <button type="button" id="mdsRunSamples" class="mds-strategy-primary">▶ Run 5 examples</button><button type="button" id="mdsRunAll">Run all 14 backtests</button></div>
@@ -48,7 +48,7 @@
         <p class="mds-caption">Same 5-year window, SPY benchmark and $10,000 simulated capital; 5 bps spread, 5 bps slippage, 0 commission, and a 2% cash floor. This is research, not live trading. Survivorship bias and free data availability affect backtest reliability.</p>
       </section>
       <section id="mdsScenario" data-mspanel="scenario" class="mds-panel">
-        <div class="mds-intro"><h2>Portfolio shock simulator</h2><p>Test <b>synthetic</b> scenarios, not price predictions or historical replays. P&amp;L is computed from the available quoted positions; missing quotes are excluded and clearly reported.</p></div>
+        <div class="mds-intro"><h2>Portfolio Shock Simulator</h2><p>Test <b>synthetic</b> scenarios, not price predictions or historical replays. P&amp;L is computed from the available quoted positions; missing quotes are excluded and clearly reported.</p></div>
         <div class="mds-controls"><label>Portfolio<select class="field" id="mdsPf"></select></label><label>Single-stock override<input id="mdsSym" class="field" placeholder="NVDA" maxlength="12"></label></div>
         <div class="mds-presets">${SCENARIOS.map((a,i)=>`<button type="button" data-mspreset="${i}">${a[0]}</button>`).join("")}</div>
         <div class="mds-controls mds-sliders">${[["Market","Broad-market shock"],["Tech","Technology-sector extra shock"],["Custom","Selected-stock extra shock"]].map(([k,n])=>`<label>${n}<div class="mds-slide"><input type="range" id="mds${k}" min="-80" max="80" step="1"><output id="mds${k}Val"></output></div></label>`).join("")}</div>
@@ -58,19 +58,19 @@
         <div class="mds-toolbar"><button type="button" id="mdsResearchReload">↻ Refresh research</button><button type="button" data-msgo="aitrade">Inspect paper AI Trader</button><span id="mdsResearchAge"></span></div><div id="mdsResearchOut"></div><div id="mdsTraderOut"></div></section>
       <section id="mdsGraph" data-mspanel="graph" class="mds-panel" hidden><div id="mdcHost"></div></section>
       <section id="mdsQuant" data-mspanel="quant" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Quant validation audit</h2><p>Read your actual saved Backtest Lab experiments and their assumptions. Validation flags are descriptive, not statistical proof of future returns.</p></div><div class="mds-toolbar"><button type="button" data-msgo="backtest">Run a new backtest</button><button type="button" data-msgo="quant">Open Monte Carlo / factors</button></div><div id="mdsQuantOut"></div></section>
+        <div class="mds-intro"><h2>Quant Validation Audit</h2><p>Read your actual saved Backtest Lab experiments and their assumptions. Validation flags are descriptive, not statistical proof of future returns.</p></div><div class="mds-toolbar"><button type="button" data-msgo="backtest">Run a new backtest</button><button type="button" data-msgo="quant">Open Monte Carlo / factors</button></div><div id="mdsQuantOut"></div></section>
       <section id="mdsAsk" data-mspanel="ask" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Market Research Assistant</h2><p>Ask questions about market developments, holdings, or financial research using available source-linked evidence. This assistant is <b>rules-based</b>, not a paid AI model; Claude is not called and the feature costs $0 in model usage.</p></div>
         <div class="mds-ask-suggestions">${["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What major risks are emerging in the market today?","What is the AI Trader reading from research?"].map((s,i)=>`<button type="button" data-msquestion="${i}">${clean(s)}</button>`).join("")}</div>
         <form id="mdsAskForm" class="mds-ask"><textarea id="mdsQuestion" rows="3" maxlength="600" placeholder="Ask about holdings, companies, filings or market risks…" required></textarea><button type="submit">Research answer</button></form>
         <div id="mdsAskOut" role="status" aria-live="polite"></div></section>
       <section id="mdsAlerts" data-mspanel="alerts" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Explainable smart alerts</h2><p>Alerts are calculated in your browser while the site is open, based on quote changes and new, important market research affecting your holdings. No push service, paid API, background guarantees or automatic trading.</p></div>
+        <div class="mds-intro"><h2>Smart Alerts</h2><p>Alerts are calculated in your browser while the site is open, based on quote changes and new, important market research affecting your holdings. No push service, paid API, background guarantees or automatic trading.</p></div>
         <div class="mds-controls"><label>Daily move threshold (%)<input type="number" id="mdsMove" class="field" min="1" max="50" step="1"></label><label>Research importance minimum (30–100)<input type="number" id="mdsImp" class="field" min="30" max="100" step="5"></label></div>
         <div class="mds-toolbar"><label><input type="checkbox" id="mdsPriceOn"> Monitor quoted price moves</label><label><input type="checkbox" id="mdsResearchOn"> Monitor important market findings</label><button id="mdsAlertClear" type="button">Clear history</button></div>
         <p id="mdsAlertFreshness" class="mds-caption"></p><div id="mdsAlertOut"></div></section>
       <section id="mdsSettings" data-mspanel="settings" class="mds-panel" hidden>
-        <div class="mds-intro"><h2>Appearance &amp; workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
+        <div class="mds-intro"><h2>Appearance &amp; Workspace</h2><p>Change how the terminal looks on this device without affecting investments or research.</p></div>
         <div class="mds-controls"><label>Information density<select class="field" id="mdsDensity"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
           <label>Accent theme<select class="field" id="mdsAccent"><option value="amber">Black &amp; military green</option><option value="cyan">Legacy cyber cyan</option></select></label>
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
@@ -298,7 +298,7 @@
     }).join("")}</div>` : '<p class="mds-empty">No recent source-linked market findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Compare NVDA, AMD or JPM with market benchmarks in Market Charts. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Open Market Charts →</button></div></div>';
     const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("studio-graph");
     const trader = E.trader, el = byId("mdsTraderOut"); if (!el) return;
-    el.innerHTML = trader ? `<div class="mds-connect"><h3>Market intelligence ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. Research never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
+    el.innerHTML = trader ? `<div class="mds-connect"><h3>Market Intelligence ↔ Paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. Research never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
     const b=el.querySelector("[data-msgo2]"); if (b) b.onclick=()=>setTab("aitrade");
   }
   function renderQuant() {
@@ -320,10 +320,10 @@
     out.textContent="Spider is checking saved research and citations…";
     try{
       const r=await api("/api/web/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,useClaude:false})});
-      out.innerHTML = '<div class="mds-answer"><h3>Research answer <small>rules-based · $0 model cost</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
+      out.innerHTML = '<div class="mds-answer"><h3>Research Answer <small>rules-based · $0 model cost</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
       byId("mdsAnswerText").textContent=r.answer || "No sourced answer available.";
       const c=byId("mdsAnswerCites");
-      if(r.citations && r.citations.length)c.innerHTML='<h4>Evidence cited</h4>'+r.citations.slice(0,12).map((d,i)=>`<div class="mds-cite">[${i+1}] ${clean(d.headline || d.title || d.id || "Finding")}${(d.sources||[]).filter((s)=>link(s.url)).slice(0,2).map((s)=>` · <a href="${clean(s.url)}" target="_blank" rel="noopener noreferrer">${clean(s.name)}</a>`).join("")}</div>`).join("");
+      if(r.citations && r.citations.length)c.innerHTML='<h4>Evidence Cited</h4>'+r.citations.slice(0,12).map((d,i)=>`<div class="mds-cite">[${i+1}] ${clean(d.headline || d.title || d.id || "Finding")}${(d.sources||[]).filter((s)=>link(s.url)).slice(0,2).map((s)=>` · <a href="${clean(s.url)}" target="_blank" rel="noopener noreferrer">${clean(s.name)}</a>`).join("")}</div>`).join("");
       else c.innerHTML='<p class="mds-caption">No cited research in the response. Treat the answer as a statement of insufficient evidence.</p>';
     }catch(e){out.innerHTML='<p class="mds-warning">'+clean(e.message || "Spider unavailable; check System Health")+'</p>';}
   }
