@@ -21,11 +21,51 @@ test("no look-ahead: a rule that reacts to a jump buys AFTER it, so it can't pro
   close(r.equity[r.equity.length - 1], 10000, 1e-6);
   assert.ok(r.trades[0].t > r.trades[0].signalDate, "execution happens the day after the signal");
 });
+test("the current New York session is excluded even after the regular close", () => {
+  const asOf = Date.parse("2016-01-08T22:00:00Z");
+  const S = { SPY: series((i) => 100 + i, 7) };
+  const aligned = Q.align(S, "SPY", -Infinity, Infinity, asOf);
+  assert.equal(aligned.dates.at(-1), T0 + 3 * 86400);
+  assert.equal(aligned.observed.SPY.at(-1), 103);
+  assert.throws(() => Q.align(S, "SPY", T0 + 4 * 86400, Infinity, asOf), /No completed benchmark sessions/);
+});
+test("a delayed buy waits for an observed close, and leaves the signal date intact", () => {
+  const S = { SPY: series(() => 100), X: series((i) => i === 451 ? null : i === 452 ? 120 : 100) };
+  const r = Q.run(spec({ series: S, universe: ["X"], strategy: "buyhold", weights: { X: 1 } }));
+  assert.equal(r.trades.length, 1);
+  assert.equal(r.trades[0].signalDate, T0 + 450 * 86400);
+  assert.equal(r.trades[0].t, T0 + 452 * 86400);
+  assert.equal(r.trades[0].price, 120);
+});
+test("a sell cannot use a closing price carried across missing sessions", () => {
+  const prices = (i) => i < 451 ? 100 : i < 455 ? 110 : i === 455 ? 96 : i < 458 ? null : 90;
+  const S = { SPY: series(() => 100), X: series(prices) };
+  const r = Q.run(spec({ series: S, universe: ["X"], strategy: "custom", params: { entry: "price > 100", exit: "price < 100" } }));
+  const sell = r.trades.find((t) => t.side === "SELL");
+  assert.equal(sell?.price, 90);
+  assert.equal(sell?.signalDate, T0 + 455 * 86400);
+  assert.equal(sell?.t, T0 + 458 * 86400);
+});
+test("a buy-and-hold entry expires after five missing execution sessions", () => {
+  const S = { SPY: series(() => 100), X: series((i) => i >= 451 && i <= 455 ? null : 100) };
+  const r = Q.run(spec({ series: S, universe: ["X"], strategy: "buyhold", weights: { X: 1 } }));
+  assert.equal(r.trades.length, 0);
+  assert.ok(r.limitations.some((s) => s.includes("Rebalances expired while waiting for observed closes: 1")));
+});
 test("trading costs: commission + half the spread + slippage on traded value", () => {
   const S = { SPY: series(() => 100) };
   const r = Q.run(spec({ series: S, universe: ["SPY"], strategy: "buyhold", weights: { SPY: 1 }, costs: { commissionBps: 1, spreadBps: 10, slippageBps: 4 } }));
   const rate = (1 + 5 + 4) / 1e4, spent = 10000 / (1 + rate); // all cash invested, leaving room for the fee
   close(r.metrics.costs, spent * rate, 1e-6); close(r.equity[r.equity.length - 1], 10000 - spent * rate, 1e-6);
+});
+test("realized P&L includes entry and exit costs", () => {
+  const S = { SPY: series(() => 100), X: series((i) => i === 452 ? 99 : 100) };
+  const r = Q.run(spec({ series: S, universe: ["X"], strategy: "custom", params: { entry: "price >= 100", exit: "price < 100" },
+    costs: { commissionBps: 1, spreadBps: 10, slippageBps: 4 }, to: T0 + 453 * 86400 }));
+  assert.equal(r.metrics.closedTrades, 1);
+  const enterCost = 10000 / 1.001 * 0.001;
+  close(r.metrics.avgLoss, -2 * enterCost, 1e-6);
+  close(r.equity.at(-1), 10000 - 2 * enterCost, 1e-6);
 });
 test("exposure limits: max position weight and minimum cash are enforced", () => {
   const S = { SPY: series(() => 100), A: series(() => 50) };

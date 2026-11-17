@@ -117,19 +117,46 @@ function scalpSignal(bars, { stopX = 1, targetX = 1.2 } = {}) {
   const t = Math.max(a * targetX, b.c * 0.0006);
   return { ...idea, entry: b.c, stop: idea.dir === "long" ? b.c - d : b.c + d, target: idea.dir === "long" ? b.c + t : b.c - t, atr: a, at: b.t };
 }
-// Exits for a scalp on one bar, then a 5-minute time stop at the close. When the stop and the target are both inside
-// one bar, the usual OHLC path rule decides which came first: a green bar went open → low → high → close,
-// a red bar open → high → low → close. A gap through either level fills at the open.
+function validMinuteBar(b) {
+  return Number.isInteger(b.t) && b.t % 60 === 0 && Number.isInteger(b.m) && b.m >= 0 && b.m < 1440 &&
+    [b.o, b.h, b.l, b.c].every((p) => Number.isFinite(p) && p > 0) &&
+    b.l <= Math.min(b.o, b.c) && b.h >= Math.max(b.o, b.c);
+}
+
+function paperBarReady(bar, readAt, maxLagSec) {
+  const lag = readAt - (bar.t + 60) * 1000;
+  return lag >= 0 && lag <= maxLagSec * 1000;
+}
+
+// The following minute starts strictly after the actual decision, including decisions on a clock boundary.
+function paperEntryMinute(signal, decisionAt, close, maxLagSec) {
+  if (!validMinuteBar(signal) || signal.m < OPEN || !paperBarReady(signal, decisionAt, maxLagSec)) return null;
+  const next = (Math.floor(decisionAt / 60e3) + 1) * 60;
+  return signal.m + (next - signal.t) / 60 < close ? next : null;
+}
+
+function paperOpen(forecast, bar) {
+  if (!forecast.idea || !validMinuteBar(bar) || bar.m < OPEN || bar.m >= CLOSE || bar.d !== forecast.day ||
+      bar.t !== forecast.fillAt || !(bar.t * 1000 > forecast.decisionAt)) return null;
+  const { dir, stopDistance, targetDistance } = forecast.idea;
+  const sign = dir === "long" ? 1 : -1;
+  const entry = bar.o, stop = entry - sign * stopDistance, target = entry + sign * targetDistance;
+  if (!(stopDistance > 0 && targetDistance > 0 && stop > 0 && target > 0)) return null;
+  return { entry, stop, target, at: bar.t * 1000 };
+}
+
+// Minute highs and lows cannot determine which level traded first. If the opening print is between them,
+// use the stop when both were touched. A gap through the stop can move the fill beyond the stop price.
 function scalpManage(p, b, maxBars = 5) {
   p.bars = (p.bars || 0) + 1;
   const long = p.dir === "long";
   const hitS = long ? b.l <= p.stop : b.h >= p.stop, hitT = long ? b.h >= p.target : b.l <= p.target;
-  const stop = { px: long ? Math.min(p.stop, b.o) : Math.max(p.stop, b.o), why: "Stop hit" }, tgt = { px: long ? Math.max(p.target, b.o) : Math.min(p.target, b.o), why: "Target hit" };
-  if (hitS && hitT) { const gapS = long ? b.o <= p.stop : b.o >= p.stop, gapT = long ? b.o >= p.target : b.o <= p.target; if (gapS) return stop; if (gapT) return tgt; const lowFirst = b.c >= b.o; return (long ? lowFirst : !lowFirst) ? stop : tgt; }
+  const stop = { px: long ? Math.min(p.stop, b.o) : Math.max(p.stop, b.o), why: "Stop hit" }, tgt = { px: p.target, why: "Target hit" };
+  if (hitT && (long ? b.o >= p.target : b.o <= p.target)) return tgt;
   if (hitS) return stop;
   if (hitT) return tgt;
   if (p.bars >= maxBars) return { px: b.c, why: `Time stop — out after ${maxBars} minutes` };
   return null;
 }
 
-module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, scalpManage };
+module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, validMinuteBar, paperBarReady, paperEntryMinute, paperOpen, scalpManage };

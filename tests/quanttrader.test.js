@@ -26,3 +26,33 @@ test("orders skip small changes, always exit dropped names, and sell before buyi
   assert.deepEqual(o.map((x) => [x.sym, x.side]), [["CCC", "SELL"], ["AAA", "BUY"]]); // BBB 50% → 50.5% skipped
   assert.ok(Math.abs(o[1].shares - 50) < 1e-9);
 });
+
+test("Quant queues across exchange holidays and uses only the exact opening bar", () => {
+  assert.equal(Q.nextTradingDay("2026-12-24", new Set(["2026-12-25"])), "2026-12-28");
+  const after = { t: 160, o: 130 }, before = { t: 40, o: 90 };
+  assert.equal(Q.openingPrice([before, after], 100), null);
+  assert.equal(Q.openingPrice([before, { t: 100, o: null }, after], 100), null);
+  assert.equal(Q.openingPrice([before, { t: 100, o: 120 }, after], 100), 120);
+});
+
+test("a rebalance waits for all opening prices and keeps the original book available for retry", () => {
+  const book = { cash: 0, positions: { A: { shares: 10, cost: 100 } } };
+  const orders = [{ sym: "A", side: "SELL", shares: 5, to: 0.5 }, { sym: "B", side: "BUY", shares: 10, to: 0.5 }];
+  assert.throws(() => Q.fillOrders(book, orders, { A: 110 }, 150, "rebalance"), /complete rebalance/);
+  assert.deepEqual(book, { cash: 0, positions: { A: { shares: 10, cost: 100 } } });
+  const filled = Q.fillOrders(book, orders, { A: 110, B: 60 }, 150, "rebalance");
+  assert.equal(filled.trades[0].pnl, 49.48);
+  assert.equal(filled.trades[0].entryFee, 0.25);
+  assert.equal(filled.positions.A.entryFee, 0.25);
+  assert.equal(filled.trades[1].price, 60);
+  assert.ok(filled.positions.B.shares < 10, "buy is clipped to available cash after fees");
+  assert.ok(filled.cash >= 0);
+  assert.deepEqual(book, { cash: 0, positions: { A: { shares: 10, cost: 100 } } });
+});
+
+test("closed Quant P&L accounts for both entry and exit fees, including legacy rows", () => {
+  const legacy = { value: 550, pnl: 49.73 };
+  assert.equal(Q.closedPnl(legacy), 49.48);
+  assert.equal(Q.closedPnl({ value: 550, pnl: 49.48, entryFee: 0.25 }), 49.48);
+  assert.equal(Q.closedPnl({ value: 550 }), undefined);
+});

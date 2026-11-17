@@ -90,13 +90,42 @@ test("scalper: uptrend pullback to the 9-EMA closing green → long, with stop a
 test("scalper: a quiet flat tape gives no trade", () => {
   assert.equal(D.scalpSignal(session(40)), null);
 });
-test("scalper: exits — stop, target, OHLC path rule when both are hit, then a 5-minute time stop", () => {
+test("scalper: stop first if intrabar sequence is unknown, then a time stop", () => {
   const p = () => ({ dir: "short", entry: 100, stop: 100.2, target: 99.76, shares: 10 });
   assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.9, 100.1)).why, "Stop hit");
-  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 99.8)).why, "Stop hit", "red bar: high came first");
-  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 100.1)).why, "Target hit", "green bar: low came first");
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 99.8)).why, "Stop hit", "red bar with ambiguous path");
+  assert.equal(D.scalpManage(p(), bar(0, 100, 100.3, 99.7, 100.1)).why, "Stop hit", "green bar with ambiguous path");
   assert.equal(D.scalpManage(p(), bar(0, 100.4, 100.5, 99.7, 99.8)).px, 100.4, "gap through the stop fills at the open");
   assert.equal(D.scalpManage(p(), bar(0, 100, 100.1, 99.7, 99.8)).px, 99.76);
   const q = p(); for (let i = 0; i < 4; i++) assert.equal(D.scalpManage(q, bar(0, 100, 100.1, 99.9, 100)), null);
   assert.match(D.scalpManage(q, bar(0, 100, 100.1, 99.9, 99.95)).why, /Time stop/);
+});
+
+const minute = { t: 6000, m: D.OPEN + 5, d: "sample session", o: 99, h: 101, l: 98, c: 100 };
+
+test("paper entry advances beyond the actual decision and rejects partial, stale, or out-of-session bars", () => {
+  assert.equal(D.paperEntryMinute(minute, 6_059_999, D.CLOSE, 90), null);
+  assert.equal(D.paperEntryMinute(minute, 6_060_000, D.CLOSE, 90), 6120, "exactly on a boundary still requires a later open");
+  assert.equal(D.paperEntryMinute(minute, 6_095_000, D.CLOSE, 90), 6120);
+  assert.equal(D.paperEntryMinute(minute, 6_122_000, D.CLOSE, 90), 6180);
+  assert.equal(D.paperEntryMinute(minute, 6_150_001, D.CLOSE, 90), null);
+  assert.equal(D.paperEntryMinute({ ...minute, m: D.CLOSE - 2 }, 6_095_000, D.CLOSE, 90), null);
+  assert.equal(D.paperEntryMinute({ ...minute, m: 13 * 60 - 2 }, 6_095_000, 13 * 60, 90), null);
+  assert.equal(D.paperEntryMinute({ ...minute, o: null }, 6_095_000, D.CLOSE, 90), null);
+  assert.equal(D.paperBarReady(minute, 6_150_000, 90), true);
+  assert.equal(D.paperBarReady(minute, 6_150_001, 90), false);
+});
+
+test("paper order fills only at its scheduled session open with a bracket based on that fill", () => {
+  const order = { day: minute.d, decisionAt: 6_095_000, fillAt: 6120, idea: { dir: "long", stopDistance: 2, targetDistance: 3 } };
+  const scheduled = { ...minute, t: 6120, m: minute.m + 2, o: 101, h: 104 };
+  assert.deepEqual(D.paperOpen(order, scheduled), { entry: 101, stop: 99, target: 104, at: 6_120_000 });
+  assert.deepEqual(D.paperOpen({ ...order, idea: { ...order.idea, dir: "short" } }, scheduled), { entry: 101, stop: 103, target: 98, at: 6_120_000 });
+  assert.equal(D.paperOpen({ ...order, decisionAt: 6_120_000 }, scheduled), null);
+  assert.equal(D.paperOpen(order, { ...scheduled, t: 6180 }), null, "missed order is never borrowed from a later bar");
+  assert.equal(D.paperOpen(order, { ...scheduled, d: "next session" }), null);
+  assert.equal(D.paperOpen(order, { ...scheduled, l: null }), null);
+  assert.equal(D.paperOpen(order, { ...scheduled, h: 99 }), null);
+  assert.equal(D.paperOpen({ ...order, idea: null }, scheduled), null);
+  assert.equal(D.scalpManage({ dir: "long", stop: 99, target: 104 }, scheduled).why, "Stop hit", "long ambiguity also gives the stop priority");
 });
