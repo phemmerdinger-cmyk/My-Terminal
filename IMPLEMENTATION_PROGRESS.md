@@ -59,6 +59,12 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - `competition-core.js` (tested): same-window stats per trader (profit, return, S&P and alpha over identical dates, max drawdown, vol, Sharpe/Sortino ≥20 days, annualized/Calmar ≥60 days, t-stat vs S&P), ranking by net profit, 20% drawdown limit → ineligible.
 - `/api/pub/leaderboard` + cards at the top of AI vs S&P 500 (Alex/Daniel/Sarah, initials as portraits, period switch Today/Week/Month/Quarter/Lifetime, expectancy with 95% range, costs, exposure, latest decision); clicking a card opens that bot.
 
+### Fin 370 ratio indicators (2026-11-16, owner's course units 6–9)
+- `ratio-core.js` (tested against the Unit 6 Sage Inc. DuPont workbook): profitability (gross/operating/net margin, ROE, 3-step DuPont), leverage (D/E, D/A, A/E, LT debt/capital — total liabilities as "debt", as in the units), efficiency (AR/inventory/asset turnover on average balances, DSO/DIO/DPO, cash conversion cycle), valuation (P/E, P/S, P/B, PEG, P/CF, EV/EBITDA, dividend yield). `score()` = 75% rank vs peers scored at the same time + 25% better/worse than the prior year, per family, −1…+1; needs ≥ 8 peers.
+- SEC tags added: `payables` (AccountsPayableCurrent…), `dividends` (PaymentsOfDividends…).
+- Sarah v3: +0.08 × ratio score in the ranking; buy reasons cite the strongest/weakest ratio. Daniel v3: +0.25 × ratio score in the stock ranking (ETFs 0). Both weights are fixed priors, labeled in STRATS, to be tested out of sample. Alex unchanged (annual ratios have no 1-minute signal).
+- Leaderboard portraits: `public/traders/*.jpg` (from the owner's screenshot).
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.

@@ -1555,18 +1555,18 @@ const BOT_RESET_ID = "2026-11-16-all-30k";
 // the same way. Archives live in Upstash lists (pft:archive:v1:<bot>) when configured, plus a local file.
 const RISK = require("./risk-core.js");
 const STRATS = {
-  swing: { id: "sarah-swing", version: 2, trader: "Sarah Chen", since: "2026-11-17",
+  swing: { id: "sarah-swing", version: 3, trader: "Sarah Chen", since: "2026-11-17",
     hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
-    changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "No trades on quotes older than 15 minutes during the session", "Zweig put/call exposure tilt"],
-    params: { slots: 10, riskSlots: 8, slipPerSide: 0.0005, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 15 } },
+    changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "No trades on quotes older than 15 minutes during the session", "Zweig put/call exposure tilt", "v3: financial-ratio indicator (Fin 370 units 6–9: profitability/DuPont, leverage, efficiency/CCC, valuation) vs peers and prior year, weight 0.08 — a fixed prior, not yet fitted"],
+    params: { ratioWeight: 0.08, slots: 10, riskSlots: 8, slipPerSide: 0.0005, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 15 } },
   day: { id: "alex-intraday", version: 2, trader: "Alex Morgan", since: "2026-11-17",
     hypothesis: "An online 1-minute return forecaster (daytrade-brain.js) has a real but small edge; trading only the minutes where the forecast clears round-trip costs plus a buffer can be net positive. If none qualify, the bot stays in research mode.",
     changes: ["Trades only when expected edge > costs + 50% buffer (was: every stock every minute)", "Risk 0.25% of equity per trade, 4× gross (Reg-T day-trading limit; was 10×)", "Daily loss limit 1% → no new trades that day", "Costs 1 bp per side (was 0.5 bp) + 1 bp short borrow", "Research evidence can veto or shrink a trade, never pick its side or upsize it", "Data gaps > 5 minutes close open trades at the first bar after the gap instead of replaying unseen minutes", "Keeps 5,000 trade records + per-day aggregates"],
     params: { costPerSide: 0.0001, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 4, netCap: 2, dailyLoss: 0.01, maxGapMin: 5 } },
-  quant: { id: "daniel-macro-quant", version: 2, trader: "Daniel Brooks", since: "2026-11-17",
+  quant: { id: "daniel-macro-quant", version: 3, trader: "Daniel Brooks", since: "2026-11-17",
     hypothesis: "A regime-aware, risk-parity allocation across liquid ETFs and mega-caps (12-1 momentum, 3-month momentum, low volatility, 200-day trend filter, 15% vol target) beats the S&P on a risk-adjusted basis after 5 bps costs.",
-    changes: ["Zweig put/call nudges the equity sleeve ±10% at sentiment extremes"],
-    params: { cost: 0.0005, minTrade: 0.015, maxW: 0.2, top: 8, volTarget: 0.15 } },
+    changes: ["Zweig put/call nudges the equity sleeve ±10% at sentiment extremes", "v3: quality + value factor from the Fin 370 ratio units (profitability/DuPont, leverage, efficiency, valuation vs peers and prior year) added to the stock ranking at 0.25 weight; ETFs get 0"],
+    params: { fundWeight: 0.25, cost: 0.0005, minTrade: 0.015, maxW: 0.2, top: 8, volTarget: 0.15 } },
 };
 const ARCH_KEY = (bot) => `pft:archive:v1:${bot}`, ARCH_FILE = (bot) => path.join(require("os").tmpdir(), `archive-v1-${bot}.jsonl`);
 async function upCmd(cmd) {
@@ -1851,7 +1851,7 @@ async function apBaseFor(sym, day) {
 // ---- health grades for the swing bot: the crawler's scorecard (FIN.health) on each candidate's last two 10-Ks.
 // A background job grades names a few seconds apart through the SEC queue; grades last a day. Until a stock has
 // a grade it's simply scored without one.
-const FINS = require("./public/fin.js");
+const FINS = require("./public/fin.js"), RATIOS = require("./ratio-core.js");
 const AP_HEALTH = new Map(); let apHealthBusy = false;
 async function apHealthJob(syms) {
   if (apHealthBusy) return; apHealthBusy = true;
@@ -1859,10 +1859,10 @@ async function apHealthJob(syms) {
     for (const sym of syms) {
       const h = AP_HEALTH.get(sym); if (h && Date.now() - h.t < 24 * 3600e3) continue;
       try {
-        const f = await secFundamentals(sym), Y = f.available ? f.years.slice(-2) : [];
+        const f = await secFundamentals(sym), Y = f.available ? f.years.slice(-2) : [], Ypp = f.available && f.years.length >= 3 ? f.years[f.years.length - 3] : null;
         if (Y.length < 2) { AP_HEALTH.set(sym, { t: Date.now(), grade: null }); continue; }
         const H = FINS.health(Y[1], Y[0]);
-        AP_HEALTH.set(sym, { t: Date.now(), grade: H.grade, score: H.score, failed: H.failed, flags: H.flags.map((c) => c.label), fy: String(Y[1].end).slice(0, 4) });
+        AP_HEALTH.set(sym, { t: Date.now(), grade: H.grade, score: H.score, failed: H.failed, flags: H.flags.map((c) => c.label), fy: String(Y[1].end).slice(0, 4), fin: { y: Y[1], p: Y[0], pp: Ypp, shares: f.shares && f.shares.v } });
         BOTDIAG.swing.graded = [...AP_HEALTH.values()].filter((v) => v.grade).length;
       } catch { AP_HEALTH.set(sym, { t: Date.now() - 23 * 3600e3, grade: null }); } // retry in an hour
       await new Promise((ok) => setTimeout(ok, 1500));
@@ -1909,6 +1909,13 @@ async function apScore(live) {
     // THE WEB: research the bot doesn't already score (insider buying, earnings-release tone, sector news patterns), at most ±SPIDER_TRADER_WEIGHT
     try { const sa = SPIDER && SPIDER_W > 0 ? SPIDER.traderAdjust(x.sym, SPIDER_W) : null; x.spider = sa && sa.adj ? { adj: sa.adj, note: sa.note } : null; if (x.spider) x.score += x.spider.adj; } catch { x.spider = null; }
   }
+  // Fin 370 ratio indicator: each stock's profitability/DuPont, leverage, efficiency and valuation ratios vs the other
+  // candidates and vs its own prior year (ratio-core.js). Only stocks with two 10-K years count; others get 0.
+  try {
+    const items = out.map((x) => { const h = AP_HEALTH.get(x.sym); return h && h.fin ? { sym: x.sym, now: RATIOS.compute(h.fin.y, h.fin.p, { price: x.px, shares: h.fin.shares }), prev: h.fin.pp ? RATIOS.compute(h.fin.p, h.fin.pp) : null } : null; }).filter(Boolean);
+    const rs = RATIOS.score(items);
+    for (const x of out) { const r = rs[x.sym]; x.ratios = r && r.score != null ? r : null; if (x.ratios) x.score += STRATS.swing.params.ratioWeight * x.ratios.score; }
+  } catch { /* ratios are an extra input; never block scoring */ }
   out.sort((a, b) => b.score - a.score); out.forEach((x, i) => { x.rank = i + 1; apPx[x.sym] = x.px; apScoreOf[x.sym] = x.score; });
   apHealthJob(out.map((x) => x.sym)).catch(() => {}); // grade anything new in the background
   // 80% risk: the more volatile 60% of names feed the risk sleeve (8 slots), the calmest 40% the safe sleeve (2 slots)
@@ -1974,6 +1981,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (x.news >= 1 && x.headlines[0]) bits.push(`good news: “${x.headlines[0].slice(0, 90)}”`);
     if (x.adj != null) bits.push(`analysts ${x.adj >= 1 ? "strongly positive" : x.adj >= 0.5 ? "positive" : "mixed"}`);
     if (x.health) bits.push(`10-K health grade ${x.health.grade}`);
+    if (x.ratios && Math.abs(x.ratios.score) >= 0.15) bits.push(`ratios ${x.ratios.score > 0 ? "beat" : "trail"} peers (${(x.ratios.score > 0 ? x.ratios.best : x.ratios.worst)[0] || ""})`);
     if (x.spider && x.spider.note) bits.push(x.spider.note.replace(/^Spider: /, "Spider research: "));
     bits.push(`${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months`);
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
@@ -2007,7 +2015,7 @@ function apSummary(end, busted, spxNow) {
     trades: AP.trades.length, days: AP.equity.length, spxRet: AP.spx0 && spxNow ? +((spxNow / AP.spx0 - 1) * 100).toFixed(2) : null, busted };
 }
 function apSignals(sc) {
-  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null });
+  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null, ratios: x.ratios || null });
   return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix, putcall: sc.putcall || null,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
@@ -2525,6 +2533,17 @@ async function qtSave() {
   if (UP_URL && UP_TOKEN) { try { await fetch(`${UP_URL}/set/${QT_KEY}`, { method: "POST", headers: { Authorization: `Bearer ${UP_TOKEN}` }, body, signal: AbortSignal.timeout(8000) }); } catch {} }
 }
 const qtValue = (px) => QT.cash + Object.entries(QT.positions).reduce((a, [s, p]) => a + p.shares * (px[s] || qtPx[s] || p.cost), 0);
+// Daniel's quality/value factor: the Fin 370 ratio score for each single stock in his universe (SEC 10-K data, cached 12 h)
+async function qtFundamentals(series) {
+  const items = [], ETF = /^(SPY|QQQ|IWM|DIA|XL\w|SMH|IEF|TLT|GLD|BIL|HYG)$/;
+  for (const s of QTC.QT_EQUITY) {
+    if (ETF.test(s) || !series[s]) continue;
+    try { const f = await secFundamentals(s); if (!f.available || f.years.length < 2) continue; const Y = f.years, n = Y.length, c = series[s].close;
+      items.push({ sym: s, now: RATIOS.compute(Y[n - 1], Y[n - 2], { price: c[c.length - 1], shares: f.shares && f.shares.v }), prev: n >= 3 ? RATIOS.compute(Y[n - 2], Y[n - 3]) : null }); } catch {}
+  }
+  const sc = RATIOS.score(items), score = {}; for (const [k, v] of Object.entries(sc)) if (v.score != null) score[k] = v.score;
+  return { score, detail: sc };
+}
 async function qtTick(force) {
   if (qtBusy) return; qtBusy = true;
   try {
@@ -2536,7 +2555,8 @@ async function qtTick(force) {
     const syms = [...new Set([...QTC.QT_EQUITY, ...QTC.QT_DEFENSIVE, QTC.QT_CASH, ...QTC.QT_SIGNALS])], series = {};
     await Promise.allSettled(syms.map(async (s) => { try { series[s] = await longHistory(s, from, to, "1d"); } catch {} }));
     if (!series.SPY) throw new Error("SPY history unavailable");
-    const A = QMS.align(series), D = QTC.decide(A.px, { putcall: pcBrief() }), prices = {};
+    const A = QMS.align(series), fund = await qtFundamentals(series);
+    const D = QTC.decide(A.px, { putcall: pcBrief(), fund: fund.score, fundWeight: STRATS.quant.params.fundWeight }), prices = {};
     for (const s of Object.keys(series)) { const c = series[s].close; prices[s] = c[c.length - 1]; qtPx[s] = prices[s]; }
     const value = qtValue(prices), hold = Object.fromEntries(Object.entries(QT.positions).map(([s, p]) => [s, p.shares]));
     const ords = QTC.orders(D.w, hold, prices, value), now = Date.now(), why = `${D.regime} · ${Math.round(D.split * 100)}% equity sleeve${D.pcTilt ? ` (Zweig put/call ${D.pcTilt > 0 ? "+" : "−"}${Math.round(Math.abs(D.pcTilt) * 100)}%)` : ""} · vol ${(D.vol * 100).toFixed(1)}%`;
@@ -2555,7 +2575,7 @@ async function qtTick(force) {
     let spxP = null; try { const q = (await getQuotes(["^GSPC"])).quotes["^GSPC"]; if (q && q.price) spxP = q.price; } catch {}
     const after = qtValue(prices); QT.equity.push({ t: now, d: t.day, v: +after.toFixed(2), s: spxP }); QT.equity = QT.equity.slice(-1500);
     if (!QT.spx0 && spxP) QT.spx0 = spxP;
-    QT.decisions.unshift({ t: now, d: t.day, regime: D.regime, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: ords.length });
+    QT.decisions.unshift({ t: now, d: t.day, fundCovered: Object.keys(fund.score).length, regime: D.regime, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: ords.length });
     QT.decisions = QT.decisions.slice(0, 60); QT.lastDay = t.day; QT.lastError = null; await qtSave();
   } catch (e) { QT.lastError = String(e.message || e); } finally { qtBusy = false; }
 }
@@ -2710,6 +2730,8 @@ const SEC_TAGS = {
   currentLiabilities: ["LiabilitiesCurrent"],
   inventory: ["InventoryNet"],
   receivables: ["AccountsReceivableNetCurrent", "ReceivablesNetCurrent", "AccountsNotesAndLoansReceivableNetCurrent"],
+  payables: ["AccountsPayableCurrent", "AccountsPayableTradeCurrent", "AccountsPayableAndAccruedLiabilitiesCurrent"],
+  dividends: ["PaymentsOfDividendsCommonStock", "PaymentsOfDividends"],
   totalAssets: ["Assets"],
   equity: ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
   ltDebt: ["LongTermDebtNoncurrent", "LongTermDebtAndCapitalLeaseObligations"],
@@ -2725,7 +2747,7 @@ const SEC_TAGS = {
   fx: ["EffectOfExchangeRateOnCashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "EffectOfExchangeRateOnCashAndCashEquivalents"],
   dilutedShares: ["WeightedAverageNumberOfDilutedSharesOutstanding"],
 };
-const FLOW = new Set(["revenue", "cogs", "grossProfit", "operatingIncome", "pretaxIncome", "incomeTax", "netIncome", "eps", "interestExpense", "da", "capex", "cfo", "cff", "dilutedShares", "cfi", "cashChange", "fx"]);
+const FLOW = new Set(["revenue", "cogs", "grossProfit", "operatingIncome", "pretaxIncome", "incomeTax", "netIncome", "eps", "interestExpense", "da", "capex", "cfo", "cff", "dilutedShares", "cfi", "cashChange", "fx", "dividends"]);
 function secSeries(facts, tag, flow) {
   const f = facts["us-gaap"] && facts["us-gaap"][tag]; if (!f) return null;
   const unitKey = Object.keys(f.units).find((u) => u === "USD" || u === "USD/shares" || u === "shares") || Object.keys(f.units)[0];
