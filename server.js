@@ -1555,15 +1555,15 @@ const BOT_RESET_ID = "2026-11-16-all-30k";
 // the same way. Archives live in Upstash lists (pft:archive:v1:<bot>) when configured, plus a local file.
 const RISK = require("./risk-core.js");
 const STRATS = {
-  swing: { id: "sarah-swing", version: 3, trader: "Sarah Chen", since: "2026-11-17",
+  swing: { id: "sarah-swing", version: 3, trader: "Swing Trader", since: "2026-11-17",
     hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
     changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "No trades on quotes older than 15 minutes during the session", "Zweig put/call exposure tilt", "v3: financial-ratio indicator (Fin 370 units 6–9: profitability/DuPont, leverage, efficiency/CCC, valuation) vs peers and prior year, weight 0.08 — a fixed prior, not yet fitted"],
     params: { ratioWeight: 0.08, slots: 10, riskSlots: 8, slipPerSide: 0.0005, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 15 } },
-  day: { id: "alex-intraday", version: 2, trader: "Alex Morgan", since: "2026-11-17",
+  day: { id: "alex-intraday", version: 2, trader: "Day Trader", since: "2026-11-17",
     hypothesis: "An online 1-minute return forecaster (daytrade-brain.js) has a real but small edge; trading only the minutes where the forecast clears round-trip costs plus a buffer can be net positive. If none qualify, the bot stays in research mode.",
     changes: ["Trades only when expected edge > costs + 50% buffer (was: every stock every minute)", "Risk 0.25% of equity per trade, 4× gross (Reg-T day-trading limit; was 10×)", "Daily loss limit 1% → no new trades that day", "Costs 1 bp per side (was 0.5 bp) + 1 bp short borrow", "Research evidence can veto or shrink a trade, never pick its side or upsize it", "Data gaps > 5 minutes close open trades at the first bar after the gap instead of replaying unseen minutes", "Keeps 5,000 trade records + per-day aggregates"],
     params: { costPerSide: 0.0001, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 4, netCap: 2, dailyLoss: 0.01, maxGapMin: 5 } },
-  quant: { id: "daniel-macro-quant", version: 3, trader: "Daniel Brooks", since: "2026-11-17",
+  quant: { id: "daniel-macro-quant", version: 3, trader: "Quant Trader", since: "2026-11-17",
     hypothesis: "A regime-aware, risk-parity allocation across liquid ETFs and mega-caps (12-1 momentum, 3-month momentum, low volatility, 200-day trend filter, 15% vol target) beats the S&P on a risk-adjusted basis after 5 bps costs.",
     changes: ["Zweig put/call nudges the equity sleeve ±10% at sentiment extremes", "v3: quality + value factor from the Fin 370 ratio units (profitability/DuPont, leverage, efficiency, valuation vs peers and prior year) added to the stock ranking at 0.25 weight; ETFs get 0"],
     params: { fundWeight: 0.25, cost: 0.0005, minTrade: 0.015, maxW: 0.2, top: 8, volTarget: 0.15 } },
@@ -1623,7 +1623,7 @@ async function apVersionCheck() {
   const busy = AP.firstTrade || AP.trades.length;
   if (busy) {
     const last = AP.equity[AP.equity.length - 1], v = last && last.v > 0 ? last.v : AP.cash + Object.entries(AP.positions || {}).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost || 0), 0);
-    const rec = { ...apSummary(v, false, last && last.spx), endValue: +v.toFixed(2), strategy: AP.strategy || { id: "sarah-swing", version: 1, note: "before the strategy registry" }, reason: `Strategy change → ${STRATS.swing.id} v${STRATS.swing.version}`, marked: "positions valued at last known prices" };
+    const rec = { ...apSummary(v, false, last && last.spx), endValue: +v.toFixed(2), strategy: AP.strategy || { id: "sarah-swing", version: 1, note: "before the strategy registry" }, reason: `Strategy change → v${STRATS.swing.version}`, marked: "positions valued at last known prices" };
     await archivePush("swing", { ...rec, tradeLog: AP.trades, equity: AP.equity });
     AP = { ...apFresh(), run: AP.run + 1, runs: [rec, ...(AP.runs || [])] };
   }
@@ -2183,7 +2183,7 @@ async function dtVersionCheck() {
   if (busy) {
     const last = (DT.equity || [])[DT.equity.length - 1], v = last && last.v > 0 ? last.v : DT.cash, vals = [DT_START, ...(DT.equity || []).map((p) => p.v), v];
     const rec = { run: DT.run || 1, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +v.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n || 0 : 0, days: (DT.equity || []).length,
-      spxRet: DT.spx0 && last && last.spx ? +((last.spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false, strategy: DT.strategy || { id: "alex-intraday", version: 1, note: "before the strategy registry: every stock every minute, 10× leverage" }, reason: `Strategy change → ${STRATS.day.id} v${STRATS.day.version}` };
+      spxRet: DT.spx0 && last && last.spx ? +((last.spx / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false, strategy: DT.strategy || { id: "alex-intraday", version: 1, note: "before the strategy registry: every stock every minute, 10× leverage" }, reason: `Strategy change → v${STRATS.day.version}` };
     await archivePush("day", { ...rec, tally: DT.tally, daily: DT.daily || [], equity: DT.equity, tradeLog: DT.trades, model: DTB.scorecard(DT.brain) });
     DT = { ...dtFresh(), run: (DT.run || 1) + 1, runs: [rec, ...(DT.runs || [])], brain: DT.brain };
   }
@@ -2514,7 +2514,7 @@ async function qtVersionCheck() {
   if (busy) {
     const last = (QT.equity || [])[QT.equity.length - 1], v = last && last.v > 0 ? last.v : QT.cash + Object.values(QT.positions || {}).reduce((a, p) => a + p.shares * p.cost, 0);
     const rec = { start: QT.firstTrade || QT.start, end: Date.now(), startValue: QTC.QT_START, endValue: +v.toFixed(2), trades: (QT.trades || []).length, days: (QT.equity || []).length,
-      spxRet: QT.spx0 && last && last.s ? +((last.s / QT.spx0 - 1) * 100).toFixed(2) : null, strategy: QT.strategy || { id: "daniel-macro-quant", version: 1, note: "before the strategy registry" }, reason: `Strategy change → ${STRATS.quant.id} v${STRATS.quant.version}`, marked: last ? "last recorded daily value" : "cost basis (no recorded value)" };
+      spxRet: QT.spx0 && last && last.s ? +((last.s / QT.spx0 - 1) * 100).toFixed(2) : null, strategy: QT.strategy || { id: "daniel-macro-quant", version: 1, note: "before the strategy registry" }, reason: `Strategy change → v${STRATS.quant.version}`, marked: last ? "last recorded daily value" : "cost basis (no recorded value)" };
     await archivePush("quant", { ...rec, tradeLog: QT.trades, equity: QT.equity, decisions: QT.decisions });
     QT = { ...qtFresh(), runs: [rec, ...(Array.isArray(QT.runs) ? QT.runs : [])] };
   }
@@ -2625,9 +2625,9 @@ function blPx(sym, fallback) {
 // modeled costs; risk measures beside it; a trader past the shared drawdown limit is ineligible. Paper money only.
 const COMP = require("./competition-core.js");
 const TRADERS = {
-  swing: { name: "Peter Swing", initials: "PS", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
-  quant: { name: "Peter Quant", initials: "PQ", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
-  day: { name: "Peter Day", initials: "PD", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
+  swing: { name: "Swing Trader", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
+  quant: { name: "Quant Trader", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
+  day: { name: "Day Trader", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {
