@@ -34,17 +34,10 @@
   function currentHoldings() { return portfolios().flatMap((p) => p.holdings || []).filter((h) => +h.shares > 0); }
   function menu() {
     const el = byId("tab-studio");
-    if (E.mounted && byId("mdsModes")) return;
+    if (E.mounted && byId("mdsStrategies")) return;
     E.mounted = true;
-    el.innerHTML = `<div class="mds-hero">
-      <div class="mds-hero-copy"><div class="mds-eyebrow">◈ INTELLIGENCE / RESEARCH OPERATIONS</div>
-      <div class="mds-title-line"><h1>Intelligence Studio</h1><span class="mds-beacon" aria-label="Studio ready"></span></div>
-      <p>Portfolio intelligence, researched connections and quant strategies in one workspace. All projections are hypothetical and no orders are placed.</p></div>
-      <div class="mds-hero-actions" aria-label="Connected terminal tools"><button type="button" data-msgo="web">◉ Spider network</button><button type="button" data-msgo="quant">∑ Quant Lab</button><button type="button" data-msgo="backtest">↗ Backtest Lab</button><button type="button" data-msgo="health">▤ System Health</button></div>
-      </div>
-      <div class="mds-nav" id="mdsModes" role="tablist" aria-label="Intelligence Studio modules">
-        ${[["strategies","Strategies"],["scenario","Shock simulator"],["research","Research bridge"],["graph","Knowledge network"],["quant","Quant audit"],["ask","Ask Spider"],["alerts","Smart alerts"],["settings","Appearance"]].map(([id,n])=>`<button type="button" data-msmode="${id}" role="tab" aria-selected="false">${n}</button>`).join("")}</div>
-      <div id="mdsFeedback" class="mds-feedback" aria-live="polite"></div>
+    // Render only the selected tool within its destination section; no stand-alone Intelligence hub.
+    el.innerHTML = `<div id="mdsFeedback" class="mds-feedback" aria-live="polite"></div>
       <section id="mdsStrategies" data-mspanel="strategies" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Strategy research lab <span class="mds-section-tag">14 executable models</span></h2>
           <p>Explore different investing rules, then compare their actual historical backtests. Every figure appears only after downloading price data and calculating performance — never from preset sample returns.</p></div>
@@ -65,7 +58,7 @@
         <div class="mds-toolbar"><button type="button" id="mdsResearchReload">↻ Refresh research</button><button type="button" data-msgo="aitrade">Inspect paper AI Trader</button><span id="mdsResearchAge"></span></div><div id="mdsResearchOut"></div><div id="mdsTraderOut"></div></section>
       <section id="mdsGraph" data-mspanel="graph" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Knowledge network explorer</h2><p>A focused preview of the existing Spider knowledge graph. Edges show the recorded reason for each connection; this is not a causal model.</p></div>
-        <form id="mdsGraphForm" class="mds-toolbar"><label for="mdsFocus">Focus company</label><input id="mdsFocus" class="field" placeholder="NVDA" maxlength="12"><button type="submit">Explore connections</button><button type="button" data-msgo="web">Open full graph</button></form>
+        <form id="mdsGraphForm" class="mds-toolbar"><label for="mdsFocus">Focus company</label><input id="mdsFocus" class="field" placeholder="NVDA" maxlength="12"><button type="submit">Explore connections</button></form>
         <div id="mdsGraphOut" class="mds-graph" role="group" aria-label="Interactive company relationship graph"></div><p id="mdsGraphDetail" class="mds-graph-detail" aria-live="polite">Select a node or connection to inspect its reason.</p></section>
       <section id="mdsQuant" data-mspanel="quant" class="mds-panel" hidden>
         <div class="mds-intro"><h2>Quant validation audit</h2><p>Read your actual saved Backtest Lab experiments and their assumptions. Validation flags are descriptive, not statistical proof of future returns.</p></div><div class="mds-toolbar"><button type="button" data-msgo="backtest">Run a new backtest</button><button type="button" data-msgo="quant">Open Monte Carlo / factors</button></div><div id="mdsQuantOut"></div></section>
@@ -86,7 +79,6 @@
           <label>Motion<select class="field" id="mdsMotion"><option value="system">Follow system</option><option value="reduced">Reduced motion</option></select></label></div>
         <div class="mds-settings-note"><span class="mds-settings-symbol">◈</span><div><strong>Visual preferences only</strong><p>Your portfolios, watchlist, saved backtests, research findings and paper-trading controls remain untouched.</p></div></div></section>`;
     el.querySelectorAll("[data-msgo]").forEach((b) => b.onclick = () => { if (typeof setTab === "function") setTab(b.dataset.msgo); });
-    byId("mdsModes").onclick = (e) => { const b = e.target.closest("[data-msmode]"); if (b) mode(b.dataset.msmode); };
     byId("mdsStrategyFilter").onchange = renderStrategies;
     byId("mdsRunSamples").onclick = () => runStrategyBatch(5);
     byId("mdsRunAll").onclick = () => runStrategyBatch(14);
@@ -123,7 +115,6 @@
   }
   function mode(next) {
     E.tab = next;
-    document.querySelectorAll("#mdsModes [data-msmode]").forEach((b) => { const on = b.dataset.msmode === next; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
     document.querySelectorAll("#tab-studio [data-mspanel]").forEach((p) => { p.hidden = p.dataset.mspanel !== next; });
     if (next === "strategies") renderStrategies();
     if (next === "scenario") renderScenario();
@@ -268,7 +259,7 @@
     try{completed=!!localStorage.getItem(STRATEGY_INITIAL);}catch{return;}
     if(completed)return;
     try{localStorage.setItem(STRATEGY_INITIAL,String(Date.now()));}catch{return;}
-    setTimeout(()=>{if(S.tab==="studio"&&E.tab==="strategies")runStrategyBatch(5);},350);
+    setTimeout(()=>{if(S.tab==="studio-strategies"&&E.tab==="strategies")runStrategyBatch(5);},350);
   }
 
   function renderScenario() {
@@ -317,7 +308,7 @@
       return `<article class="mds-find"><div class="mds-find-meta"><span>${clean(d.cat || "research")}</span><span>${clean(d.evidenceStatus)} · ${d.sourceCount} source(s)</span><span>${age(d.u || d.t)} · importance ${Math.round(+d.importance || 0)}/100</span></div>
         <strong>${clean(d.headline)}</strong><p>${clean(d.summary || "")}</p><div class="mds-find-foot"><span>Related: ${clean(d.matched.join(", ") || "market-wide")}</span><span>Evidence: ${clean(evidenceKind)}</span>${url ? `<a target="_blank" rel="noopener noreferrer" href="${clean(url)}">Original source ↗</a>` : ""}</div></article>`;
     }).join("")}</div>` : '<p class="mds-empty">No recent Spider findings for this watchlist yet. This view never invents research.</p><div class="mds-example-panel"><h4>Research examples to try</h4><p>Look at NVDA earnings and filings, AMD sector momentum, or JPM rate sensitivity in THE WEB. These are suggested research questions, not findings.</p><div class="mds-examples"><button type="button" data-ms-example-web>Explore companies in THE WEB →</button></div></div>';
-    const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("web");
+    const exampleButton=out.querySelector("[data-ms-example-web]");if(exampleButton)exampleButton.onclick=()=>setTab("studio-graph");
     const trader = E.trader, el = byId("mdsTraderOut"); if (!el) return;
     el.innerHTML = trader ? `<div class="mds-connect"><h3>Spider ↔ paper AI Trader</h3><p>${clean(trader.explain || "")}</p><p><b>${trader.weight > 0 ? "Research weighting enabled (" + trader.weight + ")" : "Research display-only; scoring weight 0"}.</b> Last sync: ${trader.at ? age(trader.at) : "not available"}. The Spider never sends real orders.</p><button type="button" data-msgo2="aitrade">Inspect actual paper trades →</button></div>` : "";
     const b=el.querySelector("[data-msgo2]"); if (b) b.onclick=()=>setTab("aitrade");
@@ -362,7 +353,7 @@
         <div class="mds-metrics"><span>CAGR <b>${pct(Number(r.cagr)*100)}</b></span><span>Sharpe <b>${Number.isFinite(r.sharpe)?r.sharpe.toFixed(2):"—"}</b></span><span>Max DD <b>${pct(Number(r.mdd)*100)}</b></span></div>
         <ul>${v.reasons.map((s)=>`<li>${clean(s)}</li>`).join("")}</ul></article>`;
       }).join("")}</div>` : '<p class="mds-empty">No saved quant experiments on this device yet. Performance metrics appear here only after a real historical simulation runs.</p><div class="mds-example-panel"><h4>Start with a tested model</h4><p>Example: compare six-month momentum, 50/200-day trend following and RSI 30/55. Each is already implemented in the strategy library.</p><div class="mds-examples"><button type="button" data-ms-example-strategies>Open 14 strategies →</button></div></div>';
-    const starter=host.querySelector("[data-ms-example-strategies]");if(starter)starter.onclick=()=>mode("strategies");
+    const starter=host.querySelector("[data-ms-example-strategies]");if(starter)starter.onclick=()=>setTab("studio-strategies");
   }
   async function ask(question) {
     const out=byId("mdsAskOut"); if(!out) return;
@@ -401,7 +392,7 @@
     if (!E.pf) E.pf=S.pfActive;
     if (!E.focus) E.focus=(activePf() && (activePf().holdings || []).find((h)=>+h.shares>0)?.symbol) || (S.wl || [])[0] || "NVDA";
     mode(E.tab);
-    if (E.tab === "strategies") firstStrategyExamples();
+    // Strategy runs are manual, so loading another section never starts backtests.
     if (!Object.keys(E.sec).length) fetch("/sp500.json").then((r)=>r.json()).then((j)=>{E.sec=Object.fromEntries((j.rows||[]).map((r)=>[r[0],r[2]]));renderScenario();}).catch(()=>{});
     if(Date.now()-E.fetched>90000)fetchResearch();
     scanAlerts();
@@ -413,5 +404,6 @@
   setInterval(check,3*60e3);
   // Delay first poll so normal startup loads prices before attempting an alert check.
   setTimeout(check,16e3);
-  if(S.tab==="studio")window.studioOpen();
+  if(window.STUDIO_ROUTES && window.STUDIO_ROUTES[S.tab]) { window.studioOpen(); window.studioSelectMode(window.STUDIO_ROUTES[S.tab]); }
+  else if(S.tab && S.tab.startsWith("studio-")) { const p=S.tab.slice(7); window.studioOpen(); window.studioSelectMode(p); }
 })();
