@@ -123,11 +123,19 @@ history, too few holdings, errors). The math lives in `public/qmath.js` and is c
 - **Overfitting controls:** optimize on the first 70% and test once on the unseen 30%; walk-forward (re-tune each year on the previous 3, chain only out-of-sample years); parameter-sensitivity heatmap (descriptive only).
 - **Backtested vs. paper-traded vs. market-observed** results are labeled and shown separately. All math runs in the browser (`public/quant.js`), so it costs nothing on the server.
 
+## Distributed research tools and system health
+- **Markets:** Data health and Appearance & workspace.
+- **Research:** Spider research and the Knowledge network explorer.
+- **Portfolio:** The Shock simulator and Smart alerts.
+- **Quant:** Strategy library (14 models) and the Quant validation audit.
+- **AI Lab:** Ask Spider (rules-based and free).
+- The former **Intelligence** navigation section was removed; its independent tools remain available through the sections above. Old `#studio` and `#web` links redirect to relevant tools.
+
 ## Data integrity and system health
 - **Data Integrity Engine** (`data/integrity.js`): every company's SEC figures are checked on the Financials and DCF pages — Assets = Liabilities + Equity, liabilities + equity components, operating + investing + financing cash flow = change in cash, gross profit and EPS consistency, sign checks, an independent re-computation of the ratios the site shows, fiscal-period and filing identification, currency, recency, merged duplicate periods, restatements (from the SEC's own filing history) and revisions (changes since the last time the site checked).
 - **Data Confidence Score (0–100):** `100 × (0.35·completeness + 0.25·recency + 0.25·consistency + 0.15·source quality)`. A data-quality diagnostic, not a probability that a number is correct.
 - **Quotes** are classified current / delayed / stale / unavailable (header indicator), with an optional cross-check against Finnhub.
-- **System Health page** (THE WEB → System health): every data source's success rate and last error (keys and tokens removed), data freshness, the research scheduler, both paper-trading bots, and the latest GitHub Actions test runs. A pass is only shown for a run that actually happened.
+- **System Health page** (Markets → Data health, or the DATA indicator in the header): every data source's success rate and last error (keys and tokens removed), data freshness, the research scheduler, both paper-trading bots, and the latest GitHub Actions test runs. A pass is only shown for a run that actually happened.
 - **Automated tests** run on every push via `.github/workflows/tests.yml` (free for public repos).
 
 ## THE WEB — how the Spider works
