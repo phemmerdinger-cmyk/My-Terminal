@@ -330,7 +330,7 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 /* app-like phone layout */
 nav.tabs .ti{display:none}
 /* two-level navigation: 4 sections, each with its own pages */
-nav.tabs button[data-group]{font-weight:600} nav.tabs button[data-group="web"]{font-family:inherit;font-size:inherit;font-weight:600;font-style:normal;letter-spacing:inherit;text-transform:none}
+nav.tabs button[data-group]{font-weight:600}
 nav.tabs .tsep{width:1px;background:var(--line2);margin:10px 8px;flex:none}
 .subtabs{display:flex;gap:2px;align-items:stretch}
 .subtabs button{background:none;border:0;padding:12px 12px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;font-size:13px}
@@ -1518,7 +1518,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
   <button data-group="quant"><span class="ti">∑</span>Quant</button>
   <button data-group="ailab" class="lab"><span class="ti">🤖</span>AI Lab</button>
-  <button data-group="web" class="nav-standard" title="Intelligence Studio and System Health"><span class="ti">🕸</span>Intelligence</button>
   <span class="tsep" aria-hidden="true"></span>
   <div class="subtabs" id="subtabs" role="tablist"></div>
 </nav>
@@ -1585,7 +1584,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="ov-row">
         <div class="an-card ov-card"><div class="ov-h"><h2 class="h" id="ovPfH">Your portfolio today</h2><button type="button" class="ov-go" data-gotab="portfolio">Portfolio →</button></div><div id="ovPf"></div></div>
         <div class="an-card ov-card ov-radar" id="ovRadar"></div>
-        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest research · THE WEB</h2><button type="button" class="ov-go" data-gotab="studio">Intelligence Studio →</button></div><div id="ovWeb"></div></div>
+        <div class="an-card ov-card"><div class="ov-h"><h2 class="h">Latest Spider research</h2><button type="button" class="ov-go" data-gotab="studio-research">Spider research →</button></div><div id="ovWeb"></div></div>
       </div>
       <div class="bb" id="bestBuys"></div>
       <div class="mk-grid" style="margin-bottom:24px">
@@ -1949,15 +1948,21 @@ const PALETTE = ["#91bd5f","#0fbf7d","#ff9e1b","#abcd85","#e11d48","#69913b","#e
 const CRYPTO = new Set(["BTC","ETH","XRP","SOL","DOGE","ADA","AVAX","SHIB","BNB","XLM","LTC","HBAR","PEPE","TRX","DOT","LINK","SUI","TON","BCH","UNI","NEAR","APT","ARB","OP","ATOM","XMR","ETC","FIL","ICP","ALGO"]);
 const normSym = (v)=>{ const s=String(v||"").trim().toUpperCase().replace(/^\$/,""); return CRYPTO.has(s)?s+"-USD":s; };
 const SHOW_SIGNALS=false; // flip to true to bring back the Signals tab (all its code is still here)
-const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","web","studio","health","backtest","quant"];
+// Each Studio tool lives in its relevant main section; there is no separate Intelligence navigation.
+const STUDIO_ROUTES = {
+  "studio-strategies": "strategies", "studio-scenario": "scenario",
+  "studio-research": "research", "studio-graph": "graph",
+  "studio-quant": "quant", "studio-ask": "ask",
+  "studio-alerts": "alerts", "studio-settings": "settings"
+};
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
-  ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[])]],
-  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"]]],
-  ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"]]],
-  ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"]]],
-  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"]]],
-  ["web",[["studio","Intelligence Studio"],["health","System health"]]],
+  ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data health"],["studio-settings","Appearance"]]],
+  ["research",[["research","Stock research"],["fin","Financials"],["dcf","DCF valuation"],["studio-research","Spider research"],["studio-graph","Knowledge network"]]],
+  ["portfolio",[["portfolio","My portfolio"],["risk","Risk & stress"],["studio-scenario","Shock simulator"],["studio-alerts","Smart alerts"]]],
+  ["quant",[["quant","Quant Lab"],["backtest","Backtest lab"],["studio-strategies","Strategy library"],["studio-quant","Validation audit"]]],
+  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction accuracy"],["studio-ask","Ask Spider"]]],
 ];
 const groupOf=t=>(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -2096,13 +2101,15 @@ setInterval(tick,1000); tick();
 
 /* ---------- tabs ---------- */
 function setTab(t){
-  if(t==="web") t="studio";
+  if(t==="web") t="studio-graph"; // retain old Spider/bookmark URLs
+  if(t==="studio") t="studio-strategies"; // retain old Studio/bookmark URLs
   if(t==="home") t="data"; // legacy Home bookmarks open Markets Overview
-  if(VIEW&&(t==="predict"||t==="studio"||t==="health")) t="news";
+  if(VIEW&&(t==="predict"||t==="health"||STUDIO_ROUTES[t])) t="news";
   S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
-  TABS.forEach(k=>$("tab-"+k).hidden=k!==t);
+  TABS.forEach(k=>{ if(STUDIO_ROUTES[k]) return; const panel=$("tab-"+k); if(panel) panel.hidden=k!==t; });
+  $("tab-studio").hidden = !STUDIO_ROUTES[t];
   if(typeof acRender==="function"&&!$("acPanel").hidden) acRender();
   if(t==="data"){ renderData(); loadPerf(); loadMarkets(); renderMood(); renderMovers2(); if(!S.movers||Date.now()-(S.moversAt||0)>120e3){ S.moversAt=Date.now(); loadMovers(); } if(!S.earn) loadEarnings(); }
   if(t==="portfolio"){ renderPortfolio(); }
@@ -2118,12 +2125,12 @@ function setTab(t){
   if(t==="predict"){ renderPredict(); refreshUsage(); }
   if(typeof webOpen==="function"){ if(t==="web") webOpen(); else webClose(); }
   if(t==="health"&&typeof hlOpen==="function") hlOpen();
-  if(t==="studio"&&typeof studioOpen==="function") studioOpen();
+  if(STUDIO_ROUTES[t]&&typeof studioOpen==="function"){ studioOpen(); if(typeof studioSelectMode==="function") studioSelectMode(STUDIO_ROUTES[t]); }
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const h=location.hash.slice(1)==="newss"?"news":location.hash.slice(1)==="web"?"studio":location.hash.slice(1); if(h==="home") setTab("data"); else if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{const raw=location.hash.slice(1); const h=({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[raw]||raw; if(TABS.includes(h)&&h!==S.tab) setTab(h);});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
@@ -5054,7 +5061,9 @@ renderNotif(); renderToolbar(); renderWL();
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
-setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(location.hash.slice(1))?(location.hash.slice(1)==="web"?"studio":location.hash.slice(1)):location.hash==="#charts"?"research":location.hash==="#home"?"data":VIEW?"news":"data");
+const requestedTab = location.hash.slice(1);
+const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
+setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:VIEW?"news":"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";
