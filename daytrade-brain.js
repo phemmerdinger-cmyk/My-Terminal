@@ -28,7 +28,7 @@ const FEATURES = [
   ["mom15", "15-minute trend", "momentum", 0.01],
   ["vwap", "distance from VWAP", "reversion", -0.025],
   ["ema", "9/20-EMA trend", "momentum", 0.01],
-  ["flow", "order-flow imbalance", "flow", 0.02],
+  ["flow", "candle pressure (close position in range × volume — an OHLC proxy, not order-book data)", "flow", 0.02],
   ["autoc", "its own momentum/reversal tendency today", "flow", 0.03],
   ["level", "liquidity sweep / gap-and-go", "levels", 0.03],
   ["pattern", "chart pattern", "momentum", 0.015],
@@ -43,7 +43,7 @@ const FEATURES = [
   ["macro", "market regime & macro × beta", "tape", 0.01],
 ];
 const KEYS = FEATURES.map((f) => f[0]), PRIOR = FEATURES.map((f) => f[3]);
-const GROUP = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Order flow", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus", quant: "Quant factors" };
+const GROUP = { momentum: "Momentum", reversion: "VWAP snap-back", flow: "Candle pressure (OHLC proxy)", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus", quant: "Quant factors" };
 const LR = 0.002, BETA2 = 0.99, EPS = 1e-8, L2 = 0.02, HUBER = 2, EW = 0.002; // EW: ~500-sample memory for the scorecard
 const MIN_X = 0.15, MAX_X = 2; // size multiplier range
 

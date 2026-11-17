@@ -1430,6 +1430,11 @@ html.viewonly .api-bal-wrap{display:none!important}
 .aps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:10px;align-items:start}
 .aps-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}.aps-card summary{cursor:pointer;display:flex;gap:6px;align-items:center;flex-wrap:wrap;list-style:none}
 .aps-card summary::-webkit-details-marker{display:none}.aps-n{margin-left:auto;font-size:11px;color:var(--dim)}.aps-card em{font-style:normal;color:var(--dim);font-size:11.5px}
+.pc-row{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:14px;align-items:stretch}@media(max-width:720px){.pc-row{grid-template-columns:1fr}}
+.pc-big{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}.pc-big .pc-num{font-size:30px;letter-spacing:-.02em;display:block}.pc-big small{display:block;color:var(--dim);font-size:11.5px}
+.pc-zone{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.pc-chart{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}.pc-chart svg{width:100%;height:120px;display:block}
+.pc-use{margin:10px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}.pc-use li{margin:2px 0}
 .aps-c{font-size:12.5px;color:var(--muted);margin:8px 0 4px}.aps-card ul{margin:4px 0 8px;padding-left:18px;font-size:12.5px}.aps-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
 .ov-row{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px;margin:0 0 18px} @media (max-width:1180px){.ov-row{grid-template-columns:1fr 1fr}.ov-radar{grid-column:1/-1}} @media (max-width:760px){.ov-row{grid-template-columns:1fr}}
 html.viewonly #ovRadar{display:none} .ov-radar{background:linear-gradient(180deg,#07121a,#05090d);border-color:rgba(158,197,114,.18)} .ov-radar .rd-b{display:flex;gap:14px;align-items:center;margin-top:8px}
@@ -1703,6 +1708,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
         <aside class="ap-hold" id="apNote"></aside>
       </div>
       <div class="apx" id="apMore"></div>
+      <section class="ap-sigs" id="apPc" hidden></section>
       <section class="ap-sigs" id="apSig" hidden></section>
       <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close — with a self-learning forecast that reads every section of the site deciding the side and the size. Every bust starts a new test run.</p>
     </section>
@@ -2095,7 +2101,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
-  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); }
+  if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
   if(t==="leader"){ lbOpen(); }
@@ -3459,7 +3465,7 @@ function apRender(d){
   const ago=t=>new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
   const started=!!d.trades.length, sig=d.lastScan, plan=d.plan;
   const busts=(d.runs||[]).filter(r=>r.busted).length;
-  const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?" <span class=\"ap-tag own\">live</span>":""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">💀 Busted</b>':"ended"}</td></tr>`; };
+  const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?" <span class=\"ap-tag own\">live</span>":""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">💀 Busted</b>':"ended"}${!cur&&(r.reason||r.strategy)?`<br><small class="dim">${esc(r.reason||"")}${r.strategy?` · ${esc(r.strategy.id||"")} v${r.strategy.version}`:""}</small>`:""}</td></tr>`; };
   const liveLine=`<div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Test run #${d.run}</b> · <span class="ap-tag risk">80% risk</span> ${(()=>{const r=d.positions.filter(p=>p.sleeve!=="safe").reduce((a,p)=>a+p.value,0),f=d.positions.filter(p=>p.sleeve==="safe").reduce((a,p)=>a+p.value,0);return d.value?`${Math.round(r/d.value*100)}% high-risk · ${Math.round(f/d.value*100)}% safe · ${Math.round(d.cash/d.value*100)}% cash · `:""})()}${esc(d.status)}${sig?` · last scan ${ago(sig.t)}`:""}</div>${botHealth(d,"swing")}
   ${sig&&sig.stress?`<div class="ap-warn">🛡 Defense mode: ${esc(sig.stress)} — the bot cuts to 50% invested and makes no new buys.</div>`:""}`;
   $("apVs").innerHTML=`
@@ -3553,7 +3559,7 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · max speed, self-learning`,dy)+card("quant","📐","Quant trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing bot",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · trades only when the edge beats costs`,dy)+card("quant","📐","Quant trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
   liveApply(false);
 }
 function dtRender(d){
@@ -3561,7 +3567,7 @@ function dtRender(d){
   const started=d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side)), a=d.analytics||{}, day=d.day||{};
   const ago=t=>new Date(t).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
   const today=d.trades.filter(t=>t.pnl!=null&&day.d&&new Date(t.t).toISOString().slice(0,10)>=day.d.slice(0,10));
-  const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?' <span class="ap-tag own">live</span>':""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">🔒 PDT lock</b>':"ended"}</td></tr>`; };
+  const runRow=(r,cur)=>{ const rr=(r.endValue/r.startValue-1)*100; return `<tr${cur?' class="cur"':""}><td>#${r.run}${cur?' <span class="ap-tag own">live</span>':""}</td><td>${new Date(r.start).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${cur?"—":new Date(r.end).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td><td>${r.days||0}</td><td>${r.trades}</td><td>${$m(r.peak)}</td><td>${$m(r.endValue)}</td><td class="${cls(rr)}">${pct(rr)}</td><td class="${cls(r.spxRet)}">${r.spxRet==null?"—":pct(r.spxRet)}</td><td>${cur?"running":r.busted?'<b class="down">🔒 PDT lock</b>':"ended"}${!cur&&(r.reason||r.strategy)?`<br><small class="dim">${esc(r.reason||"")}${r.strategy?` · ${esc(r.strategy.id||"")} v${r.strategy.version}`:""}</small>`:""}</td></tr>`; };
   const dirTag=x=>`<span class="sd ${x==="long"?"BUY":"SELL"}">${x==="long"?"LONG":"SHORT"}</span>`;
   $("apVs").innerHTML=`
   <div class="ap-vs">
@@ -3569,7 +3575,7 @@ function dtRender(d){
     <div class="ap-mid">${started?`<b data-lv="who" class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small data-lv="by">by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">max speed · ${d.rules&&d.rules.lev||10}× leverage · self-learning</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day trader · run #${d.run}</b> · <span class="ap-tag risk">cost-gated · ≤${d.rules&&d.rules.lev||4}× gross · self-learning</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
   ${apBoth()}
   ${apPerf(d)}
@@ -3598,25 +3604,31 @@ function dtRender(d){
     return `<div class="bt-card"><h4>What the research says <em>updated ${new Date(r.t).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} · market mood ${mk.lean>=0?"+":""}${(mk.lean||0).toFixed(2)} (S&amp;P ${pct(mk.spyDay||0)} today${mk.vix!=null?`, VIX ${mk.vix.toFixed(1)}`:""}${mk.below200?", below its 200-day average":""})</em></h4>
     <div class="rk-two"><div><div class="ap-note" style="margin:0 0 6px">📈 Leaning long</div><div class="ap-wrap"><table class="ap-tbl"><tbody>${bull.map(row).join("")||'<tr><td class="n">Nothing strongly bullish right now</td></tr>'}</tbody></table></div></div>
     <div><div class="ap-note" style="margin:0 0 6px">📉 Leaning short</div><div class="ap-wrap"><table class="ap-tbl"><tbody>${bear.map(row).join("")||'<tr><td class="n">Nothing strongly bearish right now</td></tr>'}</tbody></table></div></div></div></div>`;})():""}
+  ${d.researchMode?(()=>{const R=d.researchMode,f=x=>x&&x.mean!=null?`${x.mean>=0?"+":""}${x.mean.toFixed(3)} ATR${x.lo!=null?` (95% range ${x.lo.toFixed(3)} to ${x.hi.toFixed(3)})`:""}`:"—",E=a.expectancy;
+    return `<div class="bt-card"><h4>Research scorecard <em>forward paper results, no money · since ${new Date(R.since).toLocaleDateString("en-US")}</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Signals</th><th>Count</th><th>Average next-minute result after costs</th><th>Edge proven?</th></tr></thead><tbody>
+      <tr><td class="n">Every forecast (the old "trade everything" rule)</td><td>${R.allForecasts.n.toLocaleString()}</td><td class="${cls(R.allForecasts.mean||0)}">${f(R.allForecasts)}</td><td>${R.allForecasts.significant&&R.allForecasts.mean>0?"positive":"no"}</td></tr>
+      <tr><td class="n">Forecasts that qualified (edge &gt; costs + buffer)</td><td>${R.qualified.n.toLocaleString()}</td><td class="${cls(R.qualified.mean||0)}">${f(R.qualified)}</td><td>${R.qualified.significant&&R.qualified.mean>0?"positive":"no"}</td></tr>
+      ${E&&E.n?`<tr><td class="n">Actual paper trades (net $ per trade)</td><td>${E.n.toLocaleString()}</td><td class="${cls(E.mean||0)}">${(E.mean>=0?"+":"−")+"$"+Math.abs(E.mean).toFixed(2)}${E.lo!=null?` (95% range ${E.lo.toFixed(2)} to ${E.hi.toFixed(2)})`:""}</td><td>${E.significant&&E.mean>0?"positive":"no"}</td></tr>`:""}
+      </tbody></table></div><div class="ap-note">${esc(R.unit)}. "Edge proven" needs the 95% range to sit entirely above zero; a small positive average is not proof.</div></div>`;})():""}
   ${(a.bySetup||[]).length?`<div class="bt-card"><h4>By setup <em>which plays are working</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Setup</th><th>Trades</th><th>Win rate</th><th>P&amp;L</th></tr></thead><tbody>${a.bySetup.map(x=>`<tr><td class="n">${esc(x.setup)}</td><td>${x.n}</td><td>${Math.round(x.win*100)}%</td><td class="${cls(x.pnl)}">${(x.pnl>=0?"+":"−")+"$"+Math.abs(x.pnl).toFixed(0)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· trade log, orders and the rules</small></summary>
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
     ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts at 9:31 AM ET.</div>`}</div>
   <div class="bt-card"><h4>How the day trader works <em>paper money only · rules designed by Claude, run by the server</em></h4><ul class="ap-rules">
-    <li><b>Maximum speed:</b> as many trades as the data allows. Every minute, for each of ${(d.universe||[]).length} stocks, it closes the trade it opened a minute ago and opens a new one — about ${(d.rules.ceiling||0).toLocaleString()} trades on a full day. (The site gets one price bar per stock per minute, so one trade per stock per minute is the ceiling; firms that trade millions of times a day pay for millisecond data and exchange connections.)</li>
+    <li><b>Strategy ${esc((d.strategy&&d.strategy.id)||"alex-intraday")} v${(d.strategy&&d.strategy.version)||"?"}:</b> it <i>scans</i> ${(d.universe||[]).length} stocks every minute but trades only when the forecast's expected move clears round-trip costs plus a 50% safety buffer. Trade count follows the edge, not a quota — on most days that may be few or no trades, and that is the honest result. (One free price bar per stock per minute; no quotes, spreads or order book, so nothing here is high-frequency trading.)</li>
     <li><b>What it looks at:</b> 18 inputs for every stock every minute, from every section of the site.
-      <b>The chart</b> — momentum over 1, 5 and 15 minutes, distance from VWAP, the 9/20-minute trend, order-flow imbalance (where bars close in their range, weighted by volume), whether this stock has been trending or reversing minute to minute today, liquidity sweeps of key levels (prior-day, pre-market, opening-range highs and lows) and gap-and-go breaks, and chart patterns.
+      <b>The chart</b> — momentum over 1, 5 and 15 minutes, distance from VWAP, the 9/20-minute trend, candle pressure — an OHLC proxy, not order-book data (where bars close in their range, weighted by volume), whether this stock has been trending or reversing minute to minute today, liquidity sweeps of key levels (prior-day, pre-market, opening-range highs and lows) and gap-and-go breaks, and chart patterns.
       <b>The market tape</b> — its strength against the S&amp;P after adjusting for its beta, the S&amp;P's last minute, and breadth (how many of the 100 stocks are above their VWAP).
       <b>The rest of the site</b> (refreshed every 10 minutes) — News, Smart Money and trending headlines; earnings beats, misses and upcoming reports; analyst ratings; the Financials health grade from SEC filings; THE WEB Spider's findings (insider buying, earnings-release tone, sector patterns); the swing bot's ranking; <b>quant factor analysis</b> with the Quant Lab's math on a year of daily prices for every stock (12-1 month momentum, residual momentum vs the S&amp;P, 3-month momentum, low volatility, 200-day trend, short-term reversal, Sharpe ratio) blended with the Quant trader's ranking and market regime; the Heatmap's sector move vs the S&amp;P; and the Macro page (yield curve, Sahm recession rule) plus the VIX.</li>
     <li><b>How it decides:</b> a forecast model turns those inputs into the expected move over the next minute. It learns online: a minute later it scores its forecast for every stock and nudges each input's weight toward what actually worked (one averaged step per minute, about 39,000 outcomes a day, pulled back toward sensible starting weights so it can't run away on noise). The sign of the forecast picks long or short.</li>
-    <li><b>Evidence first:</b> trades lean on backed-up reasons for a stock to move — fresh news, an earnings beat or miss, analyst ratings, the financial-health grade and the Spider's research and the quant factors. When that evidence is strong (+0.4 or more) and the chart is unclear, the evidence picks the side; when it backs the trade, the trade gets up to 2.5× bigger; when it points the other way, the trade shrinks to as little as a quarter. Each trade's reason in the log says what backed it. A company reporting earnings today or tomorrow is traded at half size unless the evidence backs the side — nobody knows the result ahead of time.</li>
-    <li><b>Each trade:</b> sized by the forecast's edge <i>after</i> trading costs — from 15% of a normal slice when the edge doesn't cover costs (it still trades, but small) up to 2× when it's strong; half size into an earnings report or after a −3% day. <b>High-risk leverage:</b> a normal slice is about ${((d.rules.lev||10)*0.75).toFixed(1)}% of the account per stock, and a portfolio guard keeps the total under ${d.rules.lev||10}× the account (a real broker caps day traders at 4×, so this is more than you could actually borrow) and the net long-or-short tilt under ${d.rules.net||3.75}× (half that when the market is under stress). More leverage magnifies gains <i>and</i> losses — it only pays if the forecast has a real edge after costs. Stop one typical 1-minute range away, target 1.2 ranges; if neither hits, it closes after one minute.</li>
-    <li><b>No daily loss limit:</b> it keeps trading until the close (everything is flat by 4:00 PM). If the free data source starts refusing requests, it drops to 50 stocks for 10 minutes.</li>
+    <li><b>Research as a veto, not a trigger:</b> news, earnings, analysts, the health grade, Spider research and quant factors can block a trade (strong evidence the other way) or shrink it, but never pick the side or make it bigger — those inputs have no calibrated track record at a one-minute horizon.</li>
+    <li><b>Each trade:</b> risks ${((d.rules.riskPct||0.0025)*100).toFixed(2)}% of the account to its stop (one average 1-minute range away), each position at most ${Math.round((d.rules.posX||0.5)*100)}% of the account; total exposure at most ${d.rules.lev}× (gross) and ${d.rules.net}× (net) — the 4× is a real broker's day-trading limit. Half size into an earnings report.</li>
+    <li><b>Daily loss limit:</b> down ${((d.rules.dailyLoss||0.01)*100).toFixed(0)}% on the day (realized + open) → no new trades until tomorrow; it keeps forecasting and learning. Everything is flat by 4:00 PM. If the server was asleep or the data stopped for more than 5 minutes, open trades are closed at the first price after reconnecting — missed minutes are never replayed as if they had been watched.</li>
     <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}.</li>
     <li><b>Starts with $30,000</b> to clear the $25,000 pattern-day-trader minimum. Falling below $25,000 would lock a real account out of day trading, so it counts as a bust and a new $30,000 run starts.</li>
-    <li>Simulated on free 1-minute bars: each trade fills at the 1-minute close; if a stop and target fall in the same bar, a green bar is assumed to have hit its low first and a red bar its high. Every trade pays 0.005% of its size going in and again coming out (spread and slippage), plus 0.01% to borrow shares for a short — at tens of thousands of trades a day these costs add up fast, so expect it to lose money steadily. The trade log keeps the latest 600 events; the totals count every trade. Not financial advice.</li>
+    <li>Simulated on free 1-minute bars: entries fill at the 1-minute close the forecast was made on (optimistic: real orders arrive a little later); if a stop and target fall in the same bar, a green bar is assumed to have hit its low first and a red bar its high. Costs are a conservative flat ${((d.rules.cost||0.0001)*100).toFixed(2)}% of the trade each way plus ${((d.rules.borrow||0.0001)*100).toFixed(2)}% to borrow for a short — real spreads are wider on small or volatile names and can't be measured without quote data.</li>
   </ul></div></details>
-  <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${d.runs.length} PDT lock${d.runs.length===1?"":"s"} so far`:"no busts yet — falling under $25,000 starts a new $30,000 run"}</em></h4>
+  <div class="bt-card ap-runs"><h4>🧪 Test runs <em>${(d.runs||[]).length?`${d.runs.length} earlier run${d.runs.length===1?"":"s"} (busts and strategy changes) — kept for the record`:"no busts yet — falling under $25,000 starts a new $30,000 run"}</em></h4>
   <div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Run</th><th>Started</th><th>Ended</th><th>Days</th><th>Trades</th><th>Peak</th><th>Final</th><th>Return</th><th>S&amp;P</th><th>Result</th></tr></thead><tbody>${runRow(d.current,true)}${(d.runs||[]).map(r=>runRow(r,false)).join("")}</tbody></table></div></div>`;
   apWirePerf(d);
   liveApply(false);
@@ -5183,6 +5195,30 @@ async function apSignals(){
     <p class="aps-foot">${esc(j.rule||"")} No confidence percentages: each signal shows the findings it rests on.</p>`;
 }
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apSignals(); },20e3);
+/* ---------- AI vs S&P: Zweig put/call ratio (contrarian sentiment the three bots use; server: putcall-core.js) ---------- */
+async function apPutCall(){
+  const el=$("apPc"); if(!el) return; if(S._pcAt&&Date.now()-S._pcAt<5*60e3) return; S._pcAt=Date.now();
+  let z; try{ z=await api("/api/pub/putcall"); }catch{ el.hidden=true; return; }
+  el.hidden=false;
+  const head=`<div class="aps-h"><h2 class="h">Put/call ratio · Marty Zweig's contrarian gauge</h2><span>More puts = the crowd expects a drop → bullish. More calls = the crowd expects a rise → bearish.</span></div>`;
+  if(!z.ok){ el.innerHTML=head+`<p class="dim" style="margin:6px 0 0">Unavailable: ${esc(z.why||z.error||"no put/call data yet")}. The bots ignore this signal until there is real data.</p>`; return; }
+  const cls=z.score>0?"up":z.score<0?"down":"dim";
+  const pts=(z.ma||[]).slice(-120), vs=pts.map(p=>p.v), lo=Math.min(...vs), hi=Math.max(...vs), W=600,H=120, X=i=>pts.length>1?i/(pts.length-1)*W:0, Y=v=>hi>lo?H-6-(v-lo)/(hi-lo)*(H-12):H/2;
+  const line=pts.map((p,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join("");
+  const sig=z.signal==="BUY"?'<b class="up">BUY signal</b> — fear peaked and is fading':z.signal==="SELL"?'<b class="down">SELL signal</b> — greed peaked and is fading':"No reversal signal";
+  el.innerHTML=head+`<div class="pc-row">
+    <div class="pc-big"><small>10-day average · ${esc(z.basis==="percentile"?Math.round(z.pct*100)+"th percentile of "+(z.ma||[]).length+" days":"fixed bands (building history)")}</small><b class="pc-num ${cls}">${z.ma10.toFixed(2)}</b>
+      <small>Latest day ${esc(z.d)}: ${z.ratio.toFixed(2)}${z.provisional?" (provisional, intraday)":""}${z.ma20!=null?` · 20-day ${z.ma20.toFixed(2)}`:""}${z.total!=null?` · total ${z.total.toFixed(2)}`:""}</small>
+      <span class="pc-zone">${esc(z.zone)}</span>
+      <small style="margin-top:8px">Crowd: <b>${esc(z.crowd)}</b> → contrarian read: <b class="${cls}">${esc(z.lean)}</b> (score ${z.score>0?"+":""}${z.score.toFixed(2)})</small>
+      <small style="margin-top:4px">${sig}</small></div>
+    <div class="pc-chart"><small class="dim">10-day average of the put/call ratio — higher = more fear</small>${pts.length>1?`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="10-day put/call average"><path d="${line}" fill="none" stroke="var(--orange)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`:'<p class="dim">Chart appears once there are more days of data.</p>'}</div></div>
+    <ul class="pc-use"><li><b>Swing bot:</b> crowd heavy in puts while the S&amp;P is below its 200-day → stays up to 95% invested instead of 80%; crowd heavy in calls in an uptrend → keeps up to 15% cash. Never overrides defense mode.</li>
+      <li><b>Quant trader:</b> equity sleeve nudged up to ±10% at extremes (not in risk-off).</li>
+      <li><b>Day trader:</b> adds up to ±0.25 to its market lean (long bias on fear, short bias on greed).</li></ul>
+    <p class="aps-foot">Source: ${esc(z.source)}. ${esc(z.rule)} Updated ${z.updated?esc(ago(z.updated)):"—"}.</p>`;
+}
+setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apPutCall(); },5*60e3);
 document.addEventListener("click",e=>{ const t=e.target.closest("#apSig [data-ap-open]"); if(t){ e.preventDefault(); openQuote(t.dataset.apOpen); } });
 /* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
 async function anQuotes(){

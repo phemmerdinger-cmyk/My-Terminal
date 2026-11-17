@@ -9,6 +9,7 @@
 //   6. trades only weight changes above 1.5% of the account, paying 5 bps per side
 // Paper money only. Pure functions here; server.js supplies prices and keeps the account.
 const QM = require("./public/qmath.js");
+const PCC = require("./putcall-core.js");
 
 const QT_EQUITY = ["SPY", "QQQ", "IWM", "XLK", "XLF", "XLV", "XLE", "XLI", "XLY", "XLP", "XLU", "XLB", "XLC", "XLRE", "SMH",
   "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "AVGO", "LLY", "JPM", "V", "UNH", "XOM", "COST", "WMT", "HD", "PG", "MA", "NFLX", "AMD", "CRM", "ORCL", "CAT", "GE"];
@@ -21,12 +22,13 @@ const SPLIT = { "Risk-on trend": 1.0, "Choppy / late-cycle": 0.7, Correction: 0.
 const z = (a) => { const v = a.filter(isFinite), m = QM.mean(v), s = QM.sd(v) || 1; return a.map((x) => (isFinite(x) ? (x - m) / s : 0)); };
 
 // px: { SYM: aligned adjusted closes }, all the same length (oldest → newest). Returns target weights + the reasoning.
-function decide(px) {
+// opts.putcall: the Zweig put/call reading (putcall-core.js) — nudges the equity sleeve ±10% at sentiment extremes.
+function decide(px, opts = {}) {
   const n = px.SPY.length, last = n - 1;
   if (n < 280) throw new Error("need at least ~13 months of aligned history");
   const credit = px.HYG && px.IEF ? px.HYG.map((v, i) => v / px.IEF[i]) : null;
   const reg = QM.regimeAt(px.SPY, last, credit);
-  const split = SPLIT[reg.label] ?? 0.5;
+  const pcs = PCC.splitTilt(SPLIT[reg.label] ?? 0.5, opts.putcall, reg.label), split = pcs.split;
   // ---- rank equities
   const eq = QT_EQUITY.filter((s) => px[s]), ret = (s, a, b) => px[s][last - b] / px[s][last - a] - 1;
   const raw = eq.map((s) => { const r = QM.returns(px[s].slice(-127)); return { s, m12: ret(s, 252, 21), m3: ret(s, 63, 0), vol: QM.annVol(r), trend: px[s][last] > QM.sma(px[s], 200, last) }; });
@@ -47,7 +49,7 @@ function decide(px) {
   for (const k of Object.keys(w)) if (!(w[k] > 1e-9)) delete w[k];
   const cash = Math.max(0, 1 - Object.values(w).reduce((a, b) => a + b, 0)); if (cash > 0.001) w[QT_CASH] = (w[QT_CASH] || 0) + cash;
   const ws = syms.map((s) => w[s]), enb = QM.enb(ws.map((x) => x / (ws.reduce((a, b) => a + b, 0) || 1)), C.map((r) => r.map((x) => x / QM.DAYS))).enb;
-  return { w, regime: reg.label, score: reg.score, ind: reg.ind, split, exVol, vol: exVol * scale, scale, enb,
+  return { w, regime: reg.label, pcTilt: pcs.tilt, score: reg.score, ind: reg.ind, split, exVol, vol: exVol * scale, scale, enb,
     ranked: ranked.slice(0, 15).map((x) => ({ s: x.s, score: +x.score.toFixed(2), m12: +x.m12.toFixed(4), m3: +x.m3.toFixed(4), vol: +x.vol.toFixed(4), trend: x.trend, picked: picks.includes(x) })) };
 }
 
