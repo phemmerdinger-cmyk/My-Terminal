@@ -128,6 +128,19 @@ function paperBarReady(bar, readAt, maxLagSec) {
   return lag >= 0 && lag <= maxLagSec * 1000;
 }
 
+// Research and orders have separate clocks. A later print cannot replace a missed entry.
+function paperObservations(session, observedAt, maxLagSec, { position, research, entry }) {
+  const positionAt = position ? (position.lastProcessedBar == null ? position.at / 1000 : position.lastProcessedBar + 60) : Infinity;
+  const researchAt = research ? (research.opening == null ? research.fillAt : research.evalAt) : Infinity;
+  const entryAt = entry?.fillAt ?? Infinity;
+  const fresh = session.filter((bar) => bar.t >= Math.min(positionAt, researchAt, entryAt) && paperBarReady(bar, observedAt, maxLagSec));
+  const last = session.at(-1)?.t;
+  const missed = (t) => Number.isFinite(t) && !fresh.some((bar) => bar.t === t) &&
+    (last > t || observedAt > (t + 60 + maxLagSec) * 1000);
+  return { missedResearch: missed(researchAt), missedEntry: missed(entryAt),
+    bars: fresh.filter((bar) => bar.t >= positionAt || bar.t === researchAt || bar.t === research?.evalAt || bar.t >= entryAt) };
+}
+
 // The following minute starts strictly after the actual decision, including decisions on a clock boundary.
 function paperEntryMinute(signal, decisionAt, close, maxLagSec, hold = 1) {
   if (!validMinuteBar(signal) || signal.m < OPEN || !paperBarReady(signal, decisionAt, maxLagSec)) return null;
@@ -172,4 +185,4 @@ function managePaperPosition(position, bar, hold = 1) {
   return exit ? { ...exit, t: bar.t + 60 } : null;
 }
 
-module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, validMinuteBar, paperBarReady, paperEntryMinute, paperOpen, scalpManage, managePaperPosition };
+module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, validMinuteBar, paperBarReady, paperObservations, paperEntryMinute, paperOpen, scalpManage, managePaperPosition };

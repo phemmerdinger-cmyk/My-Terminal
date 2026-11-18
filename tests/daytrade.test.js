@@ -164,3 +164,26 @@ test("paper position settles a data gap at the first refreshed open", () => {
   const nextSessionOpen = { ...later, d: "later session", t: 92_400, m: D.OPEN };
   assert.equal(D.managePaperPosition(position, nextSessionOpen, 10).px, nextSessionOpen.o);
 });
+
+test("a newer entry has its own opening print while an earlier forecast waits to be scored", () => {
+  const research = { fillAt: 6_120, evalAt: 6_660, opening: 100 };
+  const entry = { day: minute.d, fillAt: 6_240, decisionAt: 6_181_000, idea: { dir: "long", stopDistance: 1, targetDistance: 2 } };
+  const bars = [6_240, 6_300].map((t) => ({ ...minute, t, m: minute.m + (t - minute.t) / 60 }));
+  const first = D.paperObservations(bars, 6_365_000, 90, { research, entry });
+  assert.deepEqual(first, { missedResearch: false, missedEntry: false, bars });
+  assert.equal(D.paperOpen(entry, first.bars[0]).at, 6_240_000);
+  assert.equal(D.paperOpen(entry, first.bars[1]), null);
+  const answer = { ...minute, t: 6_660, m: minute.m + 11 };
+  assert.deepEqual(D.paperObservations([answer], 6_723_000, 90, { research }).bars, [answer]);
+});
+
+test("missing research does not cancel a fresh entry, and future or late bars cannot fill it", () => {
+  const research = { fillAt: 6_060, evalAt: 6_600 };
+  const entry = { fillAt: 6_240 };
+  const bar = { ...minute, t: 6_240, m: minute.m + 4 };
+  assert.deepEqual(D.paperObservations([bar], 6_302_000, 90, { research, entry }),
+    { missedResearch: true, missedEntry: false, bars: [bar] });
+  assert.deepEqual(D.paperObservations([bar], 6_299_999, 90, { research, entry }).bars, []);
+  assert.deepEqual(D.paperObservations([bar], 6_391_000, 90, { research, entry }),
+    { missedResearch: true, missedEntry: true, bars: [] });
+});
