@@ -1442,42 +1442,36 @@ html.viewonly .api-bal-wrap{display:none!important}
 .lb-big{margin:10px 0 2px;font-size:24px;font-weight:700;letter-spacing:-.02em}.lb-sub{font-size:12px;color:var(--muted)}
 .lb-kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:10px 0 0;font-size:12px}.lb-kv span{color:var(--dim)}.lb-kv b{font-weight:600;text-align:right}
 .lb-note{font-size:11.5px;color:var(--dim);margin:8px 0 0;line-height:1.45}.lb-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
-/* AI vs S&P hero — spacing scale 4·8·12·16·24·32·48·64, type: Plex Mono for labels, Plex Sans tabular for figures */
-.axh{--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--lbl:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+/* AI vs S&P hero (option C, terminal readout) — spacing 4·8·12·16·24·32·48·64; Plex Mono labels, tabular figures */
+.hx{--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--lbl:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   --glow-up:0 0 22px color-mix(in srgb,var(--up) 30%,transparent);--glow-dn:0 0 22px color-mix(in srgb,var(--down) 30%,transparent);
   margin:var(--s5) 0 var(--s7);font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1,"lnum" 1}
-.axh-wait{color:var(--dim);font-size:13px;padding:var(--s6) 0}
-.axh-l{font-family:var(--lbl);font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);line-height:1}
-.axh-bar{display:flex;align-items:center;gap:var(--s3);margin-bottom:var(--s6)}.axh-bar .axh-t{margin-left:auto}
-.axh-live{width:6px;height:6px;border-radius:50%;background:var(--orange);box-shadow:0 0 0 0 color-mix(in srgb,var(--orange) 60%,transparent);animation:axhPulse 2.4s ease-out infinite}
-@keyframes axhPulse{70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-.axh-main{display:grid;grid-template-columns:max-content max-content max-content;column-gap:var(--s7);align-items:last baseline}
-.axh-fig{display:contents}.axh-fig>.axh-l{grid-row:1;margin-bottom:var(--s3)}.axh-fig>.axh-big{grid-row:2}.axh-fig>.axh-sub{grid-row:3}
-.axh-fig.ai>*{grid-column:1}.axh-fig.sp>*{grid-column:3}
-.axh-big{display:block;font-size:clamp(48px,7vw,84px);font-weight:600;letter-spacing:-.045em;line-height:.9;white-space:nowrap}
-.axh-big.up{color:var(--up);text-shadow:var(--glow-up)}.axh-big.down{color:var(--down);text-shadow:var(--glow-dn)}.axh-big.flat{color:var(--text)}
-.axh-big.bench{font-size:clamp(32px,4.4vw,52px);font-weight:400;color:var(--muted);letter-spacing:-.035em}
-.axh-sub{display:block;margin-top:var(--s3);font-family:var(--lbl);font-size:12.5px;color:var(--muted);white-space:nowrap}.axh-sub b{font-weight:500;color:var(--text)}
-.axh-vs{grid-column:2;grid-row:2;align-self:center;font-family:var(--lbl);font-size:11px;letter-spacing:.14em;color:var(--dim)}
-.axh-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.35fr);gap:var(--s6) var(--s7);margin-top:var(--s7);padding-top:var(--s5);border-top:1px solid var(--line)}
-.axh-d .axh-l{margin-bottom:var(--s3)}
-.axh-dv{display:flex;align-items:baseline;gap:var(--s2);font-size:30px;font-weight:500;letter-spacing:-.03em;line-height:1;white-space:nowrap}
-.axh-dv small{font-family:var(--lbl);font-size:11px;font-weight:500;letter-spacing:.08em;color:var(--dim)}
-.axh-dv i{font-style:normal;font-size:12px;transform:translateY(-6px)}
-.axh-dv.up{color:var(--up);text-shadow:var(--glow-up)}.axh-dv.down{color:var(--down);text-shadow:var(--glow-dn)}.axh-dv.flat{color:var(--muted)}
-.axh-dm{margin-top:var(--s3);font-family:var(--lbl);font-size:12px;line-height:1.7;color:var(--muted)}.axh-dm span{white-space:nowrap}.axh-dm b{font-weight:500}.axh-dm b.up{color:var(--up)}.axh-dm b.down{color:var(--down)}
-.axh-tr .axh-l{margin-bottom:var(--s2)}
-.axh-t3{display:grid;grid-template-columns:1fr auto auto;column-gap:var(--s5);width:100%;padding:var(--s2) 0;background:none;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer;align-items:baseline}
-.axh-t3+.axh-t3{border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
-.axh-t3 span{font-size:13px;color:var(--text)}.axh-t3 span em{font-style:normal;font-family:var(--lbl);font-size:10px;letter-spacing:.1em;color:var(--down);margin-left:var(--s2)}
-.axh-t3 b{font-size:14px;font-weight:600;text-align:right}.axh-t3 s{text-decoration:none;font-family:var(--lbl);font-size:11.5px;min-width:9ch;text-align:right}
-.axh-t3:hover span{color:var(--orange)}.axh-t3:focus-visible{outline:1px solid var(--orange);outline-offset:2px}
-.axh-fn{margin:var(--s5) 0 0;font-size:11px;line-height:1.55;color:var(--dim);max-width:88ch}
-.axh .up{color:var(--up)}.axh .down{color:var(--down)}.axh .flat{color:var(--muted)}
-@media(max-width:860px){.axh-row{grid-template-columns:1fr 1fr}.axh-tr{grid-column:1/-1}}
-@media(max-width:620px){.axh-main{grid-template-columns:max-content}.axh-fig.sp>*{grid-column:1}.axh-fig.sp>.axh-l{grid-row:4;margin-top:var(--s5)}.axh-fig.sp>.axh-big{grid-row:5}.axh-fig.sp>.axh-sub{grid-row:6}.axh-vs{display:none}}
-@media(max-width:520px){.axh-cap{display:none}.axh-dm{font-size:11px}.axh-dv{font-size:24px}.axh-row{gap:var(--s5) var(--s5);margin-top:var(--s6)}.axh-bar .axh-t{display:none}}
-@media(prefers-reduced-motion:reduce){.axh-live{animation:none}}
+.hx .up{color:var(--up)}.hx .down{color:var(--down)}.hx .flat{color:var(--muted)}
+.hx-wait{color:var(--dim);font-size:13px;padding:var(--s6) 0}
+.hx-l{font-family:var(--lbl);font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);line-height:1}
+.hx em{font-style:normal;font-family:var(--lbl);font-size:10px;letter-spacing:.1em;color:var(--down);margin-left:var(--s2)}
+.hx button{background:none;border:0;color:inherit;font:inherit;padding:0;cursor:pointer;text-align:left}
+.hx button:focus-visible{outline:1px solid var(--orange);outline-offset:3px}
+.hx-fn{margin:var(--s5) 0 0;font-size:11px;line-height:1.55;color:var(--dim);max-width:88ch}
+@media(prefers-reduced-motion:reduce){.hx *{animation:none!important}}
+.hx-tri{font-style:normal;font-size:.36em;vertical-align:.55em;margin-right:.18em;font-family:var(--sans)}
+/* C · TERMINAL — one monospaced readout row, Bloomberg-style, then a trader blotter */
+.hxc{font-family:var(--sans)}.hxc-st,.hxc-k,.hxc-blot th,.hxc-u{font-family:var(--lbl)}
+.hxc-st{display:flex;gap:var(--s4);align-items:center;font-size:11px;letter-spacing:.12em;color:var(--dim);margin-bottom:var(--s5)}
+.hxc-st .on{color:var(--orange)}.hxc-st .cur{display:inline-block;width:7px;height:12px;background:var(--orange);vertical-align:-2px;animation:hxcBlink 1.1s steps(1) infinite}.hxc-st .r{margin-left:auto}
+@keyframes hxcBlink{50%{opacity:0}}
+.hxc-tape{display:grid;grid-template-columns:1.25fr 1fr .9fr .9fr;gap:0}
+.hxc-c{padding:0 var(--s5);border-left:1px solid var(--line)}.hxc-c:first-child{padding-left:0;border-left:0}
+.hxc-k{font-size:10.5px;letter-spacing:.16em;color:var(--dim);margin-bottom:var(--s3)}
+.hxc-v{display:block;font-size:clamp(28px,3.8vw,48px);font-weight:500;letter-spacing:-.04em;line-height:1;white-space:nowrap}
+.hxc-c.ai .hxc-v{font-size:clamp(36px,5vw,62px);font-weight:600}.hxc-v.up{text-shadow:var(--glow-up)}.hxc-v.down{text-shadow:var(--glow-dn)}.hxc-v.spx{color:var(--text);font-weight:400}
+.hxc-d{display:block;margin-top:var(--s3);font-size:12px;color:var(--muted);white-space:nowrap}
+.hxc-blot{margin-top:var(--s6);width:100%;border-collapse:collapse;font-size:12.5px}
+.hxc-blot th{background:none;position:static;cursor:default;text-transform:none;font-weight:500;font-size:10.5px;letter-spacing:.14em;color:var(--dim);text-align:right;padding:0 0 var(--s2);border-bottom:1px solid var(--line)}.hxc-blot th:first-child,.hxc-blot td:first-child{text-align:left}
+.hxc-blot td{padding:var(--s2) 0;text-align:right;color:var(--muted);border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+.hxc-blot td b{font-weight:500}.hxc-blot tr[data-lb]{cursor:pointer}.hxc-blot tr[data-lb]:hover td:first-child{color:var(--orange)}.hxc-blot td:first-child{color:var(--text)}
+@media(max-width:760px){.hxc-tape{grid-template-columns:1fr 1fr;row-gap:var(--s5)}.hxc-c:nth-child(3){padding-left:0;border-left:0}.hxc-blot .w{display:none}.hxc-st .r,.hxc-st span:nth-child(3),.hxc-st .cur{display:none}.hxc-st span{white-space:nowrap}}
+.hxc-u{font-size:11px;letter-spacing:.12em;color:var(--dim);margin-left:6px;font-weight:500;text-shadow:none}
 .pc-big{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}.pc-big .pc-num{font-size:30px;letter-spacing:-.02em;display:block}.pc-big small{display:block;color:var(--dim);font-size:11.5px}
 .pc-zone{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
 .pc-chart{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}.pc-chart svg{width:100%;height:120px;display:block}
@@ -1746,7 +1740,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
-      <section class="axh" id="apHero" aria-live="polite"><div class="axh-wait"><span class="spin"></span> Loading performance…</div></section>
+      <section class="hx hxc" id="apHero" aria-live="polite"><div class="hx-wait"><span class="spin"></span> Loading performance…</div></section>
       <section class="lb" id="apLb"><div class="ap-empty"><span class="spin"></span> Loading the leaderboard…</div></section>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
       <div class="ap-tri">
@@ -5255,38 +5249,34 @@ var LBV=LBV||{p:"life",d:null}; // var: setTab may run before this line during s
 async function apLeaderboard(){
   if(!LBV) LBV={p:"life",d:null};
   const el=$("apLb"); if(!el) return;
-  try{ LBV.d=await api("/api/pub/leaderboard"); }catch(e){ console.warn("leaderboard:",e&&e.message); if(!LBV.d){ el.innerHTML='<p class="dim">Leaderboard unavailable right now.</p>'; const h=$("apHero"); if(h) h.innerHTML='<div class="axh-wait">Performance unavailable right now.</div>'; return; } }
+  try{ LBV.d=await api("/api/pub/leaderboard"); }catch(e){ console.warn("leaderboard:",e&&e.message); if(!LBV.d){ el.innerHTML='<p class="dim">Leaderboard unavailable right now.</p>'; const h=$("apHero"); if(h) h.innerHTML='<div class="hx-wait">Performance unavailable right now.</div>'; return; } }
   lbRender(); heroRender();
 }
 // Hero: all three AI traders combined vs the same money in the S&P 500 (server: competition-core.combine → j.summary).
 function heroRender(){
   const el=$("apHero"), j=LBV&&LBV.d; if(!el||!j) return;
-  const L=j.summary&&j.summary.life, D=j.summary&&j.summary.day;
-  if(!L||!L.ok){ el.innerHTML='<div class="axh-wait">Performance unavailable right now — no recorded values yet.</div>'; return; }
+  const FN="Paper money after modeled costs, since each trader's current run began. S&amp;P 500 = the same starting money held over the same dates (hypothetical, price only). Gap = AI return minus S&amp;P return, in percentage points.";
   const M="−", tone=v=>v==null?"flat":v>0?"up":v<0?"down":"flat";
   const pct=v=>v==null?"—":(v>0?"+":v<0?M:"")+Math.abs(v*100).toFixed(2)+"%";
   const pts=v=>v==null?"—":(v>0?"+":v<0?M:"")+Math.abs(v*100).toFixed(2);
-  const usd=(v,sign=true)=>v==null?"—":(sign?(v>0?"+":v<0?M:""):(v<0?M:""))+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
-  const arrow=v=>v==null||v===0?"":`<i>${v>0?"▲":"▼"}</i>`;
-  const delta=(label,S)=>{ const ok=S&&S.ok, g=ok?S.gap:null;
-    return `<div class="axh-d"><div class="axh-l">${label}</div>
-      <div class="axh-dv ${tone(g)}">${arrow(g)}${pts(g)}${g==null?"":"<small>PTS</small>"}</div>
-      <div class="axh-dm">${!ok?"No values recorded yet":g==null?"S&amp;P data unavailable":`<span><b class="${tone(S.edge)}">${usd(S.edge)}</b> ${S.edge>=0?"ahead of":"behind"} the S&amp;P</span><br><span>AI <b class="${tone(S.ret)}">${pct(S.ret)}</b> &nbsp;·&nbsp; S&amp;P <b>${pct(S.spxRet)}</b></span>`}</div></div>`; };
-  const life=(j.boards&&j.boards.life)||[];
-  const traders=life.filter(r=>r.stats&&r.stats.ok).map(r=>{ const t=j.traders[r.key], st=r.stats;
-    return `<button type="button" class="axh-t3" data-lb="${r.key}" title="Open ${esc(t.name)}"><span>${esc(t.name)}${r.eligible?"":"<em>OUT</em>"}</span><b class="${tone(st.ret)}">${pct(st.ret)}</b><s class="${tone(st.alpha)}">${st.alpha==null?"—":(st.alpha>0?"▲ ":st.alpha<0?"▼ ":"")+Math.abs(st.alpha*100).toFixed(2)}</s></button>`; }).join("");
-  el.innerHTML=`<div class="axh-bar"><span class="axh-live" aria-hidden="true"></span><span class="axh-l">Live · ${L.n} AI traders<span class="axh-cap"> · ${usd(L.base,false)} paper capital</span></span><span class="axh-l axh-t">Updated ${esc(ago(j.t))}</span></div>
-    <div class="axh-main">
-      <div class="axh-fig ai"><div class="axh-l">AI · total return</div><span class="axh-big ${tone(L.ret)}">${pct(L.ret)}</span><span class="axh-sub"><b>${usd(L.profit)}</b> &nbsp;·&nbsp; ${usd(L.value,false)} now</span></div>
-      <div class="axh-vs" aria-hidden="true">VS</div>
-      <div class="axh-fig sp"><div class="axh-l">S&amp;P 500 · benchmark</div><span class="axh-big bench">${pct(L.spxRet)}</span><span class="axh-sub">${L.spxProfit==null?"S&amp;P data unavailable":`<b>${usd(L.spxProfit)}</b> &nbsp;·&nbsp; same money, same dates`}</span></div>
-    </div>
-    <div class="axh-row">
-      ${delta("Gap · all-time",L)}
-      ${delta("Gap · today",D)}
-      <div class="axh-tr"><div class="axh-l">By trader · all-time · vs S&amp;P</div>${traders}</div>
-    </div>
-    <p class="axh-fn">Paper money after modeled costs, since each trader's current run began. S&amp;P 500 = the same starting money held over the same dates (hypothetical, price only). Gap = AI return minus S&amp;P return, in percentage points.${L.beating!=null?` ${L.beating} of ${L.n} traders ${L.beating===1?"is":"are"} ahead of the S&amp;P.`:""}</p>`;
+  const usd=(v,sign=true,dp=2)=>v==null?"—":(sign?(v>0?"+":v<0?M:""):(v<0?M:""))+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:dp,maximumFractionDigits:dp});
+  const triS=v=>v==null||v===0?"":`<i class="hx-tri">${v>0?"▲":"▼"}</i>`;
+  const tri=v=>v==null||v===0?"":v>0?"▲":"▼";
+  const L=j.summary&&j.summary.life, D=j.summary&&j.summary.day;
+  if(!L||!L.ok){ el.innerHTML='<div class="hx-wait">Performance unavailable right now — no recorded values yet.</div>'; return; }
+  const rows=((j.boards&&j.boards.life)||[]).filter(r=>r.stats&&r.stats.ok);
+  const nm=r=>esc(j.traders[r.key].name), out=r=>r.eligible?"":"<em>OUT</em>";
+  el.innerHTML=`<div class="hxc-st"><span class="on">● LIVE</span><span>AI/SPX · ALL-TIME</span><span>${L.n} TRADERS · ${usd(L.base,false,0)}</span><span class="cur"></span><span class="r">UPD ${esc(ago(j.t)).toUpperCase()}</span></div>
+  <div class="hxc-tape">
+    <div class="hxc-c ai"><div class="hxc-k">AI · TOTAL</div><span class="hxc-v ${tone(L.ret)}">${pct(L.ret)}</span><span class="hxc-d">${usd(L.profit)}</span></div>
+    <div class="hxc-c"><div class="hxc-k">SPX · SAME $</div><span class="hxc-v spx">${pct(L.spxRet)}</span><span class="hxc-d">${L.spxProfit==null?"N/A":usd(L.spxProfit)}</span></div>
+    <div class="hxc-c"><div class="hxc-k">Δ ALL-TIME</div><span class="hxc-v ${tone(L.gap)}">${triS(L.gap)}${pts(L.gap)}${L.gap==null?"":'<small class="hxc-u">PTS</small>'}</span><span class="hxc-d">${L.edge==null?"N/A":usd(L.edge)+" vs SPX"}</span></div>
+    <div class="hxc-c"><div class="hxc-k">Δ TODAY</div><span class="hxc-v ${tone(D&&D.gap)}">${D&&D.ok?triS(D.gap)+pts(D.gap)+(D.gap==null?"":'<small class="hxc-u">PTS</small>'):"—"}</span><span class="hxc-d">${D&&D.edge!=null?usd(D.edge)+" vs SPX":"N/A"}</span></div>
+  </div>
+  <table class="hxc-blot"><thead><tr><th>TRADER</th><th>RETURN</th><th class="w">P&amp;L</th><th class="w">SPX SAME $</th><th>Δ VS SPX</th></tr></thead><tbody>
+    ${rows.map(r=>{const s=r.stats; return `<tr data-lb="${r.key}" tabindex="0"><td>${nm(r)}${out(r)}</td><td><b class="${tone(s.ret)}">${pct(s.ret)}</b></td><td class="w">${usd(s.profit)}</td><td class="w">${s.spxProfit==null?"—":usd(s.spxProfit)}</td><td><b class="${tone(s.alpha)}">${s.alpha==null?"—":tri(s.alpha)+" "+pts(s.alpha)}</b></td></tr>`;}).join("")}
+  </tbody></table>
+  <p class="hx-fn">${FN}</p>`;
 }
 function lbRender(){
   const el=$("apLb"), j=LBV.d; if(!el||!j) return;
@@ -5316,6 +5306,7 @@ document.addEventListener("click",e=>{
   const p=e.target.closest("#apLb [data-lbp]"); if(p){ LBV.p=p.dataset.lbp; lbRender(); return; }
   const c=e.target.closest("#apLb [data-lb], #apHero [data-lb]"); if(c){ const b=document.querySelector(`#apSwitch [data-bot="${c.dataset.lb}"]`); if(b){ b.click(); b.scrollIntoView({behavior:"smooth",block:"start"}); } }
 });
+document.addEventListener("keydown",e=>{ if(e.key!=="Enter"&&e.key!==" ") return; const r=e.target.closest&&e.target.closest("#apHero tr[data-lb]"); if(r){ e.preventDefault(); r.click(); } });
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apLeaderboard(); },60e3);
 /* ---------- AI vs S&P: Zweig put/call ratio (contrarian sentiment the three bots use; server: putcall-core.js) ---------- */
 async function apPutCall(){

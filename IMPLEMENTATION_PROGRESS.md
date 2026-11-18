@@ -4,7 +4,7 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 
 ## Done
 ### AI vs S&P 500: performance hero (2026-11-18)
-- New hero at the top of the tab (`#apHero`, `heroRender()` in public/index.html; styles `.axh-*`): all three AI traders combined — total return vs the S&P 500 with the same money over the same dates, gap in percentage points + dollars for all-time and today, and a one-line-per-trader strip (all-time return, gap vs S&P; tap opens the trader). Fixed spacing scale 4/8/12/16/24/32/48, Plex Mono labels, tabular figures; no boxes.
+- New hero at the top of the tab (`#apHero`, `heroRender()` in public/index.html; styles `.hx-*`/`.hxc-*`), owner picked "terminal readout" (option C of four): AI total return, S&P 500 with the same money, all-time and today gaps (pts + $) in one monospaced row, then a trader blotter (return, P&L, S&P same $, gap; row opens the trader). Spacing scale 4/8/12/16/24/32/48, Plex Mono, tabular figures.
 - `competition-core`: `windowStats` adds `spxProfit`/`edge`; new `combine(board)` sums the traders and reports the S&P side only when every trader has S&P data. Server adds `summary: {day, life}` to `/api/pub/leaderboard`. Tests added.
 - Leaderboard cards, period buttons and everything below are unchanged.
 
