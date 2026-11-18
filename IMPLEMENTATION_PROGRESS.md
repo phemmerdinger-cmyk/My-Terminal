@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Day Trader forecast horizon (2026-11-18)
+- Model, research scoring and the paper holding clock use the same ten-minute window. Score the originally issued prediction only after its scheduled outcome is available. History and account equity carry over, and training starts fresh for the new window.
+- Keep the modeled round-trip costs, buffer and exposure limits. Require the whole window to fit before the regular or early close. Settle stops, targets and time exits from completed bars, with a conservative first-fresh-open exit after an actual data gap.
+- Show the strongest forecast against its cost threshold and distinguish qualified, queued, vetoed, expired and filled entries. Use Block's `XYZ` ticker in the scanner and sector lookup.
+
 ### Paper execution audit and capital reset (2026-11-17)
 - Swing uses prior-session daily indicators and fills queued orders against a fresh, later print with a 7.5 bp adverse allowance.
 - Day fills strictly after the decision at a scheduled completed minute's open. Missing bars expire, ambiguous stop/target bars take the stop first, and the model scores the corresponding open-to-close return. New fills use 5 bp per side plus 1 bp for short entries.

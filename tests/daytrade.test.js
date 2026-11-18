@@ -116,6 +116,13 @@ test("paper entry advances beyond the actual decision and rejects partial, stale
   assert.equal(D.paperBarReady(minute, 6_150_001, 90), false);
 });
 
+test("paper entry requires the full ten-minute hold to fit the regular or early close", () => {
+  for (const close of [D.CLOSE, 13 * 60]) {
+    assert.equal(D.paperEntryMinute({ ...minute, m: close - 12 }, 6_095_000, close, 90, 10), 6120);
+    assert.equal(D.paperEntryMinute({ ...minute, m: close - 11 }, 6_095_000, close, 90, 10), null);
+  }
+});
+
 test("paper order fills only at its scheduled session open with a bracket based on that fill", () => {
   const order = { day: minute.d, decisionAt: 6_095_000, fillAt: 6120, idea: { dir: "long", stopDistance: 2, targetDistance: 3 } };
   const scheduled = { ...minute, t: 6120, m: minute.m + 2, o: 101, h: 104 };
@@ -128,4 +135,32 @@ test("paper order fills only at its scheduled session open with a bracket based 
   assert.equal(D.paperOpen(order, { ...scheduled, h: 99 }), null);
   assert.equal(D.paperOpen({ ...order, idea: null }, scheduled), null);
   assert.equal(D.scalpManage({ dir: "long", stop: 99, target: 104 }, scheduled).why, "Stop hit", "long ambiguity also gives the stop priority");
+});
+
+test("paper position consumes only distinct, consecutive bars and closes on the tenth bar", () => {
+  const position = { at: 6_120_000, dir: "long", stop: 97, target: 102 };
+  assert.equal(D.managePaperPosition(position, minute, 10), null, "pre-entry bars are ignored");
+  for (let i = 0; i < 10; i++) {
+    const bar = { ...minute, t: 6120 + 60 * i, m: minute.m + 2 + i };
+    const exit = D.managePaperPosition(position, bar, 10);
+    assert.equal(position.lastProcessedBar, bar.t);
+    assert.equal(position.bars, i + 1);
+    if (i === 9) assert.deepEqual(exit, { px: bar.c, why: "Time stop — out after 10 minutes", t: bar.t + 60 });
+    else {
+      assert.equal(exit, null);
+      assert.equal(D.managePaperPosition(position, bar, 10), null, "duplicate bars cannot advance the hold clock");
+      assert.equal(position.bars, i + 1);
+    }
+  }
+});
+
+test("paper position settles a data gap at the first refreshed open", () => {
+  const position = { at: 6_120_000, dir: "long", stop: 97, target: 102, lastProcessedBar: 6120, bars: 1 };
+  const later = { ...minute, t: 6300, m: minute.m + 5, o: 100.25, h: 104, l: 93 };
+  assert.equal(D.managePaperPosition(position, { ...later, o: null }, 10), null);
+  assert.deepEqual(D.managePaperPosition(position, later, 10), { px: 100.25, why: "Data gap — closed at first freshly observed minute open", t: 6300 });
+  assert.equal(position.lastProcessedBar, 6120);
+  assert.equal(position.bars, 1);
+  const nextSessionOpen = { ...later, d: "later session", t: 92_400, m: D.OPEN };
+  assert.equal(D.managePaperPosition(position, nextSessionOpen, 10).px, nextSessionOpen.o);
 });

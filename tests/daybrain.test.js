@@ -50,6 +50,19 @@ test("pure noise doesn't drift the weights far from the starting weights", () =>
   const far = brain.w.map((w, i) => Math.abs(w - B.PRIOR[i])); assert.ok(Math.max(...far) < 0.12, `max drift ${Math.max(...far)}`);
 });
 
+test("a delayed outcome scores the issued forecast and trains with current weights", () => {
+  const delayed = B.fresh(), immediate = B.fresh();
+  const x = B.KEYS.map((_, i) => i === 0 ? 1 : 0);
+  delayed.w[0] = immediate.w[0] = 0.4;
+  assert.equal(B.learn(delayed, x, 0.2, "d", -0.3), -0.3);
+  assert.equal(B.learn(immediate, x, 0.2, "d"), 0.4);
+  assert.equal(delayed.hits, 0);
+  assert.equal(immediate.hits, 1);
+  assert.equal(delayed.scored, 1);
+  assert.equal(delayed.acc[0], 0.2);
+  assert.deepEqual(delayed.acc, immediate.acc);
+});
+
 test("decide: always picks a side; minimum size when the edge doesn't clear costs; bigger when it does", () => {
   const brain = B.fresh(), x = B.KEYS.map(() => 0); x[B.KEYS.indexOf("research")] = 1; x[B.KEYS.indexOf("level")] = 1;
   const f = { x };
