@@ -28,14 +28,16 @@
         ["Combined equity", money(state?.nav), state?.at ? "As of " + new Date(state.at).toLocaleTimeString("en-US", { timeZone: "America/New_York" }) + " ET" : "Waiting for aligned marks"],
         ["Session loss", money(state?.dailyLoss), money(d.policy.hardDaily) + " entry stop · " + (state?.referenceType || "reference pending")],
         ["Peak drawdown", money(state?.drawdown), money(d.policy.peakStop) + " owner-review lock"],
-        ["Modeled open risk", money(d.exposure?.stopRisk), money(d.policy.plannedRisk) + " cap on new risk"],
-        ["Net SPY beta exposure", money(d.exposure?.betaDollars), "Absolute cap " + Math.round(d.policy.betaFraction * 100) + "% of desk equity"],
+        ["Modeled open risk", money(d.exposure?.stopRisk), money(d.policy.plannedRisk) + " standard entry cap"],
+        ["Net SPY beta exposure", money(d.exposure?.betaDollars), "Standard entry cap " + Math.round(d.policy.betaFraction * 100) + "% of desk equity"],
       ]) {
         const item = add(stats, "div", "");
         add(item, "span", label);
         add(item, "b", value);
         add(item, "small", hint);
       }
+      const day = d.policy.dayPilot;
+      if (day) add(panel, "p", `Day ETF reversal paper allocation uses separate exposure limits. Up to ${money(day.entryRisk)} modeled stop risk per trade, ${money(day.openRisk)} open or queued, and ${money(day.sessionRisk)} committed per session. The desk loss and volatility controls apply.`).className = "ap-note";
       if (d.error) add(panel, "p", d.error).className = "ap-note";
       if (d.mode === "locked") {
         const button = add(panel, "button", "Review drawdown lock");

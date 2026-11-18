@@ -1705,7 +1705,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div id="dayVolumePanel" class="bt-card" hidden></div>
       <script defer src="/day-volume-panel.js?v=1"></script>
       <div id="deskRiskPanel" class="bt-card" hidden></div>
-      <script defer src="/desk-risk-panel.js?v=1"></script>
+      <script defer src="/desk-risk-panel.js?v=2"></script>
       <div id="strategyLabPanel" class="bt-card" hidden></div>
       <script defer src="/strategy-lab-panel.js?v=2"></script>
       <div class="ap-tri">
@@ -1715,7 +1715,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="apx" id="apMore"></div>
       <section class="ap-sigs" id="apPc" hidden></section>
       <section class="ap-sigs" id="apSig" hidden></section>
-      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> checks completed minutes for intraday longs and shorts, with entries subject to modeled costs and desk risk limits. Every bust starts a new test run.</p>
+      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days, the <b>quant trader</b> rebalances daily, and the <b>day trader</b> looks for confirmed intraday reversals in liquid ETFs.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3556,7 +3556,7 @@ function botNotepad(){
         <div class="hd-m"><small>put in</small>${$m(r.inv)}</div>
         <div class="hd-r"><b data-lv="pv">${$m(r.val)}</b><small data-lv="pp" class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
         <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
-      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now. New forecasts are checked during the regular session."}</div>`}${orders}</div>`;
+      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades. The trader checks for ETF reversals during the regular session."}</div>`}${orders}</div>`;
   };
   const order=BOTS.sel==="quant"?[["quant",BOTS.d.quant],["swing",BOTS.d.swing],["day",BOTS.d.day]]:BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing],["quant",BOTS.d.quant]]:[["swing",BOTS.d.swing],["day",BOTS.d.day],["quant",BOTS.d.quant]];
   const n=["swing","day","quant"].reduce((a,k)=>a+(BOTS.d[k]?BOTS.d[k].positions.length:0),0);
@@ -3569,7 +3569,7 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing Trader",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day Trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · trades only when the edge beats costs`,dy)+card("quant","📐","Quant Trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing Trader",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day Trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · ETF VWAP reversals`,dy)+card("quant","📐","Quant Trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
   liveApply(false);
 }
 function dtRender(d){
@@ -3585,23 +3585,23 @@ function dtRender(d){
     <div class="ap-mid">${started?`<b data-lv="who" class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small data-lv="by">by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day Trader · run #${d.run}</b> · <span class="ap-tag risk">cost-gated · ≤${d.rules&&d.rules.lev||4}× gross · self-learning</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day Trader · run #${d.run}</b> · <span class="ap-tag risk">ETF VWAP reversal · paper</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
   ${apBoth()}
   ${apPerf(d)}
-  <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),`${(day.forecasts||0).toLocaleString()} forecasts checked · ${(a.closed||0).toLocaleString()} closed all-time`],
+  <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),`${(a.closed||0).toLocaleString()} closed all-time`],
     ["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",a.winRate!=null?`${Math.round(a.winRate*100)}% of trades win`:"no closed trades yet"],
     ["Avg. trade",a.closed?((a.grossWins-a.grossLosses)/a.closed>=0?"+":"−")+"$"+Math.abs((a.grossWins-a.grossLosses)/a.closed).toFixed(2):"—",a.avgHold!=null?`held ${a.avgHold.toFixed(1)} min on average`:"after costs"],
-    ["Cost filter",day.best?`${day.best.moveBps.toFixed(1)} / ${day.best.hurdleBps.toFixed(1)} bps`:"—",day.best?`${esc(day.best.sym)} · closest forecast vs. minimum`:"awaiting fresh forecasts"],
-    ["Entry flow",`${day.queued||0} queued · ${day.trades||0} entered`,`${day.expired||0} expired · ${day.vetoed||0} held back by risk or research`],
-    ["Between learning samples",`${day.extraForecasts||0} forecasts · ${day.extraEntries||0} entries`,`${$m(d.rules.extraEntryRisk||15)} modeled stop risk per extra entry`],
+    ["VWAP reversal setups",`${day.reversalSignals||0} confirmed`,`${day.reversalChecks||0} ETF bars checked · target room ≥ 2× costs`],
+    ["Entry flow",`${day.reversalQueued||0} queued · ${day.reversalEntries||0} entered`,`${day.expired||0} expired · ${day.reversalBlocked||0} blocked by risk`],
+    ["Paper risk used",`${$m(day.reversalRiskUsed||0)} / ${$m(d.rules.allocation?.sessionRisk||60)}`,"Modeled stop risk committed this session"],
     ["Costs paid",a.costs!=null?"$"+Math.round(a.costs).toLocaleString():"—","spread, slippage & borrow fees"],
     ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
     ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
-    ["Open now",`${d.positions.length} trades`,`one per stock, ${d.rules.maxPos} stocks`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
+    ["Open now",`${d.positions.length} trades`,`one per ETF · ${d.rules.maxPos} eligible ETFs`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
   $("apMore").innerHTML=`
   ${d.model?(()=>{const M=d.model,ws=[...M.weights].sort((x,y)=>Math.abs(y.w)-Math.abs(x.w)),mx=Math.max(.01,...ws.map(x=>Math.abs(x.w))),hr=x=>x==null?"—":(x*100).toFixed(1)+"%";
-    return `<div class="bt-card"><h4>🧠 The forecast model <em>scores observed execution minutes before learning from them</em></h4>
+    return `<div class="bt-card"><h4>🧠 Forecast research <em>inputs for the separate Volume Test</em></h4>
     <div class="ap-mini">${[["Predictions scored",M.n.toLocaleString(),M.today?`${M.today.n.toLocaleString()} today`:"starts at the opening bell"],
       ["Direction right",hr(M.hitRate),M.today?`today ${hr(M.today.hitRate)} · 50% = coin flip`:"50% = coin flip"],
       ["Information coefficient",M.n?(M.ic>=0?"+":"")+M.ic.toFixed(3):"—","forecast vs outcome, last ~500 · above +0.02 is useful"],
@@ -3626,18 +3626,12 @@ function dtRender(d){
   ${(a.bySetup||[]).length?`<div class="bt-card"><h4>By setup <em>which plays are working</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Setup</th><th>Trades</th><th>Win rate</th><th>P&amp;L</th></tr></thead><tbody>${a.bySetup.map(x=>`<tr><td class="n">${esc(x.setup)}</td><td>${x.n}</td><td>${Math.round(x.win*100)}%</td><td class="${cls(x.pnl)}">${(x.pnl>=0?"+":"−")+"$"+Math.abs(x.pnl).toFixed(0)}</td></tr>`).join("")}</tbody></table></div></div>`:""}
   <details class="ap-hood" ${APV.hood?"open":""} ontoggle="APV.hood=this.open"><summary>Under the hood <small>· trade log, orders and the rules</small></summary>
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
-    ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">No trades yet — it starts at 9:31 AM ET.</div>`}</div>
-  <div class="bt-card"><h4>How the day trader works <em>paper money only · rules designed by Claude, run by the server</em></h4><ul class="ap-rules">
-    <li><b>Strategy v${(d.strategy&&d.strategy.version)||"?"}:</b> it <i>scans</i> ${(d.universe||[]).length} stocks every minute but trades only when the forecast's expected move clears round-trip costs plus a 50% safety buffer. Trade count follows the edge, not a quota — on most days that may be few or no trades, and that is the honest result. (One free price bar per stock per minute; no quotes, spreads or order book, so nothing here is high-frequency trading.)</li>
-    <li><b>What it looks at:</b> 18 inputs for every stock every minute, from every section of the site.
-      <b>The chart</b> — momentum over 1, 5 and 15 minutes, distance from VWAP, the 9/20-minute trend, candle pressure — an OHLC proxy, not order-book data (where bars close in their range, weighted by volume), whether this stock has been trending or reversing minute to minute today, liquidity sweeps of key levels (prior-day, pre-market, opening-range highs and lows) and gap-and-go breaks, and chart patterns.
-      <b>The market tape</b> — its strength against the S&amp;P after adjusting for its beta, the S&amp;P's last minute, and breadth (how many of the 100 stocks are above their VWAP).
-      <b>The rest of the site</b> (refreshed every 10 minutes) — News, Smart Money and trending headlines; earnings beats, misses and upcoming reports; analyst ratings; the Financials health grade from SEC filings; THE WEB Spider's findings (insider buying, earnings-release tone, sector patterns); the swing bot's ranking; <b>quant factor analysis</b> with the Quant Lab's math on a year of daily prices for every stock (12-1 month momentum, residual momentum vs the S&amp;P, 3-month momentum, low volatility, 200-day trend, short-term reversal, Sharpe ratio) blended with the Quant trader's ranking and market regime; the Heatmap's sector move vs the S&amp;P; and the Macro page (yield curve, Sahm recession rule) plus the VIX.</li>
-    <li><b>How it decides:</b> a forecast model turns those inputs into the expected move over the next ten-minute execution window. It scores the issued forecast once the window closes and nudges each input's weight toward what actually worked (one averaged step per minute, about 39,000 outcomes a day, pulled back toward sensible starting weights so it can't run away on noise). The sign of the forecast picks long or short.</li>
-    <li><b>Research as a veto, not a trigger:</b> news, earnings, analysts, the health grade, market research and quant factors can block a trade (strong evidence the other way) or shrink it, but never pick the side or make it bigger — those inputs are applied as risk checks.</li>
-    <li><b>Each trade:</b> risks ${((d.rules.riskPct||0.0025)*100).toFixed(2)}% of the account to its stop (using a range scaled to the forecast window), each position at most ${Math.round((d.rules.posX||0.5)*100)}% of the account; total exposure at most ${d.rules.lev}× (gross) and ${d.rules.net}× (net) under the paper strategy's risk rules. Half size into an earnings report.</li>
-    <li><b>Daily loss limit:</b> down ${((d.rules.dailyLoss||0.01)*100).toFixed(0)}% on the day (realized + open) → no new trades until tomorrow; it keeps forecasting and learning. New entries expire when their scheduled bar is missing or stale. Any unresolved position waits for a fresh observed price.</li>
-    <li><b>Universe:</b> ${esc((d.universe||[]).join(", "))}.</li>
+    ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">Waiting for a qualifying ETF reversal.</div>`}</div>
+  <div class="bt-card"><h4>How the day trader works <em>paper trading</em></h4><ul class="ap-rules">
+    <li><b>Entry.</b> A completed one-minute bar extends beyond a recent high or low. A separate candle must confirm the reversal toward the session’s volume-weighted average price (VWAP). The target must leave room for at least twice modeled round-trip costs.</li>
+    <li><b>Execution.</b> Check the same target, stop, and risk at the exact scheduled opening print. Orders expire when that candle is missing or stale.</li>
+    <li><b>Allocation.</b> Up to ${$m(d.rules.allocation?.entryRisk||15)} of modeled stop risk per trade, ${$m(d.rules.allocation?.openRisk||30)} open or queued, and ${$m(d.rules.allocation?.sessionRisk||60)} committed per session. Desk loss and volatility controls apply.</li>
+    <li><b>Eligible ETFs.</b> ${esc((d.rules.reversal?.universe||[]).join(", "))}.</li>
     <li><b>Starts with $30,000.</b> Below the strategy's $25,000 paper equity floor, the run resets once all positions are closed.</li>
     <li>Paper entries use a scheduled opening print strictly after the decision. Positions exit at a stop, target, or the ten-minute time limit. When one bar touches both stop and target, the simulation assumes the stop hit first. Modeled spread and slippage are ${((d.rules.cost||0.0005)*1e4).toFixed(1)} bps each way, plus ${((d.rules.borrow||0.0001)*1e4).toFixed(1)} bp for a short entry. Quote and broker fill data are needed to measure actual costs.</li>
   </ul></div></details>

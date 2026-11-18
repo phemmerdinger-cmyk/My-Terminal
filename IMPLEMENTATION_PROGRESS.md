@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Main Day Trader ETF reversals (2026-11-18)
+- Switch the main paper strategy to confirmed one-minute ETF reversals toward session VWAP. Preserve the original forecast for learning and the separate Volume Test.
+- Require a sweep of a recent range, a separate confirmation, at least twice modeled round-trip cost in target room, and a fresh exact opening print. Recheck target room, fixed bracket, and paper allocation at the opening print.
+- Give this Day-only paper strategy a bounded exception to the standard shared exposure caps, with $15 modeled risk per entry, $30 open or queued, and $60 committed in a session. Gross exposure and gross SPY beta are each capped at $3,000 for the allocation. Desk loss and volatility controls still apply. Preserve paper balances and position history.
+
 ### Day Trader volume experiment (2026-11-18)
 - Run a separate paper experiment with a target of 1,000 completed intraday round trips on a full session. Reuse the one-minute scanner and rank the available forecasts by estimated edge, including forecasts below the main strategy's cost hurdle.
 - Settle only observed post-decision opens and completed bars. Use up to $200 per order and $10,000 of gross paper exposure. Charge 5 basis points per side and a one-basis-point short entry allowance. Show fees, net paper P&L, and the number of completed trials that cleared the cost hurdle.
