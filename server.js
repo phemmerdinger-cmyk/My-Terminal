@@ -2917,6 +2917,7 @@ async function leaderboard() {
   for (const [pk, , days] of COMP.PERIODS) {
     out.boards[pk] = COMP.rank(Object.keys(bots).map((k) => ({ key: k, lifeDrawdown: out.traders[k].lifeDrawdown, stats: COMP.windowStats(series(bots[k].eq, bots[k].value), { start: bots[k].start, today, days, spx0: bots[k].spx0 }) })));
   }
+  out.summary = { day: COMP.combine(out.boards.day), life: COMP.combine(out.boards.life) }; // hero: all three AI traders vs the S&P
   LB = { t: Date.now(), v: out }; return out;
 }
 function botsLive() {

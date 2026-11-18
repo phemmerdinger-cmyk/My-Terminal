@@ -59,3 +59,14 @@ test("S&P benchmark in dollars uses the same base money and dates; edge = profit
   const n = C.windowStats(ser([30300], [null]), { start: 30000, today: "2026-01-01", days: null, spx0: null });
   assert.equal(n.spxProfit, null); assert.equal(n.edge, null); // no S&P data → no made-up benchmark
 });
+
+test("combine: the three traders together vs the same money in the S&P", () => {
+  const row = (base, profit, spxProfit, edge) => ({ stats: { ok: true, base, value: base + profit, profit, spxProfit, edge } });
+  const c = C.combine([row(30000, 900, 450, 450), row(30000, -300, 450, -750), row(20000, 200, 100, 100)]);
+  assert.equal(c.base, 80000); assert.equal(c.profit, 800); assert.equal(c.spxProfit, 1000); assert.equal(c.edge, -200);
+  assert.ok(Math.abs(c.ret - 0.01) < 1e-12); assert.ok(Math.abs(c.spxRet - 0.0125) < 1e-12); assert.ok(Math.abs(c.gap + 0.0025) < 1e-12);
+  assert.equal(c.beating, 2);
+  const p = C.combine([row(30000, 900, 450, 450), row(30000, 100, null, null)]);
+  assert.equal(p.spxProfit, null); assert.equal(p.gap, null); assert.equal(p.beating, null); // partial S&P data → no benchmark
+  assert.equal(C.combine([]).ok, false);
+});

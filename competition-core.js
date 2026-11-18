@@ -55,5 +55,21 @@
     return out;
   }
 
-  return { windowStats, rank, PERIODS, LIMITS };
+  // board: ranked rows for one window → the three AI traders combined vs the S&P 500 with the same money over the same dates.
+  // The S&P side is reported only when every trader has an S&P figure (never a partial, misleading benchmark).
+  function combine(board) {
+    const rows = (board || []).filter((r) => r && r.stats && r.stats.ok);
+    if (!rows.length) return { ok: false, why: "no recorded values yet" };
+    const sum = (f) => rows.reduce((a, r) => a + f(r.stats), 0);
+    const base = sum((s) => s.base), profit = sum((s) => s.profit), value = sum((s) => s.value);
+    const hasSpx = rows.every((r) => r.stats.spxProfit != null);
+    const spxProfit = hasSpx ? sum((s) => s.spxProfit) : null;
+    const ret = base > 0 ? profit / base : null, spxRet = hasSpx && base > 0 ? spxProfit / base : null;
+    return { ok: true, n: rows.length, base: +base.toFixed(2), value: +value.toFixed(2), profit: +profit.toFixed(2), ret,
+      spxProfit: hasSpx ? +spxProfit.toFixed(2) : null, spxRet, edge: hasSpx ? +(profit - spxProfit).toFixed(2) : null,
+      gap: ret != null && spxRet != null ? ret - spxRet : null,
+      beating: hasSpx ? rows.filter((r) => r.stats.edge > 0).length : null };
+  }
+
+  return { windowStats, rank, combine, PERIODS, LIMITS };
 });

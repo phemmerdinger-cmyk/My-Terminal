@@ -3,9 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
-### AI vs S&P 500: head-to-head money scoreboard (2026-11-18)
-- New scoreboard at the top of the leaderboard (`lbRender`, public/index.html): headline leader + $ gap to #2 and to the S&P, "N of 3 beating the S&P", combined profit, and one row per trader with bot-vs-S&P bars on a shared $0-centred scale, bot $ made, S&P $ made, and the $ difference. Rows open the trader like the cards. Period buttons and detail cards unchanged.
-- `competition-core.windowStats` now returns `spxProfit` (same base money × S&P return over the same dates — hypothetical, price only) and `edge` (profit − spxProfit); both null when S&P data is missing. Test added.
+### AI vs S&P 500: performance hero (2026-11-18)
+- New hero at the top of the tab (`#apHero`, `heroRender()` in public/index.html; styles `.axh-*`): all three AI traders combined — total return vs the S&P 500 with the same money over the same dates, gap in percentage points + dollars for all-time and today, and a one-line-per-trader strip (all-time return, gap vs S&P; tap opens the trader). Fixed spacing scale 4/8/12/16/24/32/48, Plex Mono labels, tabular figures; no boxes.
+- `competition-core`: `windowStats` adds `spxProfit`/`edge`; new `combine(board)` sums the traders and reports the S&P side only when every trader has S&P data. Server adds `summary: {day, life}` to `/api/pub/leaderboard`. Tests added.
+- Leaderboard cards, period buttons and everything below are unchanged.
 
 ### Day Trader forecast horizon (2026-11-18)
 - Model, research scoring and the paper holding clock use the same ten-minute window. Score the originally issued prediction only after its scheduled outcome is available. History and account equity carry over, and training starts fresh for the new window.
