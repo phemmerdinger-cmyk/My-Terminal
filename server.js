@@ -2636,9 +2636,14 @@ async function dtView() {
   if (!dtLoaded) await dtLoad();
   const syms = Object.keys(DT.positions);
   const q = (await getQuotes([...syms.filter((s) => !dtPx[s]), "^GSPC"])).quotes;
-  for (const s of syms) if (q[s] && q[s].price && !dtPx[s]) dtPx[s] = q[s].price;
-  const positions = syms.map((s) => { const p = DT.positions[s], price = dtPx[s] || p.entry, pnl = DTC.pnlOf(p, price); return { sym: s, dir: p.dir, shares: p.shares, entry: p.entry, stop: p.stop, target: p.target, price, pnl, value: p.shares * price, R: pnl / (Math.abs(p.entry - p.stop0) * p.shares), setup: p.setup, at: p.at, why: p.why, be: !!p.be }; });
-  const value = dtEquity(), open = sessionInfo().open, spxNow = q["^GSPC"] && q["^GSPC"].price;
+  // A position may close while the quote request is pending. Read the book once
+  // after the await, and keep display-only quotes out of the execution marks.
+  const positions = Object.entries(DT.positions).map(([s, p]) => {
+    const price = dtPx[s] || q[s]?.price || p.entry, pnl = DTC.pnlOf(p, price);
+    return { sym: s, dir: p.dir, shares: p.shares, entry: p.entry, stop: p.stop, target: p.target, price, pnl, value: p.shares * price, R: pnl / (Math.abs(p.entry - p.stop0) * p.shares), setup: p.setup, at: p.at, why: p.why, be: !!p.be };
+  });
+  const value = DT.cash + positions.reduce((sum, p) => sum + (p.dir === "long" ? 1 : -1) * p.value, 0);
+  const open = sessionInfo().open, spxNow = q["^GSPC"] && q["^GSPC"].price;
   const vals = [DT_START, ...DT.equity.map((p) => p.v), value];
   const current = { run: DT.run, start: DT.firstTrade || DT.start, end: Date.now(), startValue: DT_START, endValue: +value.toFixed(2), peak: +Math.max(...vals).toFixed(2), low: +Math.min(...vals).toFixed(2), trades: DT.tally ? DT.tally.n : 0, days: DT.equity.length, spxRet: DT.spx0 && spxNow ? +((spxNow / DT.spx0 - 1) * 100).toFixed(2) : null, busted: false };
   const T = DT.tally || dtTally(), st = botStats(DT.trades, DT.equity, DT_START, value, DT.spx0, spxNow);
