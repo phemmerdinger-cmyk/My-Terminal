@@ -5,7 +5,7 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 ## Done
 ### Owner Strategy Lab and cash benchmark (2026-11-18)
 - Independent forward paper books evaluate five-minute Day continuation/reversal and gap-filter ablation, Stage 2 Swing with and without timestamped SEC earnings confirmation, and fixed-hedge Quant pairs. The incumbent books remain the operational comparison.
-- The lab records synchronized completed-session comparisons, doubled-cost sensitivity, SPY and a prior-observation FRED DGS3MO cash benchmark. The cash hurdle is a comparison series and adds no interest to the paper ledgers.
+- The lab records synchronized completed-session comparisons, doubled-cost sensitivity, SPY and a prior-observation cash benchmark using FRED DGS3MO with a U.S. Treasury par-yield fallback. The cash hurdle is a comparison series and adds no interest to the paper ledgers.
 - Pairs require a recorded borrow estimate and an eligible opening print for both legs. The owner interface records the evidence source and timestamp. Original research and trader sources appear under the owner-only notes.
 
 ### Shared paper desk risk (2026-11-18)

@@ -29,9 +29,11 @@
   status.setAttribute("role", "status");
   const errors = add(panel, "div");
   const pairNotes = add(panel, "details");
+  pairNotes.hidden = true;
   add(pairNotes, "summary", "Quant pair decisions");
   const pairList = add(pairNotes, "ul", null, "ap-note");
   const research = add(panel, "details");
+  research.hidden = true;
   add(research, "summary", "Research and trader profiles");
   const sourceList = add(research, "ul", null, "ap-note");
   const borrow = add(panel, "details");
@@ -89,8 +91,8 @@
       data.asOf - q.marketTime <= 86_400_000).length;
     tile("Current borrow availability", `${currentBorrow}/${count(data.borrowSymbols)}`, "Quotes expire after 24 hours");
     const rf = data.riskFree;
-    const yieldTile = tile("3-month Treasury yield", rate(rf?.ratePct / 100), rf?.day ? `FRED observation ${rf.day}` : "Waiting for a prior observation");
-    if (rf?.url) addLink(yieldTile, rf.url, "FRED series");
+    const yieldTile = tile("3-month Treasury yield", rate(rf?.ratePct / 100), rf?.day ? `Observed ${rf.day}` : "Waiting for a prior observation");
+    if (rf?.url) addLink(yieldTile, rf.url, rf.source);
     tile("Treasury cash return", rate(rf?.cashReturn), "Over the comparison period");
     tile("SPY price return", rate(data.benchmarkReturn), "Over the comparison period");
 
@@ -151,11 +153,18 @@
 
   let polling = false;
   const visible = () => !document.hidden && !tab.hidden && !window.__VISITOR;
+  async function request(path, options) {
+    const response = await fetch(path, options);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Request failed.");
+    return data;
+  }
+
   async function poll() {
     if (!visible() || polling) return;
     polling = true;
     try {
-      const data = await api("/api/strategy-lab", { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+      const data = await request("/api/strategy-lab", { cache: "no-store", signal: AbortSignal.timeout(20_000) });
       if (visible()) render(data);
     } catch {
       status.textContent = "Strategy Lab data is temporarily unavailable.";
@@ -178,7 +187,7 @@
     submit.disabled = true;
     importStatus.textContent = "Importing borrow quotes…";
     try {
-      const result = await api("/api/strategy-lab/borrow", { method: "POST", headers: { "Content-Type": "application/json" },
+      const result = await request("/api/strategy-lab/borrow", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(rows), signal: AbortSignal.timeout(15_000) });
       const saved = result?.accepted ?? result?.count;
       importStatus.textContent = Number.isFinite(saved) ? `Imported ${saved} borrow quotes.` : "Borrow quote import completed.";

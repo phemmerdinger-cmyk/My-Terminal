@@ -54,3 +54,16 @@ test("lab opens a queued pair only with both observed opens and carries the Trea
   assert.equal(view.riskFree.cashReturn, null);
   assert.deepEqual(view.errors, []);
 });
+
+test("lab falls back to the Treasury's 3-month par yield when FRED is unreachable", async () => {
+  const lab = createStrategyLab({
+    store: { get: async () => null }, clock: () => ({ day: "2026-11-18" }),
+    rates: async () => { throw new Error("Timeout"); },
+    treasuryRates: async () => '"Date","2 Mo","3 Mo","4 Mo"\n"11/18/2026","5","6","7"\n"11/17/2026","3","4.33","5"\n"11/16/2026","3","N/A","5"',
+  });
+  const { riskFree, errors } = await lab.view();
+  assert.equal(riskFree.day, "2026-11-17");
+  assert.equal(riskFree.ratePct, 4.33);
+  assert.match(riskFree.source, /U.S. Treasury/);
+  assert.deepEqual(errors, []);
+});
