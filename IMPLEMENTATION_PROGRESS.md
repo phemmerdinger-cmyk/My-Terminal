@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Day Trader entry cadence (2026-11-18)
+- Evaluate each new completed minute while a symbol is flat and has no entry queued. A separate observation remains scheduled for model scoring, with one unfinished research sample per symbol.
+- Cap forward paper entries between learning samples at $15 of modeled stop risk. Report the extra forecasts and fills separately.
+- Preserve open positions, queued risk-approved orders, learned weights, paper balances, modeled costs and desk limits across the state migration. Expire a missed entry independently of its research observation.
+
 ### Owner Strategy Lab and cash benchmark (2026-11-18)
 - Independent forward paper books evaluate five-minute Day continuation/reversal and gap-filter ablation, Stage 2 Swing with and without timestamped SEC earnings confirmation, and fixed-hedge Quant pairs. The incumbent books remain the operational comparison.
 - The lab records synchronized completed-session comparisons, doubled-cost sensitivity, SPY and a prior-observation cash benchmark using FRED DGS3MO with a U.S. Treasury par-yield fallback. The cash hurdle is a comparison series and adds no interest to the paper ledgers.

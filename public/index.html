@@ -1713,7 +1713,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="apx" id="apMore"></div>
       <section class="ap-sigs" id="apPc" hidden></section>
       <section class="ap-sigs" id="apSig" hidden></section>
-      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> trades at maximum speed — a new long or short trade in each of 100 stocks every minute, flat by the close — with a self-learning forecast that reads every section of the site deciding the side and the size. Every bust starts a new test run.</p>
+      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000 and run on rules designed by Claude and run by the server with no human input, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days; the <b>quant trader</b> rebalances once a day; the <b>day trader</b> checks completed minutes for intraday longs and shorts, with entries subject to modeled costs and desk risk limits. Every bust starts a new test run.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3554,7 +3554,7 @@ function botNotepad(){
         <div class="hd-m"><small>put in</small>${$m(r.inv)}</div>
         <div class="hd-r"><b data-lv="pv">${$m(r.val)}</b><small data-lv="pp" class="${cls(r.pnl)}">${pct(r.ret*100)} · ${sgn(r.pnl)}</small></div>
         <div class="hd-x">${(+r.sh).toFixed(r.sh%1?2:0)} sh · ${d.value?Math.round(r.val/d.value*100):0}% of account${r.day!=null?` · today <span class="${cls(r.day)}">${pct(r.day)}</span>`:""} · ${r.note} · since ${since(r.at)}</div></div>`).join("")
-      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now — it trades every minute from 9:31 AM to 3:59 PM ET."}</div>`}${orders}</div>`;
+      :`<div class="hd-empty">${swing?"Nothing held right now — it buys at the next opening bell.":"No open trades right now. New forecasts are checked during the regular session."}</div>`}${orders}</div>`;
   };
   const order=BOTS.sel==="quant"?[["quant",BOTS.d.quant],["swing",BOTS.d.swing],["day",BOTS.d.day]]:BOTS.sel==="day"?[["day",BOTS.d.day],["swing",BOTS.d.swing],["quant",BOTS.d.quant]]:[["swing",BOTS.d.swing],["day",BOTS.d.day],["quant",BOTS.d.quant]];
   const n=["swing","day","quant"].reduce((a,k)=>a+(BOTS.d[k]?BOTS.d[k].positions.length:0),0);
@@ -3587,11 +3587,12 @@ function dtRender(d){
   $("apBox").innerHTML=`
   ${apBoth()}
   ${apPerf(d)}
-  <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),`ceiling ~${(d.rules.ceiling||0).toLocaleString()} a day · ${(a.closed||0).toLocaleString()} all-time`],
+  <div class="ap-mini">${[["Trades today",(day.closed||0).toLocaleString(),`${(day.forecasts||0).toLocaleString()} forecasts checked · ${(a.closed||0).toLocaleString()} closed all-time`],
     ["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",a.winRate!=null?`${Math.round(a.winRate*100)}% of trades win`:"no closed trades yet"],
     ["Avg. trade",a.closed?((a.grossWins-a.grossLosses)/a.closed>=0?"+":"−")+"$"+Math.abs((a.grossWins-a.grossLosses)/a.closed).toFixed(2):"—",a.avgHold!=null?`held ${a.avgHold.toFixed(1)} min on average`:"after costs"],
     ["Cost filter",day.best?`${day.best.moveBps.toFixed(1)} / ${day.best.hurdleBps.toFixed(1)} bps`:"—",day.best?`${esc(day.best.sym)} · closest forecast vs. minimum`:"awaiting fresh forecasts"],
     ["Entry flow",`${day.queued||0} queued · ${day.trades||0} entered`,`${day.expired||0} expired · ${day.vetoed||0} held back by risk or research`],
+    ["Between learning samples",`${day.extraForecasts||0} forecasts · ${day.extraEntries||0} entries`,`${$m(d.rules.extraEntryRisk||15)} modeled stop risk per extra entry`],
     ["Costs paid",a.costs!=null?"$"+Math.round(a.costs).toLocaleString():"—","spread, slippage & borrow fees"],
     ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
     ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
