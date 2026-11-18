@@ -4,6 +4,8 @@ const Swing = require("./swing-shadow-runner.js");
 const Pair = require("./quant-pairs-runner.js");
 const PairRules = require("./quant-pairs-core.js");
 const RiskFree = require("./risk-free-core.js");
+const FRED = { source: "FRED · DGS3MO", url: "https://fred.stlouisfed.org/series/DGS3MO" };
+const TREASURY = { source: "U.S. Treasury · 3-month par yield", url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" };
 
 const START = 30_000;
 const DAY_UNIVERSE = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMD", "JPM", "XOM", "META", "AMZN", "TSLA"];
@@ -63,7 +65,7 @@ function quarterlyComparison(facts, sessionDay, observedAt) {
     sales: sales.get(end).val, priorYearSales: sales.get(prior).val, periodEnd: end, source: "SEC EDGAR Company Facts" };
 }
 
-function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, liveDesk }) {
+function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, treasuryRates, liveDesk }) {
   let state, serial = Promise.resolve(), lastFault = null, rateCache = null, rateInFlight = null;
   const warm = new Map(), daily = new Map();
   let warmInFlight = null, dailyInFlight = null, openInFlight = null;
@@ -116,13 +118,18 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
     if (rateCache && now() < rateCache.refreshAt) return Promise.resolve(rateCache);
     if (rateInFlight) return rateInFlight;
     rateInFlight = (async () => {
-      try {
-        const observations = RiskFree.parseDgs3moCsv(await rates());
-        if (!observations.length) throw new Error("No Treasury observations available");
-        rateCache = { refreshAt: now() + 6 * 3600_000, observations, error: null };
-      } catch {
-        rateCache = { refreshAt: now() + 15 * 60_000, observations: rateCache?.observations || [], error: "Treasury rate feed unavailable" };
+      const date = clock().day;
+      for (const [feed, parse, provider] of [[rates, RiskFree.parseDgs3moCsv, FRED], [treasuryRates, RiskFree.parseTreasuryCsv, TREASURY]]) {
+        if (!feed) continue;
+        try {
+          const observations = parse(await feed(date));
+          if (!RiskFree.rateBefore(observations, date)) continue;
+          rateCache = { refreshAt: now() + 6 * 3600_000, observations, provider, error: null };
+          return rateCache;
+        } catch { /* Fall through to the next official source. */ }
       }
+      rateCache = { refreshAt: now() + 15 * 60_000, observations: rateCache?.observations || [],
+        provider: rateCache?.provider || FRED, error: "Treasury rate feeds unavailable" };
       return rateCache;
     })().finally(() => { rateInFlight = null; });
     return rateInFlight;
@@ -274,7 +281,7 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
     });
     return { asOf: now(), since: s.since, experiments, regime: s.regime?.reason ?? "Waiting for a completed session",
       recordedSessions: s.records.length, benchmarkReturn: s.records.length >= 2 && base.benchmark > 0 ? latest.benchmark / base.benchmark - 1 : null,
-      riskFree: { ...rf, cashReturn, source: "FRED · DGS3MO", url: "https://fred.stlouisfed.org/series/DGS3MO", method: "ACT/365 estimated cash benchmark. Observations precede the decision date." },
+      riskFree: { ...rf, cashReturn, ...fc.provider, method: "ACT/365 estimated cash benchmark. Observations precede the decision date." },
       borrowSymbols: PAIR_UNIVERSE, borrowEntries: Object.entries(s.borrow).map(([symbol, q]) => ({ symbol, ...q })),
       errors: [lastFault, fc.error].filter(Boolean), pairDiagnostics: s.pairs.diagnostics.slice(-10), sources: SOURCES };
   }

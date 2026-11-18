@@ -2,21 +2,32 @@
 const DAY = 86_400_000;
 const dayMs = (day) => /^\d{4}-\d{2}-\d{2}$/.test(day || "") ? Date.parse(day + "T00:00:00Z") : NaN;
 
-function parseDgs3moCsv(text) {
+function parseRateCsv(text, dateColumns, rateHeader, normalizeDay) {
   const rows = String(text).replace(/^\uFEFF/, "").trim().split(/\r?\n/);
   const cols = rows.shift().split(",").map((s) => s.trim().replace(/^"|"$/g, "").toUpperCase());
-  const dateColumn = cols.findIndex((s) => s === "DATE" || s === "OBSERVATION_DATE");
-  const rateColumn = cols.indexOf("DGS3MO");
-  if (dateColumn < 0 || rateColumn < 0) throw new Error("FRED DGS3MO CSV headers missing");
+  const dateColumn = cols.findIndex((s) => dateColumns.includes(s));
+  const rateColumn = cols.indexOf(rateHeader);
+  if (dateColumn < 0 || rateColumn < 0) throw new Error(`${rateHeader} CSV headers missing`);
   const dated = new Map();
   for (const row of rows) {
     const c = row.split(",").map((s) => s.trim().replace(/^"|"$/g, ""));
-    const day = c[dateColumn], raw = c[rateColumn];
+    const day = normalizeDay(c[dateColumn]), raw = c[rateColumn];
     const ms = dayMs(day), ratePct = Number(raw);
     if (Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === day && raw !== "" &&
         Number.isFinite(ratePct) && ratePct > -100) dated.set(day, ratePct);
   }
   return [...dated].sort(([a], [b]) => a.localeCompare(b)).map(([day, ratePct]) => ({ day, ratePct }));
+}
+
+function parseDgs3moCsv(text) {
+  return parseRateCsv(text, ["DATE", "OBSERVATION_DATE"], "DGS3MO", (day) => day);
+}
+
+function parseTreasuryCsv(text) {
+  return parseRateCsv(text, ["DATE"], "3 MO", (date) => {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(date || "");
+    return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : date;
+  });
 }
 
 function rateBefore(observations, day, { maxAgeDays = 7 } = {}) {
@@ -49,4 +60,4 @@ function cashBenchmark({ sessions, observations = [], recordedRates = {}, initia
   return { points, complete: missingIntervals === 0, missingIntervals };
 }
 
-module.exports = { parseDgs3moCsv, rateBefore, cashBenchmark };
+module.exports = { parseDgs3moCsv, parseTreasuryCsv, rateBefore, cashBenchmark };

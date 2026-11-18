@@ -3037,7 +3037,14 @@ const strategyLab = LAB.createStrategyLab({
     return { bars, raw, adjusted, fundamental };
   },
   bars: dtBars,
-  rates: () => getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=${+deskClock().day.slice(0, 4) - 2}-01-01`, "text/csv", 8_000),
+  rates: (day) => getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=${+day.slice(0, 4) - 1}-01-01`, "text/csv", 3_500),
+  treasuryRates: async (day) => {
+    const year = Number(day.slice(0, 4));
+    const years = day.slice(5) < "01-09" ? [year, year - 1] : [year];
+    const results = await Promise.allSettled(years.map((y) => treasuryYearCsv(y, year)));
+    return results.filter((r) => r.status === "fulfilled").map((r, i) =>
+      i ? r.value.trim().split(/\r?\n/).slice(1).join("\n") : r.value.trim()).join("\n");
+  },
   liveDesk: () => deskRisk.view(),
 });
 if (!process.env.AP_TEST) setTimeout(() => {
@@ -3562,11 +3569,15 @@ async function fredCsv(m) {
   return rows;
 }
 // ---- fallbacks ----
+function treasuryYearCsv(year, currentYear) {
+  return cached("ust:" + year, year < currentYear ? 7 * 864e5 : 6 * 3600e3, () =>
+    getT(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&page&_format=csv`, "text/csv", 10000));
+}
 async function treasuryYields() {
   return cached("ust:all", 6 * 3600e3, async () => {
     const y0 = new Date().getUTCFullYear(), rows = [];
     for (let y = y0 - 9; y <= y0; y++) {
-      const csv = await cached("ust:" + y, y < y0 ? 7 * 864e5 : 6 * 3600e3, () => getT(`https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${y}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${y}&page&_format=csv`, "text/csv", 20000));
+      const csv = await treasuryYearCsv(y, y0);
       const lines = csv.trim().split(/\r?\n/), head = lines[0].split(",").map((h) => h.replace(/"/g, "").trim());
       const ix = (n) => head.indexOf(n), i3 = ix("3 Mo"), i2 = ix("2 Yr"), i10 = ix("10 Yr");
       for (const l of lines.slice(1)) { const c = l.split(","); const [mm, dd, yy] = c[0].replace(/"/g, "").split("/"); if (!yy) continue; rows.push([`${yy}-${mm}-${dd}`, +c[i3], +c[i2], +c[i10]]); }
