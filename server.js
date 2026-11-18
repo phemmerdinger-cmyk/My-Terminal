@@ -2334,7 +2334,7 @@ async function dtPrev(sym, today) {
   return cached(`dtp:${sym}:${today}`, 12 * 3600e3, async () => {
     const j = JSON.parse(await get(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=5d&interval=1d`, "application/json"));
     const r = j.chart.result[0], q = r.indicators.quote[0];
-    const rows = r.timestamp.map((t, i) => ({ d: etParts(new Date(t * 1000)).day, h: q.high[i], l: q.low[i], c: q.close[i] })).filter((x) => x.c != null && x.d < today);
+    const rows = r.timestamp.map((t, i) => ({ d: etParts(new Date(t * 1000)).day, o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i] })).filter((x) => x.c != null && x.d < today);
     return rows[rows.length - 1] || null;
   });
 }
@@ -2566,6 +2566,10 @@ async function dtTick() {
     };
     const all = [];
     for (let i = 0; i < syms.length; i += 8) all.push(...(await Promise.all(syms.slice(i, i + 8).map(one))));
+    if (!process.env.AP_TEST) {
+      const prior = Object.fromEntries(Object.entries(DTP).filter(([, row]) => row.d === t.day && row.v).map(([sym, row]) => [sym, row.v]));
+      strategyLab.onMinute(all, t.day, close, prior).catch(() => {});
+    }
     if (fails > syms.length * 0.2) { dtThrottleUntil = Date.now() + 10 * 60e3; diagErr("day", `data source refused ${fails} of ${syms.length} requests — scanning the first 50 stocks for 10 minutes`); }
     const byMinute = new Map(), latest = new Map();
     const spyBars = (all.find(([s]) => s === "SPY") || [])[1] || [];
@@ -2985,6 +2989,63 @@ const deskRisk = createDeskRisk({
 if (!process.env.AP_TEST) setTimeout(() => {
   deskRisk.prepare(); setInterval(() => { deskRisk.refresh().then(() => deskRisk.prepare()).catch(() => {}); }, 60_000);
 }, 30_000);
+
+const LAB = require("./strategy-lab.js");
+async function labQuarterly(sym, day) {
+  if (!LAB.SWING_UNIVERSE.includes(sym)) return null;
+  return cached(`lab:quarter:${sym}:${day}`, 12 * 3600_000, async () => {
+    const company = await secCik(sym);
+    if (!company) return null;
+    const facts = await secGet(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(company.cik).padStart(10, "0")}.json`);
+    return LAB.quarterlyComparison(facts.facts, day, Date.now());
+  });
+}
+const labFormat = new Intl.DateTimeFormat("en-GB", { timeZone: "America/New_York", hourCycle: "h23", hour: "2-digit", minute: "2-digit" });
+function labMinute(ts) {
+  const [h, m] = labFormat.format(new Date(ts * 1000)).split(":").map(Number);
+  return h * 60 + m;
+}
+const strategyLab = LAB.createStrategyLab({
+  store: paperStore("desk-strategy-lab-v1", { url: UP_URL, token: UP_TOKEN }),
+  clock: (at) => {
+    if (at == null) return deskClock();
+    const t = etParts(new Date(at)); return { ...t, close: NYSE_EARLY.has(t.day) ? 780 : 960 };
+  },
+  nextSession: (day) => adjacentSession(day, 1),
+  minuteHistory: async (sym) => (await history(sym, "5d", "5m")).candles.map((bar) => ({ t: bar.time,
+    d: apDayFormat.format(bar.time * 1000), m: labMinute(bar.time), o: bar.open, h: bar.high, l: bar.low, c: bar.close, v: bar.volume })),
+  dailyData: async (sym, t) => {
+    const from = `${+t.day.slice(0, 4) - 2}-01-01`;
+    const [prices, formatted, fundamental] = await Promise.all([
+      fetchLongHistory(sym, from, t.day, "1d", t.close),
+      history(sym, "2y", "1d"),
+      labQuarterly(sym, t.day).catch(() => null),
+    ]);
+    const raw = {}, adjusted = {};
+    for (let i = 0; i < prices.t.length; i++) {
+      const day = apDayFormat.format(prices.t[i] * 1000);
+      if (day > t.day || !(prices.close[i] > 0)) continue;
+      raw[day] = prices.close[i];
+      if (prices.adj?.[i] > 0) adjusted[day] = prices.adj[i];
+    }
+    const bars = formatted.candles.map((b) => ({ ...b, day: apDayFormat.format(b.time * 1000) }))
+      .filter((b) => b.day <= t.day && raw[b.day] > 0);
+    const last = bars.at(-1);
+    if (!last || last.day !== t.day || Math.abs(last.close - raw[t.day]) > Math.max(0.0001, raw[t.day] * 0.00005)) {
+      throw new Error("Final daily OHLC is not aligned");
+    }
+    return { bars, raw, adjusted, fundamental };
+  },
+  bars: dtBars,
+  rates: () => getT(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS3MO&cosd=${+deskClock().day.slice(0, 4) - 2}-01-01`, "text/csv", 8_000),
+  liveDesk: () => deskRisk.view(),
+});
+if (!process.env.AP_TEST) setTimeout(() => {
+  strategyLab.tick();
+  const t = deskClock();
+  if (t.trading && t.open) strategyLab.warmDay(t.day).catch(() => {});
+  setInterval(() => strategyLab.tick(), 30_000);
+}, 35_000);
 const blOpenish = () => { const t = etParts(); return !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 9 * 60 + 25 && t.min <= 16 * 60 + 5; };
 async function blRefresh() {
   if (BL.busy) return; BL.busy = true;
@@ -3862,6 +3923,11 @@ async function handle(req, res) {
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
       if (u.pathname === "/api/desk-risk" && req.method === "GET") return send(res, 200, deskRisk.view());
+      if (u.pathname === "/api/strategy-lab" && req.method === "GET") return send(res, 200, await strategyLab.view());
+      if (u.pathname === "/api/strategy-lab/borrow" && req.method === "POST") {
+        try { return send(res, 200, await strategyLab.saveBorrow(await readBody(req))); }
+        catch (error) { return send(res, 400, { error: error.message }); }
+      }
       if (u.pathname === "/api/desk-risk/review" && req.method === "POST") {
         const ok = await deskRisk.review();
         return send(res, ok ? 200 : 409, { ok, risk: deskRisk.view() });
