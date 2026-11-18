@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### AI vs S&P 500: head-to-head money scoreboard (2026-11-18)
+- New scoreboard at the top of the leaderboard (`lbRender`, public/index.html): headline leader + $ gap to #2 and to the S&P, "N of 3 beating the S&P", combined profit, and one row per trader with bot-vs-S&P bars on a shared $0-centred scale, bot $ made, S&P $ made, and the $ difference. Rows open the trader like the cards. Period buttons and detail cards unchanged.
+- `competition-core.windowStats` now returns `spxProfit` (same base money × S&P return over the same dates — hypothetical, price only) and `edge` (profit − spxProfit); both null when S&P data is missing. Test added.
+
 ### Day Trader forecast horizon (2026-11-18)
 - Model, research scoring and the paper holding clock use the same ten-minute window. Score the originally issued prediction only after its scheduled outcome is available. History and account equity carry over, and training starts fresh for the new window.
 - Keep the modeled round-trip costs, buffer and exposure limits. Require the whole window to fit before the regular or early close. Settle stops, targets and time exits from completed bars, with a conservative first-fresh-open exit after an actual data gap.

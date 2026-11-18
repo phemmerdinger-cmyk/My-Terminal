@@ -50,3 +50,12 @@ test("ranking: profit first, but a trader past the drawdown limit is ineligible 
   assert.deepEqual(r.map((x) => [x.key, x.place]), [["c", 1], ["a", 2], ["d", null], ["b", null]]);
   assert.match(r.find((x) => x.key === "b").ineligible[0], /drawdown/);
 });
+
+test("S&P benchmark in dollars uses the same base money and dates; edge = profit minus it", () => {
+  const s = ser([30300, 30900], [101, 101.5]);
+  const w = C.windowStats(s, { start: 30000, today: "2026-01-02", days: null, spx0: 100 });
+  assert.equal(w.spxProfit, 450); // $30,000 × 1.5%
+  assert.equal(w.edge, 450);      // $900 − $450
+  const n = C.windowStats(ser([30300], [null]), { start: 30000, today: "2026-01-01", days: null, spx0: null });
+  assert.equal(n.spxProfit, null); assert.equal(n.edge, null); // no S&P data → no made-up benchmark
+});

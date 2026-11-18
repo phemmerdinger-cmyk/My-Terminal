@@ -1442,6 +1442,22 @@ html.viewonly .api-bal-wrap{display:none!important}
 .lb-big{margin:10px 0 2px;font-size:24px;font-weight:700;letter-spacing:-.02em}.lb-sub{font-size:12px;color:var(--muted)}
 .lb-kv{display:grid;grid-template-columns:1fr auto;gap:3px 10px;margin:10px 0 0;font-size:12px}.lb-kv span{color:var(--dim)}.lb-kv b{font-weight:600;text-align:right}
 .lb-note{font-size:11.5px;color:var(--dim);margin:8px 0 0;line-height:1.45}.lb-foot{font-size:11.5px;color:var(--dim);margin-top:8px}
+.lbx{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:0 0 14px}
+.lbx-top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;justify-content:space-between;margin-bottom:12px}
+.lbx-k{font-size:11px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}.lbx-lead{font-size:clamp(18px,2.4vw,24px);font-weight:700;letter-spacing:-.015em;margin-top:2px}.lbx-lead small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0;margin-top:2px}
+.lbx-tally{display:flex;gap:8px;flex-wrap:wrap}.lbx-chip{border:1px solid var(--line);border-radius:10px;padding:6px 11px;text-align:right}.lbx-chip b{display:block;font-size:17px}.lbx-chip span{font-size:11px;color:var(--dim)}
+.lbx-hd,.lbx-row{display:grid;grid-template-columns:30px minmax(110px,160px) minmax(160px,1fr) 118px 118px 128px;gap:12px;align-items:center}
+.lbx-hd{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:0 8px 6px;border-bottom:1px solid var(--line)}.lbx-hd span:nth-child(n+4){text-align:right}
+.lbx-row{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:inherit;font:inherit;text-align:left;padding:10px 8px;cursor:pointer;border-radius:0}.lbx-row:last-of-type{border-bottom:0}.lbx-row:hover{background:var(--panel2)}
+.lbx-rk{font-size:18px;font-weight:700;color:var(--orange)}.lbx-rk.x{font-size:12px;color:var(--down)}
+.lbx-nm b{display:block;font-size:14px}.lbx-nm small{font-size:11px;color:var(--dim)}
+.lbx-bars{display:grid;gap:4px}.lbx-bar{position:relative;height:12px;border-radius:3px;background:linear-gradient(90deg,transparent calc(50% - .5px),var(--line2) calc(50% - .5px),var(--line2) calc(50% + .5px),transparent calc(50% + .5px))}
+.lbx-bar i{position:absolute;top:0;bottom:0;border-radius:3px}.lbx-bar.bot i.up{background:var(--up)}.lbx-bar.bot i.down{background:var(--down)}.lbx-bar.spx{height:8px}.lbx-bar.spx i{background:var(--muted);opacity:.55}
+.lbx-bl{display:flex;justify-content:space-between;font-size:10px;color:var(--dim)}
+.lbx-v{text-align:right}.lbx-v b,.lbx-e b,.lbx-chip b{white-space:nowrap}.lbx-v b{display:block;font-size:15px;font-weight:700}.lbx-v small{font-size:11px;color:var(--muted)}.lbx-v.spxv b{color:var(--muted);font-weight:600}
+.lbx-e{text-align:right}.lbx-e b{display:block;font-size:15px}.lbx-e small{font-size:11px}
+.lbx-foot{font-size:11.5px;color:var(--dim);margin:10px 0 0;line-height:1.45}.lbx-foot i{display:inline-block;width:14px;height:8px;border-radius:2px;vertical-align:middle;margin:0 4px 0 2px}
+@media(max-width:820px){.lbx-hd{display:none}.lbx-row{grid-template-columns:30px 1fr 1fr;grid-template-areas:"r n e" "b b b" "v v s"}.lbx-rk{grid-area:r}.lbx-nm{grid-area:n}.lbx-bars{grid-area:b}.lbx-row .lbx-v:not(.spxv){grid-area:v;text-align:left}.lbx-row .lbx-v:not(.spxv)::before{content:"Bot made";display:block;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}.lbx-v.spxv::before{content:"S&P made*";display:block;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}.lbx-v.spxv{grid-area:s}.lbx-e{grid-area:e}}
 .pc-big{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}.pc-big .pc-num{font-size:30px;letter-spacing:-.02em;display:block}.pc-big small{display:block;color:var(--dim);font-size:11.5px}
 .pc-zone{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
 .pc-chart{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--panel)}.pc-chart svg{width:100%;height:120px;display:block}
@@ -5241,8 +5257,32 @@ function lbRender(){
         <span>Invested now</span><b>${t.exposure==null?"—":Math.round(t.exposure*100)+"%"}</b></div>
       <p class="lb-note">${st.ok?esc(st.confidence):""}${t.thesis?` · ${esc(t.thesis)}`:""}</p>
       <p class="lb-note"><b>Latest:</b> ${esc(t.latest||"—")}</p></button>`; };
+  // Head-to-head scoreboard: dollars made by each trader vs. the same money in the S&P 500 over the same dates.
+  const sb=(()=>{ const rows=board.filter(r=>r.stats&&r.stats.ok); if(!rows.length) return "";
+    const sg=v=>(v>0?"+":"")+$$(v), M=Math.max(1,...rows.flatMap(r=>[Math.abs(r.stats.profit),Math.abs(r.stats.spxProfit||0)]));
+    const bar=(v,k)=>{ const w=Math.min(50,Math.abs(v)/M*50).toFixed(2); return `<div class="lbx-bar ${k}"><i class="${v>=0?"up":"down"}" style="${v>=0?"left:50%":`right:50%`};width:${w}%"></i></div>`; };
+    const lead=rows.find(r=>r.place===1), second=rows.find(r=>r.place===2), nm=k=>esc(j.traders[k].name);
+    const withSpx=rows.filter(r=>r.stats.edge!=null), beat=withSpx.filter(r=>r.stats.edge>0).length;
+    const tied=rows.length>1&&rows.every(r=>r.stats.profit===rows[0].stats.profit);
+    const headline=tied?"All three traders are tied":lead?`${nm(lead.key)} is winning`:"No eligible trader right now";
+    const sub=lead&&!tied?`${lead.stats.profit>=0?"Up":"Down"} ${$$(Math.abs(lead.stats.profit))} ${P.k==="life"?"this run":esc(P.label.toLowerCase()==="today"?"today":"this "+P.label.toLowerCase())}${second?` · ${$$(Math.max(0,lead.stats.profit-second.stats.profit))} ahead of ${nm(second.key)}`:""}${lead.stats.edge!=null?` · ${$$(Math.abs(lead.stats.edge))} ${lead.stats.edge>=0?"ahead of":"behind"} the S&amp;P 500`:""}`:"";
+    const total=rows.reduce((a,r)=>a+r.stats.profit,0);
+    const row=r=>{ const st=r.stats, t=j.traders[r.key];
+      return `<button type="button" class="lbx-row" data-lb="${r.key}" title="See ${esc(t.name)}'s portfolio">
+        <span class="lbx-rk${r.place?"":" x"}">${r.place?"#"+r.place:"Out"}</span>
+        <span class="lbx-nm"><b>${esc(t.name)}</b><small>${esc(t.focus||"")}</small></span>
+        <span class="lbx-bars">${bar(st.profit,"bot")}${st.spxProfit!=null?bar(st.spxProfit,"spx"):""}</span>
+        <span class="lbx-v"><b class="${cls(st.profit)}">${sg(st.profit)}</b><small>${pc(st.ret)} return</small></span>
+        <span class="lbx-v spxv"><b>${st.spxProfit==null?"—":sg(st.spxProfit)}</b><small>${st.spxRet==null?"S&amp;P data unavailable":pc(st.spxRet)+" return"}</small></span>
+        <span class="lbx-e">${st.edge==null?'<b class="dim">—</b><small class="dim">no S&amp;P data</small>':`<b class="${cls(st.edge)}">${sg(st.edge)}</b><small class="${cls(st.edge)}">${st.edge>=0?"▲ beating the S&amp;P":"▼ trailing the S&amp;P"}</small>`}</span>
+      </button>`; };
+    return `<div class="lbx"><div class="lbx-top"><div><div class="lbx-k">${esc(P.label)} · who's made the most money</div><div class="lbx-lead">${headline}<small>${sub}</small></div></div>
+      <div class="lbx-tally"><div class="lbx-chip"><b>${withSpx.length?`${beat} of ${withSpx.length}`:"—"}</b><span>beating the S&amp;P 500</span></div><div class="lbx-chip"><b class="${cls(total)}">${sg(total)}</b><span>all three combined</span></div></div></div>
+      <div class="lbx-hd"><span>Rank</span><span>Trader</span><span>Profit: bot vs S&amp;P</span><span>Bot made</span><span>S&amp;P made*</span><span>Bot vs S&amp;P</span></div>
+      ${board.filter(r=>r.stats&&r.stats.ok).map(row).join("")}
+      <p class="lbx-foot"><i style="background:var(--up)"></i>bot's paper profit after modeled costs <i style="background:var(--muted);opacity:.55"></i>S&amp;P 500 benchmark. *What the same starting money would have made in the S&amp;P 500 over the same dates (hypothetical, price only). Bars share one scale, centred on $0. Tap a row to open that trader.</p></div>`; })();
   el.innerHTML=`<div class="lb-h"><h2 class="h">Three-Trader Challenge · leaderboard</h2><div class="lb-seg">${j.periods.map(x=>`<button type="button" data-lbp="${x.k}" class="${x.k===P.k?"on":""}">${esc(x.label)}</button>`).join("")}</div></div>
-    <div class="lb-grid">${board.map(card).join("")}</div>
+    ${sb}<div class="lb-grid">${board.map(card).join("")}</div>
     <p class="lb-foot">Paper money, forward results only — no backtests mixed in. Ranked by net profit after modeled costs over the same dates for all three, measured from each trader's value at the last close before the window (or its $30,000 start). A drawdown beyond ${Math.round(j.limits.maxDrawdown*100)}% makes a trader ineligible. Sharpe, Sortino and the beat-the-S&amp;P test need 20+ trading days; annualized figures need 60. Updated ${esc(ago(j.t))}.</p>`;
 }
 document.addEventListener("click",e=>{

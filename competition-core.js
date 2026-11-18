@@ -34,6 +34,8 @@
     const ex = pts.slice(1).map((p, i) => (p.spx > 0 && pts[i].spx > 0 ? p.v / pts[i].v - p.spx / pts[i].spx : null)).filter((x) => x != null);
     const t = ex.length >= 20 && sd(ex) > 0 ? mean(ex) / (sd(ex) / Math.sqrt(ex.length)) : null;
     return { ok: true, from: from || (s[0] && s[0].d), to: last.d, days: n, base: +base.v.toFixed(2), value: +last.v.toFixed(2), profit: +profit.toFixed(2), ret, spxRet, alpha: spxRet == null ? null : ret - spxRet,
+      // benchmark in dollars: what the same starting money in the S&P 500 made over the same dates (hypothetical)
+      spxProfit: spxRet == null ? null : +(base.v * spxRet).toFixed(2), edge: spxRet == null ? null : +(profit - base.v * spxRet).toFixed(2),
       maxDrawdown: mdd, vol, sharpe: enough && vol ? (mean(dr) * 252) / vol : null, sortino: enough && dsd ? (mean(dr) * 252) / dsd : null,
       annualized: ann, calmar: ann != null && mdd < 0 ? ann / -mdd : null, tStat: t,
       confidence: t == null ? `too few days (${ex.length}) to judge` : Math.abs(t) >= 2 ? (t > 0 ? "beating the S&P beyond chance (t ≥ 2)" : "trailing the S&P beyond chance (t ≤ −2)") : "not distinguishable from the S&P" };
