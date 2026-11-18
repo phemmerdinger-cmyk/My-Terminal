@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### AI vs S&P 500: performance hero (2026-11-18)
+- New hero at the top of the tab (`#apHero`, `heroRender()` in public/index.html; styles `.hx-*`/`.hxc-*`), owner picked "terminal readout" (option C of four): AI total return, S&P 500 with the same money, all-time and today gaps (pts + $) in one monospaced row, then a trader blotter (return, P&L, S&P same $, gap; row opens the trader). Spacing scale 4/8/12/16/24/32/48, Plex Mono, tabular figures.
+- `competition-core`: `windowStats` adds `spxProfit`/`edge`; new `combine(board)` sums the traders and reports the S&P side only when every trader has S&P data. Server adds `summary: {day, life}` to `/api/pub/leaderboard`. Tests added.
+- Leaderboard cards, period buttons and everything below are unchanged.
+
 ### Day Trader forecast horizon (2026-11-18)
 - Model, research scoring and the paper holding clock use the same ten-minute window. Score the originally issued prediction only after its scheduled outcome is available. History and account equity carry over, and training starts fresh for the new window.
 - Keep the modeled round-trip costs, buffer and exposure limits. Require the whole window to fit before the regular or early close. Settle stops, targets and time exits from completed bars, with a conservative first-fresh-open exit after an actual data gap.

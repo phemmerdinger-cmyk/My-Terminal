@@ -34,6 +34,8 @@
     const ex = pts.slice(1).map((p, i) => (p.spx > 0 && pts[i].spx > 0 ? p.v / pts[i].v - p.spx / pts[i].spx : null)).filter((x) => x != null);
     const t = ex.length >= 20 && sd(ex) > 0 ? mean(ex) / (sd(ex) / Math.sqrt(ex.length)) : null;
     return { ok: true, from: from || (s[0] && s[0].d), to: last.d, days: n, base: +base.v.toFixed(2), value: +last.v.toFixed(2), profit: +profit.toFixed(2), ret, spxRet, alpha: spxRet == null ? null : ret - spxRet,
+      // benchmark in dollars: what the same starting money in the S&P 500 made over the same dates (hypothetical)
+      spxProfit: spxRet == null ? null : +(base.v * spxRet).toFixed(2), edge: spxRet == null ? null : +(profit - base.v * spxRet).toFixed(2),
       maxDrawdown: mdd, vol, sharpe: enough && vol ? (mean(dr) * 252) / vol : null, sortino: enough && dsd ? (mean(dr) * 252) / dsd : null,
       annualized: ann, calmar: ann != null && mdd < 0 ? ann / -mdd : null, tStat: t,
       confidence: t == null ? `too few days (${ex.length}) to judge` : Math.abs(t) >= 2 ? (t > 0 ? "beating the S&P beyond chance (t ≥ 2)" : "trailing the S&P beyond chance (t ≤ −2)") : "not distinguishable from the S&P" };
@@ -53,5 +55,21 @@
     return out;
   }
 
-  return { windowStats, rank, PERIODS, LIMITS };
+  // board: ranked rows for one window → the three AI traders combined vs the S&P 500 with the same money over the same dates.
+  // The S&P side is reported only when every trader has an S&P figure (never a partial, misleading benchmark).
+  function combine(board) {
+    const rows = (board || []).filter((r) => r && r.stats && r.stats.ok);
+    if (!rows.length) return { ok: false, why: "no recorded values yet" };
+    const sum = (f) => rows.reduce((a, r) => a + f(r.stats), 0);
+    const base = sum((s) => s.base), profit = sum((s) => s.profit), value = sum((s) => s.value);
+    const hasSpx = rows.every((r) => r.stats.spxProfit != null);
+    const spxProfit = hasSpx ? sum((s) => s.spxProfit) : null;
+    const ret = base > 0 ? profit / base : null, spxRet = hasSpx && base > 0 ? spxProfit / base : null;
+    return { ok: true, n: rows.length, base: +base.toFixed(2), value: +value.toFixed(2), profit: +profit.toFixed(2), ret,
+      spxProfit: hasSpx ? +spxProfit.toFixed(2) : null, spxRet, edge: hasSpx ? +(profit - spxProfit).toFixed(2) : null,
+      gap: ret != null && spxRet != null ? ret - spxRet : null,
+      beating: hasSpx ? rows.filter((r) => r.stats.edge > 0).length : null };
+  }
+
+  return { windowStats, rank, combine, PERIODS, LIMITS };
 });
