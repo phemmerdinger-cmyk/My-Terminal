@@ -1561,8 +1561,8 @@ const STRATS = {
     params: { ratioWeight: 0.08, slots: 10, riskSlots: 8, slipPerSide: 0.00075, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 3 } },
   day: { id: "alex-intraday", version: 3, trader: "Day Trader", since: "2026-11-18",
     hypothesis: "A ten-minute forecast can identify positive net paper trades at observable prices after the decision and modeled costs.",
-    changes: ["Queue a later minute open using the real decision clock", "Score issued forecasts on the next ten minutes of observed data and apply the same time limit to paper positions", "Model 5 bps per side for spread and slippage, plus 1 bp per short", "Give the stop priority when minute data cannot determine the exit sequence", "Risk 0.25% of equity per trade, 4× modeled gross, and stop opening trades after a 1% daily loss", "Research can veto or shrink a trade"],
-    params: { costPerSide: 0.0005, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 4, netCap: 2, dailyLoss: 0.01, maxBarLagSec: 90, holdMinutes: 10 } },
+    changes: ["Queue a later minute open using the real decision clock", "Score issued forecasts on the next ten minutes of observed data and apply the same time limit to paper positions", "Model 5 bps per side for spread and slippage, plus 1 bp per short", "Give the stop priority when minute data cannot determine the exit sequence", "Risk 0.25% of equity per trade, 1× gross under the shared desk cap, and stop opening trades after a 1% daily loss", "Research can veto or shrink a trade"],
+    params: { costPerSide: 0.0005, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 1, netCap: 1, dailyLoss: 0.01, maxBarLagSec: 90, holdMinutes: 10 } },
   quant: { id: "daniel-macro-quant", version: 3, trader: "Quant Trader", since: "2026-11-17",
     hypothesis: "A regime-aware, risk-parity allocation across liquid ETFs and mega-caps (12-1 momentum, 3-month momentum, low volatility, 200-day trend filter, 15% vol target) beats the S&P on a risk-adjusted basis after 5 bps costs.",
     changes: ["Zweig put/call nudges the equity sleeve ±10% at sentiment extremes", "v3: quality + value factor from the Fin 370 ratio units (profitability/DuPont, leverage, efficiency, valuation vs peers and prior year) added to the stock ranking at 0.25 weight; ETFs get 0"],
@@ -1782,7 +1782,7 @@ function pcState() {
 const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
 setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
-const BOTDIAG = { market: {}, swing: { errors: [] }, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
+const BOTDIAG = { market: {}, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
@@ -2089,17 +2089,34 @@ async function apTick() {
       const pending = AP.pending;
       const { quotes } = await getQuotes([...new Set(pending.orders.map((order) => order.sym))]);
       const observedAt = Date.now();
-      if (!sessionInfo().open || observedAt - pending.at > PAPER.MAX_QUOTE_AGE ||
-          !pending.orders.every((order) => PAPER.usableQuote(quotes[order.sym], observedAt, pending.at))) return;
-      const next = structuredClone(AP);
-      for (const order of pending.orders) {
-        const quote = quotes[order.sym];
-        apPx[order.sym] = quote.price;
-        apTrade(next, order.side, order.sym, order.shares, quote.price, order.why, order.name, order.sleeve,
-          { decisionAt: pending.at, decisionPrice: order.referencePrice, marketTime: quote.marketTime });
-      }
-      next.pending = null;
-      await apCommitFills(next);
+      if (!sessionInfo().open || observedAt - pending.at > PAPER.MAX_QUOTE_AGE) return;
+      const buys = pending.orders.filter((o) => o.side === "BUY" && PAPER.usableQuote(quotes[o.sym], observedAt, pending.at));
+      if (buys.length) await deskRisk.prepare(buys.map((o) => o.sym));
+      if (!sessionInfo().open) return;
+      const executable = pending.orders.filter((o) => PAPER.usableQuote(quotes[o.sym], Date.now(), pending.at));
+      if (!executable.length) return;
+      const next = structuredClone(AP), tickets = [];
+      try {
+        for (const order of executable) {
+          const quote = quotes[order.sym];
+          let shares = order.shares;
+          if (order.side === "BUY") {
+            const stop = apStops({ sleeve: order.sleeve })[0];
+            const ticket = deskRisk.reserve({ bot: "swing", sym: order.sym, sign: 1, shares, price: quote.price,
+              riskPerShare: quote.price * (stop + 2 * AP_COST) });
+            if (!ticket.shares) { BOTDIAG.swing.desk = ticket.reason; continue; }
+            tickets.push(ticket);
+            shares = ticket.shares;
+          }
+          apPx[order.sym] = quote.price;
+          apTrade(next, order.side, order.sym, shares, quote.price, order.why, order.name, order.sleeve,
+            { decisionAt: pending.at, decisionPrice: order.referencePrice, marketTime: quote.marketTime });
+        }
+        const remaining = pending.orders.filter((o) => !executable.includes(o));
+        next.pending = remaining.length ? { ...pending, orders: remaining } : null;
+        await apCommitFills(next);
+      } finally { for (const ticket of tickets) ticket.release(); }
+      if (AP.pending) return;
     }
     if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = AP.firstTrade || now; } catch (e) { diagErr("swing", e); } }
     let syms = Object.keys(AP.positions), q = syms.length ? (await getQuotes(syms)).quotes : {};
@@ -2455,7 +2472,11 @@ function dtOpen(sym, forecast, bar) {
   const eq = dtEquity(), px = fill.entry;
   if (eq <= 0) return;
   const want = DTC.size(eq, px, fill.stop, DT_PARAMS.riskPct * idea.sizeX, DT_POS_X * eq);
-  const shares = DTB.guard(want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: idea.stressed ? DT_NET / 2 : DT_NET });
+  if (!forecast.approval || forecast.approval.at >= bar.t * 1000 || !deskRisk.mayExecute()) return;
+  const riskPerShare = Math.abs(px - fill.stop) + px * (2 * DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
+  const plannedRisk = forecast.approval.shares * forecast.approval.riskPerShare;
+  const limited = DTB.guard(want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: idea.stressed ? DT_NET / 2 : DT_NET });
+  const shares = Math.floor(Math.min(limited, forecast.approval.shares, plannedRisk / riskPerShare));
   if (shares < 1) return;
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   dtPx[sym] = px;
@@ -2573,18 +2594,36 @@ async function dtTick() {
     }
     for (const [, events] of [...byMinute].sort((a, b) => a[0] - b[0])) dtSettle(events, t.day);
 
-    const activeUniverse = new Set(uni);
+    const activeUniverse = new Set(uni), drafted = [];
     for (const [sym, { bars, last }] of latest) {
       dtPx[sym] = last.c;
       if (!m.open || !activeUniverse.has(sym) || DT.pend[sym] || DT.positions[sym] || last.t <= (DT.lastBar[sym] || 0)) continue;
       DT.lastBar[sym] = last.t;
       const forecast = dtDecide(bars, sym, ctx, t.day);
-      if (!forecast) continue;
+      if (forecast) drafted.push({ sym, last, forecast });
+    }
+    const riskSymbols = drafted.filter(({ forecast }) => forecast.idea).map(({ sym }) => sym);
+    if (riskSymbols.length) await deskRisk.prepare(riskSymbols);
+    for (const { sym, last, forecast } of drafted) {
       const decisionAt = Date.now();
       const fillAt = DTC.paperEntryMinute(last, decisionAt, close, DT_PARAMS.maxBarLagSec, DT_HOLD);
       if (fillAt == null) continue;
       if (dtHalted()) forecast.idea = null;
+      let ticket = null;
+      if (forecast.idea) {
+        const eq = dtEquity(), idea = forecast.idea;
+        const need = DTC.size(eq, last.c, last.c - forecast.side * idea.stopDistance, DT_PARAMS.riskPct * idea.sizeX, DT_POS_X * eq);
+        const riskPerShare = idea.stopDistance + last.c * (2 * DT_COST + (forecast.side < 0 ? DT_FEE_SHORT : 0));
+        ticket = deskRisk.reserve({ bot: "day", sym, sign: forecast.side, shares: need, price: last.c, riskPerShare, integer: true });
+        if (ticket.shares) forecast.approval = { at: decisionAt, shares: ticket.shares, price: last.c, riskPerShare };
+        else {
+          forecast.idea = null;
+          DT.day.deskBlocked = (DT.day.deskBlocked || 0) + 1;
+          BOTDIAG.day.desk = ticket.reason;
+        }
+      }
       DT.pend[sym] = { ...forecast, decisionAt, decisionPrice: last.c, fillAt, evalAt: fillAt + (DT_HOLD - 1) * 60 };
+      ticket?.release?.();
       DT.day.forecasts++;
       if (forecast.qualified) DT.day.qualified++;
       if (forecast.idea) DT.day.queued = (DT.day.queued || 0) + 1;
@@ -2769,26 +2808,63 @@ const QT_OPEN_MINUTE = 9 * 60 + 30, QT_OPEN_CUTOFF = 10 * 60;
 async function qtExecute(t, started) {
   const plan = QT.pending;
   const open = Math.floor(started / 60_000) * 60 - (t.min - QT_OPEN_MINUTE) * 60;
-  const syms = [...new Set([...plan.orders.map((o) => o.sym), "^GSPC"])];
-  const quotes = await Promise.allSettled(syms.map(async (s) => [s, QTC.openingPrice(await dtBars(s), open)]));
+  const at = plan.fillAt || open, targets = plan.orders.map((o) => o.sym);
+  const quotes = await Promise.allSettled([...new Set([...targets, "^GSPC"])].map(async (sym) => {
+    const bar = (await dtBars(sym)).find((b) => b.t === at && b.d === t.day);
+    return [sym, bar && (!plan.fillAt || DTC.paperBarReady(bar, Date.now(), 90)) ? bar.o : null];
+  }));
   const prices = Object.fromEntries(quotes.filter((r) => r.status === "fulfilled").map((r) => r.value));
-  const missing = syms.filter((s) => !(prices[s] > 0));
-  if (missing.length) throw new Error(`Opening bars unavailable for ${missing.join(", ")}`);
   const now = etParts();
   if (now.day !== plan.executeDay || now.min >= QT_OPEN_CUTOFF) throw new Error("Opening-price retry window ended");
-  const book = QTC.fillOrders(QT, plan.orders, prices, open * 1000, plan.why);
-  const references = Object.fromEntries(plan.orders.map((order) => [order.sym, order.referencePrice]));
+  if (!plan.fillAt) {
+    const exits = plan.orders.filter((o) => o.side === "SELL" && prices[o.sym] > 0);
+    const remaining = plan.orders.filter((o) => !exits.includes(o));
+    if (exits.length) await qtSettleOrders(plan, exits, prices, open, remaining.length ? { ...plan, orders: remaining } : null);
+    if (!remaining.length) return;
+    if (remaining.some((o) => o.side === "SELL")) return;
+    if (remaining.some((o) => !(prices[o.sym] > 0)) || !(prices["^GSPC"] > 0)) return;
+    const tickets = [], orders = [];
+    await deskRisk.prepare(remaining.map((o) => o.sym));
+    try {
+      for (const order of remaining) {
+        const price = prices[order.sym], riskPerShare = price * (0.02 + 2 * QTC.QT_COST);
+        const ticket = deskRisk.reserve({ bot: "quant", sym: order.sym, sign: 1, shares: order.shares, price, riskPerShare });
+        if (!ticket.shares) { BOTDIAG.quant.desk = ticket.reason; continue; }
+        tickets.push(ticket);
+        orders.push({ ...order, shares: ticket.shares, riskPerShare, approvalPrice: price });
+      }
+      const approvedAt = Date.now(), fillAt = (Math.floor(approvedAt / 60_000) + 1) * 60;
+      await qtCommit({ ...QT, pending: orders.length ? { ...plan, orders, approvedAt, fillAt } : null });
+      if (orders.length) setTimeout(qtTick, Math.max(0, (fillAt + 62) * 1000 - Date.now()));
+    } finally { for (const ticket of tickets) ticket.release(); }
+    return;
+  }
+  if (plan.approvedAt >= at * 1000 || targets.some((sym) => !(prices[sym] > 0)) || !(prices["^GSPC"] > 0)) {
+    if (Date.now() > (at + 150) * 1000) await qtCommit({ ...QT, pending: null, lastError: "Approved entry bar unavailable" });
+    else setTimeout(qtTick, 12_000);
+    return;
+  }
+  if (!deskRisk.mayExecute()) {
+    await qtCommit({ ...QT, pending: null, lastError: "Approved entries canceled by current desk risk checks" });
+    return;
+  }
+  const orders = plan.orders.map((o) => ({ ...o, shares: Math.min(o.shares, o.shares * o.approvalPrice / prices[o.sym]) }));
+  await qtSettleOrders(plan, orders, prices, at, null);
+}
+async function qtSettleOrders(plan, orders, prices, at, pending) {
+  const book = QTC.fillOrders(QT, orders, prices, at * 1000, plan.why);
+  const references = Object.fromEntries(plan.orders.map((o) => [o.sym, o.referencePrice]));
   for (const fill of book.trades) Object.assign(fill, {
-    decisionAt: plan.at, decisionPrice: references[fill.sym], fillReferencePrice: prices[fill.sym], modeledCostBps: QTC.QT_COST * 1e4,
+    decisionAt: plan.at, riskApprovedAt: plan.approvedAt ?? null, decisionPrice: references[fill.sym], fillReferencePrice: prices[fill.sym], modeledCostBps: QTC.QT_COST * 1e4,
   });
-  const decisions = QT.decisions.map((d) => d.d === plan.signalDay ? { ...d, trades: book.trades.length, executed: now.day } : d);
+  const decisions = QT.decisions.map((d) => d.d === plan.signalDay ? { ...d, trades: (d.trades || 0) + book.trades.length, executed: plan.executeDay } : d);
   await qtCommit({
-    ...QT, cash: book.cash, positions: book.positions, decisions, pending: null, lastError: null,
+    ...QT, cash: book.cash, positions: book.positions, decisions, pending, lastError: null,
     trades: [...book.trades.reverse(), ...QT.trades].slice(0, 1500),
-    firstTrade: QT.firstTrade || (book.trades.length ? open * 1000 : null),
-    spx0: QT.spx0 || (book.trades.length ? prices["^GSPC"] : null),
+    firstTrade: QT.firstTrade || (book.trades.length ? at * 1000 : null),
+    spx0: QT.spx0 || (book.trades.length ? prices["^GSPC"] || null : null),
   });
-  Object.assign(qtPx, prices);
+  for (const [sym, price] of Object.entries(prices)) if (price > 0) qtPx[sym] = price;
 }
 
 async function qtPlan(t, close) {
@@ -2852,7 +2928,11 @@ async function qtView() {
     rules: { universe: QTC.QT_EQUITY, defensive: QTC.QT_DEFENSIVE, cash: QTC.QT_CASH, top: QTC.QT_TOP, maxW: QTC.QT_MAX_W, volTarget: QTC.QT_VOL_TARGET, minTrade: QTC.QT_MIN_TRADE, cost: QTC.QT_COST, split: QTC.SPLIT },
     status: QT.lastError || (QT.pending ? `Paper rebalance queued for the ${QT.pending.executeDay} open` : QT.lastDay ? `Plans after the close for the next open · last decision ${QT.lastDay}` : "Waiting for the first completed trading session") };
 }
-setTimeout(() => { qtTick(); setInterval(qtTick, process.env.AP_TEST ? 15000 : 10 * 60e3); }, process.env.AP_TEST ? 8000 : 90_000);
+setTimeout(() => {
+  qtTick();
+  setInterval(() => { const t = etParts(); if (QT.pending?.fillAt || (t.min >= QT_OPEN_MINUTE && t.min < QT_OPEN_CUTOFF) || t.min % 10 === 0 || process.env.AP_TEST) qtTick(); },
+    process.env.AP_TEST ? 15_000 : 60_000);
+}, process.env.AP_TEST ? 8000 : 90_000);
 
 
 // ---------------------------------------------------------------- live money (both bots, marked to market every few seconds)
@@ -2861,6 +2941,50 @@ setTimeout(() => { qtTick(); setInterval(qtTick, process.env.AP_TEST ? 15000 : 1
 // are used instead when they're fresher. Nobody watching → no requests at all. Trading decisions don't use these prices
 // (they run on 1-minute bars); this is only the live scoreboard.
 const BL = { px: {}, t: 0, want: 0, busy: false, fails: 0, snap: null, snapT: 0 };
+
+const { createDeskRisk } = require("./desk-risk.js");
+const { paperStore } = require("./paper-state-store.js");
+function adjacentSession(day, direction) {
+  const date = new Date(day + "T12:00:00Z");
+  for (let i = 0; i < 12; i++) {
+    date.setUTCDate(date.getUTCDate() + direction);
+    const key = date.toISOString().slice(0, 10), wd = date.getUTCDay();
+    if (wd > 0 && wd < 6 && !NYSE_HOLIDAYS.has(key)) return key;
+  }
+  throw new Error("Adjacent trading session unavailable");
+}
+function deskClock() {
+  const t = sessionInfo();
+  return { ...t, trading: t.wd !== "Sat" && t.wd !== "Sun" && !NYSE_HOLIDAYS.has(t.day), close: NYSE_EARLY.has(t.day) ? 780 : 960 };
+}
+const deskRisk = createDeskRisk({
+  store: paperStore("desk-risk-v1", { url: UP_URL, token: UP_TOKEN }),
+  clock: deskClock, previousDay: (day) => adjacentSession(day, -1),
+  sessionOf: (at) => etParts(new Date(at)),
+  loadBooks: async () => Promise.all([apLoaded || apLoad(), dtLoaded || dtLoad(), qtLoaded || qtLoad()]),
+  quotes: async (syms) => (await getQuotes(syms)).quotes,
+  closes: async (sym, day) => {
+    const candles = (await history(sym, "1y")).candles;
+    return new Map(candles.map((bar) => [apDayFormat.format(bar.time * 1000), bar.close])
+      .filter(([date, price]) => date < day && price > 0));
+  },
+  books: () => [
+    { bot: "swing", cash: AP.cash, lots: Object.entries(AP.positions).map(([sym, p]) => ({ sym, shares: p.shares, sign: 1, risk: (price) => {
+      const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), (p.peak || p.cost) * (1 - tr));
+      return Math.max(0, price - stop) + 2 * AP_COST * price;
+    } })) },
+    { bot: "day", cash: DT.cash, lots: Object.entries(DT.positions).map(([sym, p]) => ({ sym, shares: p.shares,
+      sign: p.dir === "short" ? -1 : 1,
+      risk: (price) => Math.max(0, (p.dir === "short" ? -1 : 1) * (price - p.stop), Math.abs(p.entry - p.stop0)) + 2 * DT_COST * price })),
+      queued: Object.entries(DT.pend).filter(([, f]) => f.idea && f.approval && f.opening == null).map(([sym, f]) => ({ sym, sign: f.side, ...f.approval })) },
+    { bot: "quant", cash: QT.cash, lots: Object.entries(QT.positions).map(([sym, p]) => ({ sym, shares: p.shares,
+      sign: 1, risk: (price) => price * (0.02 + 2 * QTC.QT_COST) })),
+      queued: QT.pending?.approvedAt ? QT.pending.orders.map((o) => ({ sym: o.sym, sign: 1, shares: o.shares, riskPerShare: o.riskPerShare, price: o.approvalPrice })) : [] },
+  ],
+});
+if (!process.env.AP_TEST) setTimeout(() => {
+  deskRisk.prepare(); setInterval(() => { deskRisk.refresh().then(() => deskRisk.prepare()).catch(() => {}); }, 60_000);
+}, 30_000);
 const blOpenish = () => { const t = etParts(); return !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 9 * 60 + 25 && t.min <= 16 * 60 + 5; };
 async function blRefresh() {
   if (BL.busy) return; BL.busy = true;
@@ -2887,7 +3011,7 @@ const COMP = require("./competition-core.js");
 const TRADERS = {
   swing: { name: "Swing Trader", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
   quant: { name: "Quant Trader", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
-  day: { name: "Day Trader", role: "Intraday trader", focus: "1-minute forecasts, traded only when the edge beats costs" },
+  day: { name: "Day Trader", role: "Intraday trader", focus: "10-minute forecasts, traded only when the edge beats costs" },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {
@@ -3737,6 +3861,11 @@ async function handle(req, res) {
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
+      if (u.pathname === "/api/desk-risk" && req.method === "GET") return send(res, 200, deskRisk.view());
+      if (u.pathname === "/api/desk-risk/review" && req.method === "POST") {
+        const ok = await deskRisk.review();
+        return send(res, ok ? 200 : 409, { ok, risk: deskRisk.view() });
+      }
       if (u.pathname === "/api/pub/botslive") return send(res, 200, botsLive());
       if (u.pathname === "/api/pub/archive") { // finished experiments per bot (busts, resets, strategy changes) — never edited
         const bot = u.searchParams.get("bot"); if (!["swing", "day", "quant"].includes(bot)) return send(res, 400, { error: "bot must be swing, day or quant" });
