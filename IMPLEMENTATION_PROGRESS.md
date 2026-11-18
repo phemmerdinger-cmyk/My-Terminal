@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Owner Strategy Lab and cash benchmark (2026-11-18)
+- Independent forward paper books evaluate five-minute Day continuation/reversal and gap-filter ablation, Stage 2 Swing with and without timestamped SEC earnings confirmation, and fixed-hedge Quant pairs. The incumbent books remain the operational comparison.
+- The lab records synchronized completed-session comparisons, doubled-cost sensitivity, SPY and a prior-observation FRED DGS3MO cash benchmark. The cash hurdle is a comparison series and adds no interest to the paper ledgers.
+- Pairs require a recorded borrow estimate and an eligible opening print for both legs. The owner interface records the evidence source and timestamp. Original research and trader sources appear under the owner-only notes.
+
 ### Shared paper desk risk (2026-11-18)
 - The combined paper desk now uses synchronized position marks and a persistent session reference/high-water mark. New risk is scaled at a $400 daily loss, stopped for the session at $650, and locked at a $1,000 peak drawdown pending owner review.
 - Paper entry sizing uses aggregate stop risk, estimated SPY beta and per-strategy dollar budgets. Reducing orders remain eligible. The current Quant allocator uses a labeled 2% adverse-price scenario plus costs because its legacy positions have no individual stops.
