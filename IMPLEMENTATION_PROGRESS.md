@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Shared paper desk risk (2026-11-18)
+- The combined paper desk now uses synchronized position marks and a persistent session reference/high-water mark. New risk is scaled at a $400 daily loss, stopped for the session at $650, and locked at a $1,000 peak drawdown pending owner review.
+- Paper entry sizing uses aggregate stop risk, estimated SPY beta and per-strategy dollar budgets. Reducing orders remain eligible. The current Quant allocator uses a labeled 2% adverse-price scenario plus costs because its legacy positions have no individual stops.
+- Owner controls live on AI Lab → AI vs S&P 500, with one dashboard showing the active reference, marked equity, exposure, and any risk lock.
+
 ### AI vs S&P 500: performance hero (2026-11-18)
 - New hero at the top of the tab (`#apHero`, `heroRender()` in public/index.html; styles `.hx-*`/`.hxc-*`), owner picked "terminal readout" (option C of four): AI total return, S&P 500 with the same money, all-time and today gaps (pts + $) in one monospaced row, then a trader blotter (return, P&L, S&P same $, gap; row opens the trader). Spacing scale 4/8/12/16/24/32/48, Plex Mono, tabular figures.
 - `competition-core`: `windowStats` adds `spxProfit`/`edge`; new `combine(board)` sums the traders and reports the S&P side only when every trader has S&P data. Server adds `summary: {day, life}` to `/api/pub/leaderboard`. Tests added.
