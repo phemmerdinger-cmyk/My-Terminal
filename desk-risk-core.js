@@ -4,6 +4,7 @@ const POLICY = Object.freeze({
   capital: 90_000, softDaily: 400, hardDaily: 650, peakStop: 1_000,
   plannedRisk: 350, betaFraction: 0.25, dayGrossFraction: 1,
   tradeRisk: Object.freeze({ day: 60, swing: 90, quant: 60 }),
+  dayPilot: Object.freeze({ entryRisk: 15, openRisk: 30, sessionRisk: 60, entryGross: 1_500, openGross: 3_000, grossBeta: 3_000 }),
 });
 
 function updateMark(state, mark) {
@@ -48,15 +49,20 @@ function betaFromCloses(stock, benchmark) {
 }
 
 function exposure(lots) {
-  let stopRisk = 0, betaDollars = 0, dayGross = 0;
+  let stopRisk = 0, betaDollars = 0, dayGross = 0, dayStopRisk = 0, dayGrossBeta = 0;
   for (const lot of lots) {
     if (![lot.shares, lot.price, lot.riskPerShare, lot.beta].every(Number.isFinite) ||
         lot.shares < 0 || lot.price <= 0 || lot.riskPerShare <= 0 || ![-1, 1].includes(lot.sign)) return null;
-    stopRisk += lot.shares * lot.riskPerShare;
-    betaDollars += lot.sign * lot.shares * lot.price * lot.beta;
-    if (lot.bot === "day") dayGross += lot.shares * lot.price;
+    const risk = lot.shares * lot.riskPerShare, beta = lot.sign * lot.shares * lot.price * lot.beta;
+    stopRisk += risk;
+    betaDollars += beta;
+    if (lot.bot === "day") {
+      dayGross += lot.shares * lot.price;
+      dayStopRisk += risk;
+      dayGrossBeta += Math.abs(beta);
+    }
   }
-  return { stopRisk, betaDollars, dayGross };
+  return { stopRisk, betaDollars, dayGross, dayStopRisk, dayGrossBeta };
 }
 
 function entrySize({ state, gate, current, legs, dayEquity, units, bot }) {
@@ -76,4 +82,19 @@ function entrySize({ state, gate, current, legs, dayEquity, units, bot }) {
   return { units: next, reason: next > 0 ? null : "Desk stop-risk, beta or gross exposure limit" };
 }
 
-module.exports = { POLICY, updateMark, status, betaFromCloses, exposure, entrySize };
+// Small paper-only Day allocation used when legacy positions consume the normal exposure budget.
+// Its open risk counts the entire Day book, including queued orders, and across correlated names.
+function dayPilotSize({ state, gate, current, lot, units, sessionRoom }) {
+  if (!(gate.multiplier > 0) || !current || lot.bot !== "day" || !Number.isFinite(units) || !(units > 0) ||
+      !Number.isFinite(sessionRoom) || !(sessionRoom > 0)) return 0;
+  const unit = exposure([lot]);
+  if (!unit || !(unit.dayStopRisk > 0)) return 0;
+  const p = POLICY.dayPilot, scale = gate.multiplier;
+  const openRoom = Math.min(p.openRisk * scale, POLICY.hardDaily - state.dailyLoss, POLICY.peakStop - state.drawdown)
+    - current.dayStopRisk;
+  return Math.max(0, Math.min(units, Math.min(p.entryRisk * scale, openRoom, sessionRoom) / unit.dayStopRisk,
+    Math.min(p.entryGross, p.openGross - current.dayGross) / unit.dayGross,
+    unit.dayGrossBeta ? (p.grossBeta - current.dayGrossBeta) / unit.dayGrossBeta : Infinity));
+}
+
+module.exports = { POLICY, updateMark, status, betaFromCloses, exposure, entrySize, dayPilotSize };

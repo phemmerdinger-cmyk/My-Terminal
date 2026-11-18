@@ -42,7 +42,7 @@ function createDeskRisk({ store, loadBooks, books, quotes, closes, clock, sessio
     updating = (async () => {
       await load();
       await loadBooks();
-      const first = books(), symbols = [...new Set(first.flatMap((b) => b.lots.map((p) => p.sym)))];
+      const first = books(), symbols = [...new Set(first.flatMap((b) => [...b.lots, ...(b.queued || [])].map((p) => p.sym)))];
       const quoteMap = await quotes([...new Set([...symbols, ...extra, "SPY", "^VIX"])]);
       const markAt = now(), t2 = clock();
       if (t2.day !== t.day || !freshQuote(quoteMap.SPY, t2, markAt)) throw new Error("Market mark unavailable");
@@ -100,18 +100,21 @@ function createDeskRisk({ store, loadBooks, books, quotes, closes, clock, sessio
     return C.status(state, { day: t.day, fresh, shock: snapshot?.shock });
   }
 
-  function reserve({ bot, sym, sign, shares, price, riskPerShare, integer = false }) {
+  function reserve({ bot, sym, sign, shares, price, riskPerShare, integer = false, pilotRoom }) {
     const t = clock(), at = now(), mode = gate(t, at), beta = betaCache.get(sym);
     if (!mode.multiplier || !Number.isFinite(beta?.beta) || beta.day !== t.day) {
       return { shares: 0, reason: mode.multiplier ? "Market beta unavailable for this symbol" : mode.reason };
     }
     const lot = { bot, sign, shares: 1, price, riskPerShare, beta: beta.beta };
-    const result = C.entrySize({ state, gate: mode, current: currentExposure(t, at), legs: [lot], units: shares, dayEquity: snapshot.equity.day, bot });
+    const current = currentExposure(t, at);
+    const pilot = bot === "day" && pilotRoom != null;
+    const result = pilot ? { units: C.dayPilotSize({ state, gate: mode, current, lot, units: shares, sessionRoom: pilotRoom }),
+      reason: "Day paper allocation cannot fund one share" } : C.entrySize({ state, gate: mode, current, legs: [lot], units: shares, dayEquity: snapshot.equity.day, bot });
     const size = integer ? Math.floor(result.units) : result.units;
     if (!(size > 0)) return { shares: 0, reason: result.reason || "Desk risk budget cannot fund one share" };
     const ticket = { lot: { ...lot, shares: size } };
     reservations.add(ticket);
-    return { shares: size, release: () => reservations.delete(ticket) };
+    return { shares: size, pilot, release: () => reservations.delete(ticket) };
   }
 
   function view() {

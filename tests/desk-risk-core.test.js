@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { updateMark, status, exposure, entrySize, betaFromCloses } = require("../desk-risk-core.js");
+const { updateMark, status, exposure, entrySize, betaFromCloses, dayPilotSize } = require("../desk-risk-core.js");
 const D = "2026-11-18", P = "2026-11-17";
 const mark = (nav, at, day = D, close = false) => ({ day, previousDay: P, nav, at, close });
 const gate = (s, day = D) => status(s, { day, fresh: true, shock: false });
@@ -48,4 +48,20 @@ test("market beta uses aligned daily price changes", () => {
   }
   assert.ok(Math.abs(betaFromCloses(s, m) - 2) < 1e-9);
   assert.equal(betaFromCloses(new Map(), m), null);
+});
+
+test("separate reversal allocation admits limited paper size alongside legacy book exposure", () => {
+  const state = updateMark(updateMark(null, mark(90_000, 1)), mark(89_800, 2));
+  const swing = { bot: "swing", sign: 1, beta: 1, shares: 420, price: 100, riskPerShare: 9 };
+  const lot = { ...swing, bot: "day", shares: 1, riskPerShare: 3 };
+  const input = { state, gate: gate(state), current: exposure([swing]), lot, units: 100, sessionRoom: 60 };
+  assert.equal(entrySize({ ...input, legs: [lot], bot: "day", dayEquity: 30_000 }).units, 0);
+  assert.equal(dayPilotSize(input), 5);
+  assert.equal(dayPilotSize({ ...input, sessionRoom: 6 }), 2);
+  assert.equal(dayPilotSize({ ...input, current: exposure([swing, { ...lot, shares: 9 }]) }), 1);
+  assert.equal(dayPilotSize({ ...input, lot: { ...lot, beta: 3, price: 600, riskPerShare: 1 } }), 3_000 / 1_800);
+  assert.equal(dayPilotSize({ ...input, lot: { ...lot, bot: "swing" } }), 0);
+  assert.equal(dayPilotSize({ ...input, gate: gate({ ...state, dailyLoss: 400 }) }), 2.5);
+  assert.equal(dayPilotSize({ ...input, gate: gate({ ...state, dailyStopDay: D }) }), 0);
+  assert.equal(dayPilotSize({ ...input, gate: gate({ ...state, peakLockAt: 3 }) }), 0);
 });
