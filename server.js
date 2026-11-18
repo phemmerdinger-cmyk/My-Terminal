@@ -2547,7 +2547,9 @@ async function dtTick() {
     const t = m.t, close = NYSE_EARLY.has(t.day) ? 13 * 60 : DTC.CLOSE;
     const afterClose = t.min >= close;
     const unsettled = Object.keys(DT.pend).length || Object.keys(DT.entries).length;
-    const settling = !m.open && afterClose && t.min <= close + 2 && DT.day?.d === t.day && (unsettled || Object.keys(DT.positions).length);
+    const volumeSymbols = process.env.AP_TEST ? [] : dayVolume.symbols();
+    const settling = !m.open && afterClose && t.min <= close + 2 && DT.day?.d === t.day &&
+      (unsettled || Object.keys(DT.positions).length || volumeSymbols.length);
     if (!m.open && !settling) {
       if (unsettled && (afterClose || DT.day?.d !== t.day)) {
         DT.pend = {};
@@ -2571,7 +2573,7 @@ async function dtTick() {
     dtHalted();
     if (!DT.tally) DT.tally = dtTally();
     const uni = m.open ? (Date.now() < dtThrottleUntil ? DT_UNIVERSE.slice(0, 50) : DT_UNIVERSE) : [];
-    const syms = [...new Set([...Object.keys(DT.positions), ...Object.keys(DT.entries), ...uni, ...Object.keys(DT.pend)])];
+    const syms = [...new Set([...Object.keys(DT.positions), ...Object.keys(DT.entries), ...uni, ...Object.keys(DT.pend), ...volumeSymbols])];
     BOTDIAG.day.scans++; BOTDIAG.day.lastOpenTick = Date.now(); BOTDIAG.day.universe = uni.length;
     let fails = 0;
     const one = async (sym) => {
@@ -2622,6 +2624,8 @@ async function dtTick() {
       const forecast = dtDecide(bars, sym, ctx, t.day);
       if (forecast) drafted.push({ sym, last, forecast });
     }
+    if (!process.env.AP_TEST) dayVolume.observe({ series: all, candidates: drafted, day: t.day, close, now: Date.now(),
+      maxLagSec: DT_PARAMS.maxBarLagSec });
     const riskSymbols = drafted.filter(({ forecast }) => forecast.idea).map(({ sym }) => sym);
     if (riskSymbols.length) await deskRisk.prepare(riskSymbols);
     for (const { sym, last, forecast } of drafted) {
@@ -3016,6 +3020,8 @@ if (!process.env.AP_TEST) setTimeout(() => {
 }, 30_000);
 
 const LAB = require("./strategy-lab.js");
+const { createDayVolume } = require("./day-volume.js");
+const dayVolume = createDayVolume({ store: paperStore("day-volume-v1", { url: UP_URL, token: UP_TOKEN }) });
 async function labQuarterly(sym, day) {
   if (!LAB.SWING_UNIVERSE.includes(sym)) return null;
   return cached(`lab:quarter:${sym}:${day}`, 12 * 3600_000, async () => {
@@ -3960,6 +3966,7 @@ async function handle(req, res) {
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)
       if (u.pathname === "/api/desk-risk" && req.method === "GET") return send(res, 200, deskRisk.view());
       if (u.pathname === "/api/strategy-lab" && req.method === "GET") return send(res, 200, await strategyLab.view());
+      if (u.pathname === "/api/day-volume" && req.method === "GET") return send(res, 200, await dayVolume.view());
       if (u.pathname === "/api/strategy-lab/borrow" && req.method === "POST") {
         try { return send(res, 200, await strategyLab.saveBorrow(await readBody(req))); }
         catch (error) { return send(res, 400, { error: error.message }); }

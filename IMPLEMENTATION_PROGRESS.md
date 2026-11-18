@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Day Trader volume experiment (2026-11-18)
+- Run a separate paper experiment with a target of 1,000 completed intraday round trips on a full session. Reuse the one-minute scanner and rank the available forecasts by estimated edge, including forecasts below the main strategy's cost hurdle.
+- Settle only observed post-decision opens and completed bars. Use up to $200 per order and $10,000 of gross paper exposure. Charge 5 basis points per side and a one-basis-point short entry allowance. Show fees, net paper P&L, and the number of completed trials that cleared the cost hurdle.
+
 ### Day Trader entry cadence (2026-11-18)
 - Evaluate each new completed minute while a symbol is flat and has no entry queued. A separate observation remains scheduled for model scoring, with one unfinished research sample per symbol.
 - Cap forward paper entries between learning samples at $15 of modeled stop risk. Report the extra forecasts and fills separately.
