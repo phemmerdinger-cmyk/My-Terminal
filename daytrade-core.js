@@ -129,10 +129,12 @@ function paperBarReady(bar, readAt, maxLagSec) {
 }
 
 // The following minute starts strictly after the actual decision, including decisions on a clock boundary.
-function paperEntryMinute(signal, decisionAt, close, maxLagSec) {
+function paperEntryMinute(signal, decisionAt, close, maxLagSec, hold = 1) {
   if (!validMinuteBar(signal) || signal.m < OPEN || !paperBarReady(signal, decisionAt, maxLagSec)) return null;
+  if (!Number.isInteger(hold) || hold < 1) return null;
   const next = (Math.floor(decisionAt / 60e3) + 1) * 60;
-  return signal.m + (next - signal.t) / 60 < close ? next : null;
+  const exitMinute = signal.m + (next - signal.t) / 60 + hold;
+  return exitMinute <= close ? next : null;
 }
 
 function paperOpen(forecast, bar) {
@@ -159,4 +161,15 @@ function scalpManage(p, b, maxBars = 5) {
   return null;
 }
 
-module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, validMinuteBar, paperBarReady, paperEntryMinute, paperOpen, scalpManage };
+// The caller supplies a sealed, freshly observed regular-session bar. Never treat a missed candle as watched.
+function managePaperPosition(position, bar, hold = 1) {
+  if (!validMinuteBar(bar) || bar.m < OPEN || bar.m >= CLOSE) return null;
+  const expected = position.lastProcessedBar == null ? position.at / 1000 : position.lastProcessedBar + 60;
+  if (!Number.isFinite(expected) || bar.t < expected) return null;
+  if (bar.t > expected) return { px: bar.o, why: "Data gap — closed at first freshly observed minute open", t: bar.t };
+  position.lastProcessedBar = bar.t;
+  const exit = scalpManage(position, bar, hold);
+  return exit ? { ...exit, t: bar.t + 60 } : null;
+}
+
+module.exports = { OPEN, CLOSE, levels, vwap, avgVol, sweep, gapGo, size, fillOrder, manage, pnlOf, ema, atr, scalpSignal, validMinuteBar, paperBarReady, paperEntryMinute, paperOpen, scalpManage, managePaperPosition };

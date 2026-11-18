@@ -129,10 +129,12 @@ function features(bars, ctx = {}) {
 
 const predict = (brain, x) => x.reduce((s, v, i) => s + v * brain.w[i], 0);
 
-// Learn from one outcome. y = the next minute's move in ATRs of the decision bar. Scores the prediction first.
-function learn(brain, x, y, day) {
+// Score the prediction as issued, then learn from the newly observed outcome using the current weights.
+function learn(brain, x, y, day, issuedMu) {
   y = clip(y, -3, 3);
-  const mu = predict(brain, x), err = clip(mu - y, -HUBER, HUBER);
+  const currentMu = predict(brain, x);
+  const mu = Number.isFinite(issuedMu) ? issuedMu : currentMu;
+  const err = clip(currentMu - y, -HUBER, HUBER);
   // prequential scorecard (all-time and today)
   if (brain.day.d !== day) brain.day = { d: day, n: 0, hits: 0, scored: 0 };
   brain.n++; brain.day.n++;
