@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const DTC = require("../daytrade-core.js");
-const { PULLBACK, findPullback, findMomentum, openPullback } = require("../day-pullback-core.js");
+const { PULLBACK, findPullback, findMomentum, findPriceMomentum, openPullback } = require("../day-pullback-core.js");
 
 const DAY = "2026-11-18";
 const BELL = Date.parse(DAY + "T14:30:00Z") / 1000;
@@ -119,4 +119,29 @@ test("confirmed momentum rejects stale, incomplete, or unsealed bars and recheck
   assert.deepEqual(openPullback(order, opening, { now: sealedAt(opening) }),
     { entry: idea.entry, stop: idea.stop, target: idea.target, at: fillAt * 1000 });
   assert.equal(openPullback(order, open(idea.target - 0.01), { now: sealedAt(opening) }), null);
+});
+
+test("price momentum requires a sealed, directionally aligned impulse of at least 25 basis points", () => {
+  function impulse(side, bps, priorBps = bps * 0.8) {
+    const moves = [0, 5, 10, 15, priorBps, bps];
+    return moves.map((move, i) => {
+      const price = 100 + side * move / 100;
+      return bar(i + 30, price, price + 0.02, price - 0.02, price);
+    });
+  }
+  const evaluate = (bars, options = {}) =>
+    findPriceMomentum(bars, { day: DAY, now: sealedAt(bars.at(-1)), ...options });
+  for (const side of [1, -1]) {
+    const bars = impulse(side, 26), idea = evaluate(bars);
+    assert.equal(idea.kind, "momentum-confirmed");
+    assert.equal(idea.side, side);
+    assert.equal(idea.signalAt, bars.at(-1).t);
+    assert.ok(Math.abs(idea.grossTargetBps - 26) < 1e-9, "the observed impulse sets gross target room");
+    assert.ok(idea.stopDistance >= idea.entry * 0.0008 - 1e-9 && idea.stopDistance <= 0.65 * idea.targetDistance + 1e-9);
+    assert.equal(evaluate(impulse(side, 24)), null);
+    assert.equal(evaluate(impulse(side, 26, 27)), null, "the last minute opposes the five-minute direction");
+    assert.equal(evaluate(bars.filter((_, i) => i !== 3)), null);
+    assert.equal(evaluate(bars.map((b, i) => i === 3 ? { ...b, v: 0 } : b)), null);
+    assert.equal(evaluate(bars, { now: sealedAt(bars.at(-1)) - 600 }), null);
+  }
 });

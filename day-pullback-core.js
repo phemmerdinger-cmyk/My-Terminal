@@ -58,22 +58,21 @@ function findPullback(symbol, bars, {
   };
 }
 
-function findMomentum(bars, forecast, {
-  day, now, close = DTC.CLOSE, maxLagSec = 90, costPerSide = PULLBACK.costPerSide,
-  shortBorrow = PULLBACK.shortBorrow,
-} = {}) {
-  if (!Array.isArray(bars) || typeof day !== "string" || !Number.isFinite(now) || !forecast?.qualified ||
-      (forecast.day != null && forecast.day !== day)) return null;
-  const { side, a, moveBps } = forecast;
-  if (![1, -1].includes(side) || !Number.isFinite(a) || !(a > 0) || !Number.isFinite(moveBps) || !(moveBps > 0)) return null;
-
+function momentumBars(bars, { day, now, close = DTC.CLOSE, maxLagSec = 90 }) {
+  if (!Array.isArray(bars) || typeof day !== "string" || !Number.isFinite(now)) return null;
   const recent = bars.filter((bar) => bar.d === day && bar.m >= DTC.OPEN && bar.m < close).slice(-6);
   if (recent.length !== 6 || !recent.every((bar, i) => DTC.validMinuteBar(bar) && Number.isFinite(bar.v) && bar.v > 0 &&
       (!i || (bar.t === recent[i - 1].t + 60 && bar.m === recent[i - 1].m + 1)))) return null;
-  const last = recent.at(-1), entry = last.c;
-  if (!DTC.paperBarReady(last, now, maxLagSec) ||
-      side * (entry - recent[0].c) <= 0 || side * (entry - recent.at(-2).c) <= 0) return null;
+  const last = recent.at(-1), move = (last.c - recent[0].c) / recent[0].c, side = Math.sign(move);
+  if (!DTC.paperBarReady(last, now, maxLagSec) || !side || side * (last.c - recent.at(-2).c) <= 0) return null;
+  return { recent, last, side, observedBps: Math.abs(move) * 10_000 };
+}
 
+function momentumBracket({ last, side }, moveBps, a, {
+  costPerSide = PULLBACK.costPerSide, shortBorrow = PULLBACK.shortBorrow,
+}, why) {
+  if (!Number.isFinite(a) || !(a > 0) || !Number.isFinite(moveBps) || !(moveBps > 0)) return null;
+  const entry = last.c;
   const dir = side === 1 ? "long" : "short";
   const target = entry * (1 + side * moveBps / 10_000);
   const targetDistance = side * (target - entry);
@@ -86,8 +85,22 @@ function findMomentum(bars, forecast, {
   return {
     dir, side, kind: "momentum-confirmed", entry, stop, target, stopDistance, targetDistance,
     ...room, signalAt: last.t, costPerSide, shortBorrow, minGrossCostX,
-    why: "Forecast confirmed by the latest one-minute and five-minute moves",
+    why,
   };
+}
+
+function findMomentum(bars, forecast, options = {}) {
+  if (!forecast?.qualified || (forecast.day != null && forecast.day !== options.day)) return null;
+  const observed = momentumBars(bars, options);
+  if (!observed || observed.side !== forecast.side) return null;
+  return momentumBracket(observed, forecast.moveBps, forecast.a, options, "Forecast confirmed by the latest one-minute and five-minute moves");
+}
+
+function findPriceMomentum(bars, options = {}) {
+  const observed = momentumBars(bars, options);
+  if (!observed || observed.observedBps < 25) return null;
+  return momentumBracket(observed, observed.observedBps, DTC.atr(observed.recent) * Math.sqrt(PULLBACK.holdMinutes),
+    options, "One- and five-minute price moves agree after a five-minute move of at least 25 bps");
 }
 
 function openPullback(order, bar, { now, maxLagSec = 90 } = {}) {
@@ -102,4 +115,4 @@ function openPullback(order, bar, { now, maxLagSec = 90 } = {}) {
   return { ...fill, stop, target };
 }
 
-module.exports = { PULLBACK, findPullback, findMomentum, openPullback };
+module.exports = { PULLBACK, findPullback, findMomentum, findPriceMomentum, openPullback };
