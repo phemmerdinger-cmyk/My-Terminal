@@ -1932,6 +1932,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
 <script src="/portfolio-preview-core.js"></script>
+<script src="/quote-stream-core.js"></script>
 <script>
 const SRC = {
   yahoo:{name:"Yahoo Finance",short:"Yahoo",c:"var(--yahoo)"},
@@ -2141,11 +2142,16 @@ window.addEventListener("hashchange",()=>{
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
+function mergeQuotes(incoming){
+  const quotes={...S.quotes};
+  for(const [s,quote] of Object.entries(incoming||{})) quotes[s]=MDQuoteStream.mergeQuote(quotes[s],quote);
+  S.quotes=quotes;
+}
 async function loadQuotes(){
   const syms=[...new Set([...(S.rq&&S.rq.sym?[S.rq.sym]:[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol),...INDEXES.map(i=>i[0]),...SECTORS.map(s=>s[0]),...S.pfs.flatMap(p=>p.holdings.map(h=>h.symbol))])].slice(0,150);
   try{
     const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(",")));
-    const prev=S.quotes; S.quotes={...S.quotes,...j.quotes};
+    const prev=S.quotes; mergeQuotes(j.quotes);
     renderTape(); renderWL(prev); renderMovers(); checkAlerts();
     if(S.tab==="data") renderData();
     if(S.tab==="portfolio") renderPortfolio();
@@ -2757,9 +2763,9 @@ async function loadChart(){
   const request=++chartRequest, s=S.chartSym, range=S.chartRange; renderChartTitle();
   $("rangeSeg").innerHTML=RANGES.map(([k,l])=>`<button data-range="${k}" class="${range===k?"on":""}">${l}</button>`).join("");
   document.querySelectorAll("#typeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.type===S.chartType));
-  if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes};renderChartTitle();}).catch(()=>{});
+  if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{mergeQuotes(j.quotes);renderChartTitle();}).catch(()=>{});
   let h;
-  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${range}`;
+  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${range}${range==="1d"?"&interval=1m":""}`;
   try{ h=await api(hurl); }
   catch{ if(request===chartRequest){ await new Promise(r=>setTimeout(r,1500)); try{ if(request===chartRequest) h=await api(hurl); }catch{} } }
   if(request!==chartRequest) return;
@@ -2853,7 +2859,7 @@ async function runPredict(s,fresh){
   if(!hasKey()){ renderPredict(); return toast("Claude Predictor isn't switched on yet."); }
   S.predOrder=[s,...S.predOrder.filter(x=>x!==s)];
   S.preds[s]={loading:true}; renderPredict();
-  if(s!=="MARKET"&&!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes};}).catch(()=>{});
+  if(s!=="MARKET"&&!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>mergeQuotes(j.quotes)).catch(()=>{});
   try{
     const p=await api("/api/predict?symbol="+encodeURIComponent(s)+(fresh?"&fresh=1":""),{});
     S.preds[s]=p; dbSave(p); refreshUsage();
@@ -3840,7 +3846,7 @@ function renderDB(){
       <td>${fmt(e.priceAt)}</td><td>${fmt(e.targetShort)}</td><td>${fmt(now)}</td><td class="${cls(g.move)}">${pct(g.move)}</td><td><span class="verdict ${v[0]}">${v[1]}</span></td><td><button class="del" data-dbdel="${esc(e.id)}" title="Delete">✕</button></td></tr>`;}).join("")}</tbody>`
     :`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:20px">${S.db.length?"Nothing matches these filters.":"Your predictions will be saved here automatically. Run one on the Predict tab, or scan a whole list with the AI Screener."}</td></tr></tbody>`;
   // make sure prices are live for everything shown
-  const need=[...new Set(S.db.map(e=>e.priceSymbol||e.symbol))].filter(x=>!S.quotes[x]); if(need.length) api("/api/quotes?symbols="+encodeURIComponent(need.slice(0,80).join(","))).then(j=>{S.quotes={...S.quotes,...j.quotes}; if(S.aiPane==="db") renderDB(); aiStats();}).catch(()=>{});
+  const need=[...new Set(S.db.map(e=>e.priceSymbol||e.symbol))].filter(x=>!S.quotes[x]); if(need.length) api("/api/quotes?symbols="+encodeURIComponent(need.slice(0,80).join(","))).then(j=>{mergeQuotes(j.quotes); if(S.aiPane==="db") renderDB(); aiStats();}).catch(()=>{});
 }
 ["dbSearch","dbStance","dbStatus"].forEach(id=>$(id).addEventListener("input",renderDB));
 $("dbExport").onclick=()=>{ const head=["date","symbol","stance","confidence","risk","price_then","target_2wk","target_6mo","price_now_or_at_2wk","move_pct","result","headline"];
@@ -3942,7 +3948,7 @@ async function loadMarkets(){
   const syms=Object.values(MK).flat().map(x=>x[0]).filter(s=>!S.quotes[s]||Date.now()-(S.mkAt||0)>15e3);
   renderMarkets();
   if(!syms.length) return;
-  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(","))); S.quotes={...S.quotes,...j.quotes}; S.mkAt=Date.now(); }catch{}
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(","))); mergeQuotes(j.quotes); S.mkAt=Date.now(); }catch{}
   if(S.tab==="data") renderMarkets();
 }
 function renderMarkets(){
@@ -3965,7 +3971,7 @@ const humanize=(k)=>k.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/([A-Z])([A-Z][
 async function loadResearch(){
   const s=S.rq.sym; if(!s) return;
   renderResearch();
-  if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes}; if(S.rq.sym===s) renderResearchHead();}).catch(()=>{});
+  if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{mergeQuotes(j.quotes); if(S.rq.sym===s) renderResearchHead();}).catch(()=>{});
   try{ const j=await api("/api/summary?symbol="+encodeURIComponent(s)); if(S.rq.sym!==s) return; S.rq.sum=j; }
   catch(e){ if(S.rq.sym!==s) return; S.rq.err=e.message; }
   if(S.tab==="research") renderResearch();
@@ -4005,6 +4011,7 @@ function renderResearchHead(){
       <div class="rs-name">${esc(name)}<small>${esc(s)}</small>${type?`<span class="badge">${esc(type.replace("MUTUALFUND","Mutual fund").replace("CRYPTOCURRENCY","Crypto").replace("EQUITY","Stock"))}</span>`:""}</div>
       <div class="rs-meta">${esc(listing?.exchange||p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${!listing&&p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
       <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmt(price)}${ch!=null?`<span class="chg ${cls(ch)}">${(ch>=0?"+":"")+fmt(ch)} (${pct(chp)})</span>`:""}</div>
+      ${q?.marketTime>0?`<div class="rs-ext">${q.streamed?"Last trade":"Quote as of"} ${fmtExtendedTime(q.marketTime,true)}</div>`:""}
       ${listing?`<div class="rs-ext">IPO offer price ${$m(listing.offerPrice)} · Nasdaq debut ${esc(listing.listingDay)} · <a href="${esc(listing.announcement)}" target="_blank" rel="noopener noreferrer">IPO announcement</a> · <a href="${esc(listing.exchangeUrl)}" target="_blank" rel="noopener noreferrer">Nasdaq listing</a></div>`:""}
       ${s==="ANT"&&price==null?`<div class="rs-ext">Indicative opening price · <a href="https://robinhood.com/us/en/stocks/ANT/" target="_blank" rel="noopener noreferrer">View on Robinhood</a> · <a href="https://www.nasdaqtrader.com/Trader.aspx?id=MarketSystemStatusToday" target="_blank" rel="noopener noreferrer">Nasdaq auction status</a></div>`:""}
       ${extended}
@@ -4016,8 +4023,8 @@ function renderResearchHead(){
       <button class="btn claude" data-rs-pred="${esc(s)}">✦ Claude's prediction</button>
     </div></div>`;
 }
-function fmtExtendedTime(timestamp){
-  return new Date(timestamp).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZoneName:"short"});
+function fmtExtendedTime(timestamp,seconds=false){
+  return new Date(timestamp).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:seconds?"2-digit":undefined,timeZoneName:"short"});
 }
 function rqSubs(){
   const t=rqType();
@@ -4484,41 +4491,41 @@ $("addForm").onsubmit=e=>{
 
 /* ---------- real-time price stream (when the server has a Finnhub key) ---------- */
 let es=null, streamKey="", streamOn=false, paintPending=false, prevPaint={};
-function streamSyms(){ return [...new Set([...(S.tab==="nyse"&&typeof nyRows==="function"?nyRows().sort((a,b)=>b.mc-a.mc).slice(0,20).map(r=>r.s):[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(s=>/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s)).slice(0,30); }
+const streamableSymbol=s=>typeof s==="string"&&/^[A-Z][A-Z0-9.\-]{0,9}$/.test(s);
+function streamSyms(focus){ return [...new Set([focus,...(S.tab==="nyse"&&typeof nyRows==="function"?nyRows().sort((a,b)=>b.mc-a.mc).slice(0,20).map(r=>r.s):[]),...S.wl,...S.port.map(h=>h.symbol),...S.alerts.filter(a=>!a.hit).map(a=>a.symbol)])].filter(streamableSymbol).slice(0,30); }
 function startStream(){
   if(!streamOn||!("EventSource" in window)) return;
-  const syms=streamSyms(), key=syms.join(",");
+  const focus=S.tab==="research"&&streamableSymbol(S.rq?.sym)?S.rq.sym:"";
+  const syms=streamSyms(focus), symbols=syms.join(",");
+  const key="/api/stream?symbols="+encodeURIComponent(symbols)+(focus?"&focus="+encodeURIComponent(focus):"");
   if(es&&key===streamKey) return;
-  if(es) es.close(); streamKey=key; if(!syms.length) return;
-  es=new EventSource("/api/stream?symbols="+encodeURIComponent(key));
-  es.addEventListener("hello",()=>{ S.streaming=true; });
+  if(es) es.close(); es=null; streamKey=key; if(!syms.length) return;
+  es=new EventSource(key);
+  es.addEventListener("hello",e=>{ try{ S.streaming=JSON.parse(e.data).streaming===true; }catch{} });
   es.onmessage=e=>{
     let d; try{d=JSON.parse(e.data)}catch{return}
-    if(!paintPending) prevPaint=Object.fromEntries(streamSymsNow().map(k=>[k,{price:S.quotes[k]&&S.quotes[k].price}]));
+    if(!paintPending) prevPaint=Object.fromEntries(syms.map(k=>[k,{price:S.quotes[k]?.price}]));
+    const now=Date.now();
+    let changed=false;
     for(const [s,t] of Object.entries(d)){
-      const q=S.quotes[s]; if(!q||q.error||q.prevClose==null) continue;
-      if(q.regularSession && (t.t<q.regularSession.start || t.t>=q.regularSession.end)) continue;
-      if(q.marketTime&&t.t<q.marketTime-1000) continue; // ignore stale trades
-      q.price=t.p; q.change=t.p-q.prevClose; q.changePct=q.change/q.prevClose*100; q.marketTime=t.t;
-      if(q.dayHigh==null||t.p>q.dayHigh) q.dayHigh=t.p; if(q.dayLow==null||t.p<q.dayLow) q.dayLow=t.p;
-      if(q.spark&&q.spark.length) q.spark[q.spark.length-1]=t.p;
+      const q=S.quotes[s], next=MDQuoteStream.applyTrade(q,t,now);
+      if(next!==q){ S.quotes[s]=next; changed=true; }
     }
-    S.lastTick=Date.now(); S.streaming=true;
-    streamPaint();
+    if(changed){ S.lastTick=now; S.streaming=true; streamPaint(); }
   };
   es.onerror=()=>{ S.streaming=false; }; // EventSource reconnects by itself
 }
 // Trades can arrive many times a second. Repainting the page on each one froze it, so painting is throttled:
-// the ticker tape and watchlist at most once a second, the page you're on at most every 5 seconds.
+// Paint quotes at most once a second and heavier views at most every five seconds.
 const SP={last:0,heavy:0,timer:0};
-function streamSymsNow(){ return streamKey?streamKey.split(","):[]; }
 function streamPaint(){
   if(paintPending) return; paintPending=true;
   const wait=Math.max(0,1000-(Date.now()-SP.last));
   SP.timer=setTimeout(()=>requestAnimationFrame(()=>{ paintPending=false; SP.last=Date.now(); if(document.hidden) return;
     renderTape(); renderWL(prevPaint); checkAlerts();
+    if(S.tab==="research"&&S.rq.sym) renderResearchHead();
     if(Date.now()-SP.heavy<5000) return; SP.heavy=Date.now();
-    if(S.tab==="data") renderData(); else if(S.tab==="portfolio") renderPortfolio(); else if(S.tab==="nyse") nyRender(); else if(S.tab==="research"&&S.rq.sym) renderResearchHead(); else if(S.tab==="news") renderMovers();
+    if(S.tab==="data") renderData(); else if(S.tab==="portfolio") renderPortfolio(); else if(S.tab==="nyse") nyRender(); else if(S.tab==="news") renderMovers();
   }),wait);
 }
 // Re-subscribe when the watchlist, holdings or alerts change
@@ -4670,7 +4677,7 @@ async function pfRiskLoad(){
   try{
     const get=s=>api(`/api/history?symbol=${encodeURIComponent(s)}&range=1y`).then(h=>h.candles).catch(()=>[]);
     const [spx,...cs]=await Promise.all(["^GSPC",...syms].map(get));
-    if(!S.quotes["^IRX"]) await api("/api/quotes?symbols=%5EIRX").then(j=>{S.quotes={...S.quotes,...j.quotes};}).catch(()=>{});
+    if(!S.quotes["^IRX"]) await api("/api/quotes?symbols=%5EIRX").then(j=>mergeQuotes(j.quotes)).catch(()=>{});
     const irx=S.quotes["^IRX"], rf=irx&&!irx.error&&irx.price>0?irx.price/100:0.04;
     if(!spx.length) throw new Error("no S&P data");
     const dates=spx.map(k=>etDate(k.time)), mkt=spx.map(k=>k.close);
@@ -4974,7 +4981,7 @@ const nyQ=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price!=null?q:null; };
 async function nyList(){ if(NY.list.length) return; try{ const j=await (await fetch("/sp500.json")).json(); NY.list=j.rows; }catch(e){ console.warn("sp500 list",e); } }
 async function nyLoad(){ // index cards (every 15s)
   if(NY.loading) return; NY.loading=true;
-  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(NY_IDX.map(x=>x[0]).join(","))); S.quotes={...S.quotes,...j.quotes}; NY.at=Date.now(); }catch(e){}
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(NY_IDX.map(x=>x[0]).join(","))); mergeQuotes(j.quotes); NY.at=Date.now(); }catch(e){}
   NY.loading=false; if(S.tab==="nyse") nyRender();
 }
 async function nySnap(){ // all S&P 500 prices (every 60s, shared cache on the server)
@@ -5309,7 +5316,7 @@ document.addEventListener("click",e=>{ const t=e.target.closest("#apSig [data-ap
 /* ---------- ANALYSIS tab: free rules-based market analysis + optional Claude deep dive ---------- */
 async function anQuotes(){
   const syms=[...INDEXES.map(x=>x[0]),...SECTORS.map(x=>x[0]),...S.port.map(h=>h.symbol)];
-  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent([...new Set(syms)].join(","))); S.quotes={...S.quotes,...j.quotes}; }catch{}
+  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent([...new Set(syms)].join(","))); mergeQuotes(j.quotes); }catch{}
 }
 async function anOpen(){
   S.an=S.an||{snap:null,at:0};
