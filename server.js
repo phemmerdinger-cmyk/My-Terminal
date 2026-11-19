@@ -516,31 +516,34 @@ async function quote(sym) {
     const m = r.meta;
     const bars = r.indicators?.quote?.[0] || {};
     const closes = (bars.close || []).filter((x) => x != null);
-    const antDebut = sym === "ANT" && etParts().day === "2026-11-19";
-    // On the debut morning Yahoo can publish the $83 offer as the last price, with no traded candle.
-    const antPrint = antDebut ? (r.timestamp || []).findLastIndex((ts, i) => {
+    const firstDay = sym === "ANT" ? "2026-11-19" :
+      Number.isFinite(m.firstTradeDate) && m.firstTradeDate > 0 ? etParts(new Date(m.firstTradeDate * 1000)).day : null;
+    const debut = firstDay && etParts().day === firstDay;
+    // On a debut morning the vendor can publish the offer as the last price, with no traded candle.
+    const firstPrint = debut ? (r.timestamp || []).findLastIndex((ts, i) => {
+      if (!(bars.volume?.[i] > 0 && bars.close?.[i] > 0)) return false;
       const t = etParts(new Date(ts * 1000));
-      return t.day === "2026-11-19" && t.min >= 570 && t.min < 960 && bars.volume?.[i] > 0 && bars.close?.[i] > 0;
+      return t.day === firstDay && t.min >= 570 && t.min < 960;
     }) : -1;
-    const price = antDebut ? (antPrint >= 0 ? bars.close[antPrint] : null) : m.regularMarketPrice ?? closes.at(-1);
-    const prev = antDebut ? null : m.chartPreviousClose ?? m.previousClose;
+    const price = debut ? (firstPrint >= 0 ? bars.close[firstPrint] : null) : m.regularMarketPrice ?? closes.at(-1);
+    const prev = debut ? null : m.chartPreviousClose ?? m.previousClose;
     return {
       symbol: m.symbol,
       name: m.shortName || m.longName || m.symbol,
       price,
       prevClose: prev,
-      change: antDebut ? null : price - prev,
-      changePct: antDebut ? null : prev ? ((price - prev) / prev) * 100 : 0,
+      change: debut ? null : price - prev,
+      changePct: debut ? null : prev ? ((price - prev) / prev) * 100 : 0,
       currency: m.currency,
       exchange: m.fullExchangeName || m.exchangeName,
-      marketTime: (antDebut ? (antPrint >= 0 ? r.timestamp[antPrint] : 0) : m.regularMarketTime || 0) * 1000,
-      ...(antDebut && antPrint < 0 ? { status: "awaiting-market-print" } : {}),
-      dayHigh: price == null && antDebut ? null : m.regularMarketDayHigh,
-      dayLow: price == null && antDebut ? null : m.regularMarketDayLow,
+      marketTime: (debut ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
+      ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
+      dayHigh: price == null && debut ? null : m.regularMarketDayHigh,
+      dayLow: price == null && debut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
-      high52: antDebut ? null : m.fiftyTwoWeekHigh,
-      low52: antDebut ? null : m.fiftyTwoWeekLow,
-      spark: antDebut && antPrint < 0 ? [] : closes.length > 60 ? closes.filter((_, i) => i % Math.ceil(closes.length / 60) === 0) : closes,
+      high52: debut ? null : m.fiftyTwoWeekHigh,
+      low52: debut ? null : m.fiftyTwoWeekLow,
+      spark: debut && firstPrint < 0 ? [] : closes.length > 60 ? closes.filter((_, i) => i % Math.ceil(closes.length / 60) === 0) : closes,
     };
   });
 }
@@ -1210,7 +1213,7 @@ function unwrap(v) {
   return v;
 }
 
-async function search(q) {
+function yahooSearch(q) {
   return cached("s:" + q.toLowerCase(), 10 * 60_000, async () => {
     const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0&listsCount=0&enableFuzzyQuery=true`;
     const j = JSON.parse(await get(url, "application/json"));
@@ -1218,6 +1221,31 @@ async function search(q) {
       symbol: x.symbol, name: x.shortname || x.longname || x.symbol, type: x.quoteType || "", typeDisp: x.typeDisp || x.quoteType || "", exchange: x.exchDisp || x.exchange || "",
     }));
   });
+}
+
+const listingResult = (entry, recent = false) => ({
+  symbol: entry.providerSymbol, name: entry.name, type: entry.isEtf ? "ETF" : "EQUITY",
+  typeDisp: recent ? "Newly detected listing" : entry.isEtf ? "ETF" : "Listed security",
+  exchange: entry.exchange,
+});
+
+async function search(q) {
+  const refreshing = listingCatalog.refresh();
+  if (/^new\s+listings?$/i.test(q)) {
+    if (!listingCatalog.ready()) await Promise.race([refreshing, new Promise((resolve) => setTimeout(resolve, 1500))]);
+    return listingCatalog.recent().map((entry) => listingResult(entry, true));
+  }
+  const normalized = q.toUpperCase().replace(".", "-");
+  const exact = () => listingCatalog.search(q).filter((entry) => entry.providerSymbol === normalized).map((entry) => listingResult(entry));
+  const known = exact();
+  if (known.length) return known;
+  let yahoo = [];
+  try { yahoo = await yahooSearch(q); } catch {}
+  if (!yahoo.length && !listingCatalog.ready()) await Promise.race([refreshing, new Promise((resolve) => setTimeout(resolve, 1200))]);
+  const results = [...exact(), ...yahoo, ...listingCatalog.search(q).map((entry) => listingResult(entry))];
+  const unique = new Map();
+  for (const entry of results) if (!unique.has(entry.symbol)) unique.set(entry.symbol, entry);
+  return [...unique.values()].slice(0, 12);
 }
 
 const MODULE_SETS = [
@@ -3238,6 +3266,20 @@ function secGet(url) {
   secChain = run.catch(() => {});
   return run;
 }
+const { createListingCatalog, REFRESH_MS: LISTING_REFRESH } = require("./listing-catalog.js");
+const listingCatalog = createListingCatalog({
+  store: paperStore("listing-catalog-v1", { url: UP_URL, token: UP_TOKEN }),
+  feeds: {
+    sec: () => secGet("https://www.sec.gov/files/company_tickers_exchange.json"),
+    nasdaqListed: () => getT("https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt", "text/plain", 9_000),
+    otherListed: () => getT("https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt", "text/plain", 9_000),
+  },
+});
+if (!process.env.AP_TEST) setTimeout(() => {
+  listingCatalog.refresh();
+  setInterval(() => listingCatalog.refresh(), LISTING_REFRESH);
+}, 4_000);
+
 const secTickers = () => cached("sec:tickers", 24 * 3600e3, async () => {
   const j = await secGet("https://www.sec.gov/files/company_tickers.json");
   const m = {}; for (const k in j) m[String(j[k].ticker).toUpperCase()] = { cik: j[k].cik_str, name: j[k].title };
