@@ -2657,9 +2657,9 @@ async function dtTick() {
       const forecast = dtDecide(bars, sym, ctx, t.day);
       if (!forecast) continue;
       drafted.push({ sym, last, forecast });
-      if (!reversal && forecast.qualified) {
-        const idea = DP.findMomentum(bars, forecast, { day: t.day, now: Date.now(), close, maxLagSec: DT_PARAMS.maxBarLagSec,
-          costPerSide: DT_COST, shortBorrow: DT_FEE_SHORT });
+      if (!reversal) {
+        const options = { day: t.day, now: Date.now(), close, maxLagSec: DT_PARAMS.maxBarLagSec, costPerSide: DT_COST, shortBorrow: DT_FEE_SHORT };
+        const idea = DP.findMomentum(bars, forecast, options) || DP.findPriceMomentum(bars, options);
         if (idea) {
           setups.push({ sym, last, idea, kind: "momentum" });
           DT.day.momentumSignals = (DT.day.momentumSignals || 0) + 1;
