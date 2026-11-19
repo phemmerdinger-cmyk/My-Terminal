@@ -820,7 +820,8 @@ a.iconbtn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .mk-grid table th:nth-child(2),.mk-grid table td:nth-child(2){text-align:left}
 
 /* RESEARCH */
-.rs-search{width:100%;text-align:left;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:11px 14px;color:var(--muted);cursor:pointer;margin-bottom:16px;font-size:14px}
+.rs-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.rs-search{flex:1 1 270px;text-align:left;background:var(--panel);border:1px solid var(--line2);border-radius:8px;padding:11px 14px;color:var(--muted);cursor:pointer;font-size:14px}
 .rs-search:hover{border-color:var(--amber)}
 .rs-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:6px}
 .rs-name{font-size:22px;font-weight:600}
@@ -1601,8 +1602,10 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
     <!-- RESEARCH (Yahoo-style quote page) -->
     <section id="tab-research" class="pad" hidden>
-      <button class="rs-search" id="rsSearch">⌕ Search any stock, ETF, mutual fund, crypto, index or future…</button>
-      <button type="button" class="btn ghost" id="antIpoShortcut">ANT · Anthropic IPO</button>
+      <div class="rs-tools">
+        <button class="rs-search" id="rsSearch">⌕ Search any stock, ETF, mutual fund, crypto, index or future…</button>
+        <a class="btn ghost" id="antIpoShortcut" href="#research/ANT">View Anthropic IPO (ANT) →</a>
+      </div>
       <div id="rsHead"></div>
       <div id="rsChartPane" hidden>
         <div id="chartTitle" hidden></div>
@@ -2104,7 +2107,7 @@ function setTab(t){
   if(t==="studio") t="studio-strategies"; // retain old Studio/bookmark URLs
   if(t==="home") t="data"; // legacy Home bookmarks open Markets Overview
   if(VIEW&&(t==="predict"||t==="health"||STUDIO_ROUTES[t])) t="news";
-  S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
+  S.tab=t; try{history.replaceState(null,"",t==="research"&&S.rq?.sym==="ANT"?"#research/ANT":"#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
   TABS.forEach(k=>{ if(STUDIO_ROUTES[k]) return; const panel=$("tab-"+k); if(panel) panel.hidden=k!==t; });
@@ -2129,7 +2132,12 @@ function setTab(t){
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(g==="quant"?"quant":NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
-window.addEventListener("hashchange",()=>{const raw=location.hash.slice(1); const h=({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[raw]||raw; if(TABS.includes(h)&&h!==S.tab) setTab(h);});
+window.addEventListener("hashchange",()=>{
+  const raw=location.hash.slice(1);
+  if(raw==="research/ANT"){ openQuote("ANT"); return; }
+  const h=({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[raw]||raw;
+  if(TABS.includes(h)&&h!==S.tab) setTab(h);
+});
 $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b.dataset.tab);};
 
 /* ---------- data loading ---------- */
@@ -2717,7 +2725,13 @@ document.addEventListener("click",e=>{ const th=e.target.closest("th[data-sort]"
   const k=th.dataset.sort; S.sort=S.sort.k===k?{k,d:-S.sort.d}:{k,d:k==="symbol"||k==="name"?1:-1}; store.set("sort",S.sort); renderData(); });
 
 /* ---------- CHARTS ---------- */
-let chart, mainSeries, volSeries;
+let chart, mainSeries, volSeries, chartRequest=0;
+function chartMessage(message){
+  if(chart) chart.remove();
+  chart=mainSeries=volSeries=null;
+  $("chartStats").innerHTML="";
+  $("chart").innerHTML=`<div class="empty">${message}</div>`;
+}
 function ensureChart(){
   if(chart||!window.LightweightCharts) return !!chart;
   const el=$("chart"); el.innerHTML=""; // clear any "No chart data" message so the new chart gets the full box
@@ -2740,18 +2754,18 @@ function renderChartTitle(){
     <div class="big-px">${fmt(q.price,s==="^TNX"?3:2)} <span class="${cls(q.change)}" style="font-size:14px">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change):""} (${pct(q.changePct)})</span></div>`;
 }
 async function loadChart(){
-  const s=S.chartSym; renderChartTitle();
-  $("rangeSeg").innerHTML=RANGES.map(([k,l])=>`<button data-range="${k}" class="${S.chartRange===k?"on":""}">${l}</button>`).join("");
+  const request=++chartRequest, s=S.chartSym, range=S.chartRange; renderChartTitle();
+  $("rangeSeg").innerHTML=RANGES.map(([k,l])=>`<button data-range="${k}" class="${range===k?"on":""}">${l}</button>`).join("");
   document.querySelectorAll("#typeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.type===S.chartType));
   if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{S.quotes={...S.quotes,...j.quotes};renderChartTitle();}).catch(()=>{});
   let h;
-  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${S.chartRange}`;
+  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${range}`;
   try{ h=await api(hurl); }
-  catch{ if(s===S.chartSym){ await new Promise(r=>setTimeout(r,1500)); try{ if(s===S.chartSym) h=await api(hurl); }catch{} } }
-  if(s!==S.chartSym) return;
-  if(!h){ $("chartStats").innerHTML=""; if(chart){chart.remove();chart=null;} $("chart").innerHTML=`<div class="empty">Couldn't load the ${esc(s)} chart — the price feed is busy for a moment.<br><button class="btn ghost" type="button" data-chart-retry style="margin-top:10px">↻ Try again</button></div>`; return; }
-  if(s!==S.chartSym) return;
-  const c=h.candles;
+  catch{ if(request===chartRequest){ await new Promise(r=>setTimeout(r,1500)); try{ if(request===chartRequest) h=await api(hurl); }catch{} } }
+  if(request!==chartRequest) return;
+  if(!h){ chartMessage(`Couldn't load the ${esc(s)} chart.<br><button class="btn ghost" type="button" data-chart-retry style="margin-top:10px">↻ Try again</button>`); return; }
+  const c=h.candles||[];
+  if(!c.length){ chartMessage(S.quotes[s]?.status==="awaiting-market-print"?"Awaiting the first market trade.":`No chart data for ${esc(s)} in this period.`); return; }
   if(ensureChart()){
     if(mainSeries) chart.removeSeries(mainSeries); if(volSeries) chart.removeSeries(volSeries);
     const up=c.length&&c[c.length-1].close>=c[0].open;
@@ -2759,7 +2773,7 @@ async function loadChart(){
       mainSeries=chart.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
       mainSeries.setData(c.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
     }else{
-      const q=S.quotes[s], base=(S.chartRange==="1d"&&q&&q.prevClose)?q.prevClose:(c.length?c[0].open:0);
+      const q=S.quotes[s], base=(range==="1d"&&q&&q.prevClose)?q.prevClose:c[0].open;
       mainSeries=chart.addBaselineSeries(baselineOpts(base));
       mainSeries.setData(c.map(x=>({time:x.time,value:x.close})));
     }
@@ -2772,7 +2786,7 @@ async function loadChart(){
   }
   if(c.length){
     const first=c[0].open, last=c[c.length-1].close, hi=Math.max(...c.map(x=>x.high)), lo=Math.min(...c.map(x=>x.low));
-    const vol=c.reduce((a,x)=>a+x.volume,0)/c.length; const ch=(last-first)/first*100;
+    const vol=c.reduce((a,x)=>a+x.volume,0)/c.length; const ch=first>0?(last-first)/first*100:null;
     const rets=c.slice(1).map((x,i)=>Math.log(x.close/c[i].close)); const m=rets.reduce((a,b)=>a+b,0)/(rets.length||1);
     const sd=Math.sqrt(rets.reduce((a,b)=>a+(b-m)**2,0)/(rets.length||1));
     $("chartStats").innerHTML=[["Range return",`<span class="${cls(ch)}">${pct(ch)}</span>`],["Period high",fmt(hi)],["Period low",fmt(lo)],["Avg volume",big(Math.round(vol))],["Volatility / bar",(sd*100).toFixed(2)+"%"],["Bars",c.length+" × "+h.interval]]
@@ -2794,7 +2808,7 @@ async function renderMinis(){
   if(S.tab==="research"&&S.rq.sub==="chart") renderMinis();
 }
 function openChart(s){ openQuote(s); }
-$("rangeSeg").onclick=e=>{const b=e.target.closest("button"); if(!b) return; S.chartRange=b.dataset.range; store.set("chartRange",S.chartRange); loadChart();};
+$("rangeSeg").onclick=e=>{const b=e.target.closest("button"); if(!b) return; S.chartRange=b.dataset.range; if(!window.MARKET_LISTINGS?.[S.chartSym]) store.set("chartRange",S.chartRange); loadChart();};
 $("typeSeg").onclick=e=>{const b=e.target.closest("button"); if(!b) return; S.chartType=b.dataset.type; store.set("chartType",S.chartType); loadChart();};
 /* (ticker box for charts now lives in the Research search bar) */
 
@@ -3941,8 +3955,7 @@ function renderMarkets(){
 
 /* ---------- RESEARCH: Yahoo-style quote pages ---------- */
 S.rq={sym:null,sub:"summary",sum:null,err:null,fin:{},finStmt:"income",finFreq:"annual",hist:null,range:"1y"};
-function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,sub:"summary",range:window.MARKET_LISTINGS?.[s]?"1d":S.rq.range}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
-$("antIpoShortcut").onclick=()=>openQuote("ANT");
+function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,news:null,sub:"summary",range:window.MARKET_LISTINGS?.[s]?"1d":S.rq.range}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
 const money=(n,d=2)=>{ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n), sg=n<0?"-":"";
   return a>=1e12?sg+(a/1e12).toFixed(d)+"T":a>=1e9?sg+(a/1e9).toFixed(d)+"B":a>=1e6?sg+(a/1e6).toFixed(d)+"M":a>=1e3?sg+(a/1e3).toFixed(d)+"K":sg+a.toFixed(d); };
 const fp=(x,d=2)=>x==null||isNaN(x)?"—":(x*100).toFixed(d)+"%";
@@ -3956,7 +3969,7 @@ async function loadResearch(){
   try{ const j=await api("/api/summary?symbol="+encodeURIComponent(s)); if(S.rq.sym!==s) return; S.rq.sum=j; }
   catch(e){ if(S.rq.sym!==s) return; S.rq.err=e.message; }
   if(S.tab==="research") renderResearch();
-  if(!S.news||!S.news.items.some(i=>i.tickers.includes(s))) api("/api/news?tickers="+encodeURIComponent(s)).then(j=>{ S.rq.news=j.items.filter(i=>i.tickers.includes(s)); if(S.rq.sym===s&&S.rq.sub==="news") renderResearchBody(); }).catch(()=>{});
+  if(!S.news||!S.news.items.some(i=>i.tickers.includes(s))) api("/api/news?tickers="+encodeURIComponent(s)).then(j=>{ if(S.rq.sym!==s) return; S.rq.news=j.items.filter(i=>i.tickers.includes(s)); if(S.rq.sub==="news") renderResearchBody(); }).catch(()=>{});
 }
 async function loadResearchChart(){
   const s=S.rq.sym, r=S.rq.range;
@@ -3981,18 +3994,20 @@ function renderResearch(){
 function renderResearchHead(){
   const s=S.rq.sym, d=S.rq.sum||{}, p=d.price||{}, q=S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:null;
   const listing=window.MARKET_LISTINGS?.[s];
+  $("antIpoShortcut").hidden=s==="ANT";
   const price=listing?q?.price:q?.price??p.regularMarketPrice, ch=listing?q?.change:q?.change??p.regularMarketChange,
     chp=listing?q?.changePct:q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
   const name=listing?.name||p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||(listing?"EQUITY":"");
-  const ext=listing?"":p.postMarketPrice&&p.marketState&&p.marketState!=="REGULAR"?`After hours: ${fmt(p.postMarketPrice)} <span class="${cls(p.postMarketChange)}">${pct((p.postMarketChangePercent||0)*100)}</span>`:
-            p.preMarketPrice&&p.marketState==="PRE"?`Pre-market: ${fmt(p.preMarketPrice)} <span class="${cls(p.preMarketChange)}">${pct((p.preMarketChangePercent||0)*100)}</span>`:"";
+  const extended=[["Pre-market",q?.preMarket],["After-hours",q?.postMarket]].filter(([,session])=>session).map(([label,session])=>
+    `<div class="rs-ext">${label} ${fmt(session.price)} ${session.changePct==null?"":`<span class="${cls(session.change)}">${pct(session.changePct)}</span>`} · ${fmtExtendedTime(session.marketTime)}</div>`).join("");
   const inWl=S.wl.includes(s);
   $("rsHead").innerHTML=`<div class="rs-head"><div>
       <div class="rs-name">${esc(name)}<small>${esc(s)}</small>${type?`<span class="badge">${esc(type.replace("MUTUALFUND","Mutual fund").replace("CRYPTOCURRENCY","Crypto").replace("EQUITY","Stock"))}</span>`:""}</div>
       <div class="rs-meta">${esc(listing?.exchange||p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${!listing&&p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
       <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmt(price)}${ch!=null?`<span class="chg ${cls(ch)}">${(ch>=0?"+":"")+fmt(ch)} (${pct(chp)})</span>`:""}</div>
       ${listing?`<div class="rs-ext">IPO offer price ${$m(listing.offerPrice)} · Nasdaq debut ${esc(listing.listingDay)} · <a href="${esc(listing.announcement)}" target="_blank" rel="noopener noreferrer">IPO announcement</a> · <a href="${esc(listing.exchangeUrl)}" target="_blank" rel="noopener noreferrer">Nasdaq listing</a></div>`:""}
-      ${ext?`<div class="rs-ext">${ext}</div>`:""}
+      ${s==="ANT"&&price==null?`<div class="rs-ext">Indicative opening price · <a href="https://robinhood.com/us/en/stocks/ANT/" target="_blank" rel="noopener noreferrer">View on Robinhood</a> · <a href="https://www.nasdaqtrader.com/Trader.aspx?id=MarketSystemStatusToday" target="_blank" rel="noopener noreferrer">Nasdaq auction status</a></div>`:""}
+      ${extended}
     </div><div class="rs-actions">
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
       <button class="btn ghost" data-rs-sub="compare">Compare</button>
@@ -4000,6 +4015,9 @@ function renderResearchHead(){
 
       <button class="btn claude" data-rs-pred="${esc(s)}">✦ Claude's prediction</button>
     </div></div>`;
+}
+function fmtExtendedTime(timestamp){
+  return new Date(timestamp).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZoneName:"short"});
 }
 function rqSubs(){
   const t=rqType();
@@ -4024,7 +4042,13 @@ function renderResearchBody(){
   const s=S.rq.sym, d=S.rq.sum, sub=S.rq.sub, el=$("rsBody");
   const isCmp=sub==="compare";
   $("rsChartPane").hidden=false; $("rsComparePane").hidden=!isCmp; el.hidden=isCmp;
-  if(S.chartSym!==s||!chart){ S.chartSym=s; loadChart(); }
+  if(S.chartSym!==s){
+    if(window.MARKET_LISTINGS?.[s]) S.chartRange="1d";
+    else if(window.MARKET_LISTINGS?.[S.chartSym]) S.chartRange=store.get("chartRange","6mo");
+    S.chartSym=s;
+    chartMessage(`Loading ${esc(s)} chart…`);
+    loadChart();
+  }
   if(isCmp){ renderMinis(); const cur=$("cmpInput").value.split(/[,\s]+/).map(normSym).filter(Boolean); if(!cur.includes(s)){ $("cmpInput").value=[s,...cur.filter(x=>x!==s)].slice(0,4).join(", "); } renderCmpRange(); return; }
   if(sub==="news"){ const items=(S.news?.items||[]).filter(i=>i.tickers.includes(s)); const list=items.length?items:(S.rq.news||[]);
     el.innerHTML=list.length?`<ul class="feed" style="border:1px solid var(--line);border-radius:8px">${list.slice(0,60).map(i=>`<li class="item"><div class="t">${i.time?etTime(i.time):""}<small>${ago(i.time)}</small></div><div><div class="meta"><span class="src" style="background:${SRC[i.source].c}">${SRC[i.source].short}</span>${i.mood>0?'<span class="mood p">▲ Positive</span>':i.mood<0?'<span class="mood n">▼ Negative</span>':""}</div><h3><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>${i.summary?`<p>${esc(i.summary)}</p>`:""}</div></li>`).join("")}</ul>`:'<div class="rs-err"><span class="spin"></span>Looking for headlines…</div>'; return; }
@@ -5108,7 +5132,8 @@ setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetP
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
-setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:VIEW?"news":"data");
+if(requestedTab==="research/ANT") openQuote("ANT");
+else setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:VIEW?"news":"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";

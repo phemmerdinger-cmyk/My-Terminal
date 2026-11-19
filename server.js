@@ -507,6 +507,11 @@ async function getSmart() {
 }
 
 // ---------------------------------------------------------------- quotes (Yahoo Finance chart API)
+const { getExtendedQuotes } = require("./market-session-core.js");
+function firstTradingDay(sym, meta) {
+  if (sym === "ANT") return "2026-11-19";
+  return Number.isFinite(meta.firstTradeDate) && meta.firstTradeDate > 0 ? etParts(new Date(meta.firstTradeDate * 1000)).day : null;
+}
 async function quote(sym) {
   return cached("q:" + sym, 15_000, async () => {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m&includePrePost=true`;
@@ -516,8 +521,7 @@ async function quote(sym) {
     const m = r.meta;
     const bars = r.indicators?.quote?.[0] || {};
     const closes = (bars.close || []).filter((x) => x != null);
-    const firstDay = sym === "ANT" ? "2026-11-19" :
-      Number.isFinite(m.firstTradeDate) && m.firstTradeDate > 0 ? etParts(new Date(m.firstTradeDate * 1000)).day : null;
+    const firstDay = firstTradingDay(sym, m);
     const debut = firstDay && etParts().day === firstDay;
     // On a debut morning the vendor can publish the offer as the last price, with no traded candle.
     const firstPrint = debut ? (r.timestamp || []).findLastIndex((ts, i) => {
@@ -525,19 +529,22 @@ async function quote(sym) {
       const t = etParts(new Date(ts * 1000));
       return t.day === firstDay && t.min >= 570 && t.min < 960;
     }) : -1;
-    const price = debut ? (firstPrint >= 0 ? bars.close[firstPrint] : null) : m.regularMarketPrice ?? closes.at(-1);
+    const regular = m.currentTradingPeriod?.regular;
+    const lastRegular = regular ? (r.timestamp || []).findLastIndex((ts, i) => ts >= regular.start && ts < regular.end && bars.close?.[i] > 0) : -1;
+    const price = debut ? (firstPrint >= 0 ? bars.close[firstPrint] : null) : m.regularMarketPrice ?? (lastRegular >= 0 ? bars.close[lastRegular] : null);
     const prev = debut ? null : m.chartPreviousClose ?? m.previousClose;
     return {
       symbol: m.symbol,
       name: m.shortName || m.longName || m.symbol,
       price,
       prevClose: prev,
-      change: debut ? null : price - prev,
-      changePct: debut ? null : prev ? ((price - prev) / prev) * 100 : 0,
+      change: debut || price == null ? null : price - prev,
+      changePct: debut || price == null ? null : prev ? ((price - prev) / prev) * 100 : 0,
       currency: m.currency,
       exchange: m.fullExchangeName || m.exchangeName,
       marketTime: (debut ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
       ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
+      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut }),
       dayHigh: price == null && debut ? null : m.regularMarketDayHigh,
       dayLow: price == null && debut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
@@ -580,17 +587,20 @@ async function history(sym, range = "6mo", interval) {
         if (i) await new Promise((ok) => setTimeout(ok, 600 * i));
         const j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${qs}`, "application/json"));
         res = j.chart && j.chart.result && j.chart.result[0];
-        if (res && res.timestamp) break;
+        if (res && (res.timestamp || sym === "ANT")) break;
         if (j.chart && j.chart.error) { lastErr = new Error(j.chart.error.description || "no history"); break; } // a bad symbol: don't retry
         res = null;
       } catch (e) { lastErr = e; }
     }
-    if (!res || !res.timestamp) { if (HIST_LAST.has(key)) return HIST_LAST.get(key); throw lastErr || new Error("no history"); }
-    const q = res.indicators.quote[0];
+    if (!res) { if (HIST_LAST.has(key)) return HIST_LAST.get(key); throw lastErr || new Error("no history"); }
+    const q = res.indicators?.quote?.[0] || {};
+    const ipo = sym === "ANT" || firstTradingDay(sym, res.meta) === etParts().day;
     const candles = [];
-    res.timestamp.forEach((t, i) => {
-      if (q.open[i] == null || q.close[i] == null) return;
-      candles.push({ time: t, open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume[i] || 0 });
+    (res.timestamp || []).forEach((t, i) => {
+      const open = q.open?.[i], high = q.high?.[i], low = q.low?.[i], close = q.close?.[i], volume = q.volume?.[i] || 0;
+      if (open == null || close == null) return;
+      if (ipo && (!(volume > 0) || ![open, high, low, close].every((price) => Number.isFinite(price) && price > 0))) return;
+      candles.push({ time: t, open, high, low, close, volume });
     });
     const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles };
     HIST_LAST.set(key, out); if (HIST_LAST.size > 400) HIST_LAST.delete(HIST_LAST.keys().next().value);
