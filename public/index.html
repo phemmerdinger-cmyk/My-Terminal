@@ -4042,7 +4042,7 @@ function renderResearchBody(){
   const s=S.rq.sym, d=S.rq.sum, sub=S.rq.sub, el=$("rsBody");
   const isCmp=sub==="compare";
   $("rsChartPane").hidden=false; $("rsComparePane").hidden=!isCmp; el.hidden=isCmp;
-  if(S.chartSym!==s){
+  if(S.chartSym!==s||chartRequest===0){
     if(window.MARKET_LISTINGS?.[s]) S.chartRange="1d";
     else if(window.MARKET_LISTINGS?.[S.chartSym]) S.chartRange=store.get("chartRange","6mo");
     S.chartSym=s;
