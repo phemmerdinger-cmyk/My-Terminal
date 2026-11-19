@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Free ticker discovery and portfolio review (2026-11-19)
+- Refresh the exchange ticker directory and SEC company names in the background and use them in the existing search. Type “new listings” to see symbols first detected in the last seven days. The first complete snapshot establishes a baseline for future changes.
+- Calculate and preview dashboard holdings changes before saving them. Show shares, price and resulting average cost in a confirmation using the existing portfolio controls. An unavailable market price can be replaced by the owner's actual cost. Existing sync saves the confirmed changes.
+
 ### Anthropic IPO and Day Trader momentum (2026-11-19)
 - Add Nasdaq-listed ANT to ticker search, the default watchlist and a Research shortcut. Show the official $83 IPO offer separately from the latest observed quote. Wait for a positive-volume regular-session candle before showing a debut market price.
 - Add confirmed momentum to the main paper Day Trader alongside ETF reversals. Require aligned one- and five-minute moves plus either a qualified forecast or an observed five-minute move of at least 25 basis points. Rank candidates by target room after costs and recheck fixed brackets at the scheduled opening print. Use the existing Day allocation and desk controls.

@@ -1928,6 +1928,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 </div>
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
+<script src="/portfolio-preview-core.js"></script>
 <script>
 const SRC = {
   yahoo:{name:"Yahoo Finance",short:"Yahoo",c:"var(--yahoo)"},
@@ -2619,14 +2620,44 @@ function checkAlerts(){
   if(changed){ store.set("alerts",S.alerts); if(S.tab==="portfolio") renderPortfolio(); }
 }
 $("hCostToggle").onclick=e=>{ e.preventDefault(); $("hCost").hidden=!$("hCost").hidden; if(!$("hCost").hidden) $("hCost").focus(); };
-$("holdForm").onsubmit=async e=>{ e.preventDefault();
-  const s=normSym($("hSym").value), amt=+$("hAmt").value; let c=+$("hCost").value;
-  if(!/^[A-Z0-9.\-^=]{1,12}$/.test(s)||!(amt>0)) return toast("Enter a ticker and how much you invested.");
-  if(!(c>0)){ let q=S.quotes[s]; if(!q||q.error){ try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(s)); S.quotes={...S.quotes,...j.quotes}; q=S.quotes[s]; }catch{} }
-    if(!q||q.error||!q.price) return toast("Couldn't find a price for "+s+". Check the ticker."); c=q.price; }
-  const sh=amt/c, ex=S.port.find(h=>h.symbol===s);
-  if(ex){ const n=ex.shares+sh; ex.cost=(ex.cost*ex.shares+c*sh)/n; ex.shares=n; } else S.port.push({symbol:s,shares:+sh.toFixed(6),cost:+c.toFixed(4),added:Date.now()});
-  savePorts(); ["hSym","hAmt","hCost"].forEach(id=>$(id).value=""); $("hCost").hidden=true; renderPortfolio(); loadQuotes(); };
+function activePortfolio(){ return S.pfs.find(p=>p.id===S.pfActive); }
+function approvePortfolio(draft, detail=""){
+  const rows=draft.changes.map(r=>`${r.symbol} · +${fmt(r.sharesAdded,6)} shares at ${$m(r.cost)} · total ${fmt(r.sharesAfter,6)} shares at ${$m(r.costBasis)} average cost`);
+  return window.confirm([`Review changes for "${draft.name}"`,...rows,`Total added ${$m(draft.totalAmount)}`,detail,"Save these holdings to your dashboard?"].filter(Boolean).join("\n"));
+}
+function commitPortfolioPreview(target, before, draft){
+  if(VIEW||target!==activePortfolio()||target.id!==draft.portfolioId||target.name!==draft.name||JSON.stringify(target.holdings)!==before){
+    toast("The portfolio changed. Review the update again.");
+    return false;
+  }
+  target.holdings=draft.holdings; S.port=target.holdings;
+  savePorts(); if(S.tab==="portfolio") renderPortfolio(); loadQuotes();
+  return true;
+}
+let holdingPreviewBusy=false;
+$("holdForm").onsubmit=async e=>{
+  e.preventDefault();
+  if(VIEW||holdingPreviewBusy) return;
+  const target=activePortfolio(), s=normSym($("hSym").value), amt=+$("hAmt").value, entered=$("hCost").value.trim();
+  if(!target||!/^[A-Z0-9.\-^=]{1,12}$/.test(s)||!Number.isFinite(amt)||!(amt>0)) return toast("Enter a ticker and how much you invested.");
+  const before=JSON.stringify(target.holdings);
+  holdingPreviewBusy=true;
+  try{
+    let cost=+entered, detail="Uses the price you entered.";
+    if(!entered){
+      const j=await api("/api/quotes?symbols="+encodeURIComponent(s));
+      const q=j.quotes?.[s];
+      if(q?.error||!Number.isFinite(q?.price)||!(q.price>0)) return toast("A market quote is unavailable. Enter the price you paid.");
+      cost=q.price;
+      detail=q.marketTime?`Market quote from ${new Date(q.marketTime).toLocaleString()}`:"Uses the latest available market quote.";
+    }
+    if(target!==activePortfolio()||JSON.stringify(target.holdings)!==before) return toast("The portfolio changed. Review the update again.");
+    const draft=MDPortfolioPreview.previewPortfolioChange(target,[{symbol:s,amount:amt,cost}]);
+    if(!approvePortfolio(draft,detail)||!commitPortfolioPreview(target,before,draft)) return;
+    ["hSym","hAmt","hCost"].forEach(id=>$(id).value=""); $("hCost").hidden=true;
+  }catch(error){ toast(error.message||"Could not preview the portfolio update."); }
+  finally{ holdingPreviewBusy=false; }
+};
 
 /* ---------- multiple portfolios ---------- */
 function pfValue(p){ return p.holdings.reduce((a,h)=>{ const q=S.quotes[h.symbol]; return a+h.shares*(q&&!q.error&&q.price?q.price:h.cost); },0); }
@@ -4241,26 +4272,32 @@ attachSuggest("aSym",()=>$("aPx").focus());
 
 /* ---------- Claude can build portfolios ---------- */
 async function applyAction(a){
-  if(!a) return "";
+  if(VIEW||!a||!["create_portfolio","add_holdings"].includes(a.type)||!Array.isArray(a.holdings)||!a.holdings.length) return "";
+  const create=a.type==="create_portfolio";
+  const target=create?{id:"p"+crypto.randomUUID(),name:a.name,holdings:[]}:activePortfolio();
+  if(!target) return "Choose a portfolio before adding holdings.";
+  const before=JSON.stringify(target.holdings);
   const syms=[...new Set(a.holdings.map(h=>normSym(h.symbol)))];
-  try{ const j=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(","))); S.quotes={...S.quotes,...j.quotes}; }catch{}
-  const price=s=>{ const q=S.quotes[s]; return q&&!q.error&&q.price>0?q.price:null; };
-  const missing=[], rows=[];
-  for(const h of a.holdings){ const s=normSym(h.symbol), px=price(s); if(!px){ missing.push(s); continue; }
-    const dollars=a.type==="create_portfolio"?a.total*h.pct/100:h.amount; rows.push({symbol:s,shares:+(dollars/px).toFixed(6),cost:+px.toFixed(4),added:Date.now(),dollars}); }
-  if(!rows.length) return "⚠ I couldn't find live prices for those tickers, so nothing was added.";
-  let msg;
-  if(a.type==="create_portfolio"){
-    let name=a.name, n=2; while(S.pfs.some(p=>p.name===name)) name=`${a.name} ${n++}`;
-    const p={id:"p"+Date.now(),name,holdings:rows.map(({dollars,...r})=>r)}; S.pfs.push(p); switchPf(p.id);
-    msg=`✓ Created portfolio "${name}": ${rows.length} holdings, $${fmt(rows.reduce((x,r)=>x+r.dollars,0),0)} invested at today's prices.`;
-  } else {
-    for(const r of rows){ const ex=S.port.find(h=>h.symbol===r.symbol); if(ex){ const n=ex.shares+r.shares; ex.cost=(ex.cost*ex.shares+r.cost*r.shares)/n; ex.shares=n; } else { const {dollars,...x}=r; S.port.push(x); } }
-    savePorts(); if(S.tab==="portfolio") renderPortfolio(); loadQuotes();
-    msg=`✓ Added ${rows.length} holding${rows.length===1?"":"s"} to "${S.pfs.find(p=>p.id===S.pfActive).name}": ${rows.map(r=>`${r.symbol} $${fmt(r.dollars,0)}`).join(", ")}.`;
+  try{
+    const {quotes}=await api("/api/quotes?symbols="+encodeURIComponent(syms.join(",")));
+    const missing=syms.filter(s=>quotes?.[s]?.error||!Number.isFinite(quotes?.[s]?.price)||!(quotes[s].price>0));
+    if(missing.length) return "Review unavailable. Waiting for quotes for "+missing.join(", ")+".";
+    if(create){
+      const base=target.name; let n=2;
+      while(S.pfs.some(p=>p.name===target.name)) target.name=`${base} ${n++}`;
+    }else if(target!==activePortfolio()||JSON.stringify(target.holdings)!==before) return "The portfolio changed. Review the update again.";
+    const rows=a.holdings.map(h=>{
+      const symbol=normSym(h.symbol);
+      return {symbol,cost:quotes[symbol].price,amount:create?a.total*h.pct/100:h.amount};
+    });
+    const draft=MDPortfolioPreview.previewPortfolioChange(target,rows);
+    if(!approvePortfolio(draft,"Uses the available market quotes.")) return "Portfolio update canceled.";
+    if(create){ target.holdings=draft.holdings; S.pfs.push(target); switchPf(target.id); }
+    else if(!commitPortfolioPreview(target,before,draft)) return "The portfolio changed. Review the update again.";
+    return `${create?"Created":"Updated"} "${draft.name}" with ${draft.changes.length} holding changes.`;
+  }catch(error){
+    return error.message||"Could not preview the portfolio update.";
   }
-  if(missing.length) msg+=` Skipped (no price found): ${missing.join(", ")}.`;
-  return msg;
 }
 document.addEventListener("click",e=>{ if(e.target.closest("[data-chart-retry]")){ loadChart(); return; } });
 document.addEventListener("click",e=>{ const g=e.target.closest("[data-gotab]"); if(g){ setTab(g.dataset.gotab); if(g.dataset.scroll){ const id=g.dataset.scroll; let n=0; const t=setInterval(()=>{ const el=$(id); if(el&&el.offsetHeight>40){ clearInterval(t); el.scrollIntoView({behavior:"smooth",block:"start"}); } else if(++n>60) clearInterval(t); },250); } if(window.innerWidth<760){ $("acPanel").hidden=true; $("acFab").hidden=false; } } });
@@ -4366,7 +4403,8 @@ function buildCmd(){
   [["News","news"],["Markets","data"],["Research","research"],["Portfolio","portfolio"],["Claude Predictor","predict"]].forEach(([n,t])=>{ if(!raw||n.toUpperCase().includes(raw.toUpperCase())) items.push([`Go to ${n}`,"Tab",()=>setTab(t)]); });
   cmdItems=items; cmdSel=0; drawCmd();
 }
-function drawCmd(){ $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||'<div style="color:var(--muted)">Type a company name or ticker, like Apple or VFIAX</div>'; }
+function drawCmd(){ const msg=/^new\s+listings?$/i.test($("cmdInput").value.trim())?"No newly detected listings are available yet.":"Type a company name or ticker, like Apple or VFIAX";
+  $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||`<div style="color:var(--muted)">${msg}</div>`; }
 $("cmdBtn").onclick=openCmd;
 let cmdResults=[], cmdTimer=0, cmdQ="";
 function mergeResults(local,remote,n=12){ const seen=new Set(), out=[]; for(const r of [...local.slice(0,6),...remote,...local.slice(6)]){ if(!seen.has(r.symbol)){ seen.add(r.symbol); out.push(r); } } return out.slice(0,n); }
@@ -4394,7 +4432,14 @@ function selectSym(s){
 }
 document.addEventListener("click",e=>{
   const rm=e.target.closest("[data-rm]"); if(rm){ e.stopPropagation(); S.wl=S.wl.filter(s=>s!==rm.dataset.rm); store.set("wl",S.wl); if(S.view===rm.dataset.rm)S.view="all"; renderToolbar(); renderWL(); renderFeed(); renderTape(); if(S.tab==="data")renderData(); if(S.tab==="research"&&S.rq.sub==="compare")renderMinis(); return; }
-  const dh=e.target.closest("[data-delhold]"); if(dh){ S.port.splice(+dh.dataset.delhold,1); savePorts(); renderPortfolio(); return; }
+  const dh=e.target.closest("[data-delhold]"); if(dh){
+    if(VIEW) return;
+    const target=activePortfolio(), before=JSON.stringify(target?.holdings);
+    try{ const draft=MDPortfolioPreview.previewHoldingRemoval(target,+dh.dataset.delhold), h=draft.removed;
+      if(window.confirm(`Remove ${fmt(h.shares,6)} shares of ${h.symbol} from "${draft.name}"?`)) commitPortfolioPreview(target,before,draft);
+    }catch(error){ toast(error.message); }
+    return;
+  }
   const da=e.target.closest("[data-delalert]"); if(da){ S.alerts=S.alerts.filter(a=>String(a.id)!==da.dataset.delalert); store.set("alerts",S.alerts); renderPortfolio(); return; }
   const ak=e.target.closest("[data-ask]"); if(ak){ if(S.tab!=="predict") setTab("predict"); aiShow("predict"); $("predInput").value=ak.dataset.ask; $("predForm").requestSubmit(); return; }
   const pr=e.target.closest("[data-pred-refresh]"); if(pr){ e.preventDefault(); runPredict(pr.dataset.predRefresh,true); return; }
