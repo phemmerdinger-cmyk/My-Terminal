@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### ANT Research and extended-hours quotes (2026-11-19)
+- Open ANT in its own Research view and start on the intraday chart. Reset the visible chart immediately on symbol changes and exclude zero-volume IPO placeholders from trade history.
+- Label pre-market and after-hours prices with their New York timestamps. Keep the IPO offer separate and link to the auction indication while the first market quote is pending.
+
 ### Free ticker discovery and portfolio review (2026-11-19)
 - Refresh the exchange ticker directory and SEC company names in the background and use them in the existing search. Type “new listings” to see symbols first detected in the last seven days. The first complete snapshot establishes a baseline for future changes.
 - Calculate and preview dashboard holdings changes before saving them. Show shares, price and resulting average cost in a confirmation using the existing portfolio controls. An unavailable market price can be replaced by the owner's actual cost. Existing sync saves the confirmed changes.
