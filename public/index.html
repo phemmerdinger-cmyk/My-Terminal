@@ -4497,6 +4497,7 @@ function startStream(){
     if(!paintPending) prevPaint=Object.fromEntries(streamSymsNow().map(k=>[k,{price:S.quotes[k]&&S.quotes[k].price}]));
     for(const [s,t] of Object.entries(d)){
       const q=S.quotes[s]; if(!q||q.error||q.prevClose==null) continue;
+      if(q.regularSession && (t.t<q.regularSession.start || t.t>=q.regularSession.end)) continue;
       if(q.marketTime&&t.t<q.marketTime-1000) continue; // ignore stale trades
       q.price=t.p; q.change=t.p-q.prevClose; q.changePct=q.change/q.prevClose*100; q.marketTime=t.t;
       if(q.dayHigh==null||t.p>q.dayHigh) q.dayHigh=t.p; if(q.dayLow==null||t.p<q.dayLow) q.dayLow=t.p;
