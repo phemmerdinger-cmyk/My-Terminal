@@ -1496,6 +1496,10 @@ const fromFeed = (f) => { const m = f.match(/^BINANCE:(\w+)USDT$/); return m ? m
 
 function wanted() {
   const want = new Set();
+  for (const c of live.clients) {
+    if (c.focus) want.add(c.focus);
+    if (want.size >= 30) return want;
+  }
   for (const c of live.clients) for (const s of c.syms) { if (want.size >= 30) break; want.add(s); }
   return want;
 }
@@ -1514,6 +1518,7 @@ function connectFinnhub() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     if (m.type !== "trade" || !Array.isArray(m.data)) return;
     for (const t of m.data) {
+      if (typeof t?.s !== "string" || !Number.isFinite(t.p) || t.p <= 0 || !Number.isFinite(t.t) || t.t <= 0 || !(t.v > 0)) continue;
       const sym = fromFeed(t.s);
       const prev = live.last.get(sym);
       if (!prev || t.t >= prev.t) { live.last.set(sym, { p: t.p, t: t.t }); live.dirty.add(sym); }
@@ -1540,9 +1545,10 @@ setInterval(() => {
 // Keep connections alive through proxies
 setInterval(() => { for (const c of live.clients) c.res.write(": ping\n\n"); }, 25_000);
 
-function openStream(req, res, syms) {
+function openStream(req, res, syms, focus) {
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const client = { res, syms: new Set(syms.filter(streamable)) };
+  if (client.syms.has(focus)) client.focus = focus;
   live.clients.add(client);
   const snap = {};
   for (const s of client.syms) if (live.last.has(s)) snap[s] = live.last.get(s);
@@ -4141,7 +4147,8 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/stream") {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
-        return openStream(req, res, parseList(u.searchParams.get("symbols"), 60));
+        const focus = owner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
+        return openStream(req, res, parseList(u.searchParams.get("symbols"), 60), focus);
       }
       if (u.pathname === "/api/desk") return deskRoute(req, res); // owner-only (not in PUBLIC_API): personal layouts, profile, research
       if (u.pathname === "/api/sync") {

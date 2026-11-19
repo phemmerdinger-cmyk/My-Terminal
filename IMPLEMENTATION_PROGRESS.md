@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Research trade updates and one-minute charts (2026-11-19)
+- Prioritize the active Research ticker in the owner’s live stream. A valid regular-session trade can update an IPO quote without a previous close. Slower snapshots preserve newer trades.
+- Update the Research price and its timestamp at most once per second as trades arrive. Use one-minute candles for the 1D Research view.
+
 ### ANT Research and extended-hours quotes (2026-11-19)
 - Open ANT in its own Research view and start on the intraday chart. Reset the visible chart immediately on symbol changes and exclude zero-volume IPO placeholders from trade history.
 - Label pre-market and after-hours prices with their New York timestamps. Keep the IPO offer separate and link to the auction indication while the first market quote is pending.
