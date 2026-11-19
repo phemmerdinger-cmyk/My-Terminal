@@ -514,7 +514,8 @@ function firstTradingDay(sym, meta) {
 }
 async function quote(sym) {
   return cached("q:" + sym, 15_000, async () => {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m&includePrePost=true`;
+    const minuteBars = sym === "ANT";
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=${minuteBars ? "1m" : "5m"}&includePrePost=true`;
     const j = JSON.parse(await get(url, "application/json"));
     const r = j.chart && j.chart.result && j.chart.result[0];
     if (!r) throw new Error("no data");
@@ -531,7 +532,11 @@ async function quote(sym) {
     }) : -1;
     const regular = m.currentTradingPeriod?.regular;
     const lastRegular = regular ? (r.timestamp || []).findLastIndex((ts, i) => ts >= regular.start && ts < regular.end && bars.close?.[i] > 0) : -1;
-    const price = debut ? (firstPrint >= 0 ? bars.close[firstPrint] : null) : m.regularMarketPrice ?? (lastRegular >= 0 ? bars.close[lastRegular] : null);
+    const verifiedDebutMeta = firstPrint >= 0 && Number.isFinite(m.regularMarketPrice) && m.regularMarketPrice > 0 &&
+      m.regularMarketVolume > 0 && m.regularMarketTime >= r.timestamp[firstPrint] && m.regularMarketTime <= regular?.end &&
+      m.regularMarketTime <= Date.now() / 1000;
+    const price = debut && !verifiedDebutMeta ? (firstPrint >= 0 ? bars.close[firstPrint] : null)
+      : m.regularMarketPrice ?? (lastRegular >= 0 ? bars.close[lastRegular] : null);
     const prev = debut ? null : m.chartPreviousClose ?? m.previousClose;
     return {
       symbol: m.symbol,
@@ -543,9 +548,9 @@ async function quote(sym) {
       currency: m.currency,
       exchange: m.fullExchangeName || m.exchangeName,
       ...(regular?.start < regular?.end ? { regularSession: { start: regular.start * 1000, end: regular.end * 1000 } } : {}),
-      marketTime: (debut ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
+      marketTime: (debut && !verifiedDebutMeta ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
       ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
-      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut }),
+      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut, barSeconds: minuteBars ? 60 : 300 }),
       dayHigh: price == null && debut ? null : m.regularMarketDayHigh,
       dayLow: price == null && debut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
@@ -1489,7 +1494,7 @@ async function earningsCalendar(symbols) {
 // With FINNHUB_API_KEY set (free at finnhub.io), the server keeps one WebSocket to
 // Finnhub and streams every trade to open browsers via Server-Sent Events.
 // Free tier: real-time US stock trades, up to 30 symbols at once. Needs Node 22+.
-const live = { ws: null, open: false, subs: new Set(), last: new Map(), dirty: new Set(), clients: new Set(), retry: 1000 };
+const live = { ws: null, open: false, subs: new Set(), last: new Map(), dirty: new Set(), clients: new Set(), retry: 1000, providerTradeAt: null };
 const streamable = (s) => /^[A-Z][A-Z0-9.\-]{0,9}$/.test(s); // stocks, ETFs and COIN-USD (no ^indexes or futures)
 const toFeed = (s) => (isCrypto(s) ? `BINANCE:${base(s)}USDT` : s);
 const fromFeed = (f) => { const m = f.match(/^BINANCE:(\w+)USDT$/); return m ? m[1] + "-USD" : f; };
@@ -1520,6 +1525,7 @@ function connectFinnhub() {
     for (const t of m.data) {
       if (typeof t?.s !== "string" || !Number.isFinite(t.p) || t.p <= 0 || !Number.isFinite(t.t) || t.t <= 0 || !(t.v > 0)) continue;
       const sym = fromFeed(t.s);
+      live.providerTradeAt = Math.max(live.providerTradeAt || 0, t.t);
       const prev = live.last.get(sym);
       if (!prev || t.t >= prev.t) { live.last.set(sym, { p: t.p, t: t.t }); live.dirty.add(sym); }
     }
@@ -1545,8 +1551,8 @@ setInterval(() => {
 // Keep connections alive through proxies
 setInterval(() => { for (const c of live.clients) c.res.write(": ping\n\n"); }, 25_000);
 
-function openStream(req, res, syms, focus) {
-  res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-store", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+function openStream(res, syms, focus) {
+  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const client = { res, syms: new Set(syms.filter(streamable)) };
   if (client.syms.has(focus)) client.focus = focus;
   live.clients.add(client);
@@ -1555,7 +1561,7 @@ function openStream(req, res, syms, focus) {
   res.write(`event: hello\ndata: ${JSON.stringify({ streaming: live.open })}\n\n`);
   if (Object.keys(snap).length) res.write(`data: ${JSON.stringify(snap)}\n\n`);
   syncSubs();
-  req.on("close", () => { live.clients.delete(client); syncSubs(); });
+  res.once("close", () => { live.clients.delete(client); syncSubs(); });
 }
 
 // ---------------------------------------------------------------- device sync (portfolios, watchlist, alerts, predictions)
@@ -4148,7 +4154,7 @@ async function handle(req, res) {
       if (u.pathname === "/api/stream") {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
         const focus = owner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
-        return openStream(req, res, parseList(u.searchParams.get("symbols"), 60), focus);
+        return openStream(res, parseList(u.searchParams.get("symbols"), 60), focus);
       }
       if (u.pathname === "/api/desk") return deskRoute(req, res); // owner-only (not in PUBLIC_API): personal layouts, profile, research
       if (u.pathname === "/api/sync") {
@@ -4166,7 +4172,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // pages: the real site is owner-only; /demo is the public recruiter view
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });

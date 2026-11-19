@@ -41,7 +41,7 @@ function asQuote(print, reference) {
     changePct: change === null ? null : change / reference * 100 };
 }
 
-function getExtendedQuotes(meta, timestamps, bars, { debut = false, now = Date.now() } = {}) {
+function getExtendedQuotes(meta, timestamps, bars, { debut = false, now = Date.now(), barSeconds = 300 } = {}) {
   const trading = meta?.currentTradingPeriod;
   const regular = period(trading?.regular);
   const asOf = Math.floor(now / 1000);
@@ -65,9 +65,9 @@ function getExtendedQuotes(meta, timestamps, bars, { debut = false, now = Date.n
   const quotedClose = !debut && positive(meta.regularMarketPrice) && timestamp(regularMarketTime) &&
     regularMarketTime >= regular.start && regularMarketTime <= regular.end && regularMarketTime <= asOf &&
     (regularPrint || positive(meta.regularMarketVolume)) && (!regularPrint || regularMarketTime >= regularPrint.time);
-  // Quotes are requested as five-minute bars. A lone earlier candle cannot establish the close.
+  // A lone earlier candle cannot establish the regular close.
   const baseline = quotedClose ? meta.regularMarketPrice :
-    regularPrint?.time >= regular.end - 300 ? regularPrint.price : null;
+    regularPrint?.time >= regular.end - barSeconds ? regularPrint.price : null;
   return { preMarket: asQuote(prePrint, previous), postMarket: asQuote(postPrint, baseline) };
 }
 

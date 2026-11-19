@@ -49,6 +49,14 @@ test("a regular candle in the closing bucket substitutes for stale quote metadat
   assert.deepEqual(withoutClose.postMarket, { price: 136, marketTime: asMs("22:10"), change: null, changePct: null });
 });
 
+test("a one-minute IPO quote uses only the final minute to establish its after-hours reference", () => {
+  const extended = ["21:10", 99, 0];
+  const earlier = get([["20:55", 90, 10], extended], { debut: true, barSeconds: 60 });
+  assert.equal(earlier.postMarket.change, null);
+  const closing = get([["20:59", 90, 10], extended], { debut: true, barSeconds: 60 });
+  assert.equal(closing.postMarket.change, 9);
+});
+
 test("rejects prior-day segments and inconsistent windows", () => {
   assert.deepEqual(get([["21:10", 130, 10]], { now: asMs("10:05", "2026-11-20") }), none);
   assert.deepEqual(get([["21:10", 130, 10]], { now: asMs("20:00") }), none);
