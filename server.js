@@ -542,6 +542,7 @@ async function quote(sym) {
       changePct: debut || price == null ? null : prev ? ((price - prev) / prev) * 100 : 0,
       currency: m.currency,
       exchange: m.fullExchangeName || m.exchangeName,
+      ...(regular?.start < regular?.end ? { regularSession: { start: regular.start * 1000, end: regular.end * 1000 } } : {}),
       marketTime: (debut ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
       ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
       ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut }),
