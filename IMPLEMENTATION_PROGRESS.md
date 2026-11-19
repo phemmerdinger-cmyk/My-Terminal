@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Anthropic IPO and Day Trader momentum (2026-11-19)
+- Add Nasdaq-listed ANT to ticker search, the default watchlist and a Research shortcut. Show the official $83 IPO offer separately from the latest observed quote. Wait for a positive-volume regular-session candle before showing a debut market price.
+- Add confirmed momentum to the main paper Day Trader alongside ETF reversals. Require sealed one- and five-minute price direction to agree with a qualified forecast, rank candidates by target room after costs, and recheck fixed brackets at the scheduled opening print. Use the existing Day allocation and desk controls.
+
 ### Main Day Trader ETF reversals (2026-11-18)
 - Switch the main paper strategy to confirmed one-minute ETF reversals toward session VWAP. Preserve the original forecast for learning and the separate Volume Test.
 - Require a sweep of a recent range, a separate confirmation, at least twice modeled round-trip cost in target room, and a fresh exact opening print. Recheck target room, fixed bracket, and paper allocation at the opening print.

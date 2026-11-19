@@ -58,8 +58,41 @@ function findPullback(symbol, bars, {
   };
 }
 
+function findMomentum(bars, forecast, {
+  day, now, close = DTC.CLOSE, maxLagSec = 90, costPerSide = PULLBACK.costPerSide,
+  shortBorrow = PULLBACK.shortBorrow,
+} = {}) {
+  if (!Array.isArray(bars) || typeof day !== "string" || !Number.isFinite(now) || !forecast?.qualified ||
+      (forecast.day != null && forecast.day !== day)) return null;
+  const { side, a, moveBps } = forecast;
+  if (![1, -1].includes(side) || !Number.isFinite(a) || !(a > 0) || !Number.isFinite(moveBps) || !(moveBps > 0)) return null;
+
+  const recent = bars.filter((bar) => bar.d === day && bar.m >= DTC.OPEN && bar.m < close).slice(-6);
+  if (recent.length !== 6 || !recent.every((bar, i) => DTC.validMinuteBar(bar) && Number.isFinite(bar.v) && bar.v > 0 &&
+      (!i || (bar.t === recent[i - 1].t + 60 && bar.m === recent[i - 1].m + 1)))) return null;
+  const last = recent.at(-1), entry = last.c;
+  if (!DTC.paperBarReady(last, now, maxLagSec) ||
+      side * (entry - recent[0].c) <= 0 || side * (entry - recent.at(-2).c) <= 0) return null;
+
+  const dir = side === 1 ? "long" : "short";
+  const target = entry * (1 + side * moveBps / 10_000);
+  const targetDistance = side * (target - entry);
+  const minStop = entry * 0.0008, maxStop = targetDistance * 0.65;
+  const stopDistance = Math.max(minStop, Math.min(a, maxStop));
+  const stop = entry - side * stopDistance;
+  const minGrossCostX = PULLBACK.minGrossCostX;
+  const room = targetRoom(dir, entry, target, costPerSide, shortBorrow, minGrossCostX);
+  if (!room || !(stop > 0) || maxStop < minStop) return null;
+  return {
+    dir, side, kind: "momentum-confirmed", entry, stop, target, stopDistance, targetDistance,
+    ...room, signalAt: last.t, costPerSide, shortBorrow, minGrossCostX,
+    why: "Forecast confirmed by the latest one-minute and five-minute moves",
+  };
+}
+
 function openPullback(order, bar, { now, maxLagSec = 90 } = {}) {
-  if (!Number.isFinite(now) || !bar || !DTC.paperBarReady(bar, now, maxLagSec) || order?.idea?.kind !== "vwap-reclaim") return null;
+  if (!Number.isFinite(now) || !bar || !DTC.paperBarReady(bar, now, maxLagSec) ||
+      !["vwap-reclaim", "momentum-confirmed"].includes(order?.idea?.kind)) return null;
   const fill = DTC.paperOpen(order, bar);
   if (!fill) return null;
   const { dir, stop, target, costPerSide, shortBorrow, minGrossCostX } = order.idea;
@@ -69,4 +102,4 @@ function openPullback(order, bar, { now, maxLagSec = 90 } = {}) {
   return { ...fill, stop, target };
 }
 
-module.exports = { PULLBACK, findPullback, openPullback };
+module.exports = { PULLBACK, findPullback, findMomentum, openPullback };
