@@ -514,25 +514,33 @@ async function quote(sym) {
     const r = j.chart && j.chart.result && j.chart.result[0];
     if (!r) throw new Error("no data");
     const m = r.meta;
-    const closes = (r.indicators.quote[0].close || []).filter((x) => x != null);
-    const price = m.regularMarketPrice ?? closes[closes.length - 1];
-    const prev = m.chartPreviousClose ?? m.previousClose;
+    const bars = r.indicators?.quote?.[0] || {};
+    const closes = (bars.close || []).filter((x) => x != null);
+    const antDebut = sym === "ANT" && etParts().day === "2026-11-19";
+    // On the debut morning Yahoo can publish the $83 offer as the last price, with no traded candle.
+    const antPrint = antDebut ? (r.timestamp || []).findLastIndex((ts, i) => {
+      const t = etParts(new Date(ts * 1000));
+      return t.day === "2026-11-19" && t.min >= 570 && t.min < 960 && bars.volume?.[i] > 0 && bars.close?.[i] > 0;
+    }) : -1;
+    const price = antDebut ? (antPrint >= 0 ? bars.close[antPrint] : null) : m.regularMarketPrice ?? closes.at(-1);
+    const prev = antDebut ? null : m.chartPreviousClose ?? m.previousClose;
     return {
       symbol: m.symbol,
       name: m.shortName || m.longName || m.symbol,
       price,
       prevClose: prev,
-      change: price - prev,
-      changePct: prev ? ((price - prev) / prev) * 100 : 0,
+      change: antDebut ? null : price - prev,
+      changePct: antDebut ? null : prev ? ((price - prev) / prev) * 100 : 0,
       currency: m.currency,
       exchange: m.fullExchangeName || m.exchangeName,
-      marketTime: (m.regularMarketTime || 0) * 1000,
-      dayHigh: m.regularMarketDayHigh,
-      dayLow: m.regularMarketDayLow,
+      marketTime: (antDebut ? (antPrint >= 0 ? r.timestamp[antPrint] : 0) : m.regularMarketTime || 0) * 1000,
+      ...(antDebut && antPrint < 0 ? { status: "awaiting-market-print" } : {}),
+      dayHigh: price == null && antDebut ? null : m.regularMarketDayHigh,
+      dayLow: price == null && antDebut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
-      high52: m.fiftyTwoWeekHigh,
-      low52: m.fiftyTwoWeekLow,
-      spark: closes.length > 60 ? closes.filter((_, i) => i % Math.ceil(closes.length / 60) === 0) : closes,
+      high52: antDebut ? null : m.fiftyTwoWeekHigh,
+      low52: antDebut ? null : m.fiftyTwoWeekLow,
+      spark: antDebut && antPrint < 0 ? [] : closes.length > 60 ? closes.filter((_, i) => i % Math.ceil(closes.length / 60) === 0) : closes,
     };
   });
 }
@@ -1559,9 +1567,9 @@ const STRATS = {
     hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
     changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "Trade only on fresh post-decision prices, with 7.5 bps of modeled costs", "Zweig put/call exposure tilt", "v3: financial-ratio indicator (Fin 370 units 6–9: profitability/DuPont, leverage, efficiency/CCC, valuation) vs peers and prior year, weight 0.08 — a fixed prior, not yet fitted"],
     params: { ratioWeight: 0.08, slots: 10, riskSlots: 8, slipPerSide: 0.00075, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 3 } },
-  day: { id: "alex-intraday", version: 4, trader: "Day Trader", since: "2026-11-18",
-    hypothesis: "Confirmed intraday reversals in liquid ETFs can capture a move back toward session VWAP after modeled costs.",
-    changes: ["Trade a failed extension and confirmed reversal toward session VWAP in liquid ETFs", "Require target room of at least twice modeled round-trip costs when planning and filling", "Use the exact later opening print, a fixed stop and target, and a ten-minute max hold", "Use a capped Day paper allocation under desk loss and volatility controls", "Continue scoring the older forecast for research and the separate Volume Test"],
+  day: { id: "alex-intraday", version: 5, trader: "Day Trader", since: "2026-11-19",
+    hypothesis: "Confirmed ETF reversals and strong forecasts with aligned intraday momentum can earn more than modeled costs.",
+    changes: ["Keep confirmed ETF reversals toward session VWAP", "Add momentum entries when a cost-qualified forecast agrees with the last one and five minutes", "Require target room of at least twice modeled round-trip costs and recheck at the exact later opening print", "Use fixed stop and target brackets, a ten-minute max hold, and the capped Day paper allocation under desk loss controls"],
     params: { costPerSide: 0.0005, borrow: 0.0001, bufferX: 0.5, riskPct: 0.0025, grossCap: 1, netCap: 1, dailyLoss: 0.01, maxBarLagSec: 90, holdMinutes: 10 } },
   quant: { id: "daniel-macro-quant", version: 3, trader: "Quant Trader", since: "2026-11-17",
     hypothesis: "A regime-aware, risk-parity allocation across liquid ETFs and mega-caps (12-1 momentum, 3-month momentum, low volatility, 200-day trend filter, 15% vol target) beats the S&P on a risk-adjusted basis after 5 bps costs.",
@@ -2298,9 +2306,8 @@ function dtFixExecution() {
 // a new one. The forecaster's learned weights carry over (they are research, not account state).
 async function dtVersionCheck() {
   if (!RISK.versionChanged(DT.strategy, STRATS.day)) return false;
-  if (DT.strategy?.id === STRATS.day.id && [2, 3].includes(DT.strategy.version) && STRATS.day.version === 4) {
-    DT.entries = {};
-    DT.reversalLastBar = {};
+  if (DT.strategy?.id === STRATS.day.id && [2, 3, 4].includes(DT.strategy.version) && STRATS.day.version === 5) {
+    if (DT.strategy.version < 4) DT.entries = {};
     DT.strategy = { id: STRATS.day.id, version: STRATS.day.version, since: Date.now() };
     return true;
   }
@@ -2367,7 +2374,7 @@ function dtExit(sym, px, why, t) {
   const k = (T.kinds[p.kind || "other"] = T.kinds[p.kind || "other"] || { n: 0, wins: 0, pnl: 0 }); k.n++; if (pnl > 0) k.wins++; k.pnl += pnl;
   dtLog({ t: t ? t * 1000 : Date.now(), side: p.dir === "long" ? "SELL" : "COVER", sym, shares: p.shares, price: +px.toFixed(2), amount: +(p.shares * px).toFixed(2), setup: p.setup, why, pnl: +pnl.toFixed(2), pnlPct: +(pnl / (p.entry * p.shares)).toFixed(5), R: +R.toFixed(2), held, cost: +(cost + (p.cost0 || 0)).toFixed(2), entry: p.entry, dir: p.dir });
 }
-const DT_KIND = { "vwap-reclaim": "ETF VWAP reversal", momentum: "Momentum", reversion: "VWAP snap-back", flow: "Candle pressure (OHLC proxy)", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus",
+const DT_KIND = { "vwap-reclaim": "ETF VWAP reversal", "momentum-confirmed": "Confirmed momentum", momentum: "Momentum", reversion: "VWAP snap-back", flow: "Candle pressure (OHLC proxy)", levels: "Liquidity levels", relative: "Relative strength", tape: "Market tape", research: "News & research", spider: "Spider research", consensus: "Bot consensus",
   pullback: "Trend pullback", burst: "Momentum burst", stretch: "VWAP snap-back", momentum: "1-minute momentum", "research-long": "News & research (bullish)", "research-short": "News & research (bearish)" };
 // ---- research for the day trader: the same inputs the swing bot uses, refreshed every 10 minutes ----
 // For each stock: news headlines (the five outlets, trending, Smart Money, its own Yahoo feed), earnings (beat or miss
@@ -2500,7 +2507,8 @@ function dtOpen(sym, forecast, bar, observedAt) {
     return;
   }
   DT.day.reversalRiskUsed = (DT.day.reversalRiskUsed || 0) + shares * riskPerShare;
-  DT.day.reversalEntries = (DT.day.reversalEntries || 0) + 1;
+  const counter = idea.kind === "momentum-confirmed" ? "momentumEntries" : "reversalEntries";
+  DT.day[counter] = (DT.day[counter] || 0) + 1;
   const cost0 = shares * px * (DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   dtPx[sym] = px;
   DT.positions[sym] = { dir: idea.dir, shares, ...fill, stop0: fill.stop, setup: DT_KIND[idea.kind], kind: idea.kind, why: idea.why, cost0, costPerSide: DT_COST, hold: DT_HOLD, bars: 0 };
@@ -2630,20 +2638,33 @@ async function dtTick() {
     }
     for (const [, events] of [...byMinute].sort((a, b) => a[0] - b[0])) dtSettle(events, t.day);
 
-    const activeUniverse = new Set(uni), drafted = [], reversals = [];
+    const activeUniverse = new Set(uni), drafted = [], setups = [];
     for (const [sym, { bars, last }] of latest) {
       dtPx[sym] = last.c;
       if (!m.open || DT.entries[sym] || DT.positions[sym]) continue;
+      let reversal = null;
       if (DP.PULLBACK.universe.includes(sym) && last.t > (DT.reversalLastBar[sym] || 0)) {
         DT.reversalLastBar[sym] = last.t;
         DT.day.reversalChecks = (DT.day.reversalChecks || 0) + 1;
-        const idea = DP.findPullback(sym, bars, { day: t.day, now: Date.now(), close, maxLagSec: DT_PARAMS.maxBarLagSec,
+        reversal = DP.findPullback(sym, bars, { day: t.day, now: Date.now(), close, maxLagSec: DT_PARAMS.maxBarLagSec,
           costPerSide: DT_COST, shortBorrow: DT_FEE_SHORT });
-        if (idea) reversals.push({ sym, last, idea });
+        if (reversal) {
+          setups.push({ sym, last, idea: reversal, kind: "reversal" });
+          DT.day.reversalSignals = (DT.day.reversalSignals || 0) + 1;
+        }
       }
       if (!activeUniverse.has(sym) || last.t <= (DT.lastBar[sym] || 0)) continue;
       const forecast = dtDecide(bars, sym, ctx, t.day);
-      if (forecast) drafted.push({ sym, last, forecast });
+      if (!forecast) continue;
+      drafted.push({ sym, last, forecast });
+      if (!reversal && forecast.qualified) {
+        const idea = DP.findMomentum(bars, forecast, { day: t.day, now: Date.now(), close, maxLagSec: DT_PARAMS.maxBarLagSec,
+          costPerSide: DT_COST, shortBorrow: DT_FEE_SHORT });
+        if (idea) {
+          setups.push({ sym, last, idea, kind: "momentum" });
+          DT.day.momentumSignals = (DT.day.momentumSignals || 0) + 1;
+        }
+      }
     }
     if (!process.env.AP_TEST) dayVolume.observe({ series: all, candidates: drafted, day: t.day, close, now: Date.now(),
       maxLagSec: DT_PARAMS.maxBarLagSec });
@@ -2665,12 +2686,11 @@ async function dtTick() {
         DT.day.best = { sym, moveBps: forecast.moveBps, hurdleBps: forecast.hurdleBps };
       }
     }
-    if (reversals.length && !dtHalted()) {
-      await deskRisk.prepare(reversals.map(({ sym }) => sym));
-      reversals.sort((a, b) => b.idea.netTargetBps - a.idea.netTargetBps);
-      for (const { sym, last, idea } of reversals) {
+    if (setups.length && !dtHalted()) {
+      const ranked = setups.sort((a, b) => b.idea.netTargetBps - a.idea.netTargetBps).slice(0, 6);
+      await deskRisk.prepare(ranked.map(({ sym }) => sym));
+      for (const { sym, last, idea, kind } of ranked) {
         const decisionAt = Date.now(), side = idea.side;
-        DT.day.reversalSignals = (DT.day.reversalSignals || 0) + 1;
         const fillAt = DTC.paperEntryMinute(last, decisionAt, close, DT_PARAMS.maxBarLagSec, DT_HOLD);
         if (fillAt == null) continue;
         const riskPerShare = idea.stopDistance + last.c * (2 * DT_COST + (side < 0 ? DT_FEE_SHORT : 0));
@@ -2678,14 +2698,16 @@ async function dtTick() {
         const ticket = deskRisk.reserve({ bot: "day", sym, sign: side, shares, price: last.c, riskPerShare,
           integer: true, pilotRoom: dtPilotRoom() });
         if (!ticket.shares) {
-          DT.day.reversalBlocked = (DT.day.reversalBlocked || 0) + 1;
+          const counter = kind + "Blocked";
+          DT.day[counter] = (DT.day[counter] || 0) + 1;
           BOTDIAG.day.desk = ticket.reason;
           continue;
         }
         DT.entries[sym] = { day: t.day, side, idea, decisionAt, decisionPrice: last.c, fillAt,
           approval: { at: decisionAt, shares: ticket.shares, price: last.c, riskPerShare, pilot: true } };
         ticket.release();
-        DT.day.reversalQueued = (DT.day.reversalQueued || 0) + 1;
+        const counter = kind + "Queued";
+        DT.day[counter] = (DT.day[counter] || 0) + 1;
         DT.day.queued = (DT.day.queued || 0) + 1;
       }
     }
@@ -2750,11 +2772,11 @@ async function dtView() {
     allForecasts: RISK.expectancy(SH.all.n, SH.all.sum, SH.all.sq), qualified: RISK.expectancy(SH.qual.n, SH.qual.sum, SH.qual.sq) };
   return { ...DT, kind: "day", diag: { market: BOTDIAG.market, ...BOTDIAG.day }, rawPositions: DT.positions, positions, value, startValue: DT_START, bustAt: DT_PAPER_FLOOR, spxNow, marketOpen: open, current, analytics: st, universe: DT_UNIVERSE, quantFactors: { day: DTQ.day, t: DTQ.t, weights: DTB.QW, labels: DT_QF, top: Object.entries(DTQ.by).sort((a, b) => b[1].score - a[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })), bottom: Object.entries(DTQ.by).sort((a, b) => a[1].score - b[1].score).slice(0, 8).map(([s, x]) => ({ sym: s, score: +x.score.toFixed(2), lead: x.lead })) },
     research: { t: DTR.t, market: DTR.market, top: Object.entries(DTR.by).sort((a, b) => b[1].lean - a[1].lean).filter(([, x]) => Math.abs(x.lean) >= 0.08).map(([sym, x]) => ({ sym, lean: x.lean, reasons: x.reasons, spider: x.spider, swing: x.swing, quant: x.quant, sector: x.sector, grade: x.grade })) }, durable: !!(UP_URL && UP_TOKEN),
-    status: open ? (DT.day?.halted ? "Daily loss limit hit — entry pause" : `Scanning ${DP.PULLBACK.universe.length} ETFs for VWAP reversals · ${DT.day?.reversalSignals || 0} setups today`) : "Market closed — returns at the opening bell; unmatched positions wait for an observed price",
+    status: open ? (DT.day?.halted ? "Daily loss limit hit — entry pause" : `${DT.day?.reversalSignals || 0} ETF reversal setups · ${DT.day?.momentumSignals || 0} confirmed momentum setups today`) : "Market closed — returns at the opening bell; unmatched positions wait for an observed price",
     strategy: { ...STRATS.day, active: DT.strategy || null }, researchMode: research, daily: (DT.daily || []).slice(-30),
     model: DTB.scorecard(DT.brain), pend: undefined, entries: undefined, legacyShadow: undefined, legacyResearch: undefined,
     orders: Object.entries(DT.entries).map(([sym, f]) => ({ sym, dir: f.idea.dir, at: f.fillAt * 1000 })),
-    rules: { maxPos: DP.PULLBACK.universe.length, cost: DT_COST, borrow: DT_FEE_SHORT, hold: DT_HOLD, lev: DT_LEV, net: DT_NET,
+    rules: { maxPos: DT_UNIVERSE.length, cost: DT_COST, borrow: DT_FEE_SHORT, hold: DT_HOLD, lev: DT_LEV, net: DT_NET,
       dailyLoss: DT_PARAMS.dailyLoss, bufferX: DT_PARAMS.bufferX, reversal: DP.PULLBACK, allocation: DT_PILOT } };
 }
 async function dtRestore(doc) {
@@ -3135,7 +3157,7 @@ const COMP = require("./competition-core.js");
 const TRADERS = {
   swing: { name: "Swing Trader", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
   quant: { name: "Quant Trader", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
-  day: { name: "Day Trader", role: "Intraday trader", focus: "Confirmed ETF reversals toward session VWAP, with a ten-minute maximum hold" },
+  day: { name: "Day Trader", role: "Intraday trader", focus: "Confirmed momentum and ETF VWAP reversals, with a ten-minute maximum hold" },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {

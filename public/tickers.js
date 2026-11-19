@@ -1,6 +1,17 @@
 // Built-in list of popular symbols so search suggestions appear instantly on the first keystroke.
 // Live Yahoo Finance search results are added a moment later, so any symbol can still be found.
+window.MARKET_LISTINGS = Object.freeze({
+  ANT: Object.freeze({
+    name: "Anthropic, PBC Class A",
+    exchange: "Nasdaq Global Select Market",
+    listingDay: "2026-11-19",
+    offerPrice: 83,
+    announcement: "https://www.anthropic.com/news/anthropic-prices-initial-public-offering",
+    exchangeUrl: "https://www.nasdaq.com/market-activity/stocks/ant",
+  }),
+});
 window.TICKERS = [
+["ANT",window.MARKET_LISTINGS.ANT.name,"Stock"],
 ["AAPL","Apple Inc.","Stock"],["MSFT","Microsoft Corporation","Stock"],["NVDA","NVIDIA Corporation","Stock"],["AMZN","Amazon.com Inc.","Stock"],["GOOGL","Alphabet Inc. Class A","Stock"],["GOOG","Alphabet Inc. Class C","Stock"],["META","Meta Platforms Inc.","Stock"],["TSLA","Tesla Inc.","Stock"],["AVGO","Broadcom Inc.","Stock"],["BRK-B","Berkshire Hathaway Inc. Class B","Stock"],
 ["JPM","JPMorgan Chase & Co.","Stock"],["LLY","Eli Lilly and Company","Stock"],["V","Visa Inc.","Stock"],["UNH","UnitedHealth Group Inc.","Stock"],["XOM","Exxon Mobil Corporation","Stock"],["MA","Mastercard Inc.","Stock"],["JNJ","Johnson & Johnson","Stock"],["PG","Procter & Gamble Co.","Stock"],["HD","Home Depot Inc.","Stock"],["COST","Costco Wholesale Corporation","Stock"],
 ["ORCL","Oracle Corporation","Stock"],["ABBV","AbbVie Inc.","Stock"],["WMT","Walmart Inc.","Stock"],["BAC","Bank of America Corporation","Stock"],["NFLX","Netflix Inc.","Stock"],["CRM","Salesforce Inc.","Stock"],["KO","Coca-Cola Company","Stock"],["CVX","Chevron Corporation","Stock"],["AMD","Advanced Micro Devices Inc.","Stock"],["PEP","PepsiCo Inc.","Stock"],

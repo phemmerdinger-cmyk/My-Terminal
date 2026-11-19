@@ -1602,6 +1602,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <!-- RESEARCH (Yahoo-style quote page) -->
     <section id="tab-research" class="pad" hidden>
       <button class="rs-search" id="rsSearch">⌕ Search any stock, ETF, mutual fund, crypto, index or future…</button>
+      <button type="button" class="btn ghost" id="antIpoShortcut">ANT · Anthropic IPO</button>
       <div id="rsHead"></div>
       <div id="rsChartPane" hidden>
         <div id="chartTitle" hidden></div>
@@ -1938,7 +1939,7 @@ const SRC = {
 };
 const INDEXES = [["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow Jones"],["^RUT","Russell 2000"],["^VIX","VIX"],["^TNX","10Y Treasury"],["CL=F","Crude Oil"],["GC=F","Gold"],["BTC-USD","Bitcoin"],["ETH-USD","Ethereum"],["XRP-USD","XRP"],["SOL-USD","Solana"]];
 const IDX_NAME = Object.fromEntries(INDEXES);
-const DEFAULT_WL = ["AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM"];
+const DEFAULT_WL = ["ANT","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM"];
 const SECTORS = [["XLK","Technology"],["XLC","Communication"],["XLY","Consumer Disc."],["XLP","Consumer Staples"],["XLF","Financials"],["XLV","Health Care"],["XLI","Industrials"],["XLE","Energy"],["XLB","Materials"],["XLU","Utilities"],["XLRE","Real Estate"]];
 const PALETTE = ["#91bd5f","#0fbf7d","#ff9e1b","#abcd85","#e11d48","#69913b","#eab308","#f97316","#64748b","#ec4899","#8bba56","#a3e635"];
 // Typing a coin's symbol adds the crypto (Yahoo uses COIN-USD)
@@ -2207,7 +2208,7 @@ function renderWL(prev={}){
     const fl=p&&q.price!=null&&p.price!=null&&q.price!==p.price?(q.price>p.price?"flash-up":"flash-down"):"";
     const n=countFor(s);
     return `<li data-s="${esc(s)}" class="${S.sel===s?"sel":""} ${fl}">
-      <div><div class="sym">${esc(s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.error?"No quote":q.name||"…")}</div></div>
+      <div><div class="sym">${esc(s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.status==="awaiting-market-print"?"Awaiting market quote":q.error?"No quote":q.name||"…")}</div></div>
       ${spark(q.spark,64,22,q.prevClose)}
       <div><div class="px">${fmt(q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
       <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
@@ -3585,7 +3586,7 @@ function dtRender(d){
     <div class="ap-mid">${started?`<b data-lv="who" class="${cls(lead)}">${lead>=0?"AI leads":"S&amp;P leads"}</b><small data-lv="by">by ${$m(Math.abs(lead))}</small>`:`<b>VS</b><small>starts at the opening bell</small>`}</div>
     <div class="ap-side sp ${lead<0&&started?"lead":""}"><span>📈 S&amp;P 500</span><b data-lv="sv">${$m(spxV)}</b><small data-lv="sr" class="${cls(spxRet)}">${pct(spxRet*100)}</small></div>
   </div>
-  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day Trader · run #${d.run}</b> · <span class="ap-tag risk">ETF VWAP reversal · paper</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
+  <div class="ap-live ${d.marketOpen?"on":""}"><i></i><b>Day Trader · run #${d.run}</b> · <span class="ap-tag risk">Momentum + ETF reversals · paper</span> ${esc(d.status)}</div>${botHealth(d,"day")}`;
   $("apBox").innerHTML=`
   ${apBoth()}
   ${apPerf(d)}
@@ -3593,12 +3594,13 @@ function dtRender(d){
     ["Today's P&amp;L",day.d?(day.pnl>=0?"+":"−")+"$"+Math.abs(day.pnl||0).toFixed(0):"—",a.winRate!=null?`${Math.round(a.winRate*100)}% of trades win`:"no closed trades yet"],
     ["Avg. trade",a.closed?((a.grossWins-a.grossLosses)/a.closed>=0?"+":"−")+"$"+Math.abs((a.grossWins-a.grossLosses)/a.closed).toFixed(2):"—",a.avgHold!=null?`held ${a.avgHold.toFixed(1)} min on average`:"after costs"],
     ["VWAP reversal setups",`${day.reversalSignals||0} confirmed`,`${day.reversalChecks||0} ETF bars checked · target room ≥ 2× costs`],
-    ["Entry flow",`${day.reversalQueued||0} queued · ${day.reversalEntries||0} entered`,`${day.expired||0} expired · ${day.reversalBlocked||0} blocked by risk`],
+    ["Momentum setups",`${day.momentumSignals||0} confirmed`,"Forecast agrees with the last one and five minutes"],
+    ["Entry flow",`${(day.reversalQueued||0)+(day.momentumQueued||0)} queued · ${(day.reversalEntries||0)+(day.momentumEntries||0)} entered`,`${day.expired||0} expired · ${(day.reversalBlocked||0)+(day.momentumBlocked||0)} blocked by risk`],
     ["Paper risk used",`${$m(day.reversalRiskUsed||0)} / ${$m(d.rules.allocation?.sessionRisk||60)}`,"Modeled stop risk committed this session"],
     ["Costs paid",a.costs!=null?"$"+Math.round(a.costs).toLocaleString():"—","spread, slippage & borrow fees"],
     ["Longs / shorts",`${a.longs||0} / ${a.shorts||0}`,`${(a.longPnl||0)>=0?"+":"−"}$${Math.abs(a.longPnl||0).toFixed(0)} / ${(a.shortPnl||0)>=0?"+":"−"}$${Math.abs(a.shortPnl||0).toFixed(0)}`],
     ["To PDT lock",$m(Math.max(0,d.value-d.bustAt)),"locked out under $25,000"],
-    ["Open now",`${d.positions.length} trades`,`one per ETF · ${d.rules.maxPos} eligible ETFs`]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
+    ["Open now",`${d.positions.length} trades`,"One position per symbol"]].map(([l,v,s])=>`<div><span>${l}</span><b>${v}</b><small>${s}</small></div>`).join("")}</div>`;
   $("apMore").innerHTML=`
   ${d.model?(()=>{const M=d.model,ws=[...M.weights].sort((x,y)=>Math.abs(y.w)-Math.abs(x.w)),mx=Math.max(.01,...ws.map(x=>Math.abs(x.w))),hr=x=>x==null?"—":(x*100).toFixed(1)+"%";
     return `<div class="bt-card"><h4>🧠 Forecast research <em>inputs for the separate Volume Test</em></h4>
@@ -3628,10 +3630,10 @@ function dtRender(d){
   <div class="bt-card"><h4>Trade log <em>${d.trades.length} events · newest first</em></h4>${d.trades.length?`<div class="ap-wrap ap-tl"><table class="ap-tbl"><thead><tr><th>Time</th><th>Action</th><th>Stock</th><th>Shares</th><th>Price</th><th>Result</th><th>Setup / reason</th><th>Account after</th></tr></thead><tbody>
     ${d.trades.slice(0,200).map(t=>`<tr${/ORDER|CANCEL/.test(t.side)?' style="opacity:.7"':""}><td class="n" style="white-space:nowrap">${ago(t.t)}</td><td><span class="sd ${/BUY|COVER/.test(t.side)?"BUY":/SELL|SHORT/.test(t.side)?"SELL":""}">${t.side}</span></td><td class="n"><b>${esc(t.sym)}</b></td><td>${t.shares}</td><td>${$m(t.price)}</td><td class="${t.pnl!=null?cls(t.pnl):""}">${t.pnl!=null?`${(t.pnl>=0?"+":"−")+"$"+Math.abs(t.pnl).toFixed(0)} <small>${t.R>=0?"+":""}${t.R}R · ${t.held}m</small>`:t.stop?`stop ${$m(t.stop)} · tgt ${$m(t.target)}`:""}</td><td class="n ap-why">${esc(t.why)}${t.setup?`<small>${esc(t.setup)}</small>`:""}</td><td>${t.after!=null?$m(t.after):"—"}</td></tr>`).join("")}</tbody></table></div>`:`<div class="ap-note">Waiting for a qualifying ETF reversal.</div>`}</div>
   <div class="bt-card"><h4>How the day trader works <em>paper trading</em></h4><ul class="ap-rules">
-    <li><b>Entry.</b> A completed one-minute bar extends beyond a recent high or low. A separate candle must confirm the reversal toward the session’s volume-weighted average price (VWAP). The target must leave room for at least twice modeled round-trip costs.</li>
+    <li><b>Entry.</b> An ETF reversal requires a separate candle confirming a move back toward the session’s volume-weighted average price (VWAP). A momentum entry requires a strong forecast that agrees with price direction over the last one and five minutes. Both require target room of at least twice modeled round-trip costs.</li>
     <li><b>Execution.</b> Check the same target, stop, and risk at the exact scheduled opening print. Orders expire when that candle is missing or stale.</li>
     <li><b>Allocation.</b> Up to ${$m(d.rules.allocation?.entryRisk||15)} of modeled stop risk per trade, ${$m(d.rules.allocation?.openRisk||30)} open or queued, and ${$m(d.rules.allocation?.sessionRisk||60)} committed per session. Desk loss and volatility controls apply.</li>
-    <li><b>Eligible ETFs.</b> ${esc((d.rules.reversal?.universe||[]).join(", "))}.</li>
+    <li><b>Reversal ETFs.</b> ${esc((d.rules.reversal?.universe||[]).join(", "))}. Momentum scans the existing liquid-stock and ETF universe.</li>
     <li><b>Starts with $30,000.</b> Below the strategy's $25,000 paper equity floor, the run resets once all positions are closed.</li>
     <li>Paper entries use a scheduled opening print strictly after the decision. Positions exit at a stop, target, or the ten-minute time limit. When one bar touches both stop and target, the simulation assumes the stop hit first. Modeled spread and slippage are ${((d.rules.cost||0.0005)*1e4).toFixed(1)} bps each way, plus ${((d.rules.borrow||0.0001)*1e4).toFixed(1)} bp for a short entry. Quote and broker fill data are needed to measure actual costs.</li>
   </ul></div></details>
@@ -3908,7 +3910,8 @@ function renderMarkets(){
 
 /* ---------- RESEARCH: Yahoo-style quote pages ---------- */
 S.rq={sym:null,sub:"summary",sum:null,err:null,fin:{},finStmt:"income",finFreq:"annual",hist:null,range:"1y"};
-function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,sub:"summary"}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
+function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,sub:"summary",range:window.MARKET_LISTINGS?.[s]?"1d":S.rq.range}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
+$("antIpoShortcut").onclick=()=>openQuote("ANT");
 const money=(n,d=2)=>{ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n), sg=n<0?"-":"";
   return a>=1e12?sg+(a/1e12).toFixed(d)+"T":a>=1e9?sg+(a/1e9).toFixed(d)+"B":a>=1e6?sg+(a/1e6).toFixed(d)+"M":a>=1e3?sg+(a/1e3).toFixed(d)+"K":sg+a.toFixed(d); };
 const fp=(x,d=2)=>x==null||isNaN(x)?"—":(x*100).toFixed(d)+"%";
@@ -3946,15 +3949,18 @@ function renderResearch(){
 }
 function renderResearchHead(){
   const s=S.rq.sym, d=S.rq.sum||{}, p=d.price||{}, q=S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:null;
-  const price=q?.price??p.regularMarketPrice, ch=q?.change??p.regularMarketChange, chp=q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
-  const name=p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||"";
-  const ext=p.postMarketPrice&&p.marketState&&p.marketState!=="REGULAR"?`After hours: ${fmt(p.postMarketPrice)} <span class="${cls(p.postMarketChange)}">${pct((p.postMarketChangePercent||0)*100)}</span>`:
+  const listing=window.MARKET_LISTINGS?.[s];
+  const price=listing?q?.price:q?.price??p.regularMarketPrice, ch=listing?q?.change:q?.change??p.regularMarketChange,
+    chp=listing?q?.changePct:q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
+  const name=listing?.name||p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||(listing?"EQUITY":"");
+  const ext=listing?"":p.postMarketPrice&&p.marketState&&p.marketState!=="REGULAR"?`After hours: ${fmt(p.postMarketPrice)} <span class="${cls(p.postMarketChange)}">${pct((p.postMarketChangePercent||0)*100)}</span>`:
             p.preMarketPrice&&p.marketState==="PRE"?`Pre-market: ${fmt(p.preMarketPrice)} <span class="${cls(p.preMarketChange)}">${pct((p.preMarketChangePercent||0)*100)}</span>`:"";
   const inWl=S.wl.includes(s);
   $("rsHead").innerHTML=`<div class="rs-head"><div>
       <div class="rs-name">${esc(name)}<small>${esc(s)}</small>${type?`<span class="badge">${esc(type.replace("MUTUALFUND","Mutual fund").replace("CRYPTOCURRENCY","Crypto").replace("EQUITY","Stock"))}</span>`:""}</div>
-      <div class="rs-meta">${esc(p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
-      <div class="rs-px">${fmt(price)}<span class="chg ${cls(ch)}">${ch!=null?(ch>=0?"+":"")+fmt(ch):""} (${pct(chp)})</span></div>
+      <div class="rs-meta">${esc(listing?.exchange||p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${!listing&&p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
+      <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmt(price)}${ch!=null?`<span class="chg ${cls(ch)}">${(ch>=0?"+":"")+fmt(ch)} (${pct(chp)})</span>`:""}</div>
+      ${listing?`<div class="rs-ext">IPO offer price ${$m(listing.offerPrice)} · Nasdaq debut ${esc(listing.listingDay)} · <a href="${esc(listing.announcement)}" target="_blank" rel="noopener noreferrer">IPO announcement</a> · <a href="${esc(listing.exchangeUrl)}" target="_blank" rel="noopener noreferrer">Nasdaq listing</a></div>`:""}
       ${ext?`<div class="rs-ext">${ext}</div>`:""}
     </div><div class="rs-actions">
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
