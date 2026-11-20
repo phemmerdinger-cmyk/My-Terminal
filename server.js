@@ -12,6 +12,10 @@ const fs = require("fs");
 const path = require("path");
 
 const PORT = process.env.PORT || 3000;
+// Deploy mode (deploy-mode-core.js): unset = legacy owner sign-in + /demo; "public" = demo-only server
+// that runs the bots; "local" = owner desk on 127.0.0.1 that forwards bot/data routes to PUBLIC_URL.
+const DM = require("./deploy-mode-core.js");
+const DEPLOY = DM.parseMode(process.env);
 // data integrity + system health (data/): per-source availability, redacted error log, validation checks
 const { createHealth } = require("./data/health.js");
 const INTEG = require("./data/integrity.js");
@@ -815,7 +819,8 @@ const siteKey = (pw) => nodeCrypto.scryptSync(pw, SITE_SALT, 32, { N: 32768, r: 
 if (process.env.SITE_PASSWORD) SITE_CHECK = nodeCrypto.createHash("sha256").update(Buffer.from(siteKey(process.env.SITE_PASSWORD), "hex")).digest("hex");
 const keyOk = (hex) => /^[0-9a-f]{64}$/.test(hex || "") && nodeCrypto.timingSafeEqual(nodeCrypto.createHash("sha256").update(Buffer.from(hex, "hex")).digest(), Buffer.from(SITE_CHECK, "hex"));
 const cookieOf = (req, name) => { const m = String(req.headers.cookie || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)")); return m ? decodeURIComponent(m[1]) : ""; };
-const isOwner = (req) => keyOk(cookieOf(req, "md_owner"));
+// local mode: only this computer can connect (127.0.0.1), so everyone here is the owner; public mode: nobody is
+const isOwner = (req) => DEPLOY.mode === "local" || (DEPLOY.mode !== "public" && keyOk(cookieOf(req, "md_owner")));
 const loginTries = new Map();
 function siteLogin(req, pw) {
   const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
@@ -1839,7 +1844,7 @@ function pcState() {
   return pcView;
 }
 const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
-setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
+if (DEPLOY.runJobs) setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
 const BOTDIAG = { market: {}, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
@@ -2266,7 +2271,7 @@ function apRestore(doc) {
   AP.trades = AP.trades.slice(0, 1500); AP.equity = (AP.equity || []).slice(-2000); AP.runs = (AP.runs || []).slice(0, 200); apFix();
   apSave(); return { ok: true };
 }
-setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60e3); }, process.env.AP_TEST ? 3000 : 60_000);
+if (DEPLOY.runJobs) setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60e3); }, process.env.AP_TEST ? 3000 : 60_000);
 
 // ---------------------------------------------------------------- AI day trader (paper, intraday, longs + shorts)
 // A forecast from a completed minute can schedule a paper order for a future minute.
@@ -2844,7 +2849,7 @@ async function dtRestore(doc) {
     return { ok: true };
   } finally { dtBusy = false; }
 }
-setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
+if (DEPLOY.runJobs) setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
 
 // ---------------------------------------------------------------- Quant Trader (third paper bot): systematic, uses the Quant Lab's math
 // Once per trading day after the close (and once right away when the account is new) it reads the regime, ranks the
@@ -3059,7 +3064,7 @@ async function qtView() {
     rules: { universe: QTC.QT_EQUITY, defensive: QTC.QT_DEFENSIVE, cash: QTC.QT_CASH, top: QTC.QT_TOP, maxW: QTC.QT_MAX_W, volTarget: QTC.QT_VOL_TARGET, minTrade: QTC.QT_MIN_TRADE, cost: QTC.QT_COST, split: QTC.SPLIT },
     status: QT.lastError || (QT.pending ? `Paper rebalance queued for the ${QT.pending.executeDay} open` : QT.lastDay ? `Plans after the close for the next open · last decision ${QT.lastDay}` : "Waiting for the first completed trading session") };
 }
-setTimeout(() => {
+if (DEPLOY.runJobs) setTimeout(() => {
   qtTick();
   setInterval(() => { const t = etParts(); if (QT.pending?.fillAt || (t.min >= QT_OPEN_MINUTE && t.min < QT_OPEN_CUTOFF) || t.min % 10 === 0 || process.env.AP_TEST) qtTick(); },
     process.env.AP_TEST ? 15_000 : 60_000);
@@ -3113,7 +3118,7 @@ const deskRisk = createDeskRisk({
       queued: QT.pending?.approvedAt ? QT.pending.orders.map((o) => ({ sym: o.sym, sign: 1, shares: o.shares, riskPerShare: o.riskPerShare, price: o.approvalPrice })) : [] },
   ],
 });
-if (!process.env.AP_TEST) setTimeout(() => {
+if (!process.env.AP_TEST && DEPLOY.runJobs) setTimeout(() => {
   deskRisk.prepare(); setInterval(() => { deskRisk.refresh().then(() => deskRisk.prepare()).catch(() => {}); }, 60_000);
 }, 30_000);
 
@@ -3176,7 +3181,7 @@ const strategyLab = LAB.createStrategyLab({
   },
   liveDesk: () => deskRisk.view(),
 });
-if (!process.env.AP_TEST) setTimeout(() => {
+if (!process.env.AP_TEST && DEPLOY.runJobs) setTimeout(() => {
   strategyLab.tick();
   const t = deskClock();
   if (t.trading && t.open) strategyLab.warmDay(t.day).catch(() => {});
@@ -3826,7 +3831,7 @@ async function deskRoute(req, res) {
   } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
 }
 const SPIDER_W = Math.max(0, Math.min(0.15, process.env.SPIDER_TRADER_WEIGHT != null ? +process.env.SPIDER_TRADER_WEIGHT || 0 : 0.05));
-const SPIDER = process.env.SPIDER_OFF ? null : createSpider({
+const SPIDER = process.env.SPIDER_OFF || !DEPLOY.runJobs ? null : createSpider({ // local mode: THE WEB runs on the public server
   store: createWebStore({ url: UP_URL, token: UP_TOKEN }),
   sp500List: SP500, holidays: NYSE_HOLIDAYS, earlyClose: NYSE_EARLY,
   quotes: (syms) => getQuotes(syms),
@@ -3983,6 +3988,32 @@ async function systemHealth() {
   };
 }
 
+// ---------------------------------------------------------------- local mode: forward bot/data routes
+// In MODE=local the paper bots, THE WEB, sync and the desk store live on the public server. Their routes are
+// forwarded there with DESK_TOKEN (x-desk-token header), which never leaves this server.
+function readRaw(req, max = 1_000_000) {
+  return new Promise((resolve, reject) => {
+    const parts = []; let n = 0;
+    req.on("data", (c) => { n += c.length; if (n > max) { reject(new Error("too large")); req.destroy(); } else parts.push(c); });
+    req.on("end", () => resolve(Buffer.concat(parts)));
+    req.on("error", reject);
+  });
+}
+async function proxyToPublic(req, res, u) {
+  if (!DEPLOY.remoteReady) return send(res, 503, { error: "The paper bots, THE WEB and your saved data live on the public server. Set PUBLIC_URL and DESK_TOKEN to reach them.", code: "remote_off" });
+  try {
+    const body = req.method === "GET" || req.method === "HEAD" ? undefined : await readRaw(req);
+    const r = await fetch(DEPLOY.publicUrl + u.pathname + u.search, {
+      method: req.method, body, redirect: "manual", signal: AbortSignal.timeout(20_000),
+      headers: { "x-desk-token": DEPLOY.token, "content-type": req.headers["content-type"] || "application/json", "accept-encoding": "identity" },
+    });
+    const extra = {}; const cd = r.headers.get("content-disposition"); if (cd) extra["Content-Disposition"] = cd;
+    return send(res, r.status, Buffer.from(await r.arrayBuffer()), r.headers.get("content-type") || "application/json", extra);
+  } catch (e) {
+    return send(res, 502, { error: "Couldn't reach the public server (" + String(e.message || e) + ").", code: "remote_down" });
+  }
+}
+
 // ---------------------------------------------------------------- http
 const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".ico": "image/x-icon", ".json": "application/json", ".webmanifest": "application/manifest+json" };
 
@@ -4009,14 +4040,17 @@ process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message
 
 http
   .createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
-  .listen(PORT, () => console.log(`Stock News Hub running at http://localhost:${PORT}`));
+  .listen(PORT, DEPLOY.host, () => console.log(`Market Desk (${DEPLOY.mode || "legacy"} mode) running at http://${DEPLOY.host || "localhost"}:${PORT}`));
 async function handle(req, res) {
     const u = new URL(req.url, "http://x");
     try {
       if (u.pathname.startsWith("/api/")) {
-        const owner = isOwner(req);
-        if (u.pathname !== "/api/stream" && u.pathname !== "/api/health" && rateLimited(req, owner)) return send(res, 429, { error: "Too many requests — slow down for a minute." }, "application/json", { "Retry-After": "60" });
-        if (!owner && !isPublicApi(u, req)) return send(res, 401, { error: "This part of Market Desk is private.", code: "private" });
+        const owner = isOwner(req), token = DEPLOY.mode === "public" && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token);
+        if (u.pathname !== "/api/stream" && u.pathname !== "/api/health" && rateLimited(req, owner || token)) return send(res, 429, { error: "Too many requests — slow down for a minute." }, "application/json", { "Retry-After": "60" });
+        const act = DM.access({ mode: DEPLOY.mode, path: u.pathname, owner, token, isPublic: isPublicApi(u, req) });
+        if (act === "notfound") return send(res, 404, { error: "Not found" });
+        if (act === "deny") return send(res, 401, { error: "This part of Market Desk is private.", code: "private" });
+        if (act === "proxy") return proxyToPublic(req, res, u);
         if (u.pathname === "/api/login" && req.method === "POST") {
           let pw = ""; try { pw = (await readBody(req)).password; } catch {}
           const r = siteLogin(req, pw);
@@ -4172,10 +4206,11 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // pages: the real site is owner-only; /demo is the public recruiter view
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
+      { const to = DM.pageRedirect(DEPLOY.mode, u.pathname); if (to) return go(to); }
       if (u.pathname === "/login") return owner ? go("/") : send(res, 200, LOGIN_HTML, "text/html; charset=utf-8");
       if (u.pathname === "/logout") return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
       let page = null;
