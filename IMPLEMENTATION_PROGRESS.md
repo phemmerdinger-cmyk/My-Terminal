@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### News page polish (2026-11-20)
+- News sources use theme-friendly colors (Yahoo orange, CNBC gold, Morningstar red, Seeking Alpha burnt orange, WSJ off-white, Official grey); story counts are neutral text, only "unavailable" is red.
+- The newspaper masthead stacks (title, date, index moves) when the news column is under 900px wide, so the index strip is never squeezed or clipped.
+
 ### Back to black and orange (2026-11-20, owner's request)
 - Every military/olive-green accent (theme, Studio, spider, Quant, reader, charts, favicons) is mapped back to the original orange `#ff991f` family; gains stay green and losses red. Categorical chart palettes, news-source colors and the red-to-green mood gauge keep their colors. `tests/orange-theme.test.js` now fails if an olive accent returns.
 
