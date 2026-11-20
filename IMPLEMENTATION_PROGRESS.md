@@ -3,6 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Research → Workspace (2026-11-20)
+- One ticker, four panels side by side: price chart (1M/6M/1Y/5Y), key stats, latest tagged news (opens in the in-site reader) and the last four 10-K years (revenue, growth, net income, margin, free cash flow). Grid or Focus layout; watchlist chips; stacks on phones.
+- Each panel loads and fails independently with its own message; missing values show "—". Growth and margins are computed only from reported figures. Logic in `public/workspace-core.js` (tests in `tests/workspace-core.test.js`); UI in `public/workspace.js`, loaded on demand.
+
 ### Faster first load, phone polish, "Trading bots vs. S&P 500" (2026-11-19)
 - Quant Lab, Backtest Lab and Studio tools load when their tab first opens (`public/lazy-core.js`, tests in `tests/lazy-core.test.js`); each tool still opens itself once loaded. THE WEB's spider code loads for the owner only, after the page settles, so the demo no longer downloads it or polls its private endpoints. About 460 KB less code on the demo's first page.
 - AI Lab's bot page is now "Trading bots vs. the S&P 500", with a line saying the rules decide every trade and no AI model trades. Welcome, About and meta text updated to match.
