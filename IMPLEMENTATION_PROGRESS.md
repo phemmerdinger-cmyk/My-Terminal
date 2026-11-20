@@ -3,6 +3,9 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Back to black and orange (2026-11-20, owner's request)
+- Every military/olive-green accent (theme, Studio, spider, Quant, reader, charts, favicons) is mapped back to the original orange `#ff991f` family; gains stay green and losses red. Categorical chart palettes, news-source colors and the red-to-green mood gauge keep their colors. `tests/orange-theme.test.js` now fails if an olive accent returns.
+
 ### Research → Workspace (2026-11-20)
 - One ticker, four panels side by side: price chart (1M/6M/1Y/5Y), key stats, latest tagged news (opens in the in-site reader) and the last four 10-K years (revenue, growth, net income, margin, free cash flow). Grid or Focus layout; watchlist chips; stacks on phones.
 - Each panel loads and fails independently with its own message; missing values show "—". Growth and margins are computed only from reported figures. Logic in `public/workspace-core.js` (tests in `tests/workspace-core.test.js`); UI in `public/workspace.js`, loaded on demand.
