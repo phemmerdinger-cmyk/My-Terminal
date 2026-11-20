@@ -80,6 +80,34 @@ Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment s
 
 Run the checks with `npm test`.
 
+## Two-server setup (optional): public demo + private desk on your computer
+Instead of the sign-in page, you can run the site as two servers from this same code. Nothing changes until you set `MODE`.
+
+| | Public server (Render) | Your desk (your computer) |
+|---|---|---|
+| Setting | `MODE=public` | `MODE=local` |
+| Who can open it | Everyone, at `/demo` (`/` and `/login` redirect there) | Only your own computer: it listens on `127.0.0.1` |
+| Password | None: there is no sign-in page | None needed: nobody else can connect |
+| Owner routes (sync, desk, THE WEB, Claude…) | Don't exist (404). Bot and saved-data routes answer only requests carrying `DESK_TOKEN` | Everything works |
+| Paper bots and THE WEB | Run here, all day | Don't run here. Their pages, your sync data and your desk data are fetched from the public server using `DESK_TOKEN` |
+| Claude | Off | Works with your own `ANTHROPIC_API_KEY` (still behind the Claude password and budget) |
+
+**Set it up**
+1. Make a long random key once: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Keep it secret, like a password; anyone who has it can read and change your synced data and bot controls.
+2. On Render → Environment, add `MODE=public` and `DESK_TOKEN=<that key>`, then redeploy. `SITE_PASSWORD` is no longer used.
+3. On your computer, from this folder:
+   ```bash
+   MODE=local PUBLIC_URL=https://my-terminal-28tq.onrender.com DESK_TOKEN=<that key> node server.js
+   ```
+   (PowerShell: `$env:MODE="local"; $env:PUBLIC_URL="https://my-terminal-28tq.onrender.com"; $env:DESK_TOKEN="<that key>"; node server.js`)
+   Open http://127.0.0.1:3000. Add `ANTHROPIC_API_KEY` and `FINNHUB_API_KEY` there too if you want Claude or streaming prices on your desk.
+
+**Good to know**
+- Your desk only exists while your computer runs it, and `MODE=local` refuses connections from other devices, so it isn't reachable from your phone. If you need phone access, keep the old sign-in setup (leave `MODE` unset).
+- Without `PUBLIC_URL` and `DESK_TOKEN`, the local desk still works for news, quotes, research, DCF, risk and the quant labs, but the bot pages and sync show "unavailable".
+- Only the public server runs the bots, so the two servers never trade the same paper accounts twice.
+- To go back to the old setup, remove `MODE` (and `DESK_TOKEN`) on Render.
+
 ## Quant Trader (third paper bot)
 
 **AI Lab → AI vs S&P 500 → 📐 Quant trader** is a systematic paper-trading bot built on the Quant Lab's math (`quant-trader.js`,

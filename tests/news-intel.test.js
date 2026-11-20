@@ -77,7 +77,7 @@ test("reader loads the shared intelligence module and preserves the #newss deep 
   const reader = fs.readFileSync(path.join(__dirname, "..", "public", "reader.js"), "utf8");
   assert.ok(html.includes('<script src="/news-intel.js" defer></script>'));
   assert.ok(html.indexOf('src="/news-intel.js"') < html.indexOf('src="/reader.js"'));
-  assert.ok(html.includes('location.hash.slice(1)==="newss"?"news"'));
+  assert.ok(html.includes('({newss:"news",'), "the old #newss deep link still opens News");
   assert.match(reader, /\["priority", "For you"\]/);
   assert.match(reader, /window\.MDNewsIntel\.prioritize/);
 });

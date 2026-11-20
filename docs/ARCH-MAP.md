@@ -5,6 +5,7 @@
 ## Server (`server.js`)
 | Area | Where |
 |---|---|
+| Deploy mode | `deploy-mode-core.js` → `DEPLOY` (MODE unset / `public` / `local`); `DM.access()` decides serve / proxy / 404 for each `/api/*`; `proxyToPublic()` forwards bot, sync and desk routes in local mode |
 | Auth | `isOwner(req)` (scrypt cookie `md_owner`), `PUBLIC_API` set ≈ line 821; `handle()` ≈ 3011 rejects non-public `/api/*` for visitors |
 | Quotes / history / news / earnings / financials | `/api/quotes`, `/api/history`, `/api/pub/hist`, `/api/news` (6 sources + Official incl. SEC 8-Ks), `/api/earnings`, `/api/financials` |
 | Claude | budgeted, password-gated (`/api/predict`, ask); `x-api-cost` header → client budget chip |

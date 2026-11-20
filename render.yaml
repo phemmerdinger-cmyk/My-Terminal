@@ -11,5 +11,10 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      # Optional two-server setup (README → "Two-server setup"): set MODE=public and DESK_TOKEN here.
+      - key: MODE
+        sync: false
+      - key: DESK_TOKEN
+        sync: false
       - key: NODE_VERSION
         value: "22"
