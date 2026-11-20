@@ -14,12 +14,12 @@ if(!o)document.documentElement.classList.add("viewonly");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Market Desk · Live market dashboard by Peter Hemmerdinger</title>
-<meta name="description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
+<meta name="description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and three rule-based trading bots racing the S&amp;P 500.">
 <meta name="author" content="Peter Hemmerdinger">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Market Desk">
 <meta property="og:title" content="Market Desk · Live market dashboard">
-<meta property="og:description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
+<meta property="og:description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and three rule-based trading bots racing the S&amp;P 500.">
 <meta property="og:image" content="https://my-terminal-28tq.onrender.com/og.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="627">
@@ -581,7 +581,8 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .mc-sig small{font-size:12px;color:var(--muted)}
 /* AI vs S&P (Autopilot) */
 .aitrade .ap-head{margin-bottom:16px}
-.ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:#ff9f43}
+.ap-kick{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--orange)}
+.ap-sub{margin:0 0 4px;color:var(--muted);font-size:13px;max-width:70ch}
 .aitrade h1{margin:6px 0 6px;font-size:clamp(24px,3.4vw,34px);letter-spacing:-.02em}
 .ap-lede{margin:0;max-width:780px;color:var(--muted);font-size:14px;line-height:1.55}
 .ap-lede b{color:var(--text)}
@@ -1495,7 +1496,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <div class="hide-sm" id="mkt">—</div>
     <div class="live stale" id="live" title="Connecting…"><span class="dot"></span><span id="liveTxt">Connecting…</span></div>
     <button class="iconbtn" id="installBtn" hidden title="Install Market Desk as an app">⤓ Install app</button>
-    <button class="iconbtn sp-btn" id="spBtn" type="button" title="Send the spider to examine this page and write a report" onclick="window.spiderScan&&spiderScan()"><span class="sp-ico">🕷</span> Spider</button>
+    <button class="iconbtn sp-btn no-vo" id="spBtn" type="button" title="Send the spider to examine this page and write a report" onclick="window.spiderScan&&spiderScan()"><span class="sp-ico">🕷</span> Spider</button>
     <button class="iconbtn di-btn" id="diBtn" type="button" title="Market data status"><span class="dl">DATA</span><span id="diLbl">Validating…</span></button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <a class="iconbtn no-vo" id="logoutBtn" href="/logout" title="Sign out of your private site">⎋ <span class="tlong">Sign out</span></a>
@@ -1518,7 +1519,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 
 <div class="vo-hello" id="voHello"><div class="vo-in">
   <span class="vo-hi">👋 Welcome</span>
-  <p><b>Market Desk</b> is a live financial research terminal I built as a finance student at Bryant University. Try a <a href="#dcf" data-gotab="dcf">DCF valuation</a> built from SEC filings, run a <a href="#risk" data-gotab="risk">stress test</a>, check the <a href="#macro" data-gotab="macro">economy</a>, or follow my <a href="#aitrade" data-gotab="aitrade">AI vs. S&amp;P 500 trading experiment</a>.</p>
+  <p><b>Market Desk</b> is a live financial research terminal I built as a finance student at Bryant University. Try a <a href="#dcf" data-gotab="dcf">DCF valuation</a> built from SEC filings, run a <a href="#risk" data-gotab="risk">stress test</a>, check the <a href="#macro" data-gotab="macro">economy</a>, or follow my <a href="#aitrade" data-gotab="aitrade">trading bots vs. the S&amp;P 500</a>.</p>
   <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><a class="btn ghost" href="https://github.com/phemmerdinger-cmyk/My-Terminal" target="_blank" rel="noopener">Code on GitHub ↗</a><button type="button" class="vo-x" id="voX" title="Hide" aria-label="Hide welcome message">✕</button></div>
 </div></div>
 <div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-modal="true" aria-labelledby="voT" tabindex="-1">
@@ -1532,7 +1533,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <div><b>Quant backtest lab</b><span>Momentum, mean-reversion, moving-average, RSI, multi-factor and risk-parity strategies tested with trading costs, no look-ahead, out-of-sample and walk-forward validation.</span></div>
     <div><b>Risk &amp; stress testing</b><span>Value at Risk, expected shortfall, correlations, concentration, and what 2008, 2020 and 2022 — or a hypothetical shock — would do to a portfolio.</span></div>
     <div><b>Macro dashboard</b><span>Fed funds, inflation, jobs, GDP, the yield curve and recession signals from FRED, the Treasury and the BLS.</span></div>
-    <div><b>AI vs. S&amp;P 500 experiment</b><span>Paper accounts starting at $30,000 traded all day by rules Claude designed (news, earnings, momentum, analyst ratings), measured against the index with full trade analytics.</span></div>
+    <div><b>Trading bots vs. S&amp;P 500</b><span>Three paper accounts starting at $30,000, traded all day by fixed rules I designed with Claude's help (no AI makes the trades) (news, earnings, momentum, analyst ratings), measured against the index with full trade analytics.</span></div>
     <div><b>Live markets</b><span>Streaming prices, a ranked news front page, an S&amp;P 500 heatmap and market analysis.</span></div>
   </div>
   <details class="vo-method"><summary>Methods &amp; technology</summary>
@@ -1704,7 +1705,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div id="rkOut"><div class="fx-empty">Choose a portfolio and press Analyze.</div></div>
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
-      <div class="ap-head"><div class="ap-kick">🤖 AI TRADING PROJECT</div><h1>AI vs. the S&amp;P 500</h1></div>
+      <div class="ap-head"><div class="ap-kick">📈 PAPER TRADING EXPERIMENT</div><h1>Trading bots vs. the S&amp;P 500</h1><p class="ap-sub">Rule-based strategies I designed with Claude's help. The rules decide every trade; no AI model trades. Paper money only.</p></div>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
       <div id="dayVolumePanel" class="bt-card" hidden></div>
       <script defer src="/day-volume-panel.js?v=1"></script>
@@ -1932,6 +1933,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
 <script src="/portfolio-preview-core.js"></script>
+<script src="/lazy-core.js"></script>
 <script src="/quote-stream-core.js"></script>
 <script>
 const SRC = {
@@ -1965,7 +1967,7 @@ const NAV=[
   ["research",[["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
   ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"]]],
-  ["ailab",[["aitrade","AI vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
+  ["ailab",[["aitrade","Bots vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
 ];
 const groupOf=t=>(t==="studio-strategies"||t==="studio-quant")?"quant":(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
@@ -2128,6 +2130,9 @@ function setTab(t){
   if(t==="predict"){ renderPredict(); refreshUsage(); }
   if(typeof webClose==="function") webClose();
   if(t==="health"&&typeof hlOpen==="function") hlOpen();
+  { const g=MDLazyCore.groupForTab(t); if(g&&window.MDLazy&&!MDLazy.ready(g)){ // first visit: fetch the tool; it opens itself once loaded
+      const p=$(g==="studio"?"tab-studio":"tab-"+t); if(p&&!p.dataset.ready&&!p.children.length) p.innerHTML='<div class="fx-empty"><span class="spin"></span> Loading…</div>';
+      MDLazy.load(g).catch(e=>{ if(p&&!p.dataset.ready) p.innerHTML=`<div class="fx-empty">${esc(e.message)}. Check your connection and open this tab again.</div>`; }); } }
   if(STUDIO_ROUTES[t]&&typeof studioOpen==="function"){ studioOpen(); if(typeof studioSelectMode==="function") studioSelectMode(STUDIO_ROUTES[t]); }
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
@@ -3305,7 +3310,7 @@ function apSeries(d){
 }
 function apDiffCharts(d){
   const {pts,intra,ai,sp}=apSeries(d);
-  if(!d.trades.length||pts.length<2||sp.every(x=>x==null)) return `<div class="bt-card"><h4>AI vs. S&amp;P — the gap <em>who's ahead, and by how much</em></h4><div class="ap-empty" style="padding:30px 10px">These charts appear once the bot has traded for a little while — the gap is tracked every 5 minutes during the day and once a day after that.</div></div>`;
+  if(!d.trades.length||pts.length<2||sp.every(x=>x==null)) return `<div class="bt-card"><h4>Bots vs. S&amp;P — the gap <em>who's ahead, and by how much</em></h4><div class="ap-empty" style="padding:30px 10px">These charts appear once the bot has traded for a little while — the gap is tracked every 5 minutes during the day and once a day after that.</div></div>`;
   const gap=ai.map((v,i)=>sp[i]==null?null:v-sp[i]), g=gap.filter(x=>x!=null), lo=Math.min(0,...g), hi=Math.max(0,...g), pad=(hi-lo||1)*0.12, y0=lo-pad, y1=hi+pad;
   const W=800,H=170,n=pts.length, X=i=>i/(n-1)*W, Y=v=>H-(v-y0)/(y1-y0)*H, z=Y(0);
   const line=gap.map((v,i)=>v==null?null:[X(i),Y(v)]).filter(Boolean);
@@ -3390,7 +3395,7 @@ function apPerf(d){
     if(H&&H.length>1){ const lab=H.map(c=>new Date(c.time*1000).toLocaleString("en-US",{weekday:"short",hour:"numeric",minute:"2-digit"})), c0=H[0].close;
       APV.pre={labels:lab,series:[{n:"S&P 500",c:"#8a93a3",v:H.map(c=>c.close/c0-1)},{n:"AI (in cash, not started)",c:"#ff9f43",v:H.map(()=>0),w:2.6,dash:true}],fmt:x=>(x>=0?"+":"")+(x*100).toFixed(2)+"%"};
       chart=apSvgChart("apPre",APV.pre.labels,APV.pre.series,{zero:true,fmt:APV.pre.fmt,h:260}).replace('<div class="apc" id="apPre">','<div class="apc" id="apPre" data-zero="1">'); }
-    return `<div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>AI vs. S&amp;P 500 · preview</em></h4></div>
+    return `<div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>bots vs. S&amp;P 500 · preview</em></h4></div>
       <p class="ap-note" style="margin:0 0 8px">The bot hasn't made its first trade yet, so it's sitting in cash (flat line). Here's the S&amp;P 500's last 5 trading days for reference — from the opening bell, both lines start tracking live and every chart below fills in.</p>${chart}</div>
       <div class="ap-two"><div class="bt-card"><h4>Returns side by side</h4><div class="ap-note">Fills in after the first trades.</div></div><div class="bt-card"><h4>Head to head</h4><div class="ap-note">Fills in after two trading days.</div></div></div>`;
   }
@@ -3402,7 +3407,7 @@ function apPerf(d){
   const row=(l,f,x,y,better)=>{const w=x==null||y==null?"":better(x,y)?"ai":"sp";return `<tr class="${w}"><td>${l}</td><td>${x==null?"—":f(x)}</td><td>${y==null?"—":f(y)}</td><td>${w==="ai"?'<span class="ap-tag own">AI</span>':w==="sp"?'<span class="ap-tag">S&amp;P</span>':""}</td></tr>`;};
   const P=x=>pct(x*100), hi=(x,y)=>x>y, low=(x,y)=>x<y, dn=(x,y)=>x>y;
   return `
-  <div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>same $${d.startValue.toLocaleString()} · AI vs. S&amp;P 500</em></h4><div class="ap-ctl">${seg("view",views,APV.view)}${seg("range",ranges,APV.range)}</div></div>
+  <div class="bt-card ap-perf"><div class="ap-perf-h"><h4 style="margin:0">Performance <em>same $${d.startValue.toLocaleString()} · bots vs. S&amp;P 500</em></h4><div class="ap-ctl">${seg("view",views,APV.view)}${seg("range",ranges,APV.range)}</div></div>
     ${R.fell?`<p class="ap-note" style="margin:6px 0 0">Showing today's 5-minute data until there are two full trading days.</p>`:""}
     ${ok?`<div id="apMainWrap">${apMainChart(d,R)}</div>`:`<div class="ap-empty" style="padding:30px 10px">Not enough data for this range yet — try “Today” or come back after a few trading days.</div>`}
   </div>
@@ -5407,20 +5412,18 @@ async function anClaude(){
 }
 $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return; const o=e.target.closest("[data-nyopen]"); if(o) openQuote(o.dataset.nyopen); });
 </script>
-<script src="/web.js"></script>
-<script src="/web-env.js"></script>
-<script src="/web-control.js"></script>
 <script src="/health.js"></script>
-<script src="/quant.js"></script>
-<script src="/quant-batch.js"></script>
-<script src="/quant-ui.js"></script>
-<script src="/qmath.js"></script>
-<script src="/quant-lab.js"></script>
-<script src="/studio-core.js"></script>
-<script src="/studio-strategies.js"></script>
-<script src="/studio.js"></script>
-<script src="/market-charts.js"></script>
 <script src="/desk-store.js"></script>
 <script src="/empty-examples.js"></script>
+<script>
+/* Heavy tools load on demand (public/lazy-core.js): Quant, Backtest and Studio when their tab opens (setTab),
+   THE WEB research spider for the owner only, once the page has finished loading. */
+(function(){
+  const L=MDLazyCore.createLoader(document);
+  window.MDLazy={ load:L.load, ready:g=>MDLazyCore.GROUPS[g].every(L.loaded) };
+  const g=MDLazyCore.groupForTab(S.tab); if(g) L.load(g).catch(e=>console.warn(e.message)); // the page opened straight on a tool
+  if(!VIEW){ const web=()=>L.load("web").catch(e=>console.warn(e.message)); if("requestIdleCallback" in window) requestIdleCallback(web,{timeout:2000}); else setTimeout(web,500); }
+})();
+</script>
 </body>
 </html>

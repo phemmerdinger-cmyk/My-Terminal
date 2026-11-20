@@ -74,8 +74,9 @@ test("production UI uses actual data provider, saves five metrics and links to d
   const base=path.join(__dirname,"..","public");
   const html=fs.readFileSync(path.join(base,"index.html"),"utf8");
   const ui=fs.readFileSync(path.join(base,"quant-ui.js"),"utf8");
-  assert.ok(html.includes('src="/quant-batch.js"'));
-  assert.ok(html.indexOf('src="/quant-batch.js"')<html.indexOf('src="/quant-ui.js"'));
+  const G=require("../public/lazy-core.js").GROUPS.quant; // loaded on demand when the Quant/Backtest tab opens
+  assert.ok(G.includes("/quant-batch.js"));
+  assert.ok(G.indexOf("/quant-batch.js")<G.indexOf("/quant-ui.js"));
   assert.ok(ui.includes('window.MD.hist(sym, pad, spec.to)'));
   assert.ok(ui.includes('QB.batchDetails.set'));
   assert.ok(ui.includes('remember(item.spec, result, "backtest")'));

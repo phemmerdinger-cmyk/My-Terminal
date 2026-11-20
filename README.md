@@ -24,7 +24,7 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **DCF valuation** (Research) | Five-year unlevered free cash flow model with bull/base/bear cases, CAPM WACC, terminal value, enterprise-to-equity bridge and a WACC × growth sensitivity table; every input labeled by source. |
 | **Risk & stress** (Portfolio) | VaR / expected shortfall, correlations, concentration, rate sensitivity, beta-scaled shocks and 2008 / 2020 / 2022 replays. |
 | **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
-| **AI vs. S&P 500** (AI Lab) | Three rules-based paper-trading bots (swing, day and quant; $30,000 each, no API cost) racing the index, with trade analytics and an archive of past runs. |
+| **Trading bots vs. S&P 500** (AI Lab) | Three rules-based paper-trading bots (swing, day and quant; $30,000 each, no API cost) racing the index, with trade analytics and an archive of past runs. |
 | **Prediction accuracy** (AI Lab) | Grades saved Claude predictions with non-overlapping outcome bands, calibration and sample sizes. |
 | **🕸 THE WEB** (runs in the background; its findings appear under Research → Market Intelligence and Market Charts) | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, source-linked financial research and a rules-based Research Assistant with citations, and shares research with AI Trader. Rules-based and free. |
 | **✦ Claude Predictor** (AI Lab, owner only) | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
@@ -74,7 +74,7 @@ Railway, Fly.io or any VPS also work (there's a `Dockerfile`). Free tiers may sl
 ## Private site + public demo
 The real site is private: opening `…onrender.com/` shows a sign-in page, and only the site password unlocks it (the browser then stays signed in for 180 days; **Sign out** in the header ends it). Every private API (sync, Claude, the bot's restore) is blocked on the server without that sign-in.
 
-Recruiters and visitors use the public demo at `…onrender.com/demo`: live market data, news, the heatmap, the AI vs. S&P experiment and a sample portfolio, with none of the owner's data and no Claude. Old `?visitor` links redirect there.
+Recruiters and visitors use the public demo at `…onrender.com/demo`: live market data, news, the heatmap, the trading bots vs. S&P 500 experiment and a sample portfolio, with none of the owner's data and no Claude. Old `?visitor` links redirect there.
 
 Set `SITE_PASSWORD` (and optionally `CLAUDE_PASSWORD`) in Render's Environment settings to replace the built-in passwords. Claude is **off by default** so the site costs $0; set `CLAUDE_DAILY_LIMIT` (for example 20) to turn it on.
 
@@ -110,7 +110,7 @@ Instead of the sign-in page, you can run the site as two servers from this same 
 
 ## Quant Trader (third paper bot)
 
-**AI Lab → AI vs S&P 500 → 📐 Quant trader** is a systematic paper-trading bot built on the Quant Lab's math (`quant-trader.js`,
+**AI Lab → Bots vs S&P 500 → 📐 Quant trader** is a systematic paper-trading bot built on the Quant Lab's math (`quant-trader.js`,
 tested in `tests/quanttrader.test.js`). Once per trading day after the close it reads the market regime (S&P trend,
 50/200-day cross, realized volatility, drawdown, HYG/IEF credit), which sets the equity share (100 / 70 / 40 / 10%);
 ranks 38 liquid stocks and sector ETFs on 12-1 month momentum, 3-month momentum and low volatility; buys the top 8 above

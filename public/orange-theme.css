@@ -156,3 +156,10 @@ button:disabled{box-shadow:none!important}
 /* Keyboard focus is always visible (several inputs set outline:none for mouse users) */
 :focus-visible{outline:2px solid var(--orange);outline-offset:2px}
 input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--orange);outline-offset:0}
+
+/* Phones: keep the demo welcome strip to two lines and one row of buttons (LinkedIn and GitHub stay in the About box) */
+@media (max-width:760px){
+  .vo-hello .vo-in p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13px;margin:4px 0}
+  .vo-hello .vo-acts{flex-wrap:nowrap}
+  .vo-hello .vo-acts .btn.ghost{display:none}
+}
