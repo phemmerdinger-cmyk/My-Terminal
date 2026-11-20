@@ -19,6 +19,7 @@ test("tabs map to the group they need", () => {
   assert.equal(L.groupForTab("quant"), "quant");
   assert.equal(L.groupForTab("backtest"), "quant");
   assert.equal(L.groupForTab("studio-graph"), "studio");
+  assert.equal(L.groupForTab("workspace"), "workspace");
   assert.equal(L.groupForTab("news"), null);
   assert.equal(L.groupForTab(undefined), null);
 });

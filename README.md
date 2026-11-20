@@ -18,6 +18,7 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 |---|---|
 | **News** | One live feed from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and the WSJ. Sources dropdown (with "Only" buttons), timeline from Today to All time, positive/negative tags, ticker labels, search. |
 | **Markets** | Market mood gauge, upcoming earnings, top gainers/losers/most active, watchlist heatmap and table, sectors, indexes, Treasury yields, bond funds, crypto, ETFs, mutual funds, futures and currencies. |
+| **Workspace** (Research) | One ticker, four panels side by side: price chart, key stats, latest news and the last four years of SEC 10-K financials. Grid or Focus layout. |
 | **Research** | A Yahoo Finance-style page for any stock, ETF, fund, crypto, index or future: interactive chart first, then Summary, Statistics, Financials, Analysis, Holders, Holdings, Performance, Profile, News and Compare. |
 | **Portfolio** | Multiple named portfolios (right-click a name to rename or delete), add holdings by dollar amount, live gains, allocation by sector, price alerts, and a **Risk & performance** panel (1-year return vs. the S&P 500, annualized volatility, Sharpe ratio, beta, max drawdown, best/worst day, plus the same for each holding). |
 | **Financials** (Research) | Up to six years of income statement, balance sheet, cash flow and ratios from SEC 10-K filings (EDGAR XBRL), with a side-by-side company comparison. |
