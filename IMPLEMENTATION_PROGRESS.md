@@ -7,6 +7,8 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 - `MODE=public` serves only the demo: no sign-in page, no Claude, owner-only API routes return 404. It keeps running the paper bots and THE WEB and answers the owner's bot, sync and desk routes only for requests carrying `DESK_TOKEN`.
 - `MODE=local` is the owner desk on 127.0.0.1 with no password. It runs no bots or Spider and forwards their routes, sync and the desk store to `PUBLIC_URL` with `DESK_TOKEN`.
 - Unset `MODE` keeps the existing sign-in behavior. Routing rules live in `deploy-mode-core.js` with tests in `tests/deploy-mode-core.test.js`.
+- Rate limits, password lockouts and the Claude hourly cap use `True-Client-IP` / `CF-Connecting-IP` (set by Cloudflare in front of Render) or the socket address, never the client-supplied first `X-Forwarded-For` entry.
+- Dockerfile uses Node 22 to match `engines`. Four tests that checked removed Home/Studio markup now check the current routing.
 
 ### Research trade updates and one-minute charts (2026-11-19)
 - Prioritize the active Research ticker in the owner’s live stream. A valid regular-session trade can update an IPO quote without a previous close. Slower snapshots preserve newer trades.

@@ -87,8 +87,10 @@ test("navigation loads Studio core before UI and opens the appropriate page",()=
   const html=fs.readFileSync(path.join(__dirname,"..","public/index.html"),"utf8");
   const ui=fs.readFileSync(path.join(__dirname,"..","public/studio.js"),"utf8");
   assert.ok(html.includes('id="tab-studio"'));
-  assert.ok(html.includes('["studio","Intelligence Studio"]'));
+  assert.ok(!html.includes('["studio","Intelligence Studio"]'), "no separate Intelligence navigation");
+  assert.ok(html.includes('"studio-scenario": "scenario"'), "Studio tools are routed from their own sections");
   assert.ok(html.indexOf('src="/studio-core.js"') < html.indexOf('src="/studio.js"'));
-  assert.ok(html.includes('if(t==="studio"&&typeof studioOpen==="function") studioOpen()'));
+  assert.ok(html.includes('if(STUDIO_ROUTES[t]&&typeof studioOpen==="function"){ studioOpen();'));
+  assert.ok(html.includes('if(t==="studio") t="studio-strategies";'), "old #studio links still work");
   assert.ok(ui.includes('useClaude:false'));
 });

@@ -823,7 +823,7 @@ const cookieOf = (req, name) => { const m = String(req.headers.cookie || "").mat
 const isOwner = (req) => DEPLOY.mode === "local" || (DEPLOY.mode !== "public" && keyOk(cookieOf(req, "md_owner")));
 const loginTries = new Map();
 function siteLogin(req, pw) {
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const ip = DM.clientIp(req.headers, req.socket.remoteAddress);
   const now = Date.now(), tries = (loginTries.get(ip) || []).filter((t) => now - t < 15 * 60e3);
   if (tries.length >= 8) return { status: 429, error: "Too many wrong passwords. Try again in 15 minutes." };
   if (typeof pw !== "string" || !pw || pw.length > 200) return { status: 400, error: "Enter your password." };
@@ -856,7 +856,7 @@ const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || ((u.pathname === "
 // Per-visitor request budget for the API (keeps outbound traffic low so the free plan is never suspended)
 const RL = new Map();
 function rateLimited(req, owner) {
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const ip = DM.clientIp(req.headers, req.socket.remoteAddress);
   const now = Date.now(), max = owner ? 600 : 180;
   let b = RL.get(ip); if (!b || now - b.t > 60e3) { b = { t: now, n: 0 }; RL.set(ip, b); }
   b.n++; if (RL.size > 20000) RL.clear();
@@ -869,7 +869,7 @@ const SEC_HEADERS = {
 };
 // Returns null if allowed, or [status, body] to send back
 function claudeGate(req, pw) {
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "?").split(",")[0].trim();
+  const ip = DM.clientIp(req.headers, req.socket.remoteAddress);
   const now = Date.now(), tries = (badTries.get(ip) || []).filter(t => now - t < 15 * 60e3);
   if (tries.length >= 8) return [429, { error: "Too many wrong passwords. Try again in 15 minutes.", code: "locked" }];
   if (passOk(pw)) return null;
@@ -916,7 +916,7 @@ function spendOne() {
 const perIp = new Map();
 const IP_HOURLY = Math.max(1, parseInt(process.env.CLAUDE_HOURLY_LIMIT || "40", 10) || 40);
 function ipAllowed(req) {
-  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const ip = DM.clientIp(req.headers, req.socket.remoteAddress);
   const now = Date.now(), list = (perIp.get(ip) || []).filter((t) => now - t < 3600e3);
   if (list.length >= IP_HOURLY) return false;
   list.push(now); perIp.set(ip, list);

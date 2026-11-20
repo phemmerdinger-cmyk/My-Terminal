@@ -72,4 +72,15 @@ function pageRedirect(mode, pathname) {
   return null;
 }
 
-module.exports = { MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute };
+// The visitor's IP for rate limits and password lockouts. Render sits behind Cloudflare, which sets
+// True-Client-IP / CF-Connecting-IP itself; X-Forwarded-For is only appended to by Render, so its first
+// entry is whatever the client sent and must not be trusted. Without those headers, use the socket address.
+function clientIp(headers = {}, remote = "") {
+  for (const h of ["true-client-ip", "cf-connecting-ip"]) {
+    const v = String(headers[h] || "").trim();
+    if (v && v.length <= 64 && /^[0-9a-f:.]+$/i.test(v)) return v;
+  }
+  return String(remote || "?");
+}
+
+module.exports = { MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute, clientIp };

@@ -65,3 +65,11 @@ test("page redirects", () => {
   assert.equal(DM.pageRedirect("local", "/"), null);
   assert.equal(DM.pageRedirect("", "/"), null);
 });
+
+test("clientIp trusts Cloudflare's headers, never a client-supplied X-Forwarded-For", () => {
+  assert.equal(DM.clientIp({ "true-client-ip": "203.0.113.7", "x-forwarded-for": "1.2.3.4" }, "10.0.0.1"), "203.0.113.7");
+  assert.equal(DM.clientIp({ "cf-connecting-ip": "2001:db8::1" }, "10.0.0.1"), "2001:db8::1");
+  assert.equal(DM.clientIp({ "x-forwarded-for": "1.2.3.4, 104.22.17.40" }, "10.0.0.1"), "10.0.0.1");
+  assert.equal(DM.clientIp({ "true-client-ip": "<script>" }, "10.0.0.1"), "10.0.0.1");
+  assert.equal(DM.clientIp({}, undefined), "?");
+});

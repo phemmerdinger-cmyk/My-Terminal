@@ -97,14 +97,13 @@ test("risk: hypothetical 1Y stats from aligned daily closes, excludes short hist
   assert.ok(r.vol > 0 && Number.isFinite(r.beta));
   assert.ok(C.risk({}, { A: 1 }, null).error);
 });
-test("Home is wired into the existing shell without breaking other tabs", () => {
+test("Home was retired: legacy #home links open Markets Overview and the shell no longer loads Home", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
-  assert.ok(html.includes('id="tab-home"'));
-  assert.ok(html.includes('const TABS = ["home","news",'));
-  assert.ok(html.includes('["home",[["home","Home"]]]'));
-  assert.ok(html.includes('VIEW?"news":"home"'), "owner lands on Home, demo keeps News");
-  for (const f of ["desk-store.js", "home-core.js", "home.js"]) assert.ok(html.includes(`<script src="/${f}"></script>`), f);
-  assert.ok(html.indexOf('href="/home.css"') < html.indexOf('href="/orange-theme.css'));
+  assert.ok(!html.includes('id="tab-home"'));
+  assert.ok(html.includes('if(t==="home") t="data";'), "setTab maps #home to Overview");
+  assert.ok(html.includes('home:"data"'), "initial-hash map sends #home to Overview");
+  for (const f of ["home-core.js", "home.js"]) assert.ok(!html.includes(`src="/${f}"`), f);
+  assert.ok(html.includes('<script src="/desk-store.js"></script>'), "the personal desk store is still loaded");
   const css = fs.readFileSync(path.join(__dirname, "..", "public", "home.css"), "utf8");
   assert.ok(!/#(0ea5e9|06b6d4|22d3ee|3b82f6|8b5cf6|a855f7|f97316|ff9e1b)/i.test(css), "no blue/cyan/purple/orange accents");
   assert.ok(css.includes("prefers-reduced-motion"));

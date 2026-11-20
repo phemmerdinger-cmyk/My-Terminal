@@ -13,7 +13,7 @@ before(async () => {
 });
 after(() => srv && srv.kill());
 const get = (p, h = {}) => fetch(BASE + p, { redirect: "manual", headers: h });
-const login = (pw) => fetch(BASE + "/api/login", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": "10.0.0." + Math.floor(Math.random() * 200) }, body: JSON.stringify({ password: pw }) });
+const login = (pw) => fetch(BASE + "/api/login", { method: "POST", headers: { "content-type": "application/json", "true-client-ip": "10.0.0." + Math.floor(Math.random() * 200) }, body: JSON.stringify({ password: pw }) });
 
 test("the real site needs a login", async () => {
   for (const p of ["/", "/index.html", "/?owner"]) { const r = await get(p); assert.equal(r.status, 302, p); assert.equal(r.headers.get("location"), "/login"); }
@@ -47,12 +47,17 @@ test("wrong password fails, right password unlocks the site and private APIs", a
   assert.equal((await get("/", { cookie: "md_owner=" + "0".repeat(64) })).status, 302, "a forged cookie is rejected");
 });
 test("wrong-password lockout after 8 tries", async () => {
-  const h = { "content-type": "application/json", "x-forwarded-for": "10.9.9.9" }, body = JSON.stringify({ password: "bad" });
+  const h = { "content-type": "application/json", "true-client-ip": "10.9.9.9" }, body = JSON.stringify({ password: "bad" });
   let last; for (let i = 0; i < 9; i++) last = await fetch(BASE + "/api/login", { method: "POST", headers: h, body });
   assert.equal(last.status, 429);
 });
+test("a spoofed X-Forwarded-For can't dodge the password lockout", async () => {
+  const body = JSON.stringify({ password: "bad" }); let last;
+  for (let i = 0; i < 9; i++) last = await fetch(BASE + "/api/login", { method: "POST", body, headers: { "content-type": "application/json", "true-client-ip": "10.8.8.8", "x-forwarded-for": "198.51.100." + i } });
+  assert.equal(last.status, 429);
+});
 test("rate limit kicks in for a flood of API requests", async () => {
-  const h = { "x-forwarded-for": "10.7.7.7" }; let last;
+  const h = { "true-client-ip": "10.7.7.7" }; let last;
   for (let i = 0; i < 185; i++) last = await get("/api/nothing-here", h);
   assert.equal(last.status, 429);
 });

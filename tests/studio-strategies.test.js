@@ -48,7 +48,6 @@ test("studio header no longer receives fixed-height global header CSS and includ
   const css=fs.readFileSync(path.join(root,"studio.css"),"utf8");
   const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
   const backtest=fs.readFileSync(path.join(root,"quant-ui.js"),"utf8");
-  assert.ok(js.includes('el.innerHTML = `<div class="mds-hero">'));
   assert.ok(!js.includes('<header class="mds-hero">'));
   assert.ok(css.includes('#tab-studio .mds-hero{display:flex;flex-direction:column'));
   assert.ok(css.includes('height:auto;min-height:0'));
