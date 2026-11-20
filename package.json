@@ -1,7 +1,7 @@
 {
   "name": "my-terminal",
   "version": "1.0.0",
-  "description": "Personal live stock news hub: Yahoo Finance, CNBC, Morningstar, Seeking Alpha and WSJ, with charts, portfolio, alerts and Claude predictions",
+  "description": "Market Desk: a live finance research terminal with SEC-based financials and DCF, portfolio risk, quant labs and paper-trading bots vs. the S&P 500",
   "main": "server.js",
   "scripts": { "start": "node server.js", "test": "node --test tests/*.test.js" },
   "engines": { "node": ">=22" },

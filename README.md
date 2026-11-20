@@ -24,17 +24,17 @@ No build step and **no dependencies**. All you need is Node.js 22 or newer.
 | **DCF valuation** (Research) | Five-year unlevered free cash flow model with bull/base/bear cases, CAPM WACC, terminal value, enterprise-to-equity bridge and a WACC × growth sensitivity table; every input labeled by source. |
 | **Risk & stress** (Portfolio) | VaR / expected shortfall, correlations, concentration, rate sensitivity, beta-scaled shocks and 2008 / 2020 / 2022 replays. |
 | **Macro** (Markets) | Fed funds, CPI, unemployment, GDP, Treasury yields and curves, sentiment and recession signals (FRED, with Treasury/BLS/NY Fed/UMich/NBER fallbacks). |
-| **AI vs. S&P 500** (AI Lab) | A rules-based $10,000 paper-trading bot (no API cost) racing the index, with trade analytics and test runs. |
+| **AI vs. S&P 500** (AI Lab) | Three rules-based paper-trading bots (swing, day and quant; $30,000 each, no API cost) racing the index, with trade analytics and an archive of past runs. |
 | **Prediction accuracy** (AI Lab) | Grades saved Claude predictions with non-overlapping outcome bands, calibration and sample sizes. |
-| **🕸 THE WEB** | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, source-linked financial research and a rules-based Research Assistant with citations, and shares research with AI Trader. Rules-based and free. |
-| **✦ Claude Predictor** | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
+| **🕸 THE WEB** (runs in the background; its findings appear under Research → Market Intelligence and Market Charts) | An autonomous research Spider that runs on the server (no open tab needed): it researches your holdings, watchlist and the broader market on a schedule, remembers what it finds, writes a daily briefing (pre-market, intraday, after-market), shows a live activity feed, a discovery feed, source-linked financial research and a rules-based Research Assistant with citations, and shares research with AI Trader. Rules-based and free. |
+| **✦ Claude Predictor** (AI Lab, owner only) | Predictions with 2-week and 6-month targets, risk level and a projection chart; AI Screener that ranks a whole list; Head-to-head comparisons; a prediction database graded after 2 weeks; Ask Claude. |
 
 **Ask Claude** is on every page and sees what you're looking at. **☁ Sync** keeps portfolios, watchlist, alerts and predictions the same on every device. Press **⌘K** (or **/**) anywhere to search. Install it on your phone with "Add to Home Screen".
 
 ## Run it on your computer
 
 ```bash
-cd stock-hub
+cd My-Terminal
 node server.js
 ```
 Open http://localhost:3000
@@ -116,7 +116,7 @@ tested in `tests/quanttrader.test.js`). Once per trading day after the close it 
 ranks 38 liquid stocks and sector ETFs on 12-1 month momentum, 3-month momentum and low volatility; buys the top 8 above
 their 200-day average; sizes them by risk parity (≤ 20% each) with a risk-parity defensive sleeve (IEF, TLT, GLD);
 scales the book to a 15% volatility target with the rest in T-bills (BIL); and trades only changes above 1.5% at the
-daily close, paying 5 bps per side. Starts with $10,000. Paper money only.
+daily close, paying 5 bps per side. Starts with $30,000. Paper money only.
 
 ## The Spider button
 

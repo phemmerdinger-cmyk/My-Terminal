@@ -16,7 +16,7 @@ Read `IMPLEMENTATION_PROGRESS.md` first (what's done, what's next), then `docs/A
 - Colors: black/graphite/military green (`--orange:#879f55` is the green accent — legacy name), gains `--up`, losses `--down`. No blue/cyan/purple/orange decoration. `public/orange-theme.css` loads last.
 - One home per feature (docs/ARCHITECTURE.md). Reuse `window.MD` (data.js) for shared fetches/caching; `window.MDDesk` (desk-store.js) for new personal data.
 - Pure logic goes in UMD `*-core.js` files with node tests; UI files stay thin.
-- Targeted edits; don't rewrite `public/index.html` (5k lines) or `server.js` (3k lines).
+- Targeted edits; don't rewrite `public/index.html` (5.4k lines) or `server.js` (4.3k lines).
 
 ## Workflow
 Small phase → test → update `IMPLEMENTATION_PROGRESS.md` → commit on the feature branch.

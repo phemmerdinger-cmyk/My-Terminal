@@ -20,7 +20,7 @@ if(!o)document.documentElement.classList.add("viewonly");})();
 <meta property="og:site_name" content="Market Desk">
 <meta property="og:title" content="Market Desk · Live market dashboard">
 <meta property="og:description" content="A financial research terminal built by Peter Hemmerdinger, a finance student at Bryant University: DCF valuation from SEC filings, risk and stress testing, a macro dashboard and an AI vs. S&amp;P 500 trading experiment.">
-<meta property="og:image" content="https://my-terminal-28tq.onrender.com/og.png?v=2">
+<meta property="og:image" content="https://my-terminal-28tq.onrender.com/og.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="627">
 <meta property="og:image:alt" content="Market Desk: live S&amp;P 500 heatmap, portfolio risk analytics and market news">
@@ -1506,11 +1506,11 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <div class="tape"><div class="tape-inner" id="tape"></div></div>
 
 <nav class="tabs" id="tabs">
-  <button data-group="markets"><span class="ti">📈</span>Markets</button>
-  <button data-group="research"><span class="ti">🔎</span>Research</button>
-  <button data-group="portfolio"><span class="ti">💼</span>Portfolio</button>
-  <button data-group="quant"><span class="ti">∑</span>Quant</button>
-  <button data-group="ailab" class="lab"><span class="ti">🤖</span>AI Lab</button>
+  <button data-group="markets"><span class="ti" aria-hidden="true">📈</span>Markets</button>
+  <button data-group="research"><span class="ti" aria-hidden="true">🔎</span>Research</button>
+  <button data-group="portfolio"><span class="ti" aria-hidden="true">💼</span>Portfolio</button>
+  <button data-group="quant"><span class="ti" aria-hidden="true">∑</span>Quant</button>
+  <button data-group="ailab" class="lab"><span class="ti" aria-hidden="true">🤖</span>AI Lab</button>
   <span class="tsep" aria-hidden="true"></span>
   <div class="subtabs" id="subtabs" role="tablist"></div>
 </nav>
@@ -1519,10 +1519,10 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <div class="vo-hello" id="voHello"><div class="vo-in">
   <span class="vo-hi">👋 Welcome</span>
   <p><b>Market Desk</b> is a live financial research terminal I built as a finance student at Bryant University. Try a <a href="#dcf" data-gotab="dcf">DCF valuation</a> built from SEC filings, run a <a href="#risk" data-gotab="risk">stress test</a>, check the <a href="#macro" data-gotab="macro">economy</a>, or follow my <a href="#aitrade" data-gotab="aitrade">AI vs. S&amp;P 500 trading experiment</a>.</p>
-  <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><button type="button" class="vo-x" id="voX" title="Hide">✕</button></div>
+  <div class="vo-acts"><button type="button" class="btn" id="voAbout">About this project</button><a class="btn ghost" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">LinkedIn ↗</a><a class="btn ghost" href="https://github.com/phemmerdinger-cmyk/My-Terminal" target="_blank" rel="noopener">Code on GitHub ↗</a><button type="button" class="vo-x" id="voX" title="Hide" aria-label="Hide welcome message">✕</button></div>
 </div></div>
-<div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-labelledby="voT">
-  <button type="button" class="vo-x vo-close" id="voClose" title="Close">✕</button>
+<div class="vo-modal" id="voModal" hidden><div class="vo-card" role="dialog" aria-modal="true" aria-labelledby="voT" tabindex="-1">
+  <button type="button" class="vo-x vo-close" id="voClose" title="Close" aria-label="Close">✕</button>
   <div class="vo-k">ABOUT THIS PROJECT</div>
   <h2 id="voT">Market Desk</h2>
   <p class="vo-by">Built by <b>Peter Hemmerdinger</b> · Finance, Bryant University</p>
@@ -1541,7 +1541,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   </details>
   <div class="vo-stack"><span>Node.js</span><span>JavaScript</span><span>SEC EDGAR XBRL</span><span>FRED</span><span>Finnhub</span><span>Yahoo Finance data</span><span>Render</span></div>
   <p class="vo-small">This is the public demo: market data is live, the sample portfolio is illustrative, and stress tests are hypothetical, not investment results.</p>
-  <div class="vo-acts"><a class="btn" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">Connect on LinkedIn ↗</a><button type="button" class="btn ghost" data-gotab="dcf" id="voGoHm">Try the DCF model</button></div>
+  <div class="vo-acts"><a class="btn" href="https://www.linkedin.com/in/peter-hemmerdinger/" target="_blank" rel="noopener">Connect on LinkedIn ↗</a><a class="btn ghost" href="https://github.com/phemmerdinger-cmyk/My-Terminal" target="_blank" rel="noopener">See the code ↗</a><button type="button" class="btn ghost" data-gotab="dcf" id="voGoHm">Try the DCF model</button></div>
 </div></div>
 
 <div class="wrap">
@@ -1972,7 +1972,7 @@ const NAV_LAST={};
 function navSync(t){
   const g=groupOf(t); if(NAV.find(([key])=>key===g)[1].some(([k])=>k===t)) NAV_LAST[g]=t; // hidden advanced tools never replace Quant Lab navigation
   document.querySelectorAll("#tabs [data-group]").forEach(b=>b.classList.toggle("on",b.dataset.group===g));
-  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||!!STUDIO_ROUTES[k])));
+  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||k==="leader"||!!STUDIO_ROUTES[k])));
   const html=items.map(([k,label,c])=>`<button role="tab" data-tab="${k}" class="${c||""} ${k===t?"on":""}" aria-selected="${k===t}">${esc(label)}${k==="news"?'<span class="k" id="newsCount'+'"></span>':""}</button>`).join("");
   for(const id of ["subtabs","subtabsM"]){ const el=$(id); el.innerHTML=html.replace(' id="newsCount"',id==="subtabs"?' id="newsCount"':""); }
   if(window.__nc&&$("newsCount")) $("newsCount").textContent=window.__nc;
@@ -2107,7 +2107,7 @@ function setTab(t){
   if(t==="web") t="studio-graph"; // retain old Spider/bookmark URLs
   if(t==="studio") t="studio-strategies"; // retain old Studio/bookmark URLs
   if(t==="home") t="data"; // legacy Home bookmarks open Markets Overview
-  if(VIEW&&(t==="predict"||t==="health"||STUDIO_ROUTES[t])) t="news";
+  if(VIEW&&(t==="predict"||t==="health"||t==="leader"||STUDIO_ROUTES[t])) t="data";
   S.tab=t; try{history.replaceState(null,"",t==="research"&&S.rq?.sym==="ANT"?"#research/ANT":"#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
@@ -2126,7 +2126,7 @@ function setTab(t){
   if(t==="risk"){ rkInit(); if(!RK.ran&&$("rkSrc").value){ RK.ran=true; rkRun(); } }
   if(t==="research"){ renderResearch(); }
   if(t==="predict"){ renderPredict(); refreshUsage(); }
-  if(typeof webOpen==="function"){ if(t==="web") webOpen(); else webClose(); }
+  if(typeof webClose==="function") webClose();
   if(t==="health"&&typeof hlOpen==="function") hlOpen();
   if(STUDIO_ROUTES[t]&&typeof studioOpen==="function"){ studioOpen(); if(typeof studioSelectMode==="function") studioSelectMode(STUDIO_ROUTES[t]); }
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
@@ -3077,10 +3077,12 @@ async function dcfLoad(){
   }catch(e){ $("dcfOut").innerHTML=`<div class="fx-empty">${esc(e.message)}</div>`; }
 }
 $("dcfForm").onsubmit=e=>{e.preventDefault(); dcfLoad();};
-function fxOpen(t){
-  const def=(S.sel&&!/^\^|-USD$|=F$/.test(S.sel)?S.sel:"AAPL");
-  if(t==="fin"&&!$("finSym").value){ $("finSym").value=def; finLoad(); }
-  if(t==="dcf"&&!$("dcfSym").value){ $("dcfSym").value=def; dcfLoad(); }
+async function fxOpen(t){
+  const box=t==="fin"?$("finSym"):t==="dcf"?$("dcfSym"):null; if(!box||box.value) return;
+  let def=(S.sel&&!/^\^|-USD$|=F$/.test(S.sel)?S.sel:"AAPL");
+  // Open on the selected stock only if it has 10-K data; a new listing (an IPO) has none yet, so start on AAPL instead
+  if(def!=="AAPL"){ try{ const j=await fxSec(def); if(!j.available||!(j.years||[]).length) def="AAPL"; }catch{ def="AAPL"; } }
+  if(box.value) return; box.value=def; if(t==="fin") finLoad(); else dcfLoad();
 }
 
 /* ---------- Backtester + Risk & stress testing (all math in public/fin.js, runs in the browser) ---------- */
@@ -5141,7 +5143,7 @@ api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; s
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
 if(requestedTab==="research/ANT") openQuote("ANT");
-else setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:VIEW?"news":"data");
+else setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){
   const g=document.createElement("div"); g.className="owner-gate";
@@ -5168,7 +5170,10 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden){ loadQuo
 /* visitor welcome strip + About modal (view-only visitors only) */
 (function(){ if(!document.documentElement.classList.contains("viewonly")) return;
   try{ if(!window.__VISITOR&&localStorage.getItem("voHelloX")==="1") document.documentElement.classList.add("vo-dismissed"); }catch{}
-  const m=$("voModal"), open=()=>{ m.hidden=false; }, close=()=>{ m.hidden=true; };
+  let back=null; const m=$("voModal"), card=m.querySelector(".vo-card");
+  const open=()=>{ back=document.activeElement; m.hidden=false; card.focus(); }, close=()=>{ if(m.hidden) return; m.hidden=true; if(back&&back.focus) back.focus(); };
+  m.addEventListener("keydown",e=>{ if(e.key!=="Tab") return; const f=[...card.querySelectorAll("a[href],button,summary")].filter(x=>x.offsetParent!==null); if(!f.length) return;
+    const first=f[0], last=f[f.length-1]; if(e.shiftKey&&(document.activeElement===first||document.activeElement===card)){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); } });
   $("voAbout").onclick=open; $("voClose").onclick=close; $("voGoHm").addEventListener("click",close);
   m.addEventListener("click",e=>{ if(e.target===m) close(); }); document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&!m.hidden) close(); });
   $("voX").onclick=()=>{ document.documentElement.classList.add("vo-dismissed"); try{ if(!window.__VISITOR) localStorage.setItem("voHelloX","1"); }catch{} };

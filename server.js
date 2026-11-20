@@ -1,4 +1,4 @@
-// Personal Stock News Hub — zero-dependency Node.js server (Node 18+)
+// Market Desk — zero-dependency Node.js server (Node 22+)
 // Pulls headlines from Yahoo Finance, CNBC, Morningstar, Seeking Alpha and
 // The Wall Street Journal, plus live quotes, and serves the dashboard in /public.
 //
@@ -1556,7 +1556,17 @@ setInterval(() => {
 // Keep connections alive through proxies
 setInterval(() => { for (const c of live.clients) c.res.write(": ping\n\n"); }, 25_000);
 
-function openStream(res, syms, focus) {
+// Live price streams stay open, so cap them: a few per visitor and a fixed total, owner exempt from the per-visitor cap.
+const STREAM_PER_IP = 4, STREAM_MAX = 200;
+const streamIps = new Map();
+function streamSlot(req, owner) {
+  if (live.clients.size >= STREAM_MAX) return null;
+  const ip = DM.clientIp(req.headers, req.socket.remoteAddress), n = streamIps.get(ip) || 0;
+  if (!owner && n >= STREAM_PER_IP) return null;
+  streamIps.set(ip, n + 1);
+  return () => { const m = (streamIps.get(ip) || 1) - 1; if (m > 0) streamIps.set(ip, m); else streamIps.delete(ip); };
+}
+function openStream(res, syms, focus, release) {
   res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
   const client = { res, syms: new Set(syms.filter(streamable)) };
   if (client.syms.has(focus)) client.focus = focus;
@@ -1566,7 +1576,7 @@ function openStream(res, syms, focus) {
   res.write(`event: hello\ndata: ${JSON.stringify({ streaming: live.open })}\n\n`);
   if (Object.keys(snap).length) res.write(`data: ${JSON.stringify(snap)}\n\n`);
   syncSubs();
-  res.once("close", () => { live.clients.delete(client); syncSubs(); });
+  res.once("close", () => { live.clients.delete(client); syncSubs(); if (release) release(); });
 }
 
 // ---------------------------------------------------------------- device sync (portfolios, watchlist, alerts, predictions)
@@ -4188,7 +4198,9 @@ async function handle(req, res) {
       if (u.pathname === "/api/stream") {
         if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
         const focus = owner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
-        return openStream(res, parseList(u.searchParams.get("symbols"), 60), focus);
+        const release = streamSlot(req, owner);
+        if (!release) return send(res, 429, { error: "Too many open live-price connections.", code: "stream_busy" }, "application/json", { "Retry-After": "30" });
+        return openStream(res, parseList(u.searchParams.get("symbols"), 60), focus, release);
       }
       if (u.pathname === "/api/desk") return deskRoute(req, res); // owner-only (not in PUBLIC_API): personal layouts, profile, research
       if (u.pathname === "/api/sync") {
