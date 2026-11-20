@@ -12,7 +12,7 @@ Market Desk is a Node.js 22+ finance terminal deployed to Render. The server ent
 - Make small, targeted changes; avoid wholesale rewrites of `server.js` or `public/index.html`.
 - Put testable pure logic in `*-core.js` modules and add corresponding Node tests; keep UI code focused on presentation.
 - Reuse existing shared data/caching interfaces (`window.MD` and `window.MDDesk`) and follow documented feature ownership.
-- Maintain the existing black/graphite/military-green theme; the legacy `--orange` variable represents the green accent. Keep gains/losses semantic.
+- Maintain the black/graphite/orange theme (`--orange:#ff991f` is the accent). Keep gains/losses semantic (green/red).
 - Never fabricate market prices, historical performance, backtest results, or financial data. Distinguish simulated, hypothetical, and realized returns.
 - Preserve server-side owner/visitor authorization. Public demo access is not permission to expose private APIs or user data.
 - Avoid introducing paid services or automatic paid AI calls. Keep credentials server-side and out of commits. Subscription-based CLI login does **not** authorize using Claude or OpenAI APIs inside the deployed website.

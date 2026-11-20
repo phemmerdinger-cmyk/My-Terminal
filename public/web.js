@@ -151,16 +151,16 @@
     const nodeP = (n) => () => J(n.s, n.k), stockP = (sym) => () => placeXY(sym), secNode = {}, mine = myStocks(), q = (W.snap && W.snap.quotes) || {};
     for (const n of G.nodes) { const sec = SEC_ALIAS[String(n.label || "").toLowerCase()]; if (sec) secNode[sec] = n; }
     const capOf = (x) => (q[x] && q[x][3]) || 0, add = (a, b, c, kind, ids, why) => W.kg.push({ a, b, c, kind, ids: ids.map((x) => { const m = /^[a-z]+:([A-Z][A-Z0-9.\-]*)$/.exec(String(x)); return m && W.place && W.place[m[1]] != null ? m[1] : String(x); }), why });
-    for (const [sec, n] of Object.entries(secNode)) Object.keys(W.place || {}).filter((x) => W.sec && W.sec[x] === sec).sort((x, y) => capOf(y) - capOf(x)).slice(0, 5).forEach((x) => add(nodeP(n), stockP(x), SC[sec] || "#a8cb81", "sector", [n.id, x]));
+    for (const [sec, n] of Object.entries(secNode)) Object.keys(W.place || {}).filter((x) => W.sec && W.sec[x] === sec).sort((x, y) => capOf(y) - capOf(x)).slice(0, 5).forEach((x) => add(nodeP(n), stockP(x), SC[sec] || "#ffbe6e", "sector", [n.id, x]));
     const pf = G.nodes.find((n) => n.type === "portfolio");
     for (const n of G.nodes) { const lab = String(n.label || ""), up = lab.toUpperCase();
-      if (mine.has(up) || n.type === "holding") { const sec = W.sec && W.sec[up]; if (sec && secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#c4dca9", "holding", [n.id, secNode[sec].id]); if (pf && pf !== n) add(nodeP(pf), nodeP(n), "#f5c518", "portfolio", [pf.id, n.id]); }
-      const ms = MACRO_SECTORS[lab.toLowerCase()]; if (ms) for (const sec of ms) if (secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#8bba56", "macro", [n.id, secNode[sec].id]);
-      if (n.type === "discovery" && n.sym && W.place && W.place[n.sym] != null) add(nodeP(n), stockP(n.sym), "#a7ca7e", "finding", [n.id, n.sym]); }
+      if (mine.has(up) || n.type === "holding") { const sec = W.sec && W.sec[up]; if (sec && secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#ffdaad", "holding", [n.id, secNode[sec].id]); if (pf && pf !== n) add(nodeP(pf), nodeP(n), "#f5c518", "portfolio", [pf.id, n.id]); }
+      const ms = MACRO_SECTORS[lab.toLowerCase()]; if (ms) for (const sec of ms) if (secNode[sec]) add(nodeP(n), nodeP(secNode[sec]), "#ffa12c", "macro", [n.id, secNode[sec].id]);
+      if (n.type === "discovery" && n.sym && W.place && W.place[n.sym] != null) add(nodeP(n), stockP(n.sym), "#ffbc6a", "finding", [n.id, n.sym]); }
     // the server's own relationship graph (holdings, correlations, sector sensitivity, earnings events, findings), with its reasons
     const byId = new Map(G.nodes.map((n) => [n.id, n])), posOf = (id) => { const n = byId.get(id); if (n) return nodeP(n); const m = /^[a-z]+:([A-Z][A-Z0-9.\-]*)$/.exec(id); return m && W.place && W.place[m[1]] != null ? stockP(m[1]) : null; };
     const EC = { holds: "#f5c518", correlation: "#c4dca9", sensitivity: "#8bba56", event: "#fb923c", trader: "#ff6fae", industry: "#94b073", sector: "#a8cb81" };
-    for (const e of ((W.graph && W.graph.edges) || []).slice(0, 140)) { const a = posOf(e.a || e.from || e.source), b = posOf(e.b || e.to || e.target); if (a && b) add(a, b, EC[e.type] || "#a7ca7e", e.type || "link", [e.a || e.from || e.source, e.b || e.to || e.target], e.why); }
+    for (const e of ((W.graph && W.graph.edges) || []).slice(0, 140)) { const a = posOf(e.a || e.from || e.source), b = posOf(e.b || e.to || e.target); if (a && b) add(a, b, EC[e.type] || "#ffbc6a", e.type || "link", [e.a || e.from || e.source, e.b || e.to || e.target], e.why); }
     for (const x of mine) if (W.place && W.place[x] != null) { const sec = W.sec && W.sec[x]; if (sec && secNode[sec]) add(stockP(x), nodeP(secNode[sec]), "#f5c518", "holding", [x, secNode[sec].id]); }
     const low = document.documentElement.classList.contains("tw-low") || innerWidth < 760, PULSE = new Set(W.kg.map((e, i) => [i, e]).sort((x, y) => (y[1].kind === "holding") - (x[1].kind === "holding")).slice(0, 10).map(([i]) => i));
     g.innerHTML = W.kg.map((e, i) => `<path id="kg${i}" class="kg ${esc(e.kind)}" data-a="${esc(e.ids[0])}" data-b="${esc(e.ids[1])}" stroke="${e.c}" d="${kgD(e)}">${e.why ? `<title>${esc(e.why)}</title>` : ""}</path>${low || !PULSE.has(i) ? "" : `<circle class="kgp" r="1.9" fill="${e.c}"><animateMotion dur="${(3.2 + (i % 7) * 0.7).toFixed(1)}s" begin="-${((i * 0.37) % 4).toFixed(2)}s" repeatCount="indefinite"><mpath href="#kg${i}"/></animateMotion></circle>`}`).join("");
@@ -231,7 +231,7 @@
     const sym = g.dataset.sym, sec = (W.sec && W.sec[sym]) || g.dataset.sec || "", q = (W.snap && W.snap.quotes && W.snap.quotes[sym]) || null, p0 = placeXY(sym) || (() => { const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(g.getAttribute("transform") || ""); return m ? { x: +m[1], y: +m[2] } : null; })();
     if (svg.dataset.hovSym !== sym) { svg.dataset.hovSym = sym; svg.classList.add("hov"); svg.querySelectorAll(".twb-s.rel,.twb-s.cur").forEach((x) => x.classList.remove("rel", "cur")); g.classList.add("cur");
       const peers = Object.keys(W.place).filter((x) => x !== sym && W.sec && W.sec[x] === sec).map((x) => [x, placeXY(x)]).sort((a2, b2) => (((W.snap && W.snap.quotes[b2[0]]) || [])[3] || 0) - (((W.snap && W.snap.quotes[a2[0]]) || [])[3] || 0)).slice(0, 14);
-      const c = SC[sec] || "#a7ca7e"; links.innerHTML = p0 ? peers.map(([x, p], i) => { svg.querySelector(`.twb-s[data-sym="${CSS.escape(x)}"]`)?.classList.add("rel"); const mx = (p0.x + p.x) / 2, my = (p0.y + p.y) / 2, cx = mx + (G.cx - mx) * 0.35, cy = my + (G.cy - my) * 0.35; return `<path d="M${p0.x.toFixed(1)} ${p0.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)}" stroke="${c}" style="animation-delay:${i * 18}ms"/>`; }).join("") : ""; }
+      const c = SC[sec] || "#ffbc6a"; links.innerHTML = p0 ? peers.map(([x, p], i) => { svg.querySelector(`.twb-s[data-sym="${CSS.escape(x)}"]`)?.classList.add("rel"); const mx = (p0.x + p.x) / 2, my = (p0.y + p.y) / 2, cx = mx + (G.cx - mx) * 0.35, cy = my + (G.cy - my) * 0.35; return `<path d="M${p0.x.toFixed(1)} ${p0.y.toFixed(1)}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)}" stroke="${c}" style="animation-delay:${i * 18}ms"/>`; }).join("") : ""; }
     const r = $("twb").getBoundingClientRect(), mine = myStocks().has(sym), pc = q ? q[2] : null;
     tip.hidden = false; tip.innerHTML = `<div class="tt-h"><b>${esc(sym)}</b>${mine ? '<span class="tt-mine">★ yours</span>' : ""}</div><div class="tt-n">${esc((W.nm && W.nm[sym]) || "")}</div><div class="tt-s"><i style="background:${SC[sec] || "#64748b"}"></i>${esc(sec || "—")}</div>
       ${q ? `<div class="tt-p"><b>$${(+q[0]).toFixed(2)}</b><span class="${pc >= 0 ? "u" : "d"}">${pc >= 0 ? "+" : ""}${pc != null ? pc.toFixed(2) : "—"}%</span></div>${q[3] ? `<div class="tt-c">Market cap ${q[3] >= 1e12 ? "$" + (q[3] / 1e12).toFixed(2) + "T" : "$" + (q[3] / 1e9).toFixed(0) + "B"}</div>` : ""}` : `<div class="tt-c">No quote yet</div>`}<div class="tt-f">click to open · threads = same sector</div>`;
@@ -268,14 +268,14 @@
     if (SPD.el) return;
     SPD.el = document.createElement("div"); SPD.el.className = "tw-crawler";
     SPD.el.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true"><defs>
-      <radialGradient id="spAbd" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#8aa565"/><stop offset=".55" stop-color="#34442a"/><stop offset="1" stop-color="#0c130b"/></radialGradient>
-      <radialGradient id="spTh" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#b6cb90"/><stop offset="1" stop-color="#202c1b"/></radialGradient>
-      <radialGradient id="spEye"><stop offset="0" stop-color="#eaf4d9"/><stop offset=".45" stop-color="#a9c77b"/><stop offset="1" stop-color="#7f9c50" stop-opacity="0"/></radialGradient></defs>
+      <radialGradient id="spAbd" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#ec9b38"/><stop offset=".55" stop-color="#6b430e"/><stop offset="1" stop-color="#0c130b"/></radialGradient>
+      <radialGradient id="spTh" cx="45%" cy="35%" r="70%"><stop offset="0" stop-color="#ffc57f"/><stop offset="1" stop-color="#452b09"/></radialGradient>
+      <radialGradient id="spEye"><stop offset="0" stop-color="#ffefdb"/><stop offset=".45" stop-color="#ffb963"/><stop offset="1" stop-color="#fa8d0a" stop-opacity="0"/></radialGradient></defs>
       <g class="sp-legs">${LEGS.map((_, i) => `<path class="sp-leg" id="spL${i}"/><path class="sp-leg-core" id="spC${i}"/><circle class="sp-knee" id="spK${i}" r="1.6"/>`).join("")}</g>
-      <ellipse cx="50" cy="63" rx="13" ry="17" fill="url(#spAbd)" stroke="#536b3d" stroke-width=".8"/>
+      <ellipse cx="50" cy="63" rx="13" ry="17" fill="url(#spAbd)" stroke="#ab660e" stroke-width=".8"/>
       <path class="sp-acc" d="M50 49 L50 77 M43 56 Q50 60 57 56 M42 65 Q50 69 58 65 M44 73 Q50 76 56 73"/>
-      <ellipse cx="50" cy="45" rx="9" ry="8" fill="url(#spTh)" stroke="#536b3d" stroke-width=".8"/>
-      <path d="M44 38 Q50 30 56 38 L54 41 Q50 37 46 41 Z" fill="#27371e" stroke="#a9c77b" stroke-width=".6"/>
+      <ellipse cx="50" cy="45" rx="9" ry="8" fill="url(#spTh)" stroke="#ab660e" stroke-width=".8"/>
+      <path d="M44 38 Q50 30 56 38 L54 41 Q50 37 46 41 Z" fill="#593405" stroke="#ffb963" stroke-width=".6"/>
       <circle class="sp-eye" cx="46.5" cy="38.5" r="2.4" fill="url(#spEye)"/><circle class="sp-eye" cx="53.5" cy="38.5" r="2.4" fill="url(#spEye)"/>
       <circle class="sp-eye s" cx="44" cy="41" r="1.2" fill="url(#spEye)"/><circle class="sp-eye s" cx="56" cy="41" r="1.2" fill="url(#spEye)"/>
       <circle class="sp-core" cx="50" cy="63" r="2.2"/></svg>`;
@@ -313,7 +313,7 @@
     for (const p of SPD.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96; }
     SPD.parts = SPD.parts.filter((p) => p.life > 0);
     for (const p of SPD.parts) { c.fillStyle = `rgba(${p.life > 0.5 ? "125,249,255" : "77,163,255"},${(p.life * 0.8).toFixed(3)})`; c.fillRect(p.x - 1, p.y - 1, 2, 2); }
-    if (scanning) { const r = HALF * 1.25, a0 = (t / 380) % (Math.PI * 2); c.strokeStyle = "rgba(167,202,126,.55)"; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, r, a0, a0 + 1.1); c.stroke();
+    if (scanning) { const r = HALF * 1.25, a0 = (t / 380) % (Math.PI * 2); c.strokeStyle = "rgba(255,188,106,.55)"; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, r, a0, a0 + 1.1); c.stroke();
       const g = (t % 1200) / 1200; c.strokeStyle = `rgba(77,163,255,${(0.4 * (1 - g)).toFixed(3)})`; c.beginPath(); c.arc(cx, cy, HALF * (0.6 + g * 1.2), 0, Math.PI * 2); c.stroke(); }
   }
   const BOX = { t: -1, r: null }, boxRect = () => { const n = performance.now(); if (!BOX.r || n - BOX.t > 100) { BOX.r = $("twb").getBoundingClientRect(); BOX.t = n; } return BOX.r; };
@@ -641,7 +641,7 @@
       return `<g opacity="${a.toFixed(2)}">${L((l.w * 4).toFixed(1), l.c, ".22")}${L(l.w, l.c, "", true)}${L((l.w * 0.35).toFixed(2), "#fff")}<circle cx="${l.to.x.toFixed(1)}" cy="${l.to.y.toFixed(1)}" r="4" fill="#facc15"/></g>`; }).join("");
     const pulses = BS.pulses.filter((p) => now >= p.t0).map((p) => { const t = (now - p.t0) / bsMs(700, 200); return [0, 1, 2, 3, 4, 5, 6, 7].map((k2) => { const a = (k2 / 8) * Math.PI * 2 + 0.3, r = 6 + t * 30; return `<circle cx="${(p.p.x + Math.cos(a) * r).toFixed(1)}" cy="${(p.p.y + Math.sin(a) * r).toFixed(1)}" r="${(1.8 * (1 - t) + 0.3).toFixed(2)}" fill="${p.c}" opacity="${(1 - t).toFixed(2)}"/>`; }).join("") + `<circle cx="${p.p.x.toFixed(1)}" cy="${p.p.y.toFixed(1)}" r="${(4 + t * 26).toFixed(1)}" fill="none" stroke="${p.c}" stroke-width="2" opacity="${(1 - t).toFixed(2)}"/>`; }).join("");
     ov.innerHTML = `<defs><filter id="bsGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>${lasers}<g class="cr-legs" fill="none" stroke-linejoin="round" stroke-linecap="round">${legsSvg}</g>
-      <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y + bob).toFixed(1)})"><rect x="${(-9 * s).toFixed(1)}" y="${(-30 * s).toFixed(1)}" width="${(18 * s).toFixed(1)}" height="${(46 * s).toFixed(1)}" rx="${(8 * s).toFixed(1)}" class="cr-body"/><rect x="${(-5 * s).toFixed(1)}" y="${(-24 * s).toFixed(1)}" width="${(10 * s).toFixed(1)}" height="${(16 * s).toFixed(1)}" rx="${(4 * s).toFixed(1)}" fill="#1a1d24"/><circle cx="-${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#9bc36d"/><circle cx="${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#9bc36d"/></g>${pulses}`;
+      <g transform="translate(${Sp.x.toFixed(1)},${(Sp.y + bob).toFixed(1)})"><rect x="${(-9 * s).toFixed(1)}" y="${(-30 * s).toFixed(1)}" width="${(18 * s).toFixed(1)}" height="${(46 * s).toFixed(1)}" rx="${(8 * s).toFixed(1)}" class="cr-body"/><rect x="${(-5 * s).toFixed(1)}" y="${(-24 * s).toFixed(1)}" width="${(10 * s).toFixed(1)}" height="${(16 * s).toFixed(1)}" rx="${(4 * s).toFixed(1)}" fill="#1a1d24"/><circle cx="-${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#ffb14f"/><circle cx="${(3.2 * s).toFixed(1)}" cy="${(9 * s).toFixed(1)}" r="${(1.8 * s).toFixed(1)}" fill="#ffb14f"/></g>${pulses}`;
     BS.cap.style.transform = `translate(${Math.max(8, Math.min(innerWidth - 330, Sp.x + 70 * s)).toFixed(0)}px,${Math.max(8, Math.min(innerHeight - 40, Sp.y - 50 * s)).toFixed(0)}px)`;
   }
   const bsWait = (ms) => new Promise((r) => setTimeout(r, ms));

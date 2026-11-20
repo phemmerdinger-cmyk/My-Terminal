@@ -13,7 +13,7 @@ Read `IMPLEMENTATION_PROGRESS.md` first (what's done, what's next), then `docs/A
 - $0: no paid APIs/services. Claude API calls only behind the existing password + budget, never automatic.
 - Owner vs visitor: every `/api/*` route is owner-only unless listed in `PUBLIC_API` (server.js). Visitor (`/demo`) = `html.viewonly`, `window.__VISITOR`, `store.set` is a no-op. Never rely on hidden UI for access control.
 - Never fabricate data. Missing quote/history → show "unavailable", don't estimate. Label hypothetical vs realized vs benchmark returns.
-- Colors: black/graphite/military green (`--orange:#879f55` is the green accent — legacy name), gains `--up`, losses `--down`. No blue/cyan/purple/orange decoration. `public/orange-theme.css` loads last.
+- Colors: black/graphite/orange (`--orange:#ff991f` is the accent), gains `--up`, losses `--down`. No blue/cyan/purple/olive-green decoration; categorical chart palettes may use other hues. `public/orange-theme.css` loads last.
 - One home per feature (docs/ARCHITECTURE.md). Reuse `window.MD` (data.js) for shared fetches/caching; `window.MDDesk` (desk-store.js) for new personal data.
 - Pure logic goes in UMD `*-core.js` files with node tests; UI files stay thin.
 - Targeted edits; don't rewrite `public/index.html` (5.4k lines) or `server.js` (4.3k lines).

@@ -84,14 +84,14 @@
     let pad=(high-low)*.08;if(pad===0)pad=1;
     low-=pad;high+=pad;
     const x=(i)=>L+(W*i/(n-1)),y=(v)=>T+(high-v)*H/(high-low);
-    const grid=Array.from({length:5},(_,i)=>{const value=high-(high-low)*i/4, yy=y(value);return '<line x1="'+L+'" y1="'+yy+'" x2="'+R+'" y2="'+yy+'" stroke="#506046" stroke-opacity=".30"/><text x="'+(L-9)+'" y="'+(yy+4)+'" text-anchor="end" fill="#a9b79c" font-size="12">'+value.toFixed(1)+'%</text>';}).join("");
+    const grid=Array.from({length:5},(_,i)=>{const value=high-(high-low)*i/4, yy=y(value);return '<line x1="'+L+'" y1="'+yy+'" x2="'+R+'" y2="'+yy+'" stroke="#926225" stroke-opacity=".30"/><text x="'+(L-9)+'" y="'+(yy+4)+'" text-anchor="end" fill="#e3bf92" font-size="12">'+value.toFixed(1)+'%</text>';}).join("");
     const paths=series.map((s)=>{let d="",previous=false;
       s.values.forEach((v,i)=>{if(!Number.isFinite(v)){previous=false;return;}d+=(previous?"L":"M")+x(i).toFixed(2)+","+y(v).toFixed(2)+" ";previous=true;});
       return '<path d="'+d+'" stroke="'+s.color+'" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none" vector-effect="non-scaling-stroke"/>';
     }).join("");
-    const labels=[0,Math.floor((n-1)/2),n-1].map(i=>'<text x="'+x(i)+'" y="298" text-anchor="'+(i===0?"start":i===n-1?"end":"middle")+'" fill="#9aab92" font-size="12">'+etDate(dates[i])+'</text>').join("");
+    const labels=[0,Math.floor((n-1)/2),n-1].map(i=>'<text x="'+x(i)+'" y="298" text-anchor="'+(i===0?"start":i===n-1?"end":"middle")+'" fill="#d9b483" font-size="12">'+etDate(dates[i])+'</text>').join("");
     const legend=series.map(s=>'<span><i style="background:'+s.color+'"></i>'+esc(s.symbol)+'</span>').join("");
-    host.innerHTML='<div class="mdc-legend">'+legend+'</div><div class="mdc-svgwrap"><svg role="img" aria-label="'+esc(kind)+" historical "+'chart" viewBox="0 0 970 310" preserveAspectRatio="xMidYMid meet"><g>'+grid+labels+paths+'</g><line class="mdc-crosshair" x1="0" x2="0" y1="'+T+'" y2="'+B+'" stroke="#d1e6ba" stroke-dasharray="5 4" stroke-width="1" visibility="hidden"/></svg></div><div class="mdc-readout" aria-live="off">Move over the chart to inspect a trading day.</div>';
+    host.innerHTML='<div class="mdc-legend">'+legend+'</div><div class="mdc-svgwrap"><svg role="img" aria-label="'+esc(kind)+" historical "+'chart" viewBox="0 0 970 310" preserveAspectRatio="xMidYMid meet"><g>'+grid+labels+paths+'</g><line class="mdc-crosshair" x1="0" x2="0" y1="'+T+'" y2="'+B+'" stroke="#ffe8cb" stroke-dasharray="5 4" stroke-width="1" visibility="hidden"/></svg></div><div class="mdc-readout" aria-live="off">Move over the chart to inspect a trading day.</div>';
     const svg=host.querySelector("svg"),cross=host.querySelector(".mdc-crosshair"),readout=host.querySelector(".mdc-readout");
     svg.addEventListener("pointermove",(event)=>{
       const r=svg.getBoundingClientRect(),pos=Math.max(0,Math.min(1,(event.clientX-r.left)/r.width));
