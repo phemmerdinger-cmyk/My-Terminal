@@ -3,6 +3,13 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Review fixes (2026-11-19)
+- Demo visitors land on Markets Overview. Prediction Accuracy is hidden in the demo (the owner's log is private). The About box links to the code on GitHub.
+- DCF and Financials open on the selected stock only when it has 10-K data; otherwise AAPL (a fresh IPO such as ANT has no 10-K yet).
+- Live price streams are capped at 4 per visitor and 200 in total.
+- Accessibility: decorative nav emoji are hidden from screen readers, the About dialog traps and restores focus, keyboard focus is always visible.
+- `og.png` compressed from 838 KB to 270 KB. Removed the committed `srv.log`, an unreachable THE WEB branch in `setTab`, and stale README text ($10,000 accounts, `cd stock-hub`).
+
 ### Two-server deploy modes (2026-11-19)
 - `MODE=public` serves only the demo: no sign-in page, no Claude, owner-only API routes return 404. It keeps running the paper bots and THE WEB and answers the owner's bot, sync and desk routes only for requests carrying `DESK_TOKEN`.
 - `MODE=local` is the owner desk on 127.0.0.1 with no password. It runs no bots or Spider and forwards their routes, sync and the desk store to `PUBLIC_URL` with `DESK_TOKEN`.

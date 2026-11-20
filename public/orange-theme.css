@@ -152,3 +152,7 @@ button:disabled{box-shadow:none!important}
 .sp-btn{border-color:#617d46!important;color:#c0d59a!important;background:rgba(135,159,85,.13)!important}
 .sp-btn:hover{background:rgba(135,159,85,.23)!important}
 .sp-btn .sp-ico{color:#a3bd78;filter:drop-shadow(0 0 4px rgba(135,159,85,.55))}
+
+/* Keyboard focus is always visible (several inputs set outline:none for mouse users) */
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--orange);outline-offset:0}
