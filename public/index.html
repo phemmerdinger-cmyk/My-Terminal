@@ -51,7 +51,7 @@ document.documentElement.classList.add("owner-icon");}catch(e){}})();</script>
   --bg:#0b0d10; --panel:#12151a; --panel2:#171b21; --line:#232932; --line2:#2d3540;
   --text:#e7e9ec; --muted:#8b95a3; --dim:#5c6673;
   --amber:#ff9e1b; --up:#21c37a; --down:#ff4d5e; --flash:rgba(255,158,27,.16);
-  --yahoo:#abcd85; --cnbc:#9bc46d; --morningstar:#e11d48; --seekingalpha:#f97316; --wsj:#d7e1cb; --claude:#d97757;
+  --yahoo:#ff991f; --cnbc:#ffd166; --morningstar:#e11d48; --seekingalpha:#b45309; --wsj:#e8e2d9; --claude:#d97757;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace; --sans:"IBM Plex Sans",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
@@ -1089,7 +1089,9 @@ body.sg-lock{overflow:hidden}
 .feed{list-style:none;margin:0;padding:0}
 .np{--paper:transparent;--ink:var(--text);--ink2:var(--muted);--rule:var(--line2);--soft:var(--line);background:transparent;color:var(--ink);margin:0;padding:16px 22px 26px;font-family:"Source Serif 4",Georgia,serif}
 .np a{color:inherit;text-decoration:none} .np a:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
-.np-mast{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:16px;border-bottom:3px double var(--rule);padding-bottom:10px}
+.np-mast{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:16px;border-bottom:3px double var(--rule);padding-bottom:10px}
+.np{container-type:inline-size} .np-ear.r span{white-space:nowrap} #status .num{white-space:nowrap;padding-left:10px}
+@container (max-width:900px){ .np-mast{grid-template-columns:minmax(0,1fr)} .np-mast h1{order:-1} .np-ear.l,.np-ear.r{text-align:center;justify-content:center} }
 .np-mast h1{margin:0;font-family:"Playfair Display",Georgia,serif;font-weight:900;font-size:clamp(30px,4.6vw,56px);letter-spacing:-.01em;line-height:1;text-align:center;white-space:nowrap}
 .np-ear{font-family:"IBM Plex Sans",sans-serif;font-size:11px;color:var(--ink2);line-height:1.5}
 .np-ear span{color:var(--dim)} .np-ear.r{text-align:right;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 12px} .np-ear b{font-family:var(--mono);font-weight:600}
@@ -1943,7 +1945,7 @@ const SRC = {
   morningstar:{name:"Morningstar",short:"M★",c:"var(--morningstar)"},
   seekingalpha:{name:"Seeking Alpha",short:"SA",c:"var(--seekingalpha)"},
   wsj:{name:"Wall Street Journal",short:"WSJ",c:"var(--wsj)"},
-  official:{name:"Official: Fed, SEC, BLS, BEA, Treasury",short:"Official",c:"#bed8a1"},
+  official:{name:"Official: Fed, SEC, BLS, BEA, Treasury",short:"Official",c:"#9ca3af"},
 };
 const INDEXES = [["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow Jones"],["^RUT","Russell 2000"],["^VIX","VIX"],["^TNX","10Y Treasury"],["CL=F","Crude Oil"],["GC=F","Gold"],["BTC-USD","Bitcoin"],["ETH-USD","Ethereum"],["XRP-USD","XRP"],["SOL-USD","Solana"]];
 const IDX_NAME = Object.fromEntries(INDEXES);
@@ -2525,7 +2527,7 @@ function renderStatus(){
   if(!S.news) return;
   $("status").innerHTML=Object.entries(SRC).map(([k,s])=>{
     const ok=S.news.sources[k]?.ok; const n=S.news.items.filter(i=>i.source===k).length;
-    return `<div><span><span class="sw" style="background:${s.c};margin-right:6px"></span>${s.name}</span><span class="num ${ok?"ok":"bad"}">${ok?n+" stories":"unavailable"}</span></div>`;
+    return `<div><span><span class="sw" style="background:${s.c};margin-right:6px"></span>${s.name}</span><span class="num${ok?"":" bad"}">${ok?n+" stories":"unavailable"}</span></div>`;
   }).join("");
 }
 
