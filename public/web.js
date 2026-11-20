@@ -37,7 +37,7 @@
   // then crawls into the center and writes that sentence. The text is the server's live summary: it is rebuilt from new
   // research while the market is open and frozen as the day's final summary after the close.
   const PAGE = { data: ["markets", "Overview"], news: ["markets", "News"], nyse: ["markets", "Heatmap"], analysis: ["markets", "Analysis"], macro: ["markets", "Macro"],
-    research: ["research", "Stock research"], fin: ["research", "Financials"], portfolio: ["portfolio", "My portfolio"], aitrade: ["ailab", "AI vs S&P 500"] };
+    research: ["research", "Stock research"], fin: ["research", "Financials"], portfolio: ["portfolio", "My portfolio"], aitrade: ["ailab", "Bots vs S&P 500"] };
   const GNAME = { markets: "Markets", research: "Research", portfolio: "Portfolio", ailab: "AI Lab", quant: "Quant", web: "THE WEB" };
   const SPOKES = 16, RINGS = 6, GSPOKES = { markets: [13, 14, 15, 0, 1, 2], research: [3, 4, 5, 6], portfolio: [7, 8, 9], ailab: [10, 11, 12] };
   function pageOfJob(j) {
@@ -740,7 +740,7 @@
     else add("Claude Predictor", "No prediction yet", "Ask Claude for a call; it will be graded against the S&P 500.", [["Predict " + sym, "predict", "run"]]);
     // the paper bots
     const bots = [["Swing trader", ap], ["Day trader", dt], ["Quant trader", qt]].map(([n, d]) => { const p = d && (d.positions || []).find((x) => x.sym === sym); return p ? `${n}: holds ${usd(p.value)}${p.pnl != null ? ` (${p.pnl >= 0 ? "+" : "−"}${usd(Math.abs(p.pnl)).replace(/^[−]?\$/, "$")})` : ""}` : null; }).filter(Boolean);
-    add("AI traders (paper money)", bots.length ? bots.join(" · ") : "None of the three bots own it right now", "", [["AI vs S&P 500", "aitrade"]]);
+    add("AI traders (paper money)", bots.length ? bots.join(" · ") : "None of the three bots own it right now", "", [["Bots vs S&P 500", "aitrade"]]);
     // fundamentals + valuation
     add("Fundamentals", "SEC financial statements and a DCF valuation", "", [["Financials", "fin"], ["DCF model", "dcf"]]);
     return `<h4>Connected research on ${esc(sym)}${Q && Q.changePct != null ? ` <span class="sp-mv"><i class="${Q.changePct >= 0 ? "up" : "down"}">${sg(Q.changePct, 2)}</i> today</span>` : ""}</h4><div class="sp-links">${card.join("")}</div>`;

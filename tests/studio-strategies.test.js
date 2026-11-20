@@ -52,8 +52,9 @@ test("studio header no longer receives fixed-height global header CSS and includ
   assert.ok(css.includes('#tab-studio .mds-hero{display:flex;flex-direction:column'));
   assert.ok(css.includes('height:auto;min-height:0'));
   assert.ok(css.includes('.mds-strategy-grid'));
-  assert.ok(html.includes('src="/studio-strategies.js"'));
-  assert.ok(html.indexOf('src="/studio-strategies.js"')<html.indexOf('src="/studio.js"'));
+  const G=require("../public/lazy-core.js").GROUPS.studio; // loaded on demand when a Studio tool opens
+  assert.ok(G.includes("/studio-strategies.js"));
+  assert.ok(G.indexOf("/studio-strategies.js")<G.indexOf("/studio.js"));
   assert.ok(html.includes('src="/empty-examples.js"'));
   assert.ok(js.includes('window.QUANT.run'));
   assert.ok(js.includes('window.MD.hist'));

@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Faster first load, phone polish, "Trading bots vs. S&P 500" (2026-11-19)
+- Quant Lab, Backtest Lab and Studio tools load when their tab first opens (`public/lazy-core.js`, tests in `tests/lazy-core.test.js`); each tool still opens itself once loaded. THE WEB's spider code loads for the owner only, after the page settles, so the demo no longer downloads it or polls its private endpoints. About 460 KB less code on the demo's first page.
+- AI Lab's bot page is now "Trading bots vs. the S&P 500", with a line saying the rules decide every trade and no AI model trades. Welcome, About and meta text updated to match.
+- Phones: the demo welcome strip is two lines with one button; the spider button is owner-only.
+
 ### Review fixes (2026-11-19)
 - Demo visitors land on Markets Overview. Prediction Accuracy is hidden in the demo (the owner's log is private). The About box links to the code on GitHub.
 - DCF and Financials open on the selected stock only when it has 10-K data; otherwise AAPL (a fresh IPO such as ANT has no 10-K yet).
