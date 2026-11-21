@@ -66,7 +66,7 @@ function access({ mode, path, owner = false, isPublic = false, token = false }) 
 function pageRedirect(mode, pathname) {
   if (mode === "public") {
     if (pathname === "/ai-vs-sp500") return "/demo#aitrade";
-    if (["/", "/index.html", "/login", "/logout"].includes(pathname)) return "/demo";
+    if (["/", "/index.html", "/login", "/logout", "/hq", "/hq/"].includes(pathname)) return "/demo";
   }
   if (mode === "local" && (pathname === "/login" || pathname === "/logout")) return "/";
   return null;

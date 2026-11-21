@@ -4457,9 +4457,12 @@ async function handle(req, res) {
         if (u.searchParams.has("visitor")) return go("/demo");
         if (!owner) return go(u.pathname === "/ai-vs-sp500" ? "/demo#aitrade" : "/login");
         page = "index.html";
+      } else if (u.pathname === "/hq" || u.pathname === "/hq/") { // Bot HQ: the owner's bot control room
+        if (!owner) return go("/login");
+        page = "hq.html";
       }
       const file = path.normalize(path.join(PUBLIC, page || u.pathname));
-      if (!file.startsWith(PUBLIC + path.sep) || (!page && file === path.join(PUBLIC, "index.html"))) return send(res, 404, "Not found", "text/plain");
+      if (!file.startsWith(PUBLIC + path.sep) || (!page && (file === path.join(PUBLIC, "index.html") || file === path.join(PUBLIC, "hq.html")))) return send(res, 404, "Not found", "text/plain");
       fs.stat(file, (err, stt) => {
         if (err || !stt.isFile()) return send(res, 404, "Not found", "text/plain");
         const type = MIME[path.extname(file)] || "application/octet-stream";
