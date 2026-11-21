@@ -44,6 +44,9 @@
     D.view = v;
     document.querySelectorAll("nav.side [data-v]").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + v));
+    document.body.classList.toggle("home", v === "globe");
+    $("backbar").hidden = v === "globe";
+    $("crumb").textContent = ({ overview: "Overview", lab: "Lab", research: "Research", strategies: "Strategies", rules: "Rulebook", room: "Inside the globe", paper: "Paper & live", decisions: "Decisions", costs: "Costs", machines: "Machines", bot: "Agent" })[v] || "";
     try { history.replaceState(null, "", "#" + v); } catch {}
     render();
   }
@@ -179,22 +182,29 @@
 
   // ---------------------------------------------------------------- GLOBE (home): sources funnel in, results flow out, agents inside
   const G = { open: false, z: 0, pts: null, a: 0, nodes: [], hover: null, chips: [], uiKey: "" };
+  const PORTS = [["overview", "Overview"], ["strategies", "Strategies"], ["lab", "Lab"], ["rules", "Rulebook"], ["costs", "Costs"], ["machines", "Machines"]];
+  const portX = (i, W) => Math.round(W / 2 + (i - (PORTS.length - 1) / 2) * Math.min(150, (W - 440) / PORTS.length));
+  const portN = (v) => (v === "strategies" ? D.bots.length : v === "lab" ? gates().filter((g) => g.checks).length : v === "rules" ? RULES.length : v === "costs" ? "$0 AI" : v === "machines" ? (D.raw.sys ? "ok" : "—") : "all numbers");
   function globeUi() {
     const ui = $("globeUi"), wrap = ui.parentElement, W = wrap.clientWidth, H = wrap.clientHeight, sp = D.spider || {}, run = sp.running, now = Date.now();
     const sig = (D.raw.signals && D.raw.signals.items) || [], trades7 = D.bots.flatMap((b) => b.trades).filter((t) => t.t && now - t.t < 7 * 864e5);
     const ins = C.sourceCounts(finds(), now), outs = [{ label: "SIGNALS", n: sig.length, sub: "named research signals", spark: C.buckets(sig.map((x) => (x.inputs && x.inputs[0] && x.inputs[0].at) || 0), { now }), color: OR },
       { label: "PRE-BUY CHECKS", n: checks().length, sub: "vetoes and cautions", spark: C.buckets(checks().map((c) => c.t), { now }), color: AM },
       { label: "TRADES", n: trades7.length, sub: "paper fills, last 7 days", spark: C.buckets(trades7.map((t) => t.t), { now, size: 864e5 / 2, n: 14 }), color: UP }];
-    const key = [G.open, W, H, run ? run.label : "", ins.map((x) => x.n).join(), outs.map((x) => x.n).join()].join("|");
+    const key = [G.open, W, H, run ? run.label : "", ins.map((x) => x.n).join(), outs.map((x) => x.n).join(), PORTS.map(([v]) => portN(v)).join()].join("|");
     if (key === G.uiKey) return; G.uiKey = key;
-    const ly = (i, n) => Math.round(H / 2 - ((n - 1) * 92) / 2 + i * 92 - 30);
+    const ly = (i, n) => Math.round(H / 2 - 34 - ((n - 1) * 88) / 2 + i * 88 - 30);
     ui.innerHTML = ""
       + `<div class="nowline" style="top:22px"><b>NOW</b>${h(run ? `the spider: ${run.label}` : "the spider is idle")}</div>`
-      + `<div class="nowline" style="bottom:20px"><b>CLICK THE GLOBE</b>to go inside, where the agents sit at their desks · <span class="dim">${h(run ? run.note || run.phase || "" : (sp.queue && sp.queue[0] ? "next: " + sp.queue[0].label : "nothing queued"))}</span></div>`
+      + `<div class="nowline" style="bottom:22px"><b>CLICK THE GLOBE</b>to go inside, where the agents sit at their desks · <span class="dim">${h(run ? run.note || run.phase || "" : (sp.queue && sp.queue[0] ? "next: " + sp.queue[0].label : "nothing queued"))}</span></div>`
+      + PORTS.map(([v, l], i) => `<div class="gport" data-go="${v}" style="left:${portX(i, W)}px;top:${H - 92}px">${h(l.toUpperCase())}<b>${portN(v)}</b></div>`).join("")
       + `<div class="colhead" style="left:24px;top:${ly(0, ins.length) - 22}px">SOURCES TODAY &nbsp; Σ ${ins.reduce((a, x) => a + x.n, 0)}</div>`
-      + ins.map((x, i) => `<div class="src gsrc" style="left:24px;top:${ly(i, ins.length)}px"><small>${h(x.label.toUpperCase())}</small><b>${x.n}</b><canvas></canvas></div>`).join("")
+      + ins.map((x, i) => `<div class="src gsrc" data-kind="${["sec", "company", "earnings", "macro"][i]}" title="Open these findings" style="left:24px;top:${ly(i, ins.length)}px"><small>${h(x.label.toUpperCase())}</small><b>${x.n}</b><canvas></canvas></div>`).join("")
       + `<div class="colhead" style="right:24px;top:${ly(0, outs.length) - 22}px">OUTPUT</div>`
-      + outs.map((x, i) => `<div class="src out gsrc" style="right:24px;top:${ly(i, outs.length)}px"><small>${h(x.label)}</small><b>${x.n}</b><canvas></canvas><div class="sub">${h(x.sub)}</div></div>`).join("");
+      + outs.map((x, i) => `<div class="src out gsrc" data-go="${["research", "decisions", "paper"][i]}" title="Open" style="right:24px;top:${ly(i, outs.length)}px"><small>${h(x.label)}</small><b>${x.n}</b><canvas></canvas><div class="sub">${h(x.sub)}</div></div>`).join("");
+    ui.querySelectorAll("[data-go]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); show(b.dataset.go); }));
+    ui.querySelectorAll(".gsrc[data-kind]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); R2.kind = b.dataset.kind; R2.fkey = ""; show("research"); }));
+    G.ports = PORTS.map((_, i) => ({ x: portX(i, W), y: H - 92, n: 1, color: OR, side: "port" }));
     const cards = [...ui.querySelectorAll(".gsrc")];
     ins.forEach((x, i) => spark(cards[i].querySelector("canvas"), x.spark, GR));
     outs.forEach((x, i) => spark(cards[ins.length + i].querySelector("canvas"), x.spark, x.color));
@@ -204,7 +214,7 @@
   function drawGlobe() {
     if (D.view !== "globe") return; const k = setup($("globeCv")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000;
     G.z += ((G.open ? 1 : 0) - G.z) * 0.1; G.a += 0.003 + (D.spider && D.spider.running ? 0.003 : 0);
-    const cx = w / 2, cy = hh / 2 + 6, R = Math.min(w * 0.2, hh * 0.34) * (1 + 2.5 * G.z * G.z), busy0 = !!(D.spider && D.spider.running);
+    const cx = w / 2, cy = hh / 2 - 34, R = Math.min(w * 0.2, hh * 0.3) * (1 + 2.5 * G.z * G.z), busy0 = !!(D.spider && D.spider.running);
     // sources funnel into the globe; signals, checks and trades flow out of it
     const fade = 1 - G.z * 0.6;
     for (const f of G.flows || []) {
@@ -216,7 +226,13 @@
         c.fillStyle = f.color; c.shadowColor = f.color; c.shadowBlur = 8; c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; }
       c.globalAlpha = 1;
     }
-    $("globeUi").querySelectorAll(".gsrc,.colhead").forEach((el) => (el.style.opacity = String(0.35 + 0.65 * fade)));
+    for (const pt of G.ports || []) {
+      const x1 = cx + (pt.x - cx) * 0.25, y1 = cy + R * 0.92, x2 = pt.x, y2 = pt.y, my = (y1 + y2) / 2;
+      c.strokeStyle = "rgba(255,153,31,.18)"; c.globalAlpha = fade; c.beginPath(); c.moveTo(x1, y1); c.bezierCurveTo(x1, my, x2, my, x2, y2); c.stroke();
+      const u0 = (t * 0.22 + pt.x * 0.003) % 1, u = 1 - u0, px = u * u * u * x1 + 3 * u * u * u0 * x1 + 3 * u * u0 * u0 * x2 + u0 * u0 * u0 * x2, py = u * u * u * y1 + 3 * u * u * u0 * my + 3 * u * u0 * u0 * my + u0 * u0 * u0 * y2;
+      c.fillStyle = OR; c.shadowColor = OR; c.shadowBlur = 8; c.beginPath(); c.arc(px, py, 1.8, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; c.globalAlpha = 1;
+    }
+    $("globeUi").querySelectorAll(".gsrc,.colhead,.gport").forEach((el) => (el.style.opacity = String(0.35 + 0.65 * fade)));
     // the particle sphere
     if (!G.pts) { G.pts = []; for (let i = 0; i < 2600; i++) { const y = 1 - (i / 2599) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996; G.pts.push([Math.cos(th) * r, y, Math.sin(th) * r]); } }
     const sa = Math.sin(G.a), ca = Math.cos(G.a), busy = !!(D.spider && D.spider.running), shell = 1 - G.z * 0.55;
@@ -228,7 +244,7 @@
     const cv = $("globeCv"), pick = (e) => { const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { x, y, node: G.nodes.find((n) => Math.hypot(n.x - x, n.y - y) < n.r) }; };
     cv.addEventListener("mousemove", (e) => { const { node } = pick(e); G.hover = node ? node.id : null; });
     cv.addEventListener("click", (e) => {
-      const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 + 6, R = Math.min(r.width * 0.2, r.height * 0.34) * (1 + 0.45 * G.z);
+      const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 - 34, R = Math.min(r.width * 0.2, r.height * 0.3);
       if (Math.hypot(x - cx, y - cy) > R || G.open) return;
       G.open = true; setTimeout(() => { show("room"); G.open = false; G.z = 0; G.uiKey = ""; }, 650);
     });
@@ -438,7 +454,7 @@
     const s0 = A[0]; for (const a of A.slice(1)) { const p1 = p(s0.x, 0.05, s0.z), p2 = p(a.x, 0.05, a.z); c.setLineDash([3, 6]); c.lineDashOffset = -t * 18; c.strokeStyle = "rgba(255,153,31,.35)"; c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.stroke(); c.setLineDash([]); }
     const quad = (pts, fill, stroke) => { c.beginPath(); pts.forEach((q, i) => (i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]))); c.closePath(); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.stroke(); } };
     A.slice().sort((a, b) => p(a.x, 0, a.z)[2] - p(b.x, 0, b.z)[2]).forEach((a) => {
-      const sel = D.agent === a.id, dx = 1.2, dz = 0.6, top = 0.75, on = a.busy || sel;
+      const sel = false, dx = 1.2, dz = 0.6, top = 0.75, on = a.busy || sel;
       quad([p(a.x - dx, 0, a.z + dz), p(a.x + dx, 0, a.z + dz), p(a.x + dx, top, a.z + dz), p(a.x - dx, top, a.z + dz)], "#0e0e0e", "#262626");
       quad([p(a.x + dx, 0, a.z - dz), p(a.x + dx, 0, a.z + dz), p(a.x + dx, top, a.z + dz), p(a.x + dx, top, a.z - dz)], "#0b0b0b", "#222");
       const topPts = [[-dx, -dz], [dx, -dz], [dx, dz], [-dx, dz]].map(([x, z]) => p(a.x + x, top, a.z + z)); quad(topPts, "#161616", on ? OR : "#333");
@@ -516,7 +532,7 @@
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v !== D.view && document.getElementById("v-" + v)) show(v); });
   get("/api/health").then((x) => { if (x.mainUrl && /^https?:\/\//.test(x.mainUrl)) { $("backLink").href = x.mainUrl; $("backLink").hidden = false; } if (x.mode === "local") $("signOut").hidden = true; }).catch(() => {});
   $("homeBtn").onclick = () => { G.open = false; show("globe"); };
-  $("roomBack").onclick = () => show("globe");
+  $("toGlobe").onclick = () => show("globe");
   const start = location.hash.slice(1); if (["globe", "overview", "lab", "research", "strategies", "rules", "room", "paper", "decisions", "costs", "machines"].includes(start)) show(start); else show("globe");
   loadBots(); loadSpider(); setInterval(loadBots, 30_000); setInterval(loadSpider, 5_000);
   requestAnimationFrame(frame);

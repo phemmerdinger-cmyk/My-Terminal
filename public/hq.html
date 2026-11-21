@@ -125,6 +125,12 @@ body.home nav.side{display:none}body.home .shell{grid-template-columns:minmax(0,
 .bothead h2{margin:0;font-size:24px;font-weight:500}.bothead p{margin:3px 0 0;color:var(--muted);font-size:13px}.bothead .st{margin-left:auto;text-align:right;font:11px var(--mono);color:var(--dim)}
 .rs-row{display:grid;grid-template-columns:90px 120px minmax(0,1fr) 150px;gap:12px;align-items:start;padding:9px 0;border-top:1px solid var(--line);font-size:13px}.rs-row:first-child{border-top:0}
 .rs-row .sym{font:600 13px var(--mono)}.rs-row .role{font:10.5px var(--mono);color:var(--dim)}.rs-row .ev{color:var(--muted);line-height:1.45}.rs-row .ev small{display:block;color:var(--dim);font-size:11px}
+nav.side{display:none!important}.shell{grid-template-columns:minmax(0,1fr)!important}
+.backbar{display:flex;align-items:center;gap:12px;margin-bottom:12px}.backbar[hidden]{display:none}.backbar span{font:500 11px var(--mono);letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+body.home main{padding:0}
+.gsrc{cursor:pointer}.gsrc:hover{border-color:var(--orange)!important;background:rgba(20,14,5,.95)}
+.gport{position:absolute;transform:translate(-50%,0);background:rgba(8,8,8,.92);border:1px solid var(--line2);border-top:2px solid var(--orange);border-radius:4px;padding:7px 12px;font:500 10.5px var(--mono);letter-spacing:.12em;color:var(--muted);cursor:pointer;white-space:nowrap;z-index:2;text-align:center}
+.gport:hover{color:var(--text);border-color:var(--orange)}.gport b{display:block;font:400 15px var(--mono);color:var(--text);letter-spacing:0;margin-top:2px}
 .err{background:#1a0b0b;border:1px solid #5a2020;color:#ffb3b3;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}
 @media (max-width:1200px){.strip{grid-template-columns:repeat(4,minmax(0,1fr))}.kc{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.split,.rule{grid-template-columns:minmax(0,1fr)}.src{width:130px}.agentcard{position:static;width:auto;margin-top:10px}}
 @media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}nav.side{position:static;height:auto;display:flex;overflow-x:auto}nav.side h6,nav.side .foot{display:none}nav.side button{white-space:nowrap}.top .hs{display:none}.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.src{display:none}}
@@ -138,6 +144,7 @@ body.home nav.side{display:none}body.home .shell{grid-template-columns:minmax(0,
   <span class="pill hs" id="pBots"><i></i><span>Bots</span></span>
   <span class="pill hs" title="No paid AI runs in the bots or the spider">AI BUDGET <b>$0</b> of $0 <span class="budget"></span> free data only</span>
   <span class="sp"></span>
+  <a class="pill hs" id="backLink" href="#" hidden style="text-decoration:none">MARKET DESK ↗</a>
   <span class="stat hs"><small>JOBS RUN</small><b id="sJobs">—</b></span>
   <span class="stat hs"><small>DECISIONS</small><b id="sDec">—</b></span>
   <span class="clock mono" id="clock">—</span>
@@ -160,9 +167,10 @@ body.home nav.side{display:none}body.home .shell{grid-template-columns:minmax(0,
     <h6>SYSTEM</h6>
     <button data-v="costs"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="8" cy="8" r="6"/><path d="M8 4v8"/></svg>Costs</button>
     <button data-v="machines"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="3" width="12" height="4"/><rect x="2" y="9" width="12" height="4"/></svg>Machines</button>
-    <div class="foot"><span id="footState">brain starting</span><a id="backLink" href="#" hidden>open Market Desk ↗</a><a id="signOut" href="/logout">sign out</a></div>
+    <div class="foot"><span id="footState">brain starting</span><a id="signOut" href="/logout">sign out</a></div>
   </nav>
   <main>
+    <div class="backbar" id="backbar" hidden><button class="gback" id="toGlobe" style="position:static">‹ back to the globe</button><span id="crumb"></span></div>
     <div id="errBox"></div>
     <section class="view" id="v-overview">
       <div class="strip" id="strip"></div>
@@ -192,7 +200,7 @@ body.home nav.side{display:none}body.home .shell{grid-template-columns:minmax(0,
     </section>
     <section class="view" id="v-strategies"><div class="split"><div class="card slist" id="slist"></div><div id="sdetail"></div></div></section>
     <section class="view" id="v-rules"><div class="card"><div class="ch">Your check <em>· rule by rule: what the bots really do</em><span class="r" id="ruleN"></span></div><div class="cb" id="rule"></div></div></section>
-    <section class="view" id="v-room"><div class="card"><div class="ch"><button class="gback" style="position:static" id="roomBack">‹ globe</button> Inside the globe <em>· every agent at its desk · click a desk for its research</em><span class="r">from the bots' latest scans</span></div><div class="cb room"><canvas id="room"></canvas><div class="agentcard" id="agent" hidden></div></div>
+    <section class="view" id="v-room"><div class="card"><div class="ch">Inside the globe <em>· every agent at its desk · click a desk for its research</em><span class="r">from the bots' latest scans</span></div><div class="cb room"><canvas id="room"></canvas><div class="agentcard" id="agent" hidden></div></div>
       <div class="roomhint">drag: turn the room · click a desk: open that agent's research and numbers</div></div></section>
     <section class="view" id="v-paper"><div class="card"><div class="ch">Paper &amp; live <em>· every open position · live trading: none (paper money only)</em></div><div class="cb" id="paper"></div></div></section>
     <section class="view" id="v-decisions"><div class="card"><div class="ch">Decisions <em>· made automatically: toughness gates, pre-buy vetoes, defense mode</em></div><div class="cb" id="declog"></div></div></section>
