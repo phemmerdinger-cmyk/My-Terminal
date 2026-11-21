@@ -84,5 +84,28 @@
     return out.filter((x) => x.t).sort((a, b) => b.t - a.t).slice(0, limit);
   }
 
-  return { fromMain, fromLab, drawdowns, monthly, whenItWorks, stats, pipeline, feed, WEEKDAYS };
+  // ---- counts per time bucket (for the source/output sparklines): oldest → newest
+  function buckets(times, { now = Date.now(), size = 30 * 60e3, n = 12 } = {}) {
+    const out = Array(n).fill(0);
+    for (const t of times) { const k = Math.floor((now - t) / size); if (k >= 0 && k < n) out[n - 1 - k]++; }
+    return out;
+  }
+  // which spider categories feed which brain input
+  const SOURCES = [["SEC filings", ["filing", "insider", "fundamentals"]], ["News & movers", ["news", "mover", "company"]], ["Earnings", ["earnings"]], ["Macro & markets", ["macro", "policy", "market", "sector", "pattern"]]];
+  function sourceCounts(finds, now = Date.now()) {
+    return SOURCES.map(([label, cats]) => { const ds = finds.filter((d) => cats.includes(d.cat)); return { label, n: ds.length, spark: buckets(ds.map((d) => d.u || d.t || 0), { now }) }; });
+  }
+  // Reshuffle a bot's own closed trades (with replacement) to show the range of paths the same trades could take.
+  function fan(trades, { start = 30000, paths = 60, seed = 11 } = {}) {
+    const rets = trades.filter((t) => t.pnl != null).map((t) => t.pnl); if (rets.length < 5) return null;
+    let s = seed >>> 0; const r = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const out = []; for (let p = 0; p < paths; p++) { let v = start; const path = [v]; for (let i = 0; i < rets.length; i++) { v += rets[Math.floor(r() * rets.length)]; path.push(v); } out.push(path); }
+    const actual = [start]; let v = start; for (const x of rets.slice().reverse()) { v += x; actual.push(v); }
+    const finals = out.map((p) => p[p.length - 1]).sort((a, b) => a - b);
+    return { paths: out, actual, p05: finals[Math.floor(0.05 * finals.length)], p50: finals[Math.floor(0.5 * finals.length)], p95: finals[Math.floor(0.95 * finals.length) - 1] ?? finals[finals.length - 1] };
+  }
+  // the five toughness checks as dots (true / false / null = not run)
+  const dots = (t) => (t && Array.isArray(t.checks) ? t.checks.map((c) => !!c.ok) : [null, null, null, null, null]);
+
+  return { fromMain, fromLab, drawdowns, monthly, whenItWorks, stats, pipeline, feed, WEEKDAYS, buckets, sourceCounts, SOURCES, fan, dots };
 });

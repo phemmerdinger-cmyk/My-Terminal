@@ -34,3 +34,14 @@ test("lab experiments and the activity feed", () => {
   const p = C.pipeline({ spider: { stats: { total: 40, memory: 300 } }, signals: { items: [1, 2] }, swing: { trades: swing.trades, lastScan: { top: [1, 2, 3] }, teamwork: { checks: [1] } } }, Date.parse("2026-11-20T00:00:00Z"));
   assert.deepEqual(p.map((x) => x.value), [40, 300, 2, 3, 1, 3]);
 });
+
+test("sparkline buckets, source counts, reshuffle fan and check dots", () => {
+  const now = 10 * 3600e3;
+  assert.deepEqual(C.buckets([now - 1, now - 31 * 60e3, now - 99 * 3600e3], { now, n: 3 }), [0, 1, 1]);
+  const s = C.sourceCounts([{ cat: "insider", u: now - 1 }, { cat: "mover", u: now - 1 }, { cat: "mover", u: now - 1 }], now);
+  assert.deepEqual(s.map((x) => x.n), [1, 2, 0, 0]);
+  const f = C.fan([{ pnl: 100 }, { pnl: -50 }, { pnl: 30 }, { pnl: 20 }, { pnl: -10 }], { paths: 20 });
+  assert.equal(f.paths.length, 20); assert.equal(f.actual.at(-1), 30090); assert.ok(f.p05 <= f.p50 && f.p50 <= f.p95);
+  assert.equal(C.fan([{ pnl: 1 }]), null);
+  assert.deepEqual(C.dots({ checks: [{ ok: true }, { ok: false }] }), [true, false]);
+});
