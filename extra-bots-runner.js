@@ -23,7 +23,7 @@ function neededSymbols(state) {
 }
 
 /** After the close: mark books, decide exits and entries for the next session's open. */
-function prepareExtraBots(state, { barsBySymbol, signalDay, asOf, nextSession, sessions, universe, earningsEvents, insiderEvents }) {
+function prepareExtraBots(state, { barsBySymbol, signalDay, asOf, nextSession, sessions, universe, earningsEvents, insiderEvents, paused = {} }) {
   if (!positive(asOf) || !signalDay || (state && state.lastPreparedDay > signalDay)) return state;
   const next = state ? structuredClone(state) : freshExtraBots(asOf);
   for (const b of BOTS) next.books[b] = next.books[b] || freshBook();
@@ -67,6 +67,7 @@ function prepareExtraBots(state, { barsBySymbol, signalDay, asOf, nextSession, s
   const noteOf = {};
   for (const bot of ["pullback", "earnings", "insider"]) {
     const book = next.books[bot], slots = X.RULES[bot].slots;
+    if (paused[bot]) { noteOf[bot] = `${ideas[bot].length} candidate${ideas[bot].length === 1 ? "" : "s"} · new buys paused by the toughness test`; continue; }
     const leaving = new Set(book.pending.filter((o) => o.side === "SELL").map((o) => o.symbol));
     let open = Object.keys(book.positions).filter((s) => !leaving.has(s)).length + book.pending.filter((o) => o.side === "BUY").length;
     for (const idea of ideas[bot]) {
@@ -83,8 +84,8 @@ function prepareExtraBots(state, { barsBySymbol, signalDay, asOf, nextSession, s
     if (r.complete) {
       next.rotationMonth = month;
       for (const sym of Object.keys(rot.positions)) if (!r.targets.includes(sym)) queue(rot, "SELL", sym, `Monthly rotation: no longer a top-3 sector above its 200-day average`);
-      for (const sym of r.targets) if (!rot.positions[sym]) queue(rot, "BUY", sym, `Monthly rotation: top-3 sector by 3- and 6-month return, above its 200-day average`, { slots: X.RULES.rotation.slots });
-      noteOf.rotation = `Targets for ${month}: ${r.targets.join(", ") || "none above their 200-day (cash)"}`;
+      if (!paused.rotation) for (const sym of r.targets) if (!rot.positions[sym]) queue(rot, "BUY", sym, `Monthly rotation: top-3 sector by 3- and 6-month return, above its 200-day average`, { slots: X.RULES.rotation.slots });
+      noteOf.rotation = `Targets for ${month}: ${r.targets.join(", ") || "none above their 200-day (cash)"}${paused.rotation ? " · new buys paused by the toughness test" : ""}`;
     } else noteOf.rotation = "Waiting for all 11 sector funds' final closes";
   }
   next.lastNotes = { day: signalDay, ...noteOf };

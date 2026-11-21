@@ -132,6 +132,23 @@
       }
       add(results, "p", "Returns appear after two aligned closing snapshots. The cash benchmark uses previously published Treasury yields. The cost test applies twice the modeled cost to the recorded fills.", "ap-note");
     }
+    // toughness test: lab rows show it in their subtitle; the three main bots are listed here (no approvals needed)
+    const tough = data.toughness;
+    if (tough) {
+      const main = Array.isArray(tough.mainBots) ? tough.mainBots : [];
+      for (const b of main) {
+        const line = add(results, "p", null, "ap-note");
+        add(line, "b", `Toughness test · ${b.bot}: ${b.label || b.status}`, b.status === "pass" ? "up" : b.status === "fail" ? "down" : "");
+        const bits = [b.detail, Array.isArray(b.checks) ? b.checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label} (${c.value})`).join(" · ") : null, b.why, b.gate].filter(Boolean);
+        if (bits.length) add(line, "span", " — " + bits.join(" "));
+      }
+      for (const item of experiments.filter((x) => x.toughness && Array.isArray(x.toughness.checks))) {
+        const line = add(results, "p", null, "ap-note");
+        add(line, "b", `${item.label}: ${item.toughness.label}`, item.toughness.status === "pass" ? "up" : item.toughness.status === "fail" ? "down" : "");
+        add(line, "span", " — " + item.toughness.checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label} (${c.value})`).join(" · ") + ` ${item.toughness.gate || ""}`);
+      }
+      add(results, "p", `${tough.rule}${tough.testedOn ? ` Last tested on ${tough.testedOn}.` : ""} Replays are hypothetical: today's stock list, daily bars and modeled costs.`, "ap-note");
+    }
     for (const decision of data.pairDiagnostics || []) {
       add(pairList, "li", [decision.pairId, decision.reason || decision.stage].filter(Boolean).join(" · "));
     }
