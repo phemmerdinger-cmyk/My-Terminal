@@ -27,10 +27,15 @@
     for (let i = 0; i < n; i++) {
       const p = (Array.isArray(list) && list[i]) || DEFAULT_PANES[i] || { fn: PANE_FUNCS[i % PANE_FUNCS.length][0] };
       const fn = ok.has(p.fn) ? p.fn : "news";
-      out.push(fn === "research" ? { fn, sym: normalizeSymbol(p.sym) || "SPY" } : { fn });
+      const z = clampZoom(p.zoom), base = fn === "research" ? { fn, sym: normalizeSymbol(p.sym) || "SPY" } : { fn };
+      out.push(z === 1 ? base : { ...base, zoom: z });
     }
     return out;
   }
+  // Per-screen zoom: 50%–200% in 10% steps
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 2, ZOOM_STEP = 0.1;
+  function clampZoom(z) { z = typeof z === "number" && Number.isFinite(z) ? z : 1; return Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10; }
+  const stepZoom = (z, dir) => clampZoom(clampZoom(z) + dir * ZOOM_STEP);
   // The pane page is the normal site with ?pane=1, which hides the top bar, menus and watchlist.
   function paneUrl(pane, { path = "/", visitor = false } = {}) {
     const hash = pane.fn === "research" ? "research/" + encodeURIComponent(pane.sym || "SPY") : pane.fn;
@@ -143,5 +148,5 @@
     return Math.round(h / 24) + "d ago";
   }
 
-  return { DASH, RANGES, LAYOUTS, PANE_FUNCS, GRIDS, DEFAULT_PANES, normalizePanes, paneUrl, compact, pctText, tone, normalizeSymbol, isEquity, keyStats, rangePosition, finSummary, pickNews, chartPoints, periodReturn, relTime };
+  return { DASH, RANGES, LAYOUTS, PANE_FUNCS, GRIDS, DEFAULT_PANES, normalizePanes, paneUrl, clampZoom, stepZoom, ZOOM_MIN, ZOOM_MAX, compact, pctText, tone, normalizeSymbol, isEquity, keyStats, rangePosition, finSummary, pickNews, chartPoints, periodReturn, relTime };
 });

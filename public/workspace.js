@@ -61,6 +61,7 @@
 #tab-workspace .ws-pbar input{width:74px;font-family:var(--mono);text-transform:uppercase}
 #tab-workspace .ws-pbar .sp{flex:1}
 #tab-workspace .ws-pbar button{background:none;border:1px solid transparent;border-radius:5px;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px}
+#tab-workspace .ws-pbar .ws-zl{font-family:var(--mono);font-size:11px;min-width:42px}
 #tab-workspace .ws-pbar button:hover{color:var(--orange);border-color:var(--line2)}
 #tab-workspace .ws-pane iframe{flex:1;width:100%;border:0;background:var(--bg,#0b0b0b)}
 @media (max-width:900px){#tab-workspace .ws-multi{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;height:auto}#tab-workspace .ws-pane{height:70vh}}
@@ -137,21 +138,43 @@
         pane = document.createElement("section"); pane.className = "ws-pane";
         pane.innerHTML = `<div class="ws-pbar"><span class="ws-pn">${i + 1}</span><select aria-label="Screen ${i + 1} shows">${C.PANE_FUNCS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>
           <input aria-label="Ticker for screen ${i + 1}" maxlength="12" placeholder="Ticker"><span class="sp"></span>
+          <button type="button" data-wspb="zout" data-i="${i}" title="Zoom out (or Ctrl + scroll)">−</button><button type="button" data-wspb="zreset" data-i="${i}" class="ws-zl" title="Reset zoom">100%</button><button type="button" data-wspb="zin" data-i="${i}" title="Zoom in (or Ctrl + scroll)">+</button>
           <button type="button" data-wspb="reload" data-i="${i}" title="Reload">⟳</button><button type="button" data-wspb="max" data-i="${i}" title="Enlarge / shrink">⤢</button><button type="button" data-wspb="pop" data-i="${i}" title="Open in its own window">↗</button></div><iframe title="Screen ${i + 1}" loading="lazy"></iframe>`;
         const sel = pane.querySelector("select"), inp = pane.querySelector("input");
-        sel.onchange = () => { W.panes[i] = sel.value === "research" ? { fn: "research", sym: W.panes[i].sym || W.sym || "SPY" } : { fn: sel.value }; save(); renderMulti(); };
-        inp.onchange = () => { const s = C.normalizeSymbol(inp.value); if (!s) return; W.panes[i] = { fn: "research", sym: s }; save(); renderMulti(); };
+        const fr0 = pane.querySelector("iframe");
+        fr0.addEventListener("load", () => {
+          applyZoom(i);
+          try { // Ctrl/⌘ + scroll inside a screen zooms only that screen
+            fr0.contentWindow.addEventListener("wheel", (e) => { if (!e.ctrlKey && !e.metaKey) return; e.preventDefault(); setZoom(i, C.stepZoom(W.panes[i].zoom, e.deltaY < 0 ? 1 : -1)); }, { passive: false });
+          } catch {}
+        });
+        const keepZoom = (p) => (W.panes[i].zoom ? { ...p, zoom: W.panes[i].zoom } : p);
+        sel.onchange = () => { W.panes[i] = keepZoom(sel.value === "research" ? { fn: "research", sym: W.panes[i].sym || W.sym || "SPY" } : { fn: sel.value }); save(); renderMulti(); };
+        inp.onchange = () => { const s = C.normalizeSymbol(inp.value); if (!s) return; W.panes[i] = keepZoom({ fn: "research", sym: s }); save(); renderMulti(); };
         box.appendChild(pane);
       }
       const sel = pane.querySelector("select"), inp = pane.querySelector("input"), fr = pane.querySelector("iframe"), src = paneSrc(p);
       sel.value = p.fn; inp.hidden = p.fn !== "research"; inp.value = p.sym || "";
       pane.classList.toggle("max", W.max === i);
+      pane.querySelector(".ws-zl").textContent = Math.round(C.clampZoom(p.zoom) * 100) + "%";
       if (fr.dataset.src !== src) { fr.dataset.src = src; fr.src = src; }
     });
     while (box.children.length > W.panes.length) box.lastElementChild.remove();
   }
+  function applyZoom(i) {
+    const pane = $("wsMulti").children[i], p = W.panes[i]; if (!pane || !p) return;
+    const z = C.clampZoom(p.zoom); pane.querySelector(".ws-zl").textContent = Math.round(z * 100) + "%";
+    try { const d = pane.querySelector("iframe").contentDocument; if (d && d.documentElement) d.documentElement.style.zoom = z === 1 ? "" : String(z); } catch {}
+  }
+  function setZoom(i, z) {
+    const p = W.panes[i]; if (!p) return;
+    z = C.clampZoom(z); if (z === 1) delete p.zoom; else p.zoom = z;
+    save(); applyZoom(i);
+  }
   function paneAction(i, what) {
     const pane = $("wsMulti").children[i], p = W.panes[i]; if (!pane || !p) return;
+    if (what === "zin" || what === "zout") return setZoom(i, C.stepZoom(p.zoom, what === "zin" ? 1 : -1));
+    if (what === "zreset") return setZoom(i, 1);
     if (what === "reload") { const fr = pane.querySelector("iframe"); fr.src = fr.dataset.src; }
     else if (what === "max") { W.max = W.max === i ? -1 : i; renderMulti(); }
     else if (what === "pop") window.open(paneSrc(p), "md_pane_" + i, "popup,width=960,height=720");
