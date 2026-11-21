@@ -625,6 +625,19 @@ const HIST_LAST = new Map(); // last good chart per symbol/range, served if Yaho
 // One shared, cached snapshot of all ~503 companies: price, change and market cap.
 // Tries Yahoo's bulk quote (needs a crumb), then falls back to the spark endpoint in batches of 20.
 const SP500 = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, "public", "sp500.json"), "utf8")).rows; } catch { return []; } })();
+// The S&P 500 list refreshes itself once a day from the dataset the bundled public/sp500.json came from (sp500-core.js).
+// A download that fails or doesn't look like the S&P 500 keeps the last good list. Served at /sp500.json.
+const SPC = require("./sp500-core.js");
+let SP500_META = (() => { try { const j = JSON.parse(fs.readFileSync(path.join(__dirname, "public", "sp500.json"), "utf8")); return { asOf: j.asOf, source: j.source }; } catch { return { asOf: null, source: SPC.SOURCE }; } })();
+async function sp500Refresh() {
+  try {
+    const next = SPC.constituentsFromCsv(await get(SPC.CSV_URL, "text/csv"), new Date().toISOString().slice(0, 10));
+    const d = SPC.diff(SP500, next.rows);
+    SP500.splice(0, SP500.length, ...next.rows);
+    SP500_META = { asOf: next.asOf, source: next.source, checkedAt: Date.now(), joined: d.added, left: d.removed };
+  } catch (e) { SP500_META = { ...SP500_META, checkedAt: Date.now(), error: String(e.message || e) }; }
+}
+if (!process.env.AP_TEST) { setTimeout(sp500Refresh, 90_000).unref(); setInterval(sp500Refresh, 24 * 3600e3).unref(); }
 const spCaps = {}; // remembered market caps, so the map keeps its shape if the bulk endpoint is blocked
 // Company sizes when Yahoo's bulk quote is blocked: shares outstanding from Finnhub (free tier ~60/min),
 // gathered slowly in the background and saved to a file; market value = shares × live price.
@@ -4225,6 +4238,7 @@ async function handle(req, res) {
       { const to = DM.pageRedirect(DEPLOY.mode, u.pathname); if (to) return go(to); }
       if (u.pathname === "/login") return owner ? go("/") : send(res, 200, LOGIN_HTML, "text/html; charset=utf-8");
       if (u.pathname === "/logout") return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
+      if (u.pathname === "/sp500.json") return send(res, 200, { ...SP500_META, rows: SP500 }, "application/json", { "Cache-Control": "public, max-age=3600" });
       let page = null;
       if (u.pathname === "/demo" || u.pathname === "/demo/") page = "index.html";
       else if (u.pathname === "/" || u.pathname === "/index.html" || u.pathname === "/ai-vs-sp500") {

@@ -103,6 +103,8 @@ Instead of the sign-in page, you can run the site as two servers from this same 
    (PowerShell: `$env:MODE="local"; $env:PUBLIC_URL="https://my-terminal-28tq.onrender.com"; $env:DESK_TOKEN="<that key>"; node server.js`)
    Open http://127.0.0.1:3000. Add `ANTHROPIC_API_KEY` and `FINNHUB_API_KEY` there too if you want Claude or streaming prices on your desk.
 
+**Windows one-click desk:** `tools/Market Desk.bat` asks for your DESK_TOKEN once (saved under `%LOCALAPPDATA%\MarketDesk`), downloads the latest version from GitHub on every start, runs the portable Node in `Documents\My-Terminal\node` (or an installed one) and opens the desk in Chrome when it's ready.
+
 **Good to know**
 - Your desk only exists while your computer runs it, and `MODE=local` refuses connections from other devices, so it isn't reachable from your phone. If you need phone access, keep the old sign-in setup (leave `MODE` unset).
 - Without `PUBLIC_URL` and `DESK_TOKEN`, the local desk still works for news, quotes, research, DCF, risk and the quant labs, but the bot pages and sync show "unavailable".
