@@ -11,8 +11,7 @@
 try{var q=location.search;if(/[?&]viewer\b/.test(q))localStorage.removeItem("ownerMode");else if(!demo)localStorage.setItem("ownerMode","1");o=!demo&&localStorage.getItem("ownerMode")==="1";}catch(e){o=!demo;}
 if(demo||/[?&]visitor\b/.test(location.search)){o=false;window.__VISITOR=true;}
 if(!o)document.documentElement.classList.add("viewonly");
-/* ?pane=1: one screen inside Research → Workspace → Multi-screen (no top bar, menus or watchlist) */
-if(/[?&]pane\b/.test(location.search))document.documentElement.classList.add("pane");})();
+})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Market Desk · Live market dashboard by Peter Hemmerdinger</title>
@@ -99,8 +98,6 @@ nav.tabs button.claude.on{border-bottom-color:var(--claude)}
 
 /* layout */
 .wrap{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 128px)}
-html.pane header,html.pane #tabs,html.pane #subtabsM,html.pane aside.left,html.pane .ac-fab,html.pane .vo-hello,html.pane #briefModal{display:none!important}
-html.pane .wrap{grid-template-columns:minmax(0,1fr);min-height:100vh}html.pane main>section.pad{padding:12px}
 .left{border-right:1px solid var(--line)}
 main{min-width:0}
 .sec-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600}
@@ -1856,7 +1853,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <section id="tab-studio" class="pad fx" hidden></section>
     <section id="tab-health" class="pad fx" hidden></section>
     <section id="tab-backtest" class="pad fx" hidden></section>
-    <section id="tab-workspace" class="pad fx" hidden></section>
     <section id="tab-quant" class="pad fx" hidden></section>
 
     <section id="tab-predict" class="pad" hidden>
@@ -1968,11 +1964,11 @@ const STUDIO_ROUTES = {
   "studio-quant": "quant", "studio-ask": "ask",
   "studio-alerts": "alerts", "studio-settings": "settings"
 };
-const TABS = ["news","data","macro","workspace","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
+const TABS = ["news","data","macro","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data Health"],["studio-settings","Appearance"]]],
-  ["research",[["workspace","Workspace"],["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
+  ["research",[["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
   ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"]]],
   ["ailab",[["aitrade","Bots vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
@@ -2144,7 +2140,6 @@ function setTab(t){
   if(STUDIO_ROUTES[t]&&typeof studioOpen==="function"){ studioOpen(); if(typeof studioSelectMode==="function") studioSelectMode(STUDIO_ROUTES[t]); }
   if(t==="backtest"&&typeof qbOpen==="function") qbOpen();
   if(t==="quant"&&typeof qlOpen==="function") qlOpen();
-  if(t==="workspace"&&typeof wsOpen==="function") wsOpen();
 }
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(g==="quant"?"quant":NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
 window.addEventListener("hashchange",()=>{

@@ -13,8 +13,6 @@
     quant: Object.freeze(QUANT),
     // Studio tools reuse the Quant engine, then add the Studio UI and Market Charts
     studio: Object.freeze([...QUANT, "/studio-core.js", "/studio-strategies.js", "/studio.js", "/market-charts.js"]),
-    // Research → Workspace: chart, stats, news and financials side by side
-    workspace: Object.freeze(["/workspace-core.js", "/workspace.js"]),
     // THE WEB research spider (owner only; the public demo has no access to its data)
     web: Object.freeze(["/web.js", "/web-env.js", "/web-control.js"]),
     // Bots × spider teamwork: Morning brief pop-up and the Research "Why" card (owner / private desk only)
@@ -24,7 +22,6 @@
   // Which group a tab needs before it can show anything, or null when the page has it already.
   function groupForTab(tab) {
     if (tab === "quant" || tab === "backtest") return "quant";
-    if (tab === "workspace") return "workspace";
     if (typeof tab === "string" && tab.startsWith("studio-")) return "studio";
     return null;
   }
