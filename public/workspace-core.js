@@ -12,7 +12,30 @@
   const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
   const RANGES = Object.freeze([["1mo", "1M"], ["6mo", "6M"], ["1y", "1Y"], ["5y", "5Y"]]);
-  const LAYOUTS = Object.freeze(["grid", "focus"]); // grid = 2×2 panels; focus = big chart with a side column
+  const LAYOUTS = Object.freeze(["grid", "focus", "multi"]); // grid = 2×2 panels; focus = big chart; multi = several site tools at once
+
+  // ---- Multi-screen ("terminal") mode: any of the site's tools in 2–6 live panes, each its own window of the site
+  const PANE_FUNCS = Object.freeze([
+    ["news", "News"], ["data", "Market overview"], ["nyse", "Heatmap"], ["analysis", "Market analysis"], ["macro", "Macro"],
+    ["research", "Stock research", true], ["fin", "Financials"], ["dcf", "DCF valuation"], ["portfolio", "My portfolio"], ["risk", "Risk & stress"],
+    ["aitrade", "Bots vs S&P 500"], ["quant", "Quant Lab"], ["backtest", "Backtest Lab"], ["studio-graph", "Market charts"], ["studio-research", "Market intelligence"],
+  ]);
+  const GRIDS = Object.freeze({ 2: [2, 1], 3: [3, 1], 4: [2, 2], 6: [3, 2] }); // panes → [columns, rows]
+  const DEFAULT_PANES = Object.freeze([{ fn: "news" }, { fn: "nyse" }, { fn: "research", sym: "SPY" }, { fn: "aitrade" }]);
+  function normalizePanes(list, count = 4) {
+    const n = GRIDS[count] ? count : 4, ok = new Set(PANE_FUNCS.map((f) => f[0])), out = [];
+    for (let i = 0; i < n; i++) {
+      const p = (Array.isArray(list) && list[i]) || DEFAULT_PANES[i] || { fn: PANE_FUNCS[i % PANE_FUNCS.length][0] };
+      const fn = ok.has(p.fn) ? p.fn : "news";
+      out.push(fn === "research" ? { fn, sym: normalizeSymbol(p.sym) || "SPY" } : { fn });
+    }
+    return out;
+  }
+  // The pane page is the normal site with ?pane=1, which hides the top bar, menus and watchlist.
+  function paneUrl(pane, { path = "/", visitor = false } = {}) {
+    const hash = pane.fn === "research" ? "research/" + encodeURIComponent(pane.sym || "SPY") : pane.fn;
+    return `${path}?pane=1${visitor ? "&visitor" : ""}#${hash}`;
+  }
 
   function compact(v, prefix = "") {
     v = num(v); if (v == null) return DASH;
@@ -120,5 +143,5 @@
     return Math.round(h / 24) + "d ago";
   }
 
-  return { DASH, RANGES, LAYOUTS, compact, pctText, tone, normalizeSymbol, isEquity, keyStats, rangePosition, finSummary, pickNews, chartPoints, periodReturn, relTime };
+  return { DASH, RANGES, LAYOUTS, PANE_FUNCS, GRIDS, DEFAULT_PANES, normalizePanes, paneUrl, compact, pctText, tone, normalizeSymbol, isEquity, keyStats, rangePosition, finSummary, pickNews, chartPoints, periodReturn, relTime };
 });

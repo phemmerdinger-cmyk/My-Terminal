@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Multi-screen, Bloomberg style (2026-11-21)
+- Research → Workspace → **Multi-screen**: 2, 3, 4 or 6 live screens at once, each showing any site tool (news, heatmap, stock research for any ticker, macro, portfolio, bots, labs…), with reload, enlarge (Esc to shrink), pop out into its own window, and a ⛶ full-screen grid. Layout and choices are saved.
+- Each screen is the normal site at `?pane=1` (top bar, menus, watchlist and pop-ups hidden), so every tool works as usual. Pane helpers in `public/workspace-core.js` (tested).
+- Framing policy is now same-site only (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`): other websites still can't embed Market Desk.
+
 ### Toughness test with automatic gating (2026-11-21)
 - `robustness-core.js` replays a bot's own rules on past daily prices and checks: profit after costs, the later 40% of the period on its own, settings ±20%, doubled costs, and 1,000 bad-luck reshuffles (5th-percentile result > −15%, 95th-percentile drawdown < 30%). One miss = borderline; a loss or two misses = fail; under 15 trades = too few to judge. Limits (today's stock list, daily bars, modeled costs, hypothetical) are shown with every result.
 - Runs weekly after the close inside the Strategy Lab (pullback, sector rotation) and the Quant trader's planning step (monthly replay of `decide()`; put/call tilt and ratio score off — no free history). Earnings-drift, insider-buying, the swing bot and the day trader have no free history for their inputs, so they're judged on their live paper record after 20 closed trades.

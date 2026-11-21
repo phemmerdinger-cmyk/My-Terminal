@@ -92,3 +92,16 @@ test("relative times", () => {
   assert.equal(W.relTime(now - 50 * 3600e3, now), "2d ago");
   assert.equal(W.relTime(null, now), "");
 });
+
+test("multi-screen panes are normalized and point at the chrome-less pane page", () => {
+  const C = require("../public/workspace-core.js");
+  assert.ok(C.LAYOUTS.includes("multi"));
+  const p = C.normalizePanes([{ fn: "nyse" }, { fn: "bogus" }, { fn: "research", sym: " nvda " }], 4);
+  assert.deepEqual(p.map((x) => x.fn), ["nyse", "news", "research", "aitrade"]);
+  assert.equal(p[2].sym, "NVDA");
+  assert.equal(C.normalizePanes(null, 5).length, 4, "only supported grid sizes");
+  assert.equal(C.normalizePanes(null, 6).length, 6);
+  assert.equal(C.paneUrl({ fn: "research", sym: "BRK-B" }), "/?pane=1#research/BRK-B");
+  assert.equal(C.paneUrl({ fn: "news" }, { path: "/demo", visitor: true }), "/demo?pane=1&visitor#news");
+  assert.ok(!C.PANE_FUNCS.some(([k]) => k === "workspace"), "a pane never nests the workspace");
+});
