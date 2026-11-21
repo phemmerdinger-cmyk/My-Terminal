@@ -4397,7 +4397,7 @@ async function handle(req, res) {
         try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
       }
-      if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView(owner || token));
+      if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView(isOwner(req) || (DEPLOY.mode === "public" && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token))));
       if (u.pathname === "/api/why" && req.method === "GET") { const w = await whyView(u.searchParams.get("symbol")); return send(res, w.error ? 400 : 200, w); }
       if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());

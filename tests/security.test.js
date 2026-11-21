@@ -85,3 +85,9 @@ test("the in-site reader only fetches allowlisted public-domain hosts over https
     const j = await (await get("/api/article?url=" + encodeURIComponent(u))).json(); assert.equal(j.full, false, u); assert.deepEqual(j.paragraphs, [], u);
   }
 });
+
+test("the bot pages' data routes answer (no server errors)", async () => {
+  for (const p of ["/api/autopilot", "/api/daytrader", "/api/quanttrader"]) {
+    const r = await get(p); assert.notEqual(r.status, 500, p + " " + (await r.text()).slice(0, 120));
+  }
+});
