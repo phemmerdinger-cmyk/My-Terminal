@@ -3,6 +3,9 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Bigger built-in ticker directory (2026-11-21)
+- `public/tickers.js` grew from 296 to 753 entries: every S&P 500 company (names from `sp500.json`), about 130 popular non-S&P stocks (growth, ADRs, crypto-linked, recent IPOs such as CRWV, CRCL, FIG, CBRS, FRVO) and 26 more ETFs. No duplicates. Live Yahoo search still finds anything not listed.
+
 ### SpaceX (SPCX) (2026-11-21)
 - SpaceX, public on Nasdaq since June 12, 2026 as SPCX, is in the built-in ticker directory (instant search suggestions) and the default watchlist after ANT. Existing personal watchlists are unchanged.
 
