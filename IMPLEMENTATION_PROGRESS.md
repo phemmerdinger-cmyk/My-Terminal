@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Four more paper bots in the Strategy Lab (2026-11-21)
+- New rows in the existing Strategy Lab table (AI Lab → Bots vs S&P 500), no new page: **2-day pullback** (Connors RSI(2) < 10 above the 200-day, exit above the 5-day average, 8% stop, 7 sessions), **monthly sector rotation** (top 3 of 11 sector funds by 3/6-month return, only above their 200-day), **post-earnings drift** (≥5% EPS beat confirmed by a ≥2% up day, 10% stop, 40 sessions), **insider buying** (≥2 different open-market insider buyers in a spider Form 4 finding from the last 10 days, not >20% below the 200-day, 12% stop, 60 sessions).
+- Rules: `extra-bots-core.js`; books: `extra-bots-runner.js` (decide after the close on final daily bars, fill only at the verified 9:30 open with modeled costs; unfilled buys expire, unfilled sells retry). Each $30k paper book. Tests: `tests/extra-bots.test.js`, lab test in `tests/strategy-lab.test.js`.
+- The pairs bot already existed as "Quant · hedged spread book".
+
 ### Bots and the spider work together (2026-11-21)
 - **Pre-buy check:** before the swing bot buys, the spider's research on that stock is checked (`bot-teamwork-core.preBuyCheck`). Negative regulatory, negative earnings or negative filing findings, or a strongly negative research signal, veto the buy; insider selling or a news spike is logged as a caution. Stocks the spider hasn't researched in 7 days are queued for research and allowed.
 - **Quant regime confirmation:** a new regime is used only after it shows up 3 trading days in a row, or sooner toward safety when the spider's own macro research shows stress (`confirmRegime`). Raw vs confirmed regime is stored with each decision.

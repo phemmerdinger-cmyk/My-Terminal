@@ -12,6 +12,7 @@
 | Sync | `/api/sync?code=` (Upstash or temp dir) — client `SYNC_KEYS` in index.html |
 | THE WEB / Spider | `webRoute` → `/api/web/*` (status, discoveries, briefings, graph, timeline, control, export/import, ask) backed by `web/spider.js` + `web/store.js` (`createStore`: Upstash if `UPSTASH_REDIS_REST_URL/TOKEN`, else tmp) |
 | Desk (new, Phase 1) | `/api/desk` owner-only doc store for personal data (layouts, DNA, theses, journal…) via `createStore` prefix `pft:desk:v1:` |
+| Strategy Lab extra bots | `extra-bots-core.js` (pullback, sector rotation, earnings drift, insider buying rules) + `extra-bots-runner.js` (books, open fills), wired in `strategy-lab.js`; server passes `events` (Finnhub EPS surprises, spider insider findings) |
 | Bot teamwork | `bot-teamwork-core.js` (pre-buy check, regime confirmation, post-mortems, earnings warning, defense decision, twin compare, morning brief); spider `marketStress`/`researchedAt`/`overnight`; `/api/why`, `/api/brief` (desk routes) |
 | Paper bots | `putcall-core.js` (Zweig contrarian put/call, `/api/pub/putcall`), `daytrade-core.js` (setups), `daytrade-brain.js` (day trader's self-learning forecast + sizing), `quant-trader.js`, autopilot in server.js |
 

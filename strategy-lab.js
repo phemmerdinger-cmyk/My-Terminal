@@ -4,6 +4,8 @@ const Swing = require("./swing-shadow-runner.js");
 const Pair = require("./quant-pairs-runner.js");
 const PairRules = require("./quant-pairs-core.js");
 const RiskFree = require("./risk-free-core.js");
+const Extra = require("./extra-bots-runner.js");
+const ExtraRules = require("./extra-bots-core.js");
 const FRED = { source: "FRED · DGS3MO", url: "https://fred.stlouisfed.org/series/DGS3MO" };
 const TREASURY = { source: "U.S. Treasury · 3-month par yield", url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" };
 
@@ -11,13 +13,17 @@ const START = 30_000;
 const DAY_UNIVERSE = ["SPY", "QQQ", "IWM", "AAPL", "MSFT", "NVDA", "AMD", "JPM", "XOM", "META", "AMZN", "TSLA"];
 const SWING_UNIVERSE = ["AAPL", "MSFT", "AMD", "NVDA", "META", "GOOGL", "AMZN", "TSLA", "JPM", "V", "XOM", "CVX", "PG", "WMT", "COST", "LLY", "UNH", "CAT", "GE", "NEE", "PLD", "LIN"];
 const PAIR_UNIVERSE = [...new Set(PairRules.PAIRS.flatMap((p) => [p.left, p.right]))];
-const UNIVERSE = [...new Set(["SPY", "^VIX", ...SWING_UNIVERSE, ...PAIR_UNIVERSE])];
+const UNIVERSE = [...new Set(["SPY", "^VIX", ...SWING_UNIVERSE, ...PAIR_UNIVERSE, ...ExtraRules.SECTORS])];
 const EXPERIMENTS = [
   ["day-base", "Day · continuation + reversal", "day"],
   ["day-fvg", "Day · fair-value gap filter", "day"],
   ["swing-technical", "Swing · Stage 2 and contraction", "swing"],
   ["swing-canslim", "Swing · earnings confirmation", "swing"],
   ["quant-pairs", "Quant · hedged spread book", "quant"],
+  ["extra-pullback", "Swing · 2-day pullback (RSI 2)", "swing"],
+  ["extra-rotation", "Quant · monthly sector rotation", "quant"],
+  ["extra-earnings", "Swing · post-earnings drift", "swing"],
+  ["extra-insider", "Swing · insider buying (spider)", "swing"],
 ];
 const pairCosts = Object.fromEntries(PAIR_UNIVERSE.map((sym) => [sym, { halfSpreadBps: 2.5, slippageBps: 2.5, feeBps: 0 }]));
 const recordBook = (b) => ({
@@ -36,6 +42,10 @@ const SOURCES = [
   ["Ed Thorp", "Thorp describes fractional Kelly for limiting exposure to estimation error. The pairs study starts with fixed stop-risk caps while the edge is unproven.", "https://www.edwardothorp.com/wp-content/uploads/2016/11/thorpwilmottqfinrev2003.pdf"],
   ["Frazzini, Israel and Moskowitz", "The authors use execution records to measure trading cost by instrument and trade. The lab reports a doubled-cost sensitivity alongside modeled cost.", "https://www.aqr.com/insights/research/working-paper/trading-costs"],
   ["Bailey and López de Prado", "Their work shows how testing many variants inflates reported performance. The lab records outcomes by experiment with no automatic promotion.", "https://davidhbailey.com/dhbpapers/deflated-sharpe.pdf"],
+  ["Larry Connors · RSI(2)", "Buy above the 200-day average when the 2-period RSI drops under 10; exit on a close above the 5-day average. The lab adds an 8% stop and a 7-session limit.", "https://chartschool.stockcharts.com/table-of-contents/trading-strategies-and-models/trading-strategies/rsi-2"],
+  ["Mebane Faber", "Faber's tactical allocation paper uses long moving averages to step out of falling assets. The sector bot holds the 3 strongest sector funds only while each is above its 200-day average.", "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=962461"],
+  ["Bernard and Thomas", "They document prices drifting after earnings surprises. The lab requires a 5% EPS beat confirmed by a 2% up day and holds up to 40 sessions.", "https://www.jstor.org/stable/2491062"],
+  ["Cohen, Malloy and Pomorski", "They find predictive power in opportunistic, not routine, insider trades. The spider's Form 4 findings don't separate the two, so the lab requires two or more different insiders buying on the open market.", "https://www.nber.org/papers/w16454"],
 ].map(([title, summary, url]) => ({ title, summary, url }));
 
 function quarterlyComparison(facts, sessionDay, observedAt) {
@@ -65,15 +75,16 @@ function quarterlyComparison(facts, sessionDay, observedAt) {
     sales: sales.get(end).val, priorYearSales: sales.get(prior).val, periodEnd: end, source: "SEC EDGAR Company Facts" };
 }
 
-function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, treasuryRates, liveDesk }) {
+function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, treasuryRates, liveDesk, events = async () => ({ earnings: [], insider: [] }) }) {
   let state, serial = Promise.resolve(), lastFault = null, rateCache = null, rateInFlight = null;
   const warm = new Map(), daily = new Map();
   let warmInFlight = null, dailyInFlight = null, openInFlight = null;
-  const fresh = () => ({ since: now(), day: null, swing: Swing.freshSwingShadows(now()), pairs: Pair.freshPairShadows(), borrow: {}, records: [], regime: null, scannedDay: null });
+  const fresh = () => ({ since: now(), day: null, swing: Swing.freshSwingShadows(now()), pairs: Pair.freshPairShadows(), extra: Extra.freshExtraBots(now()), borrow: {}, records: [], regime: null, scannedDay: null });
 
   function run(fn) {
     const next = serial.then(async () => {
       if (!state) state = await store.get("lab") || fresh();
+      if (!state.extra) state.extra = Extra.freshExtraBots(now()); // labs saved before the four extra bots existed
       return fn(state);
     });
     serial = next.catch((e) => { lastFault = String(e.message || e).slice(0, 240); });
@@ -138,7 +149,8 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
   function summaries(s) {
     const pair = Pair.pairSummary(s.pairs);
     const books = [recordBook(s.day?.books?.base), recordBook(s.day?.books?.fvg), recordBook(s.swing.books.technical), recordBook(s.swing.books.canSlim),
-      { value: pair.value, cash: pair.cash, closed: pair.closedPairs, pending: pair.queued, positions: pair.openPairs, costs: pair.costs + pair.borrow, pnl: pair.value - START }];
+      { value: pair.value, cash: pair.cash, closed: pair.closedPairs, pending: pair.queued, positions: pair.openPairs, costs: pair.costs + pair.borrow, pnl: pair.value - START },
+      ...Extra.BOTS.map((b) => recordBook(s.extra?.books?.[b]))];
     return EXPERIMENTS.map(([id, label, bot], i) => ({ id, label, bot, ...books[i] }));
   }
 
@@ -168,10 +180,21 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
           daily.set(sym, { ...(await dailyData(sym, t)), day: t.day });
         }));
       }
+      // the four extra bots: today's earnings and insider-buying candidates plus anything they hold (best effort)
+      let ev = { earnings: [], insider: [] };
+      try { ev = await events(t); } catch { /* no events → no new earnings/insider ideas today */ }
+      const held = await run((s) => Extra.neededSymbols(s.extra));
+      const extraSyms = [...new Set([...held, ...(ev.earnings || []).map((e) => e.symbol), ...(ev.insider || []).map((e) => e.symbol)])].filter((sym) => !UNIVERSE.includes(sym)).slice(0, 40);
+      for (let i = 0; i < extraSyms.length; i += 4) {
+        await Promise.allSettled(extraSyms.slice(i, i + 4).map(async (sym) => {
+          if (daily.get(sym)?.day === t.day) return;
+          daily.set(sym, { ...(await dailyData(sym, t)), day: t.day });
+        }));
+      }
       const bundle = [...daily.entries()].filter(([, d]) => d.day === t.day);
       const barsBySymbol = Object.fromEntries(bundle.map(([symbol, result]) => [symbol, result.bars]));
       if (!barsBySymbol.SPY?.length || !barsBySymbol["^VIX"]?.length) throw new Error("Waiting for finalized SPY and VIX closes");
-      const observed = bundle.length;
+      const observed = bundle.filter(([sym]) => UNIVERSE.includes(sym)).length;
       if (observed < UNIVERSE.length && clock().min < t.close + 85) {
         throw new Error(`Waiting for finalized security data (${observed}/${UNIVERSE.length})`);
       }
@@ -190,11 +213,14 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
         next.pairs = Pair.preparePairShadows(next.pairs, { sessions, adjustedCloses, signal: { day: t.day, time: asOf,
           adjustedPrices: latest(PAIR_UNIVERSE, "adjusted"), rawPrices: latest(PAIR_UNIVERSE, "raw") },
           borrow: next.borrow, executionCosts: pairCosts, executeDay, now: asOf, riskOff: regime.shock !== false }) || next.pairs;
+        next.extra = Extra.prepareExtraBots(next.extra, { barsBySymbol, signalDay: t.day, asOf, nextSession: executeDay, sessions,
+          universe: SWING_UNIVERSE, earningsEvents: ev.earnings, insiderEvents: ev.insider }) || next.extra;
         next.regime = regime;
         next.scannedDay = t.day;
         const desk = liveDesk(), sp = barsBySymbol.SPY.at(-1).close;
         const shadowMarks = [...Object.values(next.swing.books).flatMap((book) => Object.keys(book.positions)),
-          ...Object.values(next.pairs.positions).flatMap((p) => p.orders.map((leg) => leg.symbol))];
+          ...Object.values(next.pairs.positions).flatMap((p) => p.orders.map((leg) => leg.symbol)),
+          ...Object.keys(next.extra.books.rotation.positions)]; // extra stock bots keep their last mark if one daily bar is late
         if (desk.state?.closeDay === t.day && desk.equity && !desk.error &&
             shadowMarks.every((sym) => barsBySymbol[sym]?.at(-1)?.day === t.day)) {
           next.records.push({ day: t.day, at: asOf, benchmark: sp, active: desk.equity, rate: RiskFree.rateBefore(observations, t.day),
@@ -213,7 +239,7 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
       const expected = await run(s => {
         const swing = Object.values(s.swing.books).flatMap((book) => (book.pending || []).filter((p) => p.openDay === t.day).map((p) => p.symbol));
         const pair = s.pairs.pending.filter((p) => p.executeDay === t.day).flatMap((p) => p.orders.map((l) => l.symbol));
-        return [...new Set([...swing, ...pair])];
+        return [...new Set([...swing, ...pair, ...Extra.openingSymbols(s.extra, t.day)])];
       });
       if (!expected.length) return;
       const marketTime = (Math.floor(now() / 60_000) - (clock().min - 570)) * 60_000;
@@ -223,7 +249,8 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
       const observed = now();
       await run(async s => {
         const next = { ...s, swing: Swing.openSwingShadows(s.swing, { day: t.day, openingBars, now: observed }),
-          pairs: Pair.openPairShadows(s.pairs, { day: t.day, opens, openTime: marketTime, now: observed, borrow: s.borrow }) || s.pairs };
+          pairs: Pair.openPairShadows(s.pairs, { day: t.day, opens, openTime: marketTime, now: observed, borrow: s.borrow }) || s.pairs,
+          extra: Extra.openExtraBots(s.extra, { day: t.day, openingBars, now: observed, minute: clock().min }) || s.extra };
         await commit(next);
       });
     })().finally(() => { openInFlight = null; });
@@ -274,15 +301,21 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
       for (const v of [...s.records.map((r) => r.shadow[p.id]?.value), p.value]) { if (v > 0) { high = Math.max(v, high); drawdown = Math.max(drawdown, 1 - v / high); } }
       const baselineReturn = enough && base.active[p.bot] > 0 ? latest.active[p.bot] / base.active[p.bot] - 1 : null;
       const costStressReturn = enough ? (end.value - Math.max(0, end.costs - base.shadow[p.id].costs)) / baseValue - 1 : null;
-      const notice = p.id === "swing-canslim" ? "Requires timestamped earnings and sales inputs" : p.bot === "day" ? "Locked experiment universe · 12 symbols · modeled costs" :
+      const notice = p.id === "extra-pullback" ? "22 large caps · RSI(2) dip above the 200-day · exits on the bounce" :
+        p.id === "extra-rotation" ? "11 sector funds · rebalanced monthly · cash when a top sector is below its 200-day" :
+        p.id === "extra-earnings" ? "Finnhub EPS surprises · needs a confirmed up day after the report" :
+        p.id === "extra-insider" ? "Insider-buying findings from THE WEB spider (SEC Form 4) · only companies the spider covers" :
+        p.id === "swing-canslim" ? "Requires timestamped earnings and sales inputs" : p.bot === "day" ? "Locked experiment universe · 12 symbols · modeled costs" :
         p.bot === "quant" ? "Requires current borrow data and both opening prices" : "Completed daily data and opening prints";
-      return { ...p, sessions: s.records.length, shadowReturn, baselineReturn, drawdown, costStressReturn,
-        excessCash: shadowReturn != null && cashReturn != null ? shadowReturn - cashReturn : null, notice };
+      const latestNote = p.id.startsWith("extra-") && s.extra?.lastNotes ? s.extra.lastNotes[p.id.slice(6)] : null;
+      return { ...p, notice: latestNote ? `${notice} · ${latestNote}` : notice, sessions: s.records.length, shadowReturn, baselineReturn, drawdown, costStressReturn,
+        excessCash: shadowReturn != null && cashReturn != null ? shadowReturn - cashReturn : null };
     });
     return { asOf: now(), since: s.since, experiments, regime: s.regime?.reason ?? "Waiting for a completed session",
       recordedSessions: s.records.length, benchmarkReturn: s.records.length >= 2 && base.benchmark > 0 ? latest.benchmark / base.benchmark - 1 : null,
       riskFree: { ...rf, cashReturn, ...fc.provider, method: "ACT/365 estimated cash benchmark. Observations precede the decision date." },
       borrowSymbols: PAIR_UNIVERSE, borrowEntries: Object.entries(s.borrow).map(([symbol, q]) => ({ symbol, ...q })),
+      extraNotes: s.extra?.lastNotes || null,
       errors: [lastFault, fc.error].filter(Boolean), pairDiagnostics: s.pairs.diagnostics.slice(-10), sources: SOURCES };
   }
   return { tick, view, warmDay, onMinute, saveBorrow };
