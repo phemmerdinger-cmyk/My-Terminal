@@ -82,3 +82,9 @@ test("the Why card and Morning brief are desk routes, never public", () => {
     assert.equal(DM2.access({ mode: "local", path: p, owner: false, token: false, isPublic: false }), "proxy");
   }
 });
+
+test("Bot HQ is never served by the public demo server", () => {
+  const DM3 = require("../deploy-mode-core.js");
+  assert.equal(DM3.pageRedirect("public", "/hq"), "/demo");
+  assert.equal(DM3.pageRedirect("local", "/hq"), null);
+});

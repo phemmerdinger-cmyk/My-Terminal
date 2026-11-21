@@ -1504,6 +1504,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <button class="iconbtn" id="installBtn" hidden title="Install Market Desk as an app">⤓ Install app</button>
     <button class="iconbtn sp-btn no-vo" id="spBtn" type="button" title="Send the spider to examine this page and write a report" onclick="window.spiderScan&&spiderScan()"><span class="sp-ico">🕷</span> Spider</button>
     <button class="iconbtn di-btn" id="diBtn" type="button" title="Market data status"><span class="dl">DATA</span><span id="diLbl">Validating…</span></button>
+    <a class="iconbtn" id="hqBtn" href="/hq" target="_blank" rel="noopener" title="Bot HQ: what every bot and the spider are working on" hidden>HQ</a>
     <button class="iconbtn" id="briefBtn" title="Morning brief: overnight research, bot plans, earnings and risk flags" aria-label="Morning brief" hidden>☀</button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <a class="iconbtn no-vo" id="logoutBtn" href="/logout" title="Sign out of your private site">⎋ <span class="tlong">Sign out</span></a>
@@ -5436,6 +5437,7 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
   const L=MDLazyCore.createLoader(document);
   window.MDLazy={ load:L.load, ready:g=>MDLazyCore.GROUPS[g].every(L.loaded) };
   const g=MDLazyCore.groupForTab(S.tab); if(g) L.load(g).catch(e=>console.warn(e.message)); // the page opened straight on a tool
+  if(!VIEW) $("hqBtn").hidden=false;
   if(!VIEW){ const bb=$("briefBtn"); bb.hidden=false; bb.onclick=()=>L.load("team").then(()=>MDTeam.openBrief(true)).catch(e=>toast(e.message)); }
   if(!VIEW){ const web=()=>L.load("web").then(()=>L.load("team")).catch(e=>console.warn(e.message)); if("requestIdleCallback" in window) requestIdleCallback(web,{timeout:2000}); else setTimeout(web,500); }
 })();
