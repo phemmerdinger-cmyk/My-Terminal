@@ -1607,7 +1607,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <section id="tab-research" class="pad" hidden>
       <div class="rs-tools">
         <button class="rs-search" id="rsSearch">⌕ Search any stock, ETF, mutual fund, crypto, index or future…</button>
-        <a class="btn ghost" id="antIpoShortcut" href="#research/ANT">View Anthropic IPO (ANT) →</a>
       </div>
       <div id="rsHead"></div>
       <div id="rsChartPane" hidden>
@@ -1949,7 +1948,7 @@ const SRC = {
 };
 const INDEXES = [["^GSPC","S&P 500"],["^IXIC","Nasdaq"],["^DJI","Dow Jones"],["^RUT","Russell 2000"],["^VIX","VIX"],["^TNX","10Y Treasury"],["CL=F","Crude Oil"],["GC=F","Gold"],["BTC-USD","Bitcoin"],["ETH-USD","Ethereum"],["XRP-USD","XRP"],["SOL-USD","Solana"]];
 const IDX_NAME = Object.fromEntries(INDEXES);
-const DEFAULT_WL = ["ANT","SPCX","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM"];
+const DEFAULT_WL = ["SPCX","AAPL","MSFT","NVDA","AMZN","GOOGL","META","TSLA","JPM"];
 const SECTORS = [["XLK","Technology"],["XLC","Communication"],["XLY","Consumer Disc."],["XLP","Consumer Staples"],["XLF","Financials"],["XLV","Health Care"],["XLI","Industrials"],["XLE","Energy"],["XLB","Materials"],["XLU","Utilities"],["XLRE","Real Estate"]];
 const PALETTE = ["#91bd5f","#0fbf7d","#ff9e1b","#abcd85","#e11d48","#69913b","#eab308","#f97316","#64748b","#ec4899","#8bba56","#a3e635"];
 // Typing a coin's symbol adds the crypto (Yahoo uses COIN-USD)
@@ -2113,7 +2112,7 @@ function setTab(t){
   if(t==="studio") t="studio-strategies"; // retain old Studio/bookmark URLs
   if(t==="home") t="data"; // legacy Home bookmarks open Markets Overview
   if(VIEW&&(t==="predict"||t==="health"||t==="leader"||STUDIO_ROUTES[t])) t="data";
-  S.tab=t; try{history.replaceState(null,"",t==="research"&&S.rq?.sym==="ANT"?"#research/ANT":"#"+t)}catch{}
+  S.tab=t; try{history.replaceState(null,"","#"+t)}catch{}
   document.body.classList.toggle("on-predict",t==="predict"); if(t==="data"&&typeof loadBestBuys==="function") loadBestBuys(); if(t==="predict"&&typeof renderApiBal==="function") renderApiBal();
   navSync(t);
   TABS.forEach(k=>{ if(STUDIO_ROUTES[k]) return; const panel=$("tab-"+k); if(panel) panel.hidden=k!==t; });
@@ -2144,7 +2143,7 @@ function setTab(t){
 $("tabs").onclick=e=>{const b=e.target.closest("button"); if(!b) return; if(b.dataset.group){ const g=b.dataset.group; setTab(g==="quant"?"quant":NAV_LAST[g]||(g==="markets"?"news":NAV.find(([k])=>k===g)[1][0][0])); } else if(b.dataset.tab) setTab(b.dataset.tab);};
 window.addEventListener("hashchange",()=>{
   const raw=location.hash.slice(1);
-  if(raw==="research/ANT"){ openQuote("ANT"); return; }
+  const rsym=raw.match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/); if(rsym){ openQuote(rsym[1]); return; }
   const h=({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[raw]||raw;
   if(TABS.includes(h)&&h!==S.tab) setTab(h);
 });
@@ -4018,7 +4017,6 @@ function renderResearch(){
 function renderResearchHead(){
   const s=S.rq.sym, d=S.rq.sum||{}, p=d.price||{}, q=S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:null;
   const listing=window.MARKET_LISTINGS?.[s];
-  $("antIpoShortcut").hidden=s==="ANT";
   const price=listing?q?.price:q?.price??p.regularMarketPrice, ch=listing?q?.change:q?.change??p.regularMarketChange,
     chp=listing?q?.changePct:q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
   const name=listing?.name||p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||(listing?"EQUITY":"");
@@ -4030,8 +4028,6 @@ function renderResearchHead(){
       <div class="rs-meta">${esc(listing?.exchange||p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${!listing&&p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
       <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmt(price)}${ch!=null?`<span class="chg ${cls(ch)}">${(ch>=0?"+":"")+fmt(ch)} (${pct(chp)})</span>`:""}</div>
       ${q?.marketTime>0?`<div class="rs-ext">${q.streamed?"Last trade":"Quote as of"} ${fmtExtendedTime(q.marketTime,true)}</div>`:""}
-      ${listing?`<div class="rs-ext">IPO offer price ${$m(listing.offerPrice)} · Nasdaq debut ${esc(listing.listingDay)} · <a href="${esc(listing.announcement)}" target="_blank" rel="noopener noreferrer">IPO announcement</a> · <a href="${esc(listing.exchangeUrl)}" target="_blank" rel="noopener noreferrer">Nasdaq listing</a></div>`:""}
-      ${s==="ANT"&&price==null?`<div class="rs-ext">Indicative opening price · <a href="https://robinhood.com/us/en/stocks/ANT/" target="_blank" rel="noopener noreferrer">View on Robinhood</a> · <a href="https://www.nasdaqtrader.com/Trader.aspx?id=MarketSystemStatusToday" target="_blank" rel="noopener noreferrer">Nasdaq auction status</a></div>`:""}
       ${extended}
     </div><div class="rs-actions">
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
@@ -5158,7 +5154,7 @@ setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetP
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
-if(requestedTab==="research/ANT") openQuote("ANT");
+{ const rsym=String(requestedTab||"").match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/); if(rsym) openQuote(rsym[1]); }
 else setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){

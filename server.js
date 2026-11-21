@@ -513,13 +513,11 @@ async function getSmart() {
 // ---------------------------------------------------------------- quotes (Yahoo Finance chart API)
 const { getExtendedQuotes } = require("./market-session-core.js");
 function firstTradingDay(sym, meta) {
-  if (sym === "ANT") return "2026-11-19";
   return Number.isFinite(meta.firstTradeDate) && meta.firstTradeDate > 0 ? etParts(new Date(meta.firstTradeDate * 1000)).day : null;
 }
 async function quote(sym) {
   return cached("q:" + sym, 15_000, async () => {
-    const minuteBars = sym === "ANT";
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=${minuteBars ? "1m" : "5m"}&includePrePost=true`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m&includePrePost=true`;
     const j = JSON.parse(await get(url, "application/json"));
     const r = j.chart && j.chart.result && j.chart.result[0];
     if (!r) throw new Error("no data");
@@ -554,7 +552,7 @@ async function quote(sym) {
       ...(regular?.start < regular?.end ? { regularSession: { start: regular.start * 1000, end: regular.end * 1000 } } : {}),
       marketTime: (debut && !verifiedDebutMeta ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
       ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
-      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut, barSeconds: minuteBars ? 60 : 300 }),
+      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut, barSeconds: 300 }),
       dayHigh: price == null && debut ? null : m.regularMarketDayHigh,
       dayLow: price == null && debut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
@@ -597,14 +595,14 @@ async function history(sym, range = "6mo", interval) {
         if (i) await new Promise((ok) => setTimeout(ok, 600 * i));
         const j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${qs}`, "application/json"));
         res = j.chart && j.chart.result && j.chart.result[0];
-        if (res && (res.timestamp || sym === "ANT")) break;
+        if (res && res.timestamp) break;
         if (j.chart && j.chart.error) { lastErr = new Error(j.chart.error.description || "no history"); break; } // a bad symbol: don't retry
         res = null;
       } catch (e) { lastErr = e; }
     }
     if (!res) { if (HIST_LAST.has(key)) return HIST_LAST.get(key); throw lastErr || new Error("no history"); }
     const q = res.indicators?.quote?.[0] || {};
-    const ipo = sym === "ANT" || firstTradingDay(sym, res.meta) === etParts().day;
+    const ipo = firstTradingDay(sym, res.meta) === etParts().day;
     const candles = [];
     (res.timestamp || []).forEach((t, i) => {
       const open = q.open?.[i], high = q.high?.[i], low = q.low?.[i], close = q.close?.[i], volume = q.volume?.[i] || 0;
