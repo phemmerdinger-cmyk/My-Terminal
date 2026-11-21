@@ -10,7 +10,9 @@
 /* The server only sends the real site to a signed-in owner; /demo is the public recruiter view and never touches this device's saved data */
 try{var q=location.search;if(/[?&]viewer\b/.test(q))localStorage.removeItem("ownerMode");else if(!demo)localStorage.setItem("ownerMode","1");o=!demo&&localStorage.getItem("ownerMode")==="1";}catch(e){o=!demo;}
 if(demo||/[?&]visitor\b/.test(location.search)){o=false;window.__VISITOR=true;}
-if(!o)document.documentElement.classList.add("viewonly");})();
+if(!o)document.documentElement.classList.add("viewonly");
+/* ?pane=1: one screen inside Research → Workspace → Multi-screen (no top bar, menus or watchlist) */
+if(/[?&]pane\b/.test(location.search))document.documentElement.classList.add("pane");})();
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Market Desk · Live market dashboard by Peter Hemmerdinger</title>
@@ -97,6 +99,8 @@ nav.tabs button.claude.on{border-bottom-color:var(--claude)}
 
 /* layout */
 .wrap{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:calc(100vh - 128px)}
+html.pane header,html.pane #tabs,html.pane #subtabsM,html.pane aside.left,html.pane .ac-fab,html.pane .vo-hello,html.pane #briefModal{display:none!important}
+html.pane .wrap{grid-template-columns:minmax(0,1fr);min-height:100vh}html.pane main>section.pad{padding:12px}
 .left{border-right:1px solid var(--line)}
 main{min-width:0}
 .sec-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;font-weight:600}

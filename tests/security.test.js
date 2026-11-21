@@ -25,8 +25,8 @@ test("old visitor links go to the public demo", async () => {
 test("the demo is public, compressed and sends security headers", async () => {
   const r = await get("/demo", { "accept-encoding": "gzip" });
   assert.equal(r.status, 200);
-  assert.match(r.headers.get("content-security-policy"), /frame-ancestors 'none'/);
-  assert.equal(r.headers.get("x-frame-options"), "DENY");
+  assert.match(r.headers.get("content-security-policy"), /frame-ancestors 'self'/);
+  assert.equal(r.headers.get("x-frame-options"), "SAMEORIGIN");
   assert.equal(r.headers.get("x-content-type-options"), "nosniff");
   assert.equal(r.headers.get("content-encoding"), "gzip");
   assert.match(await r.text(), /Market Desk|MARKET/i);

@@ -5,9 +5,9 @@
   "use strict";
   const C = window.MDWorkspaceCore;
   if (!C) return;
-  const W = { sym: null, range: "6mo", layout: "grid", req: 0, chart: null, series: null, ro: null, mounted: false };
-  try { const saved = store.get("md_ws", null); if (saved) { W.range = saved.range || W.range; W.layout = C.LAYOUTS.includes(saved.layout) ? saved.layout : W.layout; W.sym = saved.sym || null; } } catch {}
-  const save = () => { try { store.set("md_ws", { sym: W.sym, range: W.range, layout: W.layout }); } catch {} };
+  const W = { sym: null, range: "6mo", layout: "grid", req: 0, chart: null, series: null, ro: null, mounted: false, panes: null, count: 4, max: -1 };
+  try { const saved = store.get("md_ws", null); if (saved) { W.range = saved.range || W.range; W.layout = C.LAYOUTS.includes(saved.layout) ? saved.layout : W.layout; W.sym = saved.sym || null; W.count = C.GRIDS[saved.count] ? saved.count : 4; W.panes = saved.panes || null; } } catch {}
+  const save = () => { try { store.set("md_ws", { sym: W.sym, range: W.range, layout: W.layout, count: W.count, panes: W.panes }); } catch {} };
 
   const CSS = `
 #tab-workspace .ws-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px}
@@ -51,6 +51,19 @@
 #tab-workspace .ws-scroll{overflow-x:auto;max-width:100%}
 #tab-workspace .ws-note{color:var(--dim);font-size:11px;margin-top:8px}
 #tab-workspace .ws-empty{color:var(--muted);font-size:13px;padding:18px 0}
+#tab-workspace .ws-multi{display:grid;gap:8px;height:calc(100vh - 230px);min-height:520px}
+#tab-workspace .ws-multi:fullscreen{height:100vh;padding:8px;background:var(--bg,#0b0b0b)}
+#tab-workspace .ws-pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+#tab-workspace .ws-pane.max{position:fixed;inset:8px;z-index:70;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+#tab-workspace .ws-pbar{display:flex;align-items:center;gap:6px;padding:4px 6px;border-bottom:1px solid var(--line);background:var(--panel2)}
+#tab-workspace .ws-pbar .ws-pn{font-family:var(--mono);font-size:10px;color:var(--orange);letter-spacing:.12em}
+#tab-workspace .ws-pbar select,#tab-workspace .ws-pbar input{background:var(--panel);border:1px solid var(--line2);border-radius:5px;color:var(--text);font-size:12px;padding:3px 6px}
+#tab-workspace .ws-pbar input{width:74px;font-family:var(--mono);text-transform:uppercase}
+#tab-workspace .ws-pbar .sp{flex:1}
+#tab-workspace .ws-pbar button{background:none;border:1px solid transparent;border-radius:5px;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px}
+#tab-workspace .ws-pbar button:hover{color:var(--orange);border-color:var(--line2)}
+#tab-workspace .ws-pane iframe{flex:1;width:100%;border:0;background:var(--bg,#0b0b0b)}
+@media (max-width:900px){#tab-workspace .ws-multi{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:none!important;height:auto}#tab-workspace .ws-pane{height:70vh}}
 @media (max-width:900px){#tab-workspace .ws-grid,#tab-workspace .ws-grid.focus{grid-template-columns:minmax(0,1fr)}#tab-workspace .ws-grid.focus .ws-chart{grid-row:auto}#tab-workspace .ws-top{align-items:flex-start}#tab-workspace .ws-fin{font-size:12px}#tab-workspace .ws-fin th,#tab-workspace .ws-fin td{padding:5px 4px}#tab-workspace .ws-grid.focus .ws-chart .ws-plot{height:300px}}
 `;
 
@@ -67,8 +80,10 @@
       <p class="ws-sub">One ticker, every view at once: chart, key stats, latest news and SEC financials.</p></div>
       <div class="ws-ctl"><form class="ws-form" id="wsForm" autocomplete="off"><input id="wsSym" maxlength="12" placeholder="Ticker" aria-label="Ticker"><button class="btn">Open</button></form>
       <div class="ws-seg" role="group" aria-label="Chart range">${C.RANGES.map(([r, l]) => `<button type="button" data-wsr="${r}">${l}</button>`).join("")}</div>
-      <div class="ws-seg" role="group" aria-label="Layout"><button type="button" data-wsl="grid">Grid</button><button type="button" data-wsl="focus">Focus</button></div></div></div>
+      <div class="ws-seg" role="group" aria-label="Layout"><button type="button" data-wsl="grid">Grid</button><button type="button" data-wsl="focus">Focus</button><button type="button" data-wsl="multi" title="Several of the site's tools on screen at once">Multi-screen</button></div>
+      <div class="ws-seg" role="group" aria-label="Number of screens" id="wsCount" hidden>${Object.keys(C.GRIDS).map((n) => `<button type="button" data-wsc="${n}">${n}</button>`).join("")}<button type="button" data-wsfull title="Fill the whole screen (Esc to leave)">⛶ Full screen</button></div></div></div>
       <div class="ws-chips" id="wsChips" aria-label="Your watchlist"></div>
+      <div class="ws-multi" id="wsMulti" hidden></div>
       <div class="ws-grid" id="wsGrid">
         <section class="ws-p ws-chart"><div class="ws-ph"><h2>Price</h2><button type="button" data-wsgo="research">Full research →</button></div><div data-ws="head"></div><div class="ws-plot" data-ws="chart"></div></section>
         <section class="ws-p"><div class="ws-ph"><h2>Key stats</h2></div><div data-ws="stats"></div></section>
@@ -78,7 +93,10 @@
     $("wsForm").onsubmit = (e) => { e.preventDefault(); const s = C.normalizeSymbol($("wsSym").value); if (s) open(s); else $("wsSym").select(); };
     el().addEventListener("click", (e) => {
       const r = e.target.closest("[data-wsr]"); if (r) { W.range = r.dataset.wsr; save(); syncControls(); loadChart(W.sym, W.req); return; }
-      const l = e.target.closest("[data-wsl]"); if (l) { W.layout = l.dataset.wsl; save(); syncControls(); return; }
+      const l = e.target.closest("[data-wsl]"); if (l) { W.layout = l.dataset.wsl; save(); syncControls(); if (W.layout !== "multi" && !panel("chart").childElementCount) open(W.sym || "AAPL"); return; }
+      const k = e.target.closest("[data-wsc]"); if (k) { W.count = +k.dataset.wsc; W.panes = C.normalizePanes(W.panes, W.count); W.max = -1; save(); syncControls(); return; }
+      if (e.target.closest("[data-wsfull]")) { const m = $("wsMulti"); if (m.requestFullscreen) m.requestFullscreen().catch(() => {}); return; }
+      const pb = e.target.closest("[data-wspb]"); if (pb) { paneAction(+pb.dataset.i, pb.dataset.wspb); return; }
       const c = e.target.closest("[data-wssym]"); if (c) { open(c.dataset.wssym); return; }
       const n = e.target.closest("[data-wsnews]"); if (n) { const it = W.news && W.news[+n.dataset.wsnews]; if (it && typeof window.openReader === "function" && !e.metaKey && !e.ctrlKey) { e.preventDefault(); window.openReader(it); } return; }
       const g = e.target.closest("[data-wsgo]"); if (g) go(g.dataset.wsgo);
@@ -96,9 +114,49 @@
     el().querySelectorAll("[data-wsr]").forEach((b) => b.classList.toggle("on", b.dataset.wsr === W.range));
     el().querySelectorAll("[data-wsl]").forEach((b) => b.classList.toggle("on", b.dataset.wsl === W.layout));
     $("wsGrid").className = "ws-grid" + (W.layout === "focus" ? " focus" : "");
+    const multi = W.layout === "multi";
+    $("wsGrid").hidden = multi; $("wsMulti").hidden = !multi; $("wsCount").hidden = !multi;
+    el().querySelectorAll("[data-wsr]").forEach((b) => (b.parentElement.hidden = multi));
+    $("wsForm").hidden = multi; $("wsChips").hidden = multi;
+    el().querySelectorAll("[data-wsc]").forEach((b) => b.classList.toggle("on", +b.dataset.wsc === W.count));
+    if (multi) renderMulti();
     $("wsChips").innerHTML = (S.wl || []).slice(0, 10).map((s) => `<button type="button" data-wssym="${esc(s)}" class="${s === W.sym ? "on" : ""}">${esc(s)}</button>`).join("");
     if (W.sym && document.activeElement !== $("wsSym")) $("wsSym").value = W.sym;
   }
+
+  // ---- Multi-screen: each pane is the site itself (?pane=1 hides the menus), so every tool works exactly as usual
+  const paneSrc = (p) => C.paneUrl(p, { path: location.pathname.startsWith("/demo") ? "/demo" : "/", visitor: !!window.__VISITOR });
+  function renderMulti() {
+    W.panes = C.normalizePanes(W.panes, W.count);
+    const box = $("wsMulti"), [cols, rows] = C.GRIDS[W.count];
+    box.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`; box.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+    const have = [...box.children];
+    W.panes.forEach((p, i) => {
+      let pane = have[i];
+      if (!pane) {
+        pane = document.createElement("section"); pane.className = "ws-pane";
+        pane.innerHTML = `<div class="ws-pbar"><span class="ws-pn">${i + 1}</span><select aria-label="Screen ${i + 1} shows">${C.PANE_FUNCS.map(([k, l]) => `<option value="${k}">${esc(l)}</option>`).join("")}</select>
+          <input aria-label="Ticker for screen ${i + 1}" maxlength="12" placeholder="Ticker"><span class="sp"></span>
+          <button type="button" data-wspb="reload" data-i="${i}" title="Reload">⟳</button><button type="button" data-wspb="max" data-i="${i}" title="Enlarge / shrink">⤢</button><button type="button" data-wspb="pop" data-i="${i}" title="Open in its own window">↗</button></div><iframe title="Screen ${i + 1}" loading="lazy"></iframe>`;
+        const sel = pane.querySelector("select"), inp = pane.querySelector("input");
+        sel.onchange = () => { W.panes[i] = sel.value === "research" ? { fn: "research", sym: W.panes[i].sym || W.sym || "SPY" } : { fn: sel.value }; save(); renderMulti(); };
+        inp.onchange = () => { const s = C.normalizeSymbol(inp.value); if (!s) return; W.panes[i] = { fn: "research", sym: s }; save(); renderMulti(); };
+        box.appendChild(pane);
+      }
+      const sel = pane.querySelector("select"), inp = pane.querySelector("input"), fr = pane.querySelector("iframe"), src = paneSrc(p);
+      sel.value = p.fn; inp.hidden = p.fn !== "research"; inp.value = p.sym || "";
+      pane.classList.toggle("max", W.max === i);
+      if (fr.dataset.src !== src) { fr.dataset.src = src; fr.src = src; }
+    });
+    while (box.children.length > W.panes.length) box.lastElementChild.remove();
+  }
+  function paneAction(i, what) {
+    const pane = $("wsMulti").children[i], p = W.panes[i]; if (!pane || !p) return;
+    if (what === "reload") { const fr = pane.querySelector("iframe"); fr.src = fr.dataset.src; }
+    else if (what === "max") { W.max = W.max === i ? -1 : i; renderMulti(); }
+    else if (what === "pop") window.open(paneSrc(p), "md_pane_" + i, "popup,width=960,height=720");
+  }
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && W.max >= 0 && S.tab === "workspace") { W.max = -1; renderMulti(); } });
 
   function open(sym) {
     W.sym = sym; save(); syncControls();
@@ -183,7 +241,7 @@
   window.wsOpen = function () {
     mount(); syncControls();
     const start = W.sym || (S.sel && C.normalizeSymbol(S.sel)) || "AAPL";
-    if (start !== W.sym || !panel("chart").childElementCount) open(start);
+    if (W.layout !== "multi" && (start !== W.sym || !panel("chart").childElementCount)) open(start);
   };
   if (S.tab === "workspace") window.wsOpen(); // the page opened straight on #workspace
 })();
