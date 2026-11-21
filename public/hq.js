@@ -44,7 +44,6 @@
     D.view = v;
     document.querySelectorAll("nav.side [data-v]").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + v));
-    document.body.classList.toggle("home", v === "globe");
     try { history.replaceState(null, "", "#" + v); } catch {}
     render();
   }
@@ -178,30 +177,46 @@
     c.strokeStyle = "rgba(120,120,120,.14)"; const L = 14, bx = R * 1.25, by = R * 1.12; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => { c.beginPath(); c.moveTo(cx + sx * bx, cy + sy * by + -sy * L); c.lineTo(cx + sx * bx, cy + sy * by); c.lineTo(cx + sx * bx - sx * L, cy + sy * by); c.stroke(); });
   }
 
-  // ---------------------------------------------------------------- GLOBE (home): everything funnels through it
-  const SECTIONS = [["overview", "Overview"], ["lab", "Lab"], ["research", "Research"], ["strategies", "Strategies"], ["rules", "Rulebook"], ["room", "Agent room"], ["paper", "Paper & live"], ["decisions", "Decisions"], ["costs", "Costs"], ["machines", "Machines"]];
+  // ---------------------------------------------------------------- GLOBE (home): sources funnel in, results flow out, agents inside
   const G = { open: false, z: 0, pts: null, a: 0, nodes: [], hover: null, chips: [], uiKey: "" };
   function globeUi() {
-    const ui = $("globeUi"), key = (G.open ? "open" : "closed") + D.bots.length + (D.spider && D.spider.running ? 1 : 0);
+    const ui = $("globeUi"), wrap = ui.parentElement, W = wrap.clientWidth, H = wrap.clientHeight, sp = D.spider || {}, run = sp.running, now = Date.now();
+    const sig = (D.raw.signals && D.raw.signals.items) || [], trades7 = D.bots.flatMap((b) => b.trades).filter((t) => t.t && now - t.t < 7 * 864e5);
+    const ins = C.sourceCounts(finds(), now), outs = [{ label: "SIGNALS", n: sig.length, sub: "named research signals", spark: C.buckets(sig.map((x) => (x.inputs && x.inputs[0] && x.inputs[0].at) || 0), { now }), color: OR },
+      { label: "PRE-BUY CHECKS", n: checks().length, sub: "vetoes and cautions", spark: C.buckets(checks().map((c) => c.t), { now }), color: AM },
+      { label: "TRADES", n: trades7.length, sub: "paper fills, last 7 days", spark: C.buckets(trades7.map((t) => t.t), { now, size: 864e5 / 2, n: 14 }), color: UP }];
+    const key = [G.open, W, H, run ? run.label : "", ins.map((x) => x.n).join(), outs.map((x) => x.n).join()].join("|");
     if (key === G.uiKey) return; G.uiKey = key;
-    const n = (v) => (v === "decisions" ? gates().filter((g) => g.status === "fail").length + checks().filter((c) => c.verdict === "veto").length : v === "strategies" ? D.bots.length : v === "rules" ? RULES.length : null);
+    const ly = (i, n) => Math.round(H / 2 - ((n - 1) * 92) / 2 + i * 92 - 30);
     ui.innerHTML = (G.open ? '<button class="gback" id="gBack">‹ outside the globe</button>' : "")
-      + `<div class="gtitle"><h1>MARKET DESK <span>//</span> BOT HQ</h1><p>${G.open ? "the six agents inside · click one to see its research" : "every section funnels through the globe"}</p></div>`
-      + `<div class="ghint" style="bottom:22px">${G.open ? "CLICK AN AGENT" : "CLICK THE GLOBE TO ENTER"}</div>`
-      + SECTIONS.map(([v, l], i) => `<button class="gchip" data-go="${v}" data-i="${i}">${h(l.toUpperCase())}${n(v) != null ? `<b>${n(v)}</b>` : ""}</button>`).join("");
-    ui.querySelectorAll("[data-go]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); show(b.dataset.go); }));
+      + `<div class="nowline" style="top:22px"><b>NOW</b>${h(run ? `the spider: ${run.label}` : "the spider is idle")}</div>`
+      + `<div class="nowline" style="bottom:20px"><b>${G.open ? "CLICK AN AGENT" : "CLICK THE GLOBE"}</b>${G.open ? "to see its research and numbers" : "to see the six agents inside"} · <span class="dim">${h(run ? run.note || run.phase || "" : (sp.queue && sp.queue[0] ? "next: " + sp.queue[0].label : "nothing queued"))}</span></div>`
+      + `<div class="colhead" style="left:24px;top:${ly(0, ins.length) - 22}px">SOURCES TODAY &nbsp; Σ ${ins.reduce((a, x) => a + x.n, 0)}</div>`
+      + ins.map((x, i) => `<div class="src gsrc" style="left:24px;top:${ly(i, ins.length)}px"><small>${h(x.label.toUpperCase())}</small><b>${x.n}</b><canvas></canvas></div>`).join("")
+      + `<div class="colhead" style="right:24px;top:${ly(0, outs.length) - 22}px">OUTPUT</div>`
+      + outs.map((x, i) => `<div class="src out gsrc" style="right:24px;top:${ly(i, outs.length)}px"><small>${h(x.label)}</small><b>${x.n}</b><canvas></canvas><div class="sub">${h(x.sub)}</div></div>`).join("");
+    const cards = [...ui.querySelectorAll(".gsrc")];
+    ins.forEach((x, i) => spark(cards[i].querySelector("canvas"), x.spark, GR));
+    outs.forEach((x, i) => spark(cards[ins.length + i].querySelector("canvas"), x.spark, x.color));
+    G.flows = [...ins.map((x, i) => ({ side: "in", x: 24 + 172, y: ly(i, ins.length) + 30, n: x.n, color: GR })), ...outs.map((x, i) => ({ side: "out", x: W - 24 - 172, y: ly(i, outs.length) + 30, n: x.n, color: x.color }))];
     const back = $("gBack"); if (back) back.onclick = (e) => { e.stopPropagation(); G.open = false; G.uiKey = ""; globeUi(); };
   }
   function drawGlobe() {
     if (D.view !== "globe") return; const k = setup($("globeCv")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000;
     G.z += ((G.open ? 1 : 0) - G.z) * 0.08; G.a += 0.003 + (D.spider && D.spider.running ? 0.003 : 0);
-    const cx = w / 2, cy = hh / 2 + 10, R = Math.min(w, hh) * (0.3 + 0.13 * G.z);
-    // section chips sit on a ring around the globe, wired into it
-    const chips = [...$("globeUi").querySelectorAll(".gchip")], ringR = R * 1.32 + 30;
-    chips.forEach((el, i) => { const ang = -Math.PI / 2 + (i / chips.length) * Math.PI * 2, x = cx + Math.cos(ang) * ringR * 1.25, y = cy + Math.sin(ang) * ringR * 0.92;
-      el.style.left = x + "px"; el.style.top = y + "px"; el.style.opacity = String(1 - G.z * 0.65);
-      const ex = cx + Math.cos(ang) * R, ey = cy + Math.sin(ang) * R; c.strokeStyle = "rgba(255,153,31,.16)"; c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey); c.stroke();
-      const f = (t * 0.25 + i / chips.length) % 1; c.fillStyle = "rgba(255,153,31,.8)"; c.beginPath(); c.arc(x + (ex - x) * f, y + (ey - y) * f, 1.6, 0, Math.PI * 2); c.fill(); });
+    const cx = w / 2, cy = hh / 2 + 6, R = Math.min(w * 0.2, hh * 0.34) * (1 + 0.45 * G.z), busy0 = !!(D.spider && D.spider.running);
+    // sources funnel into the globe; signals, checks and trades flow out of it
+    const fade = 1 - G.z * 0.6;
+    for (const f of G.flows || []) {
+      const x1 = f.side === "in" ? f.x : cx + R * 0.97, y1 = f.side === "in" ? f.y : cy + (f.y - cy) * 0.3, x2 = f.side === "in" ? cx - R * 0.97 : f.x, y2 = f.side === "in" ? cy + (f.y - cy) * 0.3 : f.y, mx = (x1 + x2) / 2;
+      for (let s2 = -2; s2 <= 2; s2++) { c.strokeStyle = f.color; c.globalAlpha = (s2 === 0 ? 0.24 : 0.08) * fade; c.beginPath(); c.moveTo(x1, y1 + s2 * 2); c.bezierCurveTo(mx, y1 + s2 * 2, mx, y2 + s2 * 3, x2, y2 + s2 * 3); c.stroke(); }
+      c.globalAlpha = fade; const count = Math.min(7, 2 + Math.floor(Math.log2(1 + (f.n || 0))));
+      for (let i = 0; i < count; i++) { const u0 = (t * (busy0 ? 0.32 : 0.16) + i / count + (f.y % 7) / 7) % 1, u = 1 - u0;
+        const x = u * u * u * x1 + 3 * u * u * u0 * mx + 3 * u * u0 * u0 * mx + u0 * u0 * u0 * x2, y = u * u * u * y1 + 3 * u * u * u0 * y1 + 3 * u * u0 * u0 * y2 + u0 * u0 * u0 * y2;
+        c.fillStyle = f.color; c.shadowColor = f.color; c.shadowBlur = 8; c.beginPath(); c.arc(x, y, 1.8, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; }
+      c.globalAlpha = 1;
+    }
+    $("globeUi").querySelectorAll(".gsrc,.colhead").forEach((el) => (el.style.opacity = String(0.35 + 0.65 * fade)));
     // the particle sphere
     if (!G.pts) { G.pts = []; for (let i = 0; i < 2600; i++) { const y = 1 - (i / 2599) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996; G.pts.push([Math.cos(th) * r, y, Math.sin(th) * r]); } }
     const sa = Math.sin(G.a), ca = Math.cos(G.a), busy = !!(D.spider && D.spider.running), shell = 1 - G.z * 0.55;
@@ -211,7 +226,7 @@
     if (G.z < 0.05) return;
     // inside: the spider in the middle, five agents around it, research flowing out to each
     const A = agents(), core = A[0], ring = A.slice(1), alpha = Math.min(1, G.z * 1.4);
-    const pos = [{ a: core, x: cx, y: cy }, ...ring.map((a, i) => { const ang = -Math.PI / 2 + (i / ring.length) * Math.PI * 2 + G.a * 0.6; return { a, x: cx + Math.cos(ang) * R * 0.62, y: cy + Math.sin(ang) * R * 0.5 }; })];
+    const pos = [{ a: core, x: cx, y: cy }, ...ring.map((a, i) => { const ang = -Math.PI / 2 + (i / ring.length) * Math.PI * 2 + G.a * 0.6; return { a, x: cx + Math.cos(ang) * R * 0.64, y: cy + Math.sin(ang) * R * 0.6 }; })];
     for (const q of pos.slice(1)) {
       c.strokeStyle = `rgba(255,153,31,${0.25 * alpha})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(q.x, q.y); c.stroke();
       for (let j = 0; j < 3; j++) { const f = (t * 0.35 + j / 3 + q.x * 0.001) % 1; c.fillStyle = `rgba(255,190,110,${alpha})`; c.shadowColor = OR; c.shadowBlur = 8; c.beginPath(); c.arc(cx + (q.x - cx) * f, cy + (q.y - cy) * f, 2, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; }
@@ -231,7 +246,7 @@
     const cv = $("globeCv"), pick = (e) => { const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { x, y, node: G.nodes.find((n) => Math.hypot(n.x - x, n.y - y) < n.r) }; };
     cv.addEventListener("mousemove", (e) => { const { node } = pick(e); G.hover = node ? node.id : null; });
     cv.addEventListener("click", (e) => {
-      const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 + 10, R = Math.min(r.width, r.height) * (0.3 + 0.13 * G.z);
+      const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 + 6, R = Math.min(r.width * 0.2, r.height * 0.34) * (1 + 0.45 * G.z);
       if (G.open && node) { D.botId = node.id; D.tab = "overview"; show("bot"); return; }
       const inside = Math.hypot(x - cx, y - cy) < R; G.open = G.open ? inside || !!node : inside; G.uiKey = ""; globeUi();
     });
