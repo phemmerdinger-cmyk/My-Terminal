@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Lists that update themselves (2026-11-21)
+- The S&P 500 list refreshes daily from github.com/datasets/s-and-p-500-companies (`sp500-core.js`, tests in `tests/sp500-core.test.js`); `/sp500.json` is served from memory with `asOf`, `joined`, `left`; a bad download keeps the last good list. Bots and screens using `SP500` see the update in place.
+- The instant search list adds S&P joiners and the exchange catalog's new listings (past week) on page load, so new IPOs appear without editing `tickers.js`.
+- The owner's laptop desk (`Market Desk.bat`) downloads the latest `main` from GitHub on every start and keeps the existing copy when offline.
+
 ### Bigger built-in ticker directory (2026-11-21)
 - `public/tickers.js` grew from 296 to 753 entries: every S&P 500 company (names from `sp500.json`), about 130 popular non-S&P stocks (growth, ADRs, crypto-linked, recent IPOs such as CRWV, CRCL, FIG, CBRS, FRVO) and 26 more ETFs. No duplicates. Live Yahoo search still finds anything not listed.
 
