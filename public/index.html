@@ -1705,6 +1705,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="fx-bar"><select class="field" id="rkSrc" style="max-width:320px"></select><button class="btn" type="button" id="rkRun">Analyze</button></div>
       <div id="rkOut"><div class="fx-empty">Choose a portfolio and press Analyze.</div></div>
     </section>
+    <section id="tab-brief" class="pad" hidden></section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">📈 PAPER TRADING EXPERIMENT</div><h1>Trading bots vs. the S&amp;P 500</h1><p class="ap-sub">Rule-based strategies I designed with Claude's help. The rules decide every trade; no AI model trades. Paper money only.</p></div>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
@@ -1962,21 +1963,21 @@ const STUDIO_ROUTES = {
   "studio-quant": "quant", "studio-ask": "ask",
   "studio-alerts": "alerts", "studio-settings": "settings"
 };
-const TABS = ["news","data","macro","workspace","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
+const TABS = ["news","data","macro","workspace","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","brief","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data Health"],["studio-settings","Appearance"]]],
   ["research",[["workspace","Workspace"],["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
   ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"]]],
-  ["ailab",[["aitrade","Bots vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
+  ["ailab",[["aitrade","Bots vs S&P 500"],["brief","Morning Brief"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
 ];
 const groupOf=t=>(t==="studio-strategies"||t==="studio-quant")?"quant":(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
 function navSync(t){
   const g=groupOf(t); if(NAV.find(([key])=>key===g)[1].some(([k])=>k===t)) NAV_LAST[g]=t; // hidden advanced tools never replace Quant Lab navigation
   document.querySelectorAll("#tabs [data-group]").forEach(b=>b.classList.toggle("on",b.dataset.group===g));
-  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||k==="leader"||!!STUDIO_ROUTES[k])));
+  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||k==="leader"||k==="brief"||!!STUDIO_ROUTES[k])));
   const html=items.map(([k,label,c])=>`<button role="tab" data-tab="${k}" class="${c||""} ${k===t?"on":""}" aria-selected="${k===t}">${esc(label)}${k==="news"?'<span class="k" id="newsCount'+'"></span>':""}</button>`).join("");
   for(const id of ["subtabs","subtabsM"]){ const el=$(id); el.innerHTML=html.replace(' id="newsCount"',id==="subtabs"?' id="newsCount"':""); }
   if(window.__nc&&$("newsCount")) $("newsCount").textContent=window.__nc;
@@ -2123,6 +2124,7 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
+  if(t==="brief"&&window.MDTeam) MDTeam.openBrief();
   if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
@@ -4043,9 +4045,9 @@ function fmtExtendedTime(timestamp,seconds=false){
 function rqSubs(){
   const t=rqType();
   if(S.rq.sum&&S.rq.sum.limited){ const d=S.rq.sum; return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],...(d.recommendationTrend||d.earningsHistory?[["analysis","Analysis"]]:[]),...(d.insiderTransactions?[["holders","Holders"]]:[]),...(d.assetProfile?[["profile","Profile"]]:[]),["news","News"]]; }
-  if(t==="ETF"||t==="MUTUALFUND") return [["summary","Summary"],["holdings","Holdings"],["performance","Performance"],["profile","Profile"],["news","News"]];
+  if(t==="ETF"||t==="MUTUALFUND") return [["summary","Summary"],["holdings","Holdings"],["performance","Performance"],["profile","Profile"],["news","News"],...(VIEW||t!=="ETF"?[]:[["why","Why (bots)"]])];
   if(t==="CRYPTOCURRENCY"||t==="INDEX"||t==="FUTURE"||t==="CURRENCY") return [["summary","Summary"],["news","News"]];
-  return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],["analysis","Analysis"],["holders","Holders"],["profile","Profile"],["news","News"]];
+  return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],["analysis","Analysis"],["holders","Holders"],["profile","Profile"],["news","News"],...(VIEW?[]:[["why","Why (bots)"]])];
 }
 function renderResearchNav(){
   const subs=rqSubs(); if(!subs.some(x=>x[0]===S.rq.sub)&&S.rq.sub!=="compare") S.rq.sub="summary";
@@ -4071,6 +4073,7 @@ function renderResearchBody(){
     loadChart();
   }
   if(isCmp){ renderMinis(); const cur=$("cmpInput").value.split(/[,\s]+/).map(normSym).filter(Boolean); if(!cur.includes(s)){ $("cmpInput").value=[s,...cur.filter(x=>x!==s)].slice(0,4).join(", "); } renderCmpRange(); return; }
+  if(sub==="why"){ if(window.MDTeam) MDTeam.why(el,s); else { el.innerHTML='<div class="fx-empty"><span class="spin"></span> Loading…</div>'; MDLazy.load("team").catch(e=>{ el.innerHTML=`<div class="fx-empty">${esc(e.message)}</div>`; }); } return; }
   if(sub==="news"){ const items=(S.news?.items||[]).filter(i=>i.tickers.includes(s)); const list=items.length?items:(S.rq.news||[]);
     el.innerHTML=list.length?`<ul class="feed" style="border:1px solid var(--line);border-radius:8px">${list.slice(0,60).map(i=>`<li class="item"><div class="t">${i.time?etTime(i.time):""}<small>${ago(i.time)}</small></div><div><div class="meta"><span class="src" style="background:${SRC[i.source].c}">${SRC[i.source].short}</span>${i.mood>0?'<span class="mood p">▲ Positive</span>':i.mood<0?'<span class="mood n">▼ Negative</span>':""}</div><h3><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>${i.summary?`<p>${esc(i.summary)}</p>`:""}</div></li>`).join("")}</ul>`:'<div class="rs-err"><span class="spin"></span>Looking for headlines…</div>'; return; }
   if(!d){ el.innerHTML=S.rq.err?`<div class="rs-err">Couldn't load research data for <b>${esc(s)}</b>.<br><span style="font-size:12px">${esc(S.rq.err)}</span><br>Check the symbol, or try again in a minute.</div>`:`<div class="skeleton"></div><div class="skeleton"></div>`; return; }
@@ -5154,7 +5157,8 @@ setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetP
 api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
-{ const rsym=String(requestedTab||"").match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/); if(rsym) openQuote(rsym[1]); }
+const rqDeep=String(requestedTab||"").match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/);
+if(rqDeep) openQuote(rqDeep[1]);
 else setTab(location.pathname==="/ai-vs-sp500"&&!location.hash?"aitrade":TABS.includes(initialTab)?initialTab:"data");
 // Owner unlock: open the site with ?owner and enter the Claude password once on each of your devices
 if(VIEW&&/[?&]owner\b/.test(location.search)){

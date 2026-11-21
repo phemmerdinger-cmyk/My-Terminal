@@ -73,3 +73,12 @@ test("clientIp trusts Cloudflare's headers, never a client-supplied X-Forwarded-
   assert.equal(DM.clientIp({ "true-client-ip": "<script>" }, "10.0.0.1"), "10.0.0.1");
   assert.equal(DM.clientIp({}, undefined), "?");
 });
+
+test("the Why card and Morning brief are desk routes, never public", () => {
+  const DM2 = require("../deploy-mode-core.js");
+  for (const p of ["/api/why", "/api/brief"]) {
+    assert.equal(DM2.isRemoteRoute(p), true);
+    assert.equal(DM2.access({ mode: "public", path: p, owner: false, token: false, isPublic: false }), "notfound");
+    assert.equal(DM2.access({ mode: "local", path: p, owner: false, token: false, isPublic: false }), "proxy");
+  }
+});

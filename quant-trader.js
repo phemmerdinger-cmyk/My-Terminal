@@ -28,7 +28,9 @@ function decide(px, opts = {}) {
   if (n < 280) throw new Error("need at least ~13 months of aligned history");
   const credit = px.HYG && px.IEF ? px.HYG.map((v, i) => v / px.IEF[i]) : null;
   const reg = QM.regimeAt(px.SPY, last, credit);
-  const pcs = PCC.splitTilt(SPLIT[reg.label] ?? 0.5, opts.putcall, reg.label), split = pcs.split;
+  // opts.regimeLabel(raw) lets the caller confirm a regime change before acting on it (bot-teamwork-core.confirmRegime)
+  const rawRegime = reg.label, label = typeof opts.regimeLabel === "function" ? opts.regimeLabel(rawRegime) || rawRegime : rawRegime;
+  const pcs = PCC.splitTilt(SPLIT[label] ?? 0.5, opts.putcall, label), split = pcs.split;
   // ---- rank equities
   const eq = QT_EQUITY.filter((s) => px[s]), ret = (s, a, b) => px[s][last - b] / px[s][last - a] - 1;
   const raw = eq.map((s) => { const r = QM.returns(px[s].slice(-127)); return { s, m12: ret(s, 252, 21), m3: ret(s, 63, 0), vol: QM.annVol(r), trend: px[s][last] > QM.sma(px[s], 200, last) }; });
@@ -50,7 +52,7 @@ function decide(px, opts = {}) {
   for (const k of Object.keys(w)) if (!(w[k] > 1e-9)) delete w[k];
   const cash = Math.max(0, 1 - Object.values(w).reduce((a, b) => a + b, 0)); if (cash > 0.001) w[QT_CASH] = (w[QT_CASH] || 0) + cash;
   const ws = syms.map((s) => w[s]), enb = QM.enb(ws.map((x) => x / (ws.reduce((a, b) => a + b, 0) || 1)), C.map((r) => r.map((x) => x / QM.DAYS))).enb;
-  return { w, regime: reg.label, pcTilt: pcs.tilt, score: reg.score, ind: reg.ind, split, exVol, vol: exVol * scale, scale, enb,
+  return { w, regime: label, rawRegime, pcTilt: pcs.tilt, score: reg.score, ind: reg.ind, split, exVol, vol: exVol * scale, scale, enb,
     ranked: ranked.slice(0, 15).map((x) => ({ s: x.s, score: +x.score.toFixed(2), fund: x.fund, m12: +x.m12.toFixed(4), m3: +x.m3.toFixed(4), vol: +x.vol.toFixed(4), trend: x.trend, picked: picks.includes(x) })) };
 }
 

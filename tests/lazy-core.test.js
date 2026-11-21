@@ -44,3 +44,11 @@ test("the page loads tools on demand and keeps the spider out of the demo", () =
   assert.ok(html.indexOf('src="/lazy-core.js"') < html.indexOf("function setTab("));
   assert.ok(html.includes('if(!VIEW){ const web=()=>L.load("web")'), "THE WEB loads for the owner only");
 });
+
+test("the Morning Brief tab loads the teamwork UI on demand", () => {
+  const L = require("../public/lazy-core.js");
+  assert.equal(L.groupForTab("brief"), "team");
+  assert.deepEqual([...L.GROUPS.team], ["/teamwork.js"]);
+  const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../public/index.html"), "utf8");
+  assert.ok(!html.includes('<script src="/teamwork.js"'), "teamwork.js is not loaded eagerly");
+});
