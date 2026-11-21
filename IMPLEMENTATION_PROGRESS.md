@@ -3,9 +3,10 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
-### Bot HQ — a separate control room for the bots (2026-11-21)
-- `/hq` (owner / private desk only; the public server sends it to /demo, `/hq.html` is never served directly): Overview (all-bot KPIs, a "research brain" globe with what the spider is reading and finding, live activity, research→trade pipeline, automatic toughness gates, morning report), Every bot (equity vs S&P, drawdown, month-by-month grid, when-it-works by weekday/hour, holdings, queued orders, trades with reasons, toughness checks), Agent room (each bot at a desk with its live status), Spider (running job, queue, recent jobs, findings with sources), Risk & costs.
-- Reads the existing APIs only; logic in `public/hq-core.js` (tests in `tests/hq-core.test.js`), UI in `public/hq.html` + `public/hq.js`. "HQ" button in the main site's top bar (owner only).
+### Bot HQ — a separate website for the bots (2026-11-21)
+- Its own site, not a page of Market Desk: on the laptop desk it runs at **http://127.0.0.1:3001** (second port of the same local server, `HQ_PORT`); online it can run as its own service with `MODE=hq` (its own sign-in with SITE_PASSWORD; reads the bots from PUBLIC_URL with DESK_TOKEN, read-only routes only). Market Desk's "HQ" button links to it when one is available (`/api/health` → `hqUrl`; `HQ_URL` env for an online one). The main site no longer serves `/hq`.
+- Views: Overview (all-bot KPIs, research-brain globe, live activity, pipeline, automatic toughness gates, morning report), Every bot (equity vs S&P, drawdown, month grid, when-it-works by weekday/hour, holdings, queued orders, trades with reasons, toughness checks), Agent room, Spider, Risk & costs.
+- Rules in `deploy-mode-core.js` (`hqAccess`, `hqPage`); logic in `public/hq-core.js`; UI `public/hq.html` + `public/hq.js`. Tests: `tests/hq-core.test.js`, `tests/hq-site.test.js` (runs the server with MODE=hq).
 
 ### Multi-screen, Bloomberg style (2026-11-21)
 - Research → Workspace → **Multi-screen**: 2, 3, 4 or 6 live screens at once, each showing any site tool (news, heatmap, stock research for any ticker, macro, portfolio, bots, labs…), with reload, enlarge (Esc to shrink), pop out into its own window, and a ⛶ full-screen grid. Layout and choices are saved.

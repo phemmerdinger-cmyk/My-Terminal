@@ -4273,8 +4273,66 @@ process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message
 
 http
   .createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
-  .listen(PORT, DEPLOY.host, () => console.log(`Market Desk (${DEPLOY.mode || "legacy"} mode) running at http://${DEPLOY.host || "localhost"}:${PORT}`));
+  .listen(PORT, DEPLOY.host, () => console.log(`${DEPLOY.mode === "hq" ? "Bot HQ" : "Market Desk"} (${DEPLOY.mode || "legacy"} mode) running at http://${DEPLOY.host || "localhost"}:${PORT}`));
+if (DEPLOY.hqPort && DEPLOY.hqPort !== +PORT) {
+  http.createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
+    .on("error", (e) => console.error("Bot HQ couldn't start on port " + DEPLOY.hqPort + ": " + e.message))
+    .listen(DEPLOY.hqPort, DEPLOY.host, () => console.log(`Bot HQ running at http://${DEPLOY.host}:${DEPLOY.hqPort}`));
+}
+function serveFile(req, res, file) {
+      fs.stat(file, (err, stt) => {
+    if (err || !stt.isFile()) return send(res, 404, "Not found", "text/plain");
+    const type = MIME[path.extname(file)] || "application/octet-stream";
+    let c = STATIC_GZ.get(file);
+    const done = () => {
+      const html = /html/.test(type);
+      const hdr = { ETag: c.etag, "Cache-Control": html || /javascript|css/.test(type) ? "no-cache" : "public, max-age=86400" }; // code always revalidates (cheap 304) so a deploy never mixes old and new files
+      if (req.headers["if-none-match"] === c.etag) return send(res, 304, "", type, hdr);
+      const gz = /\bgzip\b/.test(String(req.headers["accept-encoding"] || "")) && c.gz;
+      send(res, 200, gz || c.raw, type, gz ? { ...hdr, "Content-Encoding": "gzip", Vary: "Accept-Encoding" } : hdr);
+    };
+    if (c && c.mtime === stt.mtimeMs) return done();
+    fs.readFile(file, (e2, data) => {
+      if (e2) return send(res, 404, "Not found", "text/plain");
+      const comp = /json|text|javascript|svg|xml|manifest|icon/.test(type) && data.length > 1024;
+      c = { mtime: stt.mtimeMs, raw: data, gz: comp ? zlib.gzipSync(data, { level: 9 }) : null, etag: '"' + nodeCrypto.createHash("sha1").update(data).digest("hex").slice(0, 16) + '"' };
+      STATIC_GZ.set(file, c); done();
+    });
+  });
+}
+// ---- Bot HQ as its own website: MODE=hq, or the desk's second port (127.0.0.1:HQ_PORT)
+const HQ_LOGIN_HTML = LOGIN_HTML.replace("<title>Market Desk · Sign in</title>", "<title>Bot HQ · Sign in</title>")
+  .replace(/MARKET <span>DESK<\/span>/, "BOT <span>HQ</span>").replace(/<h1>[^<]*<\/h1><p>[^<]*<\/p>/, "<h1>Bot HQ sign-in</h1><p>Peter's private control room for the paper-trading bots.</p>")
+  .replace(/<a href="\/demo">[^<]*<\/a>/, "");
+async function handleHq(req, res, u) {
+  try {
+    const owner = isOwner(req);
+    if (u.pathname.startsWith("/api/")) {
+      if (u.pathname !== "/api/health" && rateLimited(req, owner)) return send(res, 429, { error: "Too many requests — slow down for a minute." }, "application/json", { "Retry-After": "60" });
+      const act = DM.hqAccess({ path: u.pathname, method: req.method, owner, remote: DEPLOY.remoteReady || DEPLOY.mode === "local" || DEPLOY.mode === "hq" });
+      if (act === "notfound") return send(res, 404, { error: "Not found" });
+      if (act === "deny") return send(res, 401, { error: "Sign in to Bot HQ first.", code: "private" });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, site: "hq", mode: DEPLOY.mode, remote: DEPLOY.remoteReady, mainUrl: DEPLOY.mode === "local" ? `http://127.0.0.1:${PORT}/` : process.env.MAIN_URL || null });
+      if (u.pathname === "/api/login" && req.method === "POST") {
+        let pw = ""; try { pw = (await readBody(req)).password; } catch {}
+        const r = siteLogin(req, pw);
+        if (r.status !== 200) return send(res, r.status, { error: r.error });
+        return send(res, 200, { ok: true }, "application/json", { "Set-Cookie": `md_owner=${r.key}; Path=/; Max-Age=${180 * 86400}; HttpOnly; Secure; SameSite=Lax` });
+      }
+      if (act === "proxy") return proxyToPublic(req, res, u);
+      return send(res, 404, { error: "Not found" });
+    }
+    const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
+    const r = DM.hqPage(u.pathname, owner);
+    if (!r) return send(res, 404, "Not found", "text/plain");
+    if (r.redirect) return go(r.redirect);
+    if (r.login) return send(res, 200, HQ_LOGIN_HTML, "text/html; charset=utf-8");
+    if (r.logout) return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
+    return serveFile(req, res, path.join(PUBLIC, r.page || r.file));
+  } catch (e) { send(res, 500, { error: String(e.message || e) }); }
+}
 async function handle(req, res) {
+    if (DEPLOY.mode === "hq" || (DEPLOY.hqPort && req.socket.localPort === DEPLOY.hqPort)) return handleHq(req, res, new URL(req.url, "http://x"));
     const u = new URL(req.url, "http://x");
     try {
       if (u.pathname.startsWith("/api/")) {
@@ -4443,7 +4501,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // pages: the real site is owner-only; /demo is the public recruiter view
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
@@ -4457,31 +4515,10 @@ async function handle(req, res) {
         if (u.searchParams.has("visitor")) return go("/demo");
         if (!owner) return go(u.pathname === "/ai-vs-sp500" ? "/demo#aitrade" : "/login");
         page = "index.html";
-      } else if (u.pathname === "/hq" || u.pathname === "/hq/") { // Bot HQ: the owner's bot control room
-        if (!owner) return go("/login");
-        page = "hq.html";
       }
       const file = path.normalize(path.join(PUBLIC, page || u.pathname));
       if (!file.startsWith(PUBLIC + path.sep) || (!page && (file === path.join(PUBLIC, "index.html") || file === path.join(PUBLIC, "hq.html")))) return send(res, 404, "Not found", "text/plain");
-      fs.stat(file, (err, stt) => {
-        if (err || !stt.isFile()) return send(res, 404, "Not found", "text/plain");
-        const type = MIME[path.extname(file)] || "application/octet-stream";
-        let c = STATIC_GZ.get(file);
-        const done = () => {
-          const html = /html/.test(type);
-          const hdr = { ETag: c.etag, "Cache-Control": html || /javascript|css/.test(type) ? "no-cache" : "public, max-age=86400" }; // code always revalidates (cheap 304) so a deploy never mixes old and new files
-          if (req.headers["if-none-match"] === c.etag) return send(res, 304, "", type, hdr);
-          const gz = /\bgzip\b/.test(String(req.headers["accept-encoding"] || "")) && c.gz;
-          send(res, 200, gz || c.raw, type, gz ? { ...hdr, "Content-Encoding": "gzip", Vary: "Accept-Encoding" } : hdr);
-        };
-        if (c && c.mtime === stt.mtimeMs) return done();
-        fs.readFile(file, (e2, data) => {
-          if (e2) return send(res, 404, "Not found", "text/plain");
-          const comp = /json|text|javascript|svg|xml|manifest|icon/.test(type) && data.length > 1024;
-          c = { mtime: stt.mtimeMs, raw: data, gz: comp ? zlib.gzipSync(data, { level: 9 }) : null, etag: '"' + nodeCrypto.createHash("sha1").update(data).digest("hex").slice(0, 16) + '"' };
-          STATIC_GZ.set(file, c); done();
-        });
-      });
+      return serveFile(req, res, file);
     } catch (e) {
       send(res, 500, { error: String(e.message || e) });
     }

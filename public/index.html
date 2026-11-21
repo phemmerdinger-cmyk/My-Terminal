@@ -1504,7 +1504,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <button class="iconbtn" id="installBtn" hidden title="Install Market Desk as an app">⤓ Install app</button>
     <button class="iconbtn sp-btn no-vo" id="spBtn" type="button" title="Send the spider to examine this page and write a report" onclick="window.spiderScan&&spiderScan()"><span class="sp-ico">🕷</span> Spider</button>
     <button class="iconbtn di-btn" id="diBtn" type="button" title="Market data status"><span class="dl">DATA</span><span id="diLbl">Validating…</span></button>
-    <a class="iconbtn" id="hqBtn" href="/hq" target="_blank" rel="noopener" title="Bot HQ: what every bot and the spider are working on" hidden>HQ</a>
+    <a class="iconbtn" id="hqBtn" href="#" target="_blank" rel="noopener" title="Bot HQ: what every bot and the spider are working on" hidden>HQ</a>
     <button class="iconbtn" id="briefBtn" title="Morning brief: overnight research, bot plans, earnings and risk flags" aria-label="Morning brief" hidden>☀</button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <a class="iconbtn no-vo" id="logoutBtn" href="/logout" title="Sign out of your private site">⎋ <span class="tlong">Sign out</span></a>
@@ -5158,7 +5158,7 @@ renderNotif(); renderToolbar(); renderWL();
 /* ---------- start-up: Claude budget, live prices, first page, refresh timers ---------- */
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
-api("/api/health").then(j=>{S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
+api("/api/health").then(j=>{if(!VIEW&&j.hqUrl&&/^(https?:\/\/)/.test(j.hqUrl)){const hb=$("hqBtn");hb.href=j.hqUrl;hb.hidden=false;} S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
 const rqDeep=String(requestedTab||"").match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/);
@@ -5437,7 +5437,6 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
   const L=MDLazyCore.createLoader(document);
   window.MDLazy={ load:L.load, ready:g=>MDLazyCore.GROUPS[g].every(L.loaded) };
   const g=MDLazyCore.groupForTab(S.tab); if(g) L.load(g).catch(e=>console.warn(e.message)); // the page opened straight on a tool
-  if(!VIEW) $("hqBtn").hidden=false;
   if(!VIEW){ const bb=$("briefBtn"); bb.hidden=false; bb.onclick=()=>L.load("team").then(()=>MDTeam.openBrief(true)).catch(e=>toast(e.message)); }
   if(!VIEW){ const web=()=>L.load("web").then(()=>L.load("team")).catch(e=>console.warn(e.message)); if("requestIdleCallback" in window) requestIdleCallback(web,{timeout:2000}); else setTimeout(web,500); }
 })();

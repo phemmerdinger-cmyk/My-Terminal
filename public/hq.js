@@ -263,6 +263,7 @@
   // ---------------------------------------------------------------- start
   window.addEventListener("resize", () => render());
   const start = location.hash.slice(1); if (["overview", "bots", "room", "research", "risk"].includes(start)) show(start);
+  get("/api/health").then((x) => { if (x.mainUrl && /^https?:\/\//.test(x.mainUrl)) { $("backLink").href = x.mainUrl; $("backLink").hidden = false; } if (x.mode === "local") $("signOut").hidden = true; }).catch(() => {});
   loadBots(); loadSpider(); setInterval(loadBots, 30_000); setInterval(loadSpider, 6_000);
   requestAnimationFrame(drawGlobe);
 })();
