@@ -1,0 +1,40 @@
+/* Bot HQ rulebook: every rule the bots actually follow, in plain words plus the line of code that decides it
+ * (shortened from the real modules named in `src`). Pictures are illustrations, not market data. */
+(function (root) {
+  "use strict";
+  root.MDHQRules = Object.freeze([
+    { id: "pullback", tags: ["Price action", "Strategy Lab"], title: "2-day pullback", src: "extra-bots-core.js",
+      plain: "A strong stock (above its 200-day average) drops sharply for two days. Buy at the next open; sell when it closes back above its 5-day average.",
+      code: "buy  = close > sma(200) && rsi(2) < 10\nsell = close > sma(5) || down 8% || 7 sessions", pic: "pullback" },
+    { id: "rotation", tags: ["Momentum", "Strategy Lab"], title: "Sector rotation", src: "extra-bots-core.js",
+      plain: "Once a month, rank the 11 sector funds by their 3- and 6-month returns and hold the top 3 — but only the ones above their 200-day average.",
+      code: "score   = (ret(63) + ret(126)) / 2\ntargets = top3(score).filter(close > sma(200))", pic: "rotation" },
+    { id: "drift", tags: ["Earnings", "Strategy Lab"], title: "Post-earnings drift", src: "extra-bots-core.js",
+      plain: "A company beats its EPS estimate by 5% or more and the market agrees (the stock rises 2%+ on the report). Prices often keep drifting the same way.",
+      code: "buy  = surprise >= 5% && reactionDay >= +2% && close > sma(50)\nsell = down 10% || 40 sessions", pic: "drift" },
+    { id: "insider", tags: ["SEC filings", "Spider", "Strategy Lab"], title: "Insider buying", src: "extra-bots-core.js",
+      plain: "Two or more different executives buy their own company's stock on the open market (SEC Form 4, found by the spider). Skip falling knives.",
+      code: "buy  = buyers >= 2 && lastFiling <= 10 days && close >= 0.8 * sma(200)\nsell = down 12% || 60 sessions", pic: "insider" },
+    { id: "rank", tags: ["Swing bot"], title: "Swing ranking score", src: "server.js · apScore",
+      plain: "Every candidate gets one score from analyst ratings, 3-month momentum, trend, news tone and today's move, plus earnings, 10-K grade, ratios, spider research and lessons from past losses.",
+      code: "score = .3*analysts + .2*momentum + .2*trend + .2*news + .1*today\n      + earnings + grade + ratios + spider(±.05) + lessons(≤ −.08)", pic: "rank" },
+    { id: "check", tags: ["Spider", "Swing bot"], title: "Pre-buy check", src: "bot-teamwork-core.js",
+      plain: "Before a buy, the spider's research is checked. Regulatory trouble, bad earnings, a bad filing or strongly negative research vetoes it.",
+      code: "veto = regulatory || negativeEarnings || badFiling\n    || (signal <= -0.4 && conf >= 0.3 && n >= 2)", pic: "check" },
+    { id: "defense", tags: ["Risk", "Swing bot"], title: "Defense mode", src: "bot-teamwork-core.js",
+      plain: "Needs a broad selloff or two independent warnings (VIX, S&P drop, black-swan headline, the spider's macro research). High-risk holdings are trimmed first.",
+      code: "on = spx <= -3% || (breadth >= 75% && spx <= -1.5%)\n  || count(vix>=30, spx<=-2%, swan, spiderStress) >= 2", pic: "defense" },
+    { id: "earnwarn", tags: ["Earnings", "Swing bot"], title: "Earnings early warning", src: "bot-teamwork-core.js",
+      plain: "A holding that reports within 5 trading days is held, or trimmed if research leans negative or a big winner is about to report. New buys wait for the report.",
+      code: "held && negative research  -> trim 50%\nheld && risky && +15% && <=1 day -> trim 33%\nnew buy && <=1 day          -> skip", pic: "earn" },
+    { id: "regime", tags: ["Quant trader"], title: "Confirmed market regime", src: "bot-teamwork-core.js",
+      plain: "The quant trader only switches regime after the new one shows up 3 trading days in a row — sooner toward safety if the spider agrees there's stress.",
+      code: "switch = days(raw != current) >= 3\n      || (safer(raw) && spiderStress)", pic: "regime" },
+    { id: "stops", tags: ["Risk", "Swing bot"], title: "Stops", src: "server.js · apStops",
+      plain: "High-risk picks get room to swing (15% stop, 20% trailing); safe picks are cut sooner (8% stop, 10% trailing).",
+      code: "stop = max(cost * (1 - sl), peak * (1 - trail))\nsl, trail = risky ? .15, .20 : .08, .10", pic: "stops" },
+    { id: "tough", tags: ["Toughness test"], title: "Toughness test", src: "robustness-core.js",
+      plain: "Replay the rules on past prices: must make money after costs, in the later 40%, with settings ±20%, with double costs, and in 1,000 bad-luck reshuffles. Fail = new buys pause by themselves.",
+      code: "pass = profit && later > 0 && settings±20% > 0\n    && 2xCosts > 0 && p05 > -15% && dd95 < 30%", pic: "fan" },
+  ]);
+})(typeof self !== "undefined" ? self : this);
