@@ -113,6 +113,18 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
 .qi{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}.qi:first-child{border-top:0}.qi small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
 .qi .sc{font:11px var(--mono);color:var(--orange);flex:none}
 .steps{margin-top:10px}.steps div{display:flex;gap:8px;font:11.5px var(--mono);color:var(--dim);padding:2px 0}.steps div.on{color:var(--text)}.steps div::before{content:"○";color:var(--dim)}.steps div.done::before{content:"●";color:var(--up)}.steps div.on::before{content:"●";color:var(--orange)}
+body.home nav.side{display:none}body.home .shell{grid-template-columns:minmax(0,1fr)}body.home main{padding:0}
+.globe{position:relative;height:calc(100vh - 70px);min-height:560px;overflow:hidden;background:radial-gradient(ellipse at 50% 50%,#120d06 0%,#060606 62%)}
+.globe canvas{position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+.gchip{position:absolute;transform:translate(-50%,-50%);background:rgba(8,8,8,.9);border:1px solid var(--line2);border-radius:999px;padding:6px 13px;font:500 11px var(--mono);letter-spacing:.1em;color:var(--muted);cursor:pointer;white-space:nowrap;z-index:2}
+.gchip:hover{color:var(--text);border-color:var(--orange)}.gchip b{color:var(--orange);font-weight:500;margin-left:6px}
+.ghint{position:absolute;left:0;right:0;text-align:center;font:11px var(--mono);letter-spacing:.2em;color:var(--dim);z-index:2;pointer-events:none}
+.gtitle{position:absolute;left:0;right:0;top:22px;text-align:center;z-index:2;pointer-events:none}.gtitle h1{margin:0;font:600 13px var(--mono);letter-spacing:.32em}.gtitle h1 span{color:var(--orange)}.gtitle p{margin:6px 0 0;font:11px var(--mono);color:var(--dim)}
+.gback{position:absolute;left:18px;top:18px;z-index:3;background:rgba(8,8,8,.9);border:1px solid var(--line2);border-radius:5px;padding:6px 12px;font:11px var(--mono);color:var(--muted);cursor:pointer}.gback:hover{color:var(--text);border-color:var(--orange)}
+.bothead{display:flex;align-items:flex-start;gap:14px;padding:14px}.bothead .ico{width:44px;height:44px;border-radius:50%;border:1px solid var(--orange);display:grid;place-items:center;box-shadow:0 0 18px rgba(255,153,31,.35)}
+.bothead h2{margin:0;font-size:24px;font-weight:500}.bothead p{margin:3px 0 0;color:var(--muted);font-size:13px}.bothead .st{margin-left:auto;text-align:right;font:11px var(--mono);color:var(--dim)}
+.rs-row{display:grid;grid-template-columns:90px 120px minmax(0,1fr) 150px;gap:12px;align-items:start;padding:9px 0;border-top:1px solid var(--line);font-size:13px}.rs-row:first-child{border-top:0}
+.rs-row .sym{font:600 13px var(--mono)}.rs-row .role{font:10.5px var(--mono);color:var(--dim)}.rs-row .ev{color:var(--muted);line-height:1.45}.rs-row .ev small{display:block;color:var(--dim);font-size:11px}
 .err{background:#1a0b0b;border:1px solid #5a2020;color:#ffb3b3;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}
 @media (max-width:1200px){.strip{grid-template-columns:repeat(4,minmax(0,1fr))}.kc{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.split,.rule{grid-template-columns:minmax(0,1fr)}.src{width:130px}.agentcard{position:static;width:auto;margin-top:10px}}
 @media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}nav.side{position:static;height:auto;display:flex;overflow-x:auto}nav.side h6,nav.side .foot{display:none}nav.side button{white-space:nowrap}.top .hs{display:none}.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.src{display:none}}
@@ -120,7 +132,7 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
 </head>
 <body>
 <div class="top">
-  <span class="plus" title="Bot HQ"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff991f" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M4.6 7h14.8M4.6 17h14.8"/></svg></span>
+  <span class="plus" title="Back to the globe" id="homeBtn" style="cursor:pointer"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ff991f" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M4.6 7h14.8M4.6 17h14.8"/></svg></span>
   <span class="brand">MARKET DESK<span>//</span><b>BOT HQ</b></span>
   <span class="pill hs" id="pSpider"><i></i><span>Spider</span></span>
   <span class="pill hs" id="pBots"><i></i><span>Bots</span></span>
@@ -134,7 +146,8 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
 <div class="shell">
   <nav class="side" aria-label="Bot HQ">
     <h6>OVERVIEW</h6>
-    <button data-v="overview" class="on"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>Overview</button>
+    <button data-v="globe"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="8" cy="8" r="6"/><ellipse cx="8" cy="8" rx="2.6" ry="6"/><path d="M2 8h12"/></svg>Globe</button>
+    <button data-v="overview"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>Overview</button>
     <h6>BRAIN</h6>
     <button data-v="lab"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><path d="M6 2v4l-3 7h10l-3-7V2M5 2h6"/></svg>Lab<span class="dot on"></span></button>
     <button data-v="research"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor"><circle cx="7" cy="7" r="4"/><path d="M10 10l4 4"/></svg>Research<span class="dot" id="resDot"></span></button>
@@ -151,7 +164,7 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
   </nav>
   <main>
     <div id="errBox"></div>
-    <section class="view on" id="v-overview">
+    <section class="view" id="v-overview">
       <div class="strip" id="strip"></div>
       <div class="card"><div class="ch">Brain core <em>· today · sources flow in, signals and trades come out</em><span class="r" id="brainState">● brain idle</span></div>
         <div class="brainwrap" id="brainWrap"><canvas id="brain"></canvas></div>
@@ -164,20 +177,17 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
       </div>
     </section>
     <section class="view" id="v-lab"><div class="card"><div class="ch">Lab <em>· toughness test and bad-luck reshuffles of each bot's own trades</em></div><div class="cb" id="lab"></div></div></section>
+    <section class="view" id="v-globe"><div class="globe"><canvas id="globeCv"></canvas><div id="globeUi"></div></div></section>
+    <section class="view" id="v-bot"><div id="botPage"></div></section>
     <section class="view" id="v-research">
       <div class="kinds" id="kinds"></div>
       <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
-        <div class="card"><div class="ch">Research map <em>· every star is a finding · hover to read it, click to open it</em><span class="r" id="mapNote"></span></div>
-          <div class="map"><canvas id="map"></canvas><div class="tip" id="mapTip" hidden></div></div>
-          <div class="legend"><span><i style="background:var(--up)"></i>good news</span><span><i style="background:var(--down)"></i>bad news</span><span><i style="background:var(--amber)"></i>neutral</span><span style="margin-left:auto">bigger star = more important · brighter = newer</span></div></div>
+        <div class="card"><div class="ch">Findings <em>· newest first · click one for the details and sources</em><span class="r"><input id="findQ" placeholder="search, e.g. NVDA or insider" autocomplete="off"></span></div><div class="cb flist" id="flist"></div></div>
         <div class="grid" style="align-content:start">
           <div class="card"><div class="ch">Now reading<span class="r" id="readSrc"></span></div><div class="cb reading" id="reading"></div></div>
-          <div class="card"><div class="ch">Up next <em>· the spider's queue, highest priority first</em><span class="r" id="queueN"></span></div><div class="cb" id="queue"></div></div>
+          <div class="card"><div class="ch">Up next <em>· the spider's queue</em><span class="r" id="queueN"></span></div><div class="cb" id="queue"></div></div>
+          <div class="card"><div class="ch">Thought stream <em>· step by step</em></div><div class="cb stream" id="stream"></div></div>
         </div>
-      </div>
-      <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);margin-top:12px">
-        <div class="card"><div class="ch">Findings <em>· newest first · click one for the details and sources</em><span class="r"><input id="findQ" placeholder="search, e.g. NVDA or insider" autocomplete="off"></span></div><div class="cb flist" id="flist"></div></div>
-        <div class="card"><div class="ch">Thought stream <em>· what the spider did, step by step</em></div><div class="cb stream" id="stream"></div></div>
       </div>
     </section>
     <section class="view" id="v-strategies"><div class="split"><div class="card slist" id="slist"></div><div id="sdetail"></div></div></section>

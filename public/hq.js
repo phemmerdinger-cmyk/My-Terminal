@@ -12,7 +12,7 @@
   const tm = (t) => (t ? new Date(t).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
   const when = (t) => (t ? new Date(t).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
   const get = (p) => fetch(p, { credentials: "same-origin", cache: "no-store" }).then(async (r) => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "HTTP " + r.status); return j; });
-  const D = { raw: {}, bots: [], spider: null, view: "overview", sel: "swing", tab: "overview", rule: 0, agent: null, rot: 0.12 };
+  const D = { raw: {}, bots: [], spider: null, view: "globe", botId: null, sel: "swing", tab: "overview", rule: 0, agent: null, rot: 0.12 };
   const OR = "#ff991f", UP = "#3ddc84", DN = "#ff5a5a", AM = "#ffb85c", GR = "#cfcfcf";
 
   // ---------------------------------------------------------------- canvas helpers
@@ -44,6 +44,7 @@
     D.view = v;
     document.querySelectorAll("nav.side [data-v]").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
     document.querySelectorAll(".view").forEach((s) => s.classList.toggle("on", s.id === "v-" + v));
+    document.body.classList.toggle("home", v === "globe");
     try { history.replaceState(null, "", "#" + v); } catch {}
     render();
   }
@@ -102,6 +103,8 @@
   function render(light) {
     top(); tape(events());
     if (D.view === "overview") overview(light);
+    else if (D.view === "globe") globeUi(light);
+    else if (D.view === "bot") botPage(light);
     else if (D.view === "lab" && !light) lab();
     else if (D.view === "research") research();
     else if (D.view === "strategies" && !light) strategies();
@@ -175,6 +178,107 @@
     c.strokeStyle = "rgba(120,120,120,.14)"; const L = 14, bx = R * 1.25, by = R * 1.12; [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => { c.beginPath(); c.moveTo(cx + sx * bx, cy + sy * by + -sy * L); c.lineTo(cx + sx * bx, cy + sy * by); c.lineTo(cx + sx * bx - sx * L, cy + sy * by); c.stroke(); });
   }
 
+  // ---------------------------------------------------------------- GLOBE (home): everything funnels through it
+  const SECTIONS = [["overview", "Overview"], ["lab", "Lab"], ["research", "Research"], ["strategies", "Strategies"], ["rules", "Rulebook"], ["room", "Agent room"], ["paper", "Paper & live"], ["decisions", "Decisions"], ["costs", "Costs"], ["machines", "Machines"]];
+  const G = { open: false, z: 0, pts: null, a: 0, nodes: [], hover: null, chips: [], uiKey: "" };
+  function globeUi() {
+    const ui = $("globeUi"), key = (G.open ? "open" : "closed") + D.bots.length + (D.spider && D.spider.running ? 1 : 0);
+    if (key === G.uiKey) return; G.uiKey = key;
+    const n = (v) => (v === "decisions" ? gates().filter((g) => g.status === "fail").length + checks().filter((c) => c.verdict === "veto").length : v === "strategies" ? D.bots.length : v === "rules" ? RULES.length : null);
+    ui.innerHTML = (G.open ? '<button class="gback" id="gBack">‹ outside the globe</button>' : "")
+      + `<div class="gtitle"><h1>MARKET DESK <span>//</span> BOT HQ</h1><p>${G.open ? "the six agents inside · click one to see its research" : "every section funnels through the globe"}</p></div>`
+      + `<div class="ghint" style="bottom:22px">${G.open ? "CLICK AN AGENT" : "CLICK THE GLOBE TO ENTER"}</div>`
+      + SECTIONS.map(([v, l], i) => `<button class="gchip" data-go="${v}" data-i="${i}">${h(l.toUpperCase())}${n(v) != null ? `<b>${n(v)}</b>` : ""}</button>`).join("");
+    ui.querySelectorAll("[data-go]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); show(b.dataset.go); }));
+    const back = $("gBack"); if (back) back.onclick = (e) => { e.stopPropagation(); G.open = false; G.uiKey = ""; globeUi(); };
+  }
+  function drawGlobe() {
+    if (D.view !== "globe") return; const k = setup($("globeCv")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000;
+    G.z += ((G.open ? 1 : 0) - G.z) * 0.08; G.a += 0.003 + (D.spider && D.spider.running ? 0.003 : 0);
+    const cx = w / 2, cy = hh / 2 + 10, R = Math.min(w, hh) * (0.3 + 0.13 * G.z);
+    // section chips sit on a ring around the globe, wired into it
+    const chips = [...$("globeUi").querySelectorAll(".gchip")], ringR = R * 1.32 + 30;
+    chips.forEach((el, i) => { const ang = -Math.PI / 2 + (i / chips.length) * Math.PI * 2, x = cx + Math.cos(ang) * ringR * 1.25, y = cy + Math.sin(ang) * ringR * 0.92;
+      el.style.left = x + "px"; el.style.top = y + "px"; el.style.opacity = String(1 - G.z * 0.65);
+      const ex = cx + Math.cos(ang) * R, ey = cy + Math.sin(ang) * R; c.strokeStyle = "rgba(255,153,31,.16)"; c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey); c.stroke();
+      const f = (t * 0.25 + i / chips.length) % 1; c.fillStyle = "rgba(255,153,31,.8)"; c.beginPath(); c.arc(x + (ex - x) * f, y + (ey - y) * f, 1.6, 0, Math.PI * 2); c.fill(); });
+    // the particle sphere
+    if (!G.pts) { G.pts = []; for (let i = 0; i < 2600; i++) { const y = 1 - (i / 2599) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996; G.pts.push([Math.cos(th) * r, y, Math.sin(th) * r]); } }
+    const sa = Math.sin(G.a), ca = Math.cos(G.a), busy = !!(D.spider && D.spider.running), shell = 1 - G.z * 0.55;
+    for (const [x, y, z] of G.pts) { const X = x * ca + z * sa, Z = -x * sa + z * ca, d = (Z + 1) / 2, s = 0.5 + d * 1.1; c.fillStyle = `rgba(${busy ? "255,196,130" : "228,228,228"},${(0.05 + d * 0.6) * shell})`; c.fillRect(cx + X * R, cy + y * R, s, s); }
+    const glow = c.createRadialGradient(cx, cy, 0, cx, cy, R); glow.addColorStop(0, `rgba(255,153,31,${0.05 + 0.12 * G.z})`); glow.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = glow; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.fill();
+    G.nodes = [];
+    if (G.z < 0.05) return;
+    // inside: the spider in the middle, five agents around it, research flowing out to each
+    const A = agents(), core = A[0], ring = A.slice(1), alpha = Math.min(1, G.z * 1.4);
+    const pos = [{ a: core, x: cx, y: cy }, ...ring.map((a, i) => { const ang = -Math.PI / 2 + (i / ring.length) * Math.PI * 2 + G.a * 0.6; return { a, x: cx + Math.cos(ang) * R * 0.62, y: cy + Math.sin(ang) * R * 0.5 }; })];
+    for (const q of pos.slice(1)) {
+      c.strokeStyle = `rgba(255,153,31,${0.25 * alpha})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(q.x, q.y); c.stroke();
+      for (let j = 0; j < 3; j++) { const f = (t * 0.35 + j / 3 + q.x * 0.001) % 1; c.fillStyle = `rgba(255,190,110,${alpha})`; c.shadowColor = OR; c.shadowBlur = 8; c.beginPath(); c.arc(cx + (q.x - cx) * f, cy + (q.y - cy) * f, 2, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; }
+    }
+    for (const q of pos) {
+      const a = q.a, isCore = a.id === "spider", r = (isCore ? 30 : 22) * (G.hover === a.id ? 1.15 : 1), on = a.busy;
+      const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, r * 2.4); g.addColorStop(0, `rgba(255,153,31,${(on ? 0.35 : 0.15) * alpha})`); g.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, r * 2.4, 0, Math.PI * 2); c.fill();
+      c.fillStyle = `rgba(10,10,10,${0.92 * alpha})`; c.strokeStyle = G.hover === a.id ? "#fff" : on ? OR : "#5a5a5a"; c.lineWidth = 1.5; c.beginPath(); c.arc(q.x, q.y, r, 0, Math.PI * 2); c.fill(); c.stroke(); c.lineWidth = 1;
+      if (on) { c.strokeStyle = `rgba(255,153,31,${0.5 * (1 - (t % 1))})`; c.beginPath(); c.arc(q.x, q.y, r + 6 + (t % 1) * 10, 0, Math.PI * 2); c.stroke(); }
+      c.fillStyle = `rgba(255,153,31,${alpha})`; c.font = `600 ${isCore ? 13 : 11}px monospace`; c.textAlign = "center"; c.fillText(({ spider: "SPIDER", swing: "SWING", day: "DAY", quant: "QUANT", lab: "LAB", risk: "RISK" })[a.id] || a.id, q.x, q.y + 4);
+      c.fillStyle = `rgba(230,230,230,${alpha})`; c.font = "600 11px monospace"; c.fillText(a.name, q.x, q.y + r + 18);
+      c.fillStyle = `rgba(150,150,150,${alpha})`; c.font = "11px sans-serif"; c.fillText(String(a.now).slice(0, 42), q.x, q.y + r + 33); c.textAlign = "left";
+      G.nodes.push({ id: a.id, x: q.x, y: q.y, r: r + 14 });
+    }
+  }
+  (() => {
+    const cv = $("globeCv"), pick = (e) => { const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { x, y, node: G.nodes.find((n) => Math.hypot(n.x - x, n.y - y) < n.r) }; };
+    cv.addEventListener("mousemove", (e) => { const { node } = pick(e); G.hover = node ? node.id : null; });
+    cv.addEventListener("click", (e) => {
+      const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 + 10, R = Math.min(r.width, r.height) * (0.3 + 0.13 * G.z);
+      if (G.open && node) { D.botId = node.id; D.tab = "overview"; show("bot"); return; }
+      const inside = Math.hypot(x - cx, y - cy) < R; G.open = G.open ? inside || !!node : inside; G.uiKey = ""; globeUi();
+    });
+  })();
+
+  // ---------------------------------------------------------------- BOT PAGE: one agent's research, then its numbers
+  function researchRows(syms) {
+    const fs = finds(), sig = (D.raw.signals && D.raw.signals.items) || [], ch = checks();
+    return syms.map(([sym, role]) => {
+      const f = fs.filter((d) => (d.tickers || []).includes(sym)).slice(0, 2), s = sig.filter((x) => x.sym === sym), k = ch.find((x) => x.sym === sym);
+      return `<div class="rs-row"><div class="sym">${h(sym)}</div><div class="role">${h(role)}</div>
+        <div class="ev">${f.length ? f.map((d) => `<div><span class="${d.tone > 0 ? "up" : d.tone < 0 ? "down" : "or"}">${d.tone > 0 ? "▲" : d.tone < 0 ? "▼" : "●"}</span> ${h(d.headline)}<small>${h(((d.sources || [])[0] || {}).name || "spider")} · ${h(when(d.u))}</small></div>`).join("") : '<span class="dim">No spider findings on it yet.</span>'}</div>
+        <div>${s.map((x) => `<span class="tag ${x.dir < 0 ? "bad" : x.dir > 0 ? "ok" : ""}">${h(x.name)}</span>`).join("")}${k ? `<span class="tag ${k.verdict === "veto" ? "bad" : "warn"}">${h(k.verdict)}</span>` : ""}</div></div>`;
+    }).join("") || '<div class="empty">Nothing on its list right now.</div>';
+  }
+  function botPage(light) {
+    const a = agents().find((x) => x.id === D.botId) || agents()[0]; if (!a) return;
+    if (light && a.id !== "spider") return;
+    const el = $("botPage"), head = `<div class="card"><div class="bothead"><button class="gback" style="position:static;margin-right:4px" id="bpBack">‹ globe</button><div class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ff991f" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></div>
+      <div><h2>${h(a.name)}</h2><p>${h(a.role)}</p></div><div class="st"><span class="tag ${a.busy ? "warn" : ""}">${a.busy ? "working" : "idle"}</span><div style="margin-top:6px">${h(String(a.now).slice(0, 80))}</div></div></div></div>`;
+    let body = "";
+    if (a.id === "spider") {
+      const sp = D.spider || {}, run = sp.running;
+      body = `<div class="grid g2" style="margin-top:12px"><div class="card"><div class="ch">Now reading</div><div class="cb reading">${run ? `<h4>${h(run.label)}</h4><div class="dim mono" style="font-size:11px">${h(run.note || run.phase || "")}</div>` : "<h4>Resting between jobs</h4>"}</div></div>
+        <div class="card"><div class="ch">Up next</div><div class="cb">${(sp.queue || []).slice(0, 6).map((j) => `<div class="qi"><span>${h(j.label)}<small>${h((j.why || [])[0] || "")}</small></span></div>`).join("") || '<div class="empty">Nothing waiting.</div>'}</div></div></div>
+        <div class="card" style="margin-top:12px"><div class="ch">Latest findings <em>· open the Research section for search and filters</em></div><div class="cb flist">${finds().slice(0, 25).map((d) => `<div class="fi"><div class="fh"><span class="ar ${d.tone > 0 ? "up" : d.tone < 0 ? "down" : "or"}">${d.tone > 0 ? "▲" : d.tone < 0 ? "▼" : "●"}</span><span>${h(d.headline)}</span></div><div class="meta">${(d.tickers || []).slice(0, 4).map((x) => `<span class="tk">${h(x)}</span>`).join("")}${h(d.cat)} · ${h(((d.sources || [])[0] || {}).name || "spider")} · ${h(when(d.u))}</div></div>`).join("") || '<div class="empty">No findings stored yet.</div>'}</div></div>
+        <div class="card" style="margin-top:12px"><div class="ch">Thought stream</div><div class="cb stream">${(sp.recent || []).slice(0, 20).map((j) => `<div><span class="t">${h(tm(j.started))}</span><span>${h(j.label)}${j.summary ? ` · <span class="dim">${h(j.summary)}</span>` : ""}</span></div>`).join("") || '<div class="empty">No jobs yet.</div>'}</div></div>`;
+    } else if (a.b) {
+      const b = a.b, raw = D.raw[a.id] || {}, list = new Map();
+      b.positions.forEach((p) => list.set(p.sym, "holding")); b.plans.forEach((p) => list.has(p.sym) || list.set(p.sym, `planned ${p.side.toLowerCase()}`));
+      if (a.id === "swing") ((raw.lastScan && raw.lastScan.top) || []).slice(0, 10).forEach((x) => list.has(x.sym) || list.set(x.sym, `candidate #${x.rank}`));
+      if (a.id === "day") ((raw.quantFactors && raw.quantFactors.top) || []).slice(0, 6).forEach((x) => list.has(x.sym) || list.set(x.sym, "top intraday score"));
+      if (a.id === "quant") ((raw.latest && raw.latest.ranked) || []).filter((x) => x.picked).forEach((x) => list.has(x.s) || list.set(x.s, "picked by factors"));
+      const extra = a.id === "quant" && raw.latest ? `<div class="note">Regime: ${h(raw.latest.regime)}${raw.latest.regimeNote ? " · " + h(raw.latest.regimeNote) : ""}</div>` : a.id === "swing" && raw.lastScan ? `<div class="note">${h(b.detail || "")}${(raw.lastScan.lessons || []).length ? ` · lessons applied: ${raw.lastScan.lessons.map((l) => l.tag).join(", ")}` : ""}</div>` : "";
+      body = `<div class="card" style="margin-top:12px"><div class="ch">Its research <em>· what it holds, plans and is weighing, with the spider's findings on each</em></div><div class="cb">${researchRows([...list.entries()].slice(0, 16))}${extra}</div></div><div id="bpDetail" style="margin-top:12px"></div>`;
+    } else if (a.id === "lab") {
+      const labs = D.bots.filter((x) => x.group === "lab");
+      body = `<div class="card" style="margin-top:12px"><div class="ch">Its research <em>· what each experiment scanned last</em></div><div class="cb">${labs.map((x) => `<div class="row"><span><b style="font-weight:500">${h(x.name)}</b><div class="note" style="margin:2px 0 0">${h(x.status)}</div></span><span class="mono ${cls(x.ret)}">${pct(x.ret, 1)}<div class="dim" style="font-size:11px">${x.openCount || 0} open · ${x.queued || 0} queued</div></span></div>`).join("") || '<div class="empty">No experiments reported yet.</div>'}</div></div>`;
+    } else {
+      const dk = D.raw.desk;
+      body = `<div class="card" style="margin-top:12px"><div class="ch">Its research <em>· the shared risk budget</em></div><div class="cb">${dk ? `<div class="row"><span>Mode</span><b style="font-weight:500">${h(dk.mode)}</b></div><div class="row"><span>Why</span><span class="muted">${h(dk.reason || "")}</span></div>${dk.state ? `<div class="row"><span>Daily loss</span><span class="mono">${money(dk.state.dailyLoss)} of ${money(dk.policy && dk.policy.hardDaily)}</span></div><div class="row"><span>Drawdown from high</span><span class="mono">${money(dk.state.drawdown)} of ${money(dk.policy && dk.policy.peakStop)}</span></div>` : ""}${dk.exposure ? `<div class="row"><span>Open stop risk</span><span class="mono">${money(dk.exposure.stopRisk)}</span></div>` : ""}` : '<div class="empty">Desk risk unavailable.</div>'}</div></div>`;
+    }
+    el.innerHTML = head + body;
+    $("bpBack").onclick = () => { G.open = true; G.uiKey = ""; show("globe"); };
+    if (a.b && $("bpDetail")) { botDetail(a.b, $("bpDetail"), () => botPage()); const dup = $("bpDetail").querySelector(".head"); if (dup) dup.closest(".card").remove(); }
+  }
+
   // ---------------------------------------------------------------- LAB
   function lab() {
     const items = D.bots.map((b) => ({ b, t: b.toughness || gates().find((g) => g.name === b.name) || null, fan: C.fan(b.trades, { start: b.start }) }));
@@ -205,7 +309,6 @@
     const count = (k) => (k === "all" ? fs.length : fs.filter((d) => clusterOf(d) === k).length);
     $("kinds").innerHTML = [["all", "Everything"], ...CLUSTERS.map((c) => [c[0], c[1]])].map(([k, l]) => `<button data-kind="${k}" class="${R2.kind === k ? "on" : ""}">${h(l)} <b>${count(k)}</b></button>`).join("");
     document.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => { R2.kind = b.dataset.kind; R2.open = null; research(); }));
-    $("mapNote").textContent = `${shown().length} of ${fs.length} findings`;
     // now reading
     const log = run ? (sp.recent || []).find((j) => j.id === run.id) : null, doneSteps = new Set(((log && log.phases) || []).map((x) => x.p)), cur = run && run.phase;
     const secs = run && run.started ? Math.round((Date.now() - run.started) / 1000) : 0;
@@ -231,41 +334,6 @@
     $("stream").innerHTML = (sp.recent || []).slice(0, 30).map((j) => `<div><span class="t">${h(tm(j.started))}</span><span>${h(j.label)}${j.summary ? `<br><span class="dim">${h(j.summary)}</span>` : ""}${j.status === "error" ? ' <span class="down">failed</span>' : j.status === "running" ? ' <span class="or">running</span>' : ""}</span></div>`).join("") || '<div class="empty">No jobs yet.</div>';
   }
   $("findQ").addEventListener("input", (e) => { R2.q = e.target.value; research(); });
-  function drawMap() {
-    if (D.view !== "research") return; const k = setup($("map")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000, now = Date.now();
-    const vis = new Set(shown().map((d) => d.id)), fs = finds(), pos = { company: [0.27, 0.32], sec: [0.62, 0.24], earnings: [0.8, 0.62], macro: [0.22, 0.74], sectors: [0.5, 0.6], portfolio: [0.84, 0.25] };
-    R2.stars = [];
-    for (const [key, label] of CLUSTERS) {
-      const items = fs.filter((d) => clusterOf(d) === key), cx = pos[key][0] * w, cy = pos[key][1] * hh, dim = R2.kind !== "all" && R2.kind !== key;
-      const g = c.createRadialGradient(cx, cy, 0, cx, cy, 120); g.addColorStop(0, `rgba(255,153,31,${dim ? 0.03 : 0.1})`); g.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = g; c.fillRect(cx - 120, cy - 120, 240, 240);
-      items.forEach((d, j) => {
-        const a = hash(d.id || d.headline) * Math.PI * 2 + t * 0.015, r = 30 + hash((d.id || d.headline) + "r") * 105, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.75;
-        const on = vis.has(d.id) && !dim, fresh = Math.max(0.25, 1 - (now - (d.u || 0)) / (3 * 864e5)), col = d.tone > 0 ? "61,220,132" : d.tone < 0 ? "255,90,90" : "255,184,92", hov = R2.hover === d.id || R2.open === d.id;
-        c.strokeStyle = `rgba(255,153,31,${on ? 0.08 : 0.02})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
-        const rad = (1.6 + (d.importance || 0.3) * 3) * (hov ? 1.8 : 1), tw = 0.75 + 0.25 * Math.sin(t * 2 + j);
-        c.fillStyle = `rgba(${col},${on ? fresh * tw : 0.12})`; if (on) { c.shadowColor = `rgb(${col})`; c.shadowBlur = hov ? 16 : 6; }
-        c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
-        if (hov) { c.strokeStyle = "#fff"; c.beginPath(); c.arc(x, y, rad + 4, 0, Math.PI * 2); c.stroke(); }
-        if (on) R2.stars.push({ x, y, r: rad + 4, d });
-      });
-      c.fillStyle = dim ? "#444" : "#fff"; if (!dim) { c.shadowColor = OR; c.shadowBlur = 16; } c.beginPath(); c.arc(cx, cy, 3.5, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
-      c.textAlign = "center"; c.font = "600 12px sans-serif"; const tw2 = c.measureText(label).width + 16;
-      c.fillStyle = "rgba(6,6,6,.85)"; c.fillRect(cx - tw2 / 2, cy + 10, tw2, 30); c.fillStyle = dim ? "#555" : "#e0e0e0"; c.fillText(label, cx, cy + 24);
-      c.font = "10px monospace"; c.fillStyle = dim ? "#444" : "#8a8a8a"; c.fillText(`${items.length} finding${items.length === 1 ? "" : "s"}`, cx, cy + 36); c.textAlign = "left";
-    }
-    if (!fs.length) { c.fillStyle = "#6b6b6b"; c.font = "13px sans-serif"; c.textAlign = "center"; c.fillText("No findings stored yet — stars appear as the spider researches.", w / 2, hh / 2); c.textAlign = "left"; }
-  }
-  const mapCv = $("map"), tip = $("mapTip");
-  const starAt = (e) => { const r = mapCv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 1e9; for (const s of R2.stars) { const dd = Math.hypot(s.x - x, s.y - y); if (dd < Math.max(9, s.r) && dd < bd) { bd = dd; best = s; } } return { best, x, y }; };
-  mapCv.addEventListener("mousemove", (e) => {
-    const { best, x, y } = starAt(e); R2.hover = best ? best.d.id : null; mapCv.style.cursor = best ? "pointer" : "default";
-    if (!best) { tip.hidden = true; return; } const d = best.d, src = (d.sources || [])[0] || {};
-    tip.innerHTML = `${h(d.headline)}<small>${(d.tickers || []).slice(0, 3).map(h).join(" · ")}${(d.tickers || []).length ? " · " : ""}${h(d.cat)} · ${h(src.name || "spider")} · ${h(ago(d.u))}</small>`;
-    tip.hidden = false; tip.style.left = Math.min(x + 14, mapCv.clientWidth - 310) + "px"; tip.style.top = Math.max(6, y - 10) + "px";
-  });
-  mapCv.addEventListener("mouseleave", () => { R2.hover = null; tip.hidden = true; });
-  mapCv.addEventListener("click", (e) => { const { best } = starAt(e); if (!best) return; R2.open = best.d.id; R2.kind = "all"; R2.q = ""; $("findQ").value = ""; research(); const el = document.querySelector(`[data-f="${CSS.escape(best.d.id)}"]`); if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" }); });
-
   // ---------------------------------------------------------------- STRATEGIES
   function strategies() {
     if (!D.bots.find((b) => b.id === D.sel) && D.bots[0]) D.sel = D.bots[0].id;
@@ -273,6 +341,10 @@
     document.querySelectorAll("[data-s]").forEach((el) => (el.onclick = () => { D.sel = el.dataset.s; D.tab = "overview"; strategies(); }));
     document.querySelectorAll("[data-sp]").forEach((cv) => { const b = D.bots.find((x) => x.id === cv.dataset.sp); if (b && b.equity.length > 1) spark(cv, b.equity.map((p) => p.v), b.ret >= 0 ? UP : DN); });
     const b = D.bots.find((x) => x.id === D.sel); if (!b) { $("sdetail").innerHTML = ""; return; }
+    botDetail(b, $("sdetail"), strategies);
+  }
+  // one bot's numbers, charts, toughness, holdings, plans and trades (used by Strategies and the bot pages)
+  function botDetail(b, root, rerender) {
     const st = C.stats(b.trades), closed = b.trades.filter((t) => t.pnl != null), wins = closed.filter((t) => t.pnl > 0), losses = closed.filter((t) => t.pnl <= 0);
     const avgW = wins.length ? wins.reduce((a, t) => a + t.pnl, 0) / wins.length : null, avgL = losses.length ? -losses.reduce((a, t) => a + t.pnl, 0) / losses.length : null;
     const dd = b.equity.length ? Math.min(...C.drawdowns(b.equity).map((d) => d.dd)) : null, hi = b.equity.length ? Math.max(...b.equity.map((p) => p.v)) : null;
@@ -285,19 +357,19 @@
         <div><small>EXPECTANCY</small><b class="${cls(closed.length ? st.net / closed.length : null)}">${closed.length ? money(st.net / closed.length) : "—"}</b><span>per trade, after costs</span></div>
         <div><small>TRADES</small><b>${b.trades.length || b.closed || 0}</b><span>${b.group === "main" ? "fills recorded" : `${b.openCount || 0} open · ${b.queued || 0} queued`}</span></div>
         <div><small>MAX DRAWDOWN</small><b class="${dd ? "down" : ""}">${dd == null ? (b.drawdown != null ? "−" + (b.drawdown * 100).toFixed(1) + "%" : "—") : (dd * 100).toFixed(1) + "%"}</b><span>${hi ? "below its high of " + money(hi) : "from its own high"}</span></div></div></div>
-      <div class="card" style="margin-top:12px"><div class="ch">Equity curve <em>· paper dollars, after costs · grey: S&amp;P 500</em><span class="r ${cls(b.ret)}">${pct(b.ret)}${b.benchRet != null ? ` · S&amp;P ${pct(b.benchRet)}` : ""}</span></div><div class="cb">${b.group === "main" ? '<canvas class="chart" id="sEq"></canvas><canvas class="chart sm" id="sDd" style="margin-top:6px"></canvas>' : '<div class="empty">Strategy Lab books record a daily snapshot; their curve shows in the main site\'s Strategy Lab table after two sessions.</div>'}</div></div>
+      <div class="card" style="margin-top:12px"><div class="ch">Equity curve <em>· paper dollars, after costs · grey: S&amp;P 500</em><span class="r ${cls(b.ret)}">${pct(b.ret)}${b.benchRet != null ? ` · S&amp;P ${pct(b.benchRet)}` : ""}</span></div><div class="cb">${b.group === "main" ? '<canvas class="chart sEq"></canvas><canvas class="chart sm sDd" style="margin-top:6px"></canvas>' : '<div class="empty">Strategy Lab books record a daily snapshot; their curve shows in the main site\'s Strategy Lab table after two sessions.</div>'}</div></div>
       <div class="grid g2" style="margin-top:12px"><div class="card"><div class="ch">Monthly robustness <em>· win or loss per month</em></div><div class="cb">${months.length ? `<div class="months">${months.map((m) => `<div class="${m.ret > 0 ? "w" : m.ret < 0 ? "l" : ""}">${h(m.m.slice(2))}<br>${pct(m.ret, 1)}</div>`).join("")}</div>` : '<div class="empty">Waiting for data: twelve boxes, green a winning month, red a losing one.</div>'}</div></div>
         <div class="card"><div class="ch">When does it work <em>· New York time</em></div><div class="cb">${closed.length ? bar(wk.weekday, (x) => x) + bar(wk.hour, (x) => (x > 12 ? x - 12 : x) + (x >= 12 ? "p" : "a")) : '<div class="empty">Waiting for data: results per weekday and hour appear after closed trades.</div>'}</div></div></div>
       ${t ? `<div class="card" style="margin-top:12px"><div class="ch">Toughness test <em>· ${h(t.label || t.status)}</em></div><div class="cb">${(t.checks || []).map((x) => `<div class="row"><span>${x.ok ? '<span class="tag ok">✓</span>' : '<span class="tag bad">✗</span>'}${h(x.label)}</span><span class="mono">${h(x.value)}</span></div>`).join("") || `<div class="muted">${h(t.detail || t.why || "")}</div>`}<div class="note">${h(t.gate || "")}</div></div></div>` : ""}
       <div class="grid g2" style="margin-top:12px"><div class="card"><div class="ch">Holding now</div><div class="cb">${b.positions.length ? `<table><tr><th>STOCK</th><th>VALUE</th><th>P&amp;L</th></tr>${b.positions.map((p) => `<tr><td>${h(p.sym)}</td><td>${money(p.value)}</td><td class="${cls(p.pnl)}">${money(p.pnl)}</td></tr>`).join("")}</table>` : '<div class="empty">No open positions.</div>'}</div></div>
         <div class="card"><div class="ch">Working on next</div><div class="cb">${b.plans.length ? b.plans.slice(0, 10).map((o) => `<div class="row"><span><span class="tag ${o.side === "BUY" ? "ok" : "bad"}">${h(o.side)}</span>${h(o.sym)} ${o.amount ? money(o.amount) : ""}<div class="note" style="margin:2px 0 0">${h(String(o.why || "").slice(0, 160))}</div></span><span class="dim">${h(o.when)}</span></div>`).join("") : '<div class="empty">Nothing queued right now.</div>'}</div></div></div>`;
-    $("sdetail").innerHTML = `<div class="card"><div class="cb head"><h2>${h(b.name)}</h2><p>${h(b.group === "main" ? "Main bot · paper account racing the S&P 500" : "Strategy Lab experiment · $30,000 paper book")}${b.detail ? " · " + h(b.detail) : ""}</p></div></div>
+    root.innerHTML = `<div class="card"><div class="cb head"><h2>${h(b.name)}</h2><p>${h(b.group === "main" ? "Main bot · paper account racing the S&P 500" : "Strategy Lab experiment · $30,000 paper book")}${b.detail ? " · " + h(b.detail) : ""}</p></div></div>
       <div class="tabs"><button data-t="overview" class="${D.tab === "overview" ? "on" : ""}">OVERVIEW</button><button data-t="trades" class="${D.tab === "trades" ? "on" : ""}">TRADES · ${b.trades.length}</button></div>${D.tab === "trades" ? trades : over}`;
-    document.querySelectorAll("[data-t]").forEach((x) => (x.onclick = () => { D.tab = x.dataset.t; strategies(); }));
-    if (D.tab === "overview" && $("sEq")) {
+    root.querySelectorAll("[data-t]").forEach((x) => (x.onclick = () => { D.tab = x.dataset.t; rerender(); }));
+    if (D.tab === "overview" && root.querySelector(".sEq")) {
       const b0 = (b.equity.find((p) => p.b != null) || {}).b;
-      line($("sEq"), [{ values: b.equity.map((p) => (p.b != null && b0 ? (p.b / b0) * b.start : NaN)), color: "#5a5a5a", width: 1 }, { values: b.equity.map((p) => p.v), color: UP, width: 1.8, fill: "rgba(61,220,132,.22)" }], { fmt: (v) => "$" + (v / 1000).toFixed(1) + "k" });
-      line($("sDd"), [{ values: C.drawdowns(b.equity).map((d) => d.dd * 100), color: DN, fill: "rgba(255,90,90,.25)" }], { fmt: (v) => v.toFixed(1) + "%", zero: true });
+      line(root.querySelector(".sEq"), [{ values: b.equity.map((p) => (p.b != null && b0 ? (p.b / b0) * b.start : NaN)), color: "#5a5a5a", width: 1 }, { values: b.equity.map((p) => p.v), color: UP, width: 1.8, fill: "rgba(61,220,132,.22)" }], { fmt: (v) => "$" + (v / 1000).toFixed(1) + "k" });
+      line(root.querySelector(".sDd"), [{ values: C.drawdowns(b.equity).map((d) => d.dd * 100), color: DN, fill: "rgba(255,90,90,.25)" }], { fmt: (v) => v.toFixed(1) + "%", zero: true });
     }
   }
 
@@ -442,11 +514,12 @@
   }
 
   // ---------------------------------------------------------------- animation loop + start
-  function frame() { try { drawBrain(); drawMap(); drawRoom(); } catch (e) { console.warn(e); } requestAnimationFrame(frame); }
+  function frame() { try { drawGlobe(); drawBrain(); drawRoom(); } catch (e) { console.warn(e); } requestAnimationFrame(frame); }
   window.addEventListener("resize", () => render());
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v !== D.view && document.getElementById("v-" + v)) show(v); });
   get("/api/health").then((x) => { if (x.mainUrl && /^https?:\/\//.test(x.mainUrl)) { $("backLink").href = x.mainUrl; $("backLink").hidden = false; } if (x.mode === "local") $("signOut").hidden = true; }).catch(() => {});
-  const start = location.hash.slice(1); if (["overview", "lab", "research", "strategies", "rules", "room", "paper", "decisions", "costs", "machines"].includes(start)) show(start); else render();
+  $("homeBtn").onclick = () => { G.open = false; show("globe"); };
+  const start = location.hash.slice(1); if (["globe", "overview", "lab", "research", "strategies", "rules", "room", "paper", "decisions", "costs", "machines"].includes(start)) show(start); else show("globe");
   loadBots(); loadSpider(); setInterval(loadBots, 30_000); setInterval(loadSpider, 5_000);
   requestAnimationFrame(frame);
 })();
