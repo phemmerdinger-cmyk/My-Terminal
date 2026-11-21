@@ -188,9 +188,9 @@
     const key = [G.open, W, H, run ? run.label : "", ins.map((x) => x.n).join(), outs.map((x) => x.n).join()].join("|");
     if (key === G.uiKey) return; G.uiKey = key;
     const ly = (i, n) => Math.round(H / 2 - ((n - 1) * 92) / 2 + i * 92 - 30);
-    ui.innerHTML = (G.open ? '<button class="gback" id="gBack">‹ outside the globe</button>' : "")
+    ui.innerHTML = ""
       + `<div class="nowline" style="top:22px"><b>NOW</b>${h(run ? `the spider: ${run.label}` : "the spider is idle")}</div>`
-      + `<div class="nowline" style="bottom:20px"><b>${G.open ? "CLICK AN AGENT" : "CLICK THE GLOBE"}</b>${G.open ? "to see its research and numbers" : "to see the six agents inside"} · <span class="dim">${h(run ? run.note || run.phase || "" : (sp.queue && sp.queue[0] ? "next: " + sp.queue[0].label : "nothing queued"))}</span></div>`
+      + `<div class="nowline" style="bottom:20px"><b>CLICK THE GLOBE</b>to go inside, where the agents sit at their desks · <span class="dim">${h(run ? run.note || run.phase || "" : (sp.queue && sp.queue[0] ? "next: " + sp.queue[0].label : "nothing queued"))}</span></div>`
       + `<div class="colhead" style="left:24px;top:${ly(0, ins.length) - 22}px">SOURCES TODAY &nbsp; Σ ${ins.reduce((a, x) => a + x.n, 0)}</div>`
       + ins.map((x, i) => `<div class="src gsrc" style="left:24px;top:${ly(i, ins.length)}px"><small>${h(x.label.toUpperCase())}</small><b>${x.n}</b><canvas></canvas></div>`).join("")
       + `<div class="colhead" style="right:24px;top:${ly(0, outs.length) - 22}px">OUTPUT</div>`
@@ -203,8 +203,8 @@
   }
   function drawGlobe() {
     if (D.view !== "globe") return; const k = setup($("globeCv")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000;
-    G.z += ((G.open ? 1 : 0) - G.z) * 0.08; G.a += 0.003 + (D.spider && D.spider.running ? 0.003 : 0);
-    const cx = w / 2, cy = hh / 2 + 6, R = Math.min(w * 0.2, hh * 0.34) * (1 + 0.45 * G.z), busy0 = !!(D.spider && D.spider.running);
+    G.z += ((G.open ? 1 : 0) - G.z) * 0.1; G.a += 0.003 + (D.spider && D.spider.running ? 0.003 : 0);
+    const cx = w / 2, cy = hh / 2 + 6, R = Math.min(w * 0.2, hh * 0.34) * (1 + 2.5 * G.z * G.z), busy0 = !!(D.spider && D.spider.running);
     // sources funnel into the globe; signals, checks and trades flow out of it
     const fade = 1 - G.z * 0.6;
     for (const f of G.flows || []) {
@@ -223,32 +223,14 @@
     for (const [x, y, z] of G.pts) { const X = x * ca + z * sa, Z = -x * sa + z * ca, d = (Z + 1) / 2, s = 0.5 + d * 1.1; c.fillStyle = `rgba(${busy ? "255,196,130" : "228,228,228"},${(0.05 + d * 0.6) * shell})`; c.fillRect(cx + X * R, cy + y * R, s, s); }
     const glow = c.createRadialGradient(cx, cy, 0, cx, cy, R); glow.addColorStop(0, `rgba(255,153,31,${0.05 + 0.12 * G.z})`); glow.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = glow; c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.fill();
     G.nodes = [];
-    if (G.z < 0.05) return;
-    // inside: the spider in the middle, five agents around it, research flowing out to each
-    const A = agents(), core = A[0], ring = A.slice(1), alpha = Math.min(1, G.z * 1.4);
-    const pos = [{ a: core, x: cx, y: cy }, ...ring.map((a, i) => { const ang = -Math.PI / 2 + (i / ring.length) * Math.PI * 2 + G.a * 0.6; return { a, x: cx + Math.cos(ang) * R * 0.64, y: cy + Math.sin(ang) * R * 0.6 }; })];
-    for (const q of pos.slice(1)) {
-      c.strokeStyle = `rgba(255,153,31,${0.25 * alpha})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(q.x, q.y); c.stroke();
-      for (let j = 0; j < 3; j++) { const f = (t * 0.35 + j / 3 + q.x * 0.001) % 1; c.fillStyle = `rgba(255,190,110,${alpha})`; c.shadowColor = OR; c.shadowBlur = 8; c.beginPath(); c.arc(cx + (q.x - cx) * f, cy + (q.y - cy) * f, 2, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0; }
-    }
-    for (const q of pos) {
-      const a = q.a, isCore = a.id === "spider", r = (isCore ? 30 : 22) * (G.hover === a.id ? 1.15 : 1), on = a.busy;
-      const g = c.createRadialGradient(q.x, q.y, 0, q.x, q.y, r * 2.4); g.addColorStop(0, `rgba(255,153,31,${(on ? 0.35 : 0.15) * alpha})`); g.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = g; c.beginPath(); c.arc(q.x, q.y, r * 2.4, 0, Math.PI * 2); c.fill();
-      c.fillStyle = `rgba(10,10,10,${0.92 * alpha})`; c.strokeStyle = G.hover === a.id ? "#fff" : on ? OR : "#5a5a5a"; c.lineWidth = 1.5; c.beginPath(); c.arc(q.x, q.y, r, 0, Math.PI * 2); c.fill(); c.stroke(); c.lineWidth = 1;
-      if (on) { c.strokeStyle = `rgba(255,153,31,${0.5 * (1 - (t % 1))})`; c.beginPath(); c.arc(q.x, q.y, r + 6 + (t % 1) * 10, 0, Math.PI * 2); c.stroke(); }
-      c.fillStyle = `rgba(255,153,31,${alpha})`; c.font = `600 ${isCore ? 13 : 11}px monospace`; c.textAlign = "center"; c.fillText(({ spider: "SPIDER", swing: "SWING", day: "DAY", quant: "QUANT", lab: "LAB", risk: "RISK" })[a.id] || a.id, q.x, q.y + 4);
-      c.fillStyle = `rgba(230,230,230,${alpha})`; c.font = "600 11px monospace"; c.fillText(a.name, q.x, q.y + r + 18);
-      c.fillStyle = `rgba(150,150,150,${alpha})`; c.font = "11px sans-serif"; c.fillText(String(a.now).slice(0, 42), q.x, q.y + r + 33); c.textAlign = "left";
-      G.nodes.push({ id: a.id, x: q.x, y: q.y, r: r + 14 });
-    }
   }
   (() => {
     const cv = $("globeCv"), pick = (e) => { const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; return { x, y, node: G.nodes.find((n) => Math.hypot(n.x - x, n.y - y) < n.r) }; };
     cv.addEventListener("mousemove", (e) => { const { node } = pick(e); G.hover = node ? node.id : null; });
     cv.addEventListener("click", (e) => {
       const { x, y, node } = pick(e), r = cv.getBoundingClientRect(), cx = r.width / 2, cy = r.height / 2 + 6, R = Math.min(r.width * 0.2, r.height * 0.34) * (1 + 0.45 * G.z);
-      if (G.open && node) { D.botId = node.id; D.tab = "overview"; show("bot"); return; }
-      const inside = Math.hypot(x - cx, y - cy) < R; G.open = G.open ? inside || !!node : inside; G.uiKey = ""; globeUi();
+      if (Math.hypot(x - cx, y - cy) > R || G.open) return;
+      G.open = true; setTimeout(() => { show("room"); G.open = false; G.z = 0; G.uiKey = ""; }, 650);
     });
   })();
 
@@ -265,7 +247,7 @@
   function botPage(light) {
     const a = agents().find((x) => x.id === D.botId) || agents()[0]; if (!a) return;
     if (light && a.id !== "spider") return;
-    const el = $("botPage"), head = `<div class="card"><div class="bothead"><button class="gback" style="position:static;margin-right:4px" id="bpBack">‹ globe</button><div class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ff991f" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></div>
+    const el = $("botPage"), head = `<div class="card"><div class="bothead"><button class="gback" style="position:static;margin-right:4px" id="bpBack">‹ agent room</button><div class="ico"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ff991f" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg></div>
       <div><h2>${h(a.name)}</h2><p>${h(a.role)}</p></div><div class="st"><span class="tag ${a.busy ? "warn" : ""}">${a.busy ? "working" : "idle"}</span><div style="margin-top:6px">${h(String(a.now).slice(0, 80))}</div></div></div></div>`;
     let body = "";
     if (a.id === "spider") {
@@ -290,7 +272,7 @@
       body = `<div class="card" style="margin-top:12px"><div class="ch">Its research <em>· the shared risk budget</em></div><div class="cb">${dk ? `<div class="row"><span>Mode</span><b style="font-weight:500">${h(dk.mode)}</b></div><div class="row"><span>Why</span><span class="muted">${h(dk.reason || "")}</span></div>${dk.state ? `<div class="row"><span>Daily loss</span><span class="mono">${money(dk.state.dailyLoss)} of ${money(dk.policy && dk.policy.hardDaily)}</span></div><div class="row"><span>Drawdown from high</span><span class="mono">${money(dk.state.drawdown)} of ${money(dk.policy && dk.policy.peakStop)}</span></div>` : ""}${dk.exposure ? `<div class="row"><span>Open stop risk</span><span class="mono">${money(dk.exposure.stopRisk)}</span></div>` : ""}` : '<div class="empty">Desk risk unavailable.</div>'}</div></div>`;
     }
     el.innerHTML = head + body;
-    $("bpBack").onclick = () => { G.open = true; G.uiKey = ""; show("globe"); };
+    $("bpBack").onclick = () => show("room");
     if (a.b && $("bpDetail")) { botDetail(a.b, $("bpDetail"), () => botPage()); const dup = $("bpDetail").querySelector(".head"); if (dup) dup.closest(".card").remove(); }
   }
 
@@ -470,9 +452,9 @@
       c.fillStyle = "#e8e8e8"; c.beginPath(); c.arc(head[0], head[1], r, 0, Math.PI * 2); c.fill();
       c.strokeStyle = on ? OR : "#7a7a7a"; c.lineWidth = 3; c.beginPath(); c.arc(head[0], head[1], r * 1.1, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); c.lineWidth = 1;
       if (a.busy) { c.strokeStyle = "rgba(255,153,31,.5)"; c.beginPath(); c.arc(head[0], head[1], r * (1.6 + (t % 1)), 0, Math.PI * 2); c.stroke(); }
-      const lp = p(a.x, 0, a.z + dz + 1.5); c.textAlign = "center"; c.font = "600 11px monospace"; c.fillStyle = sel ? "#fff" : a.busy ? OR : "#8a8a8a"; c.fillText(a.name, lp[0], lp[1]);
-      c.font = "11px sans-serif"; c.fillStyle = "#bdbdbd"; c.fillText(String(a.now).slice(0, 48), lp[0], lp[1] + 15); c.textAlign = "left";
-      const xs = [...topPts.map((q) => q[0]), head[0]], ys = [...topPts.map((q) => q[1]), head[1] - r, lp[1] + 18];
+      const lp = p(a.x, 0, a.z + dz + 0.55); lp[1] = head[1] - r * 2.4; /* name floats above the agent's head */ c.textAlign = "center"; c.font = "600 11px monospace"; c.fillStyle = sel ? "#fff" : a.busy ? OR : "#8a8a8a"; c.fillText(a.name, lp[0], lp[1]);
+      c.font = "11px sans-serif"; c.fillStyle = "#bdbdbd"; c.fillText(String(a.now).slice(0, 48), lp[0], lp[1] + 14); c.textAlign = "left";
+      const xs = [...topPts.map((q) => q[0]), head[0]], ys = [...topPts.map((q) => q[1]), head[1] + r * 2, lp[1] - 12];
       room.hits.push({ id: a.id, x0: Math.min(...xs) - 12, x1: Math.max(...xs) + 12, y0: Math.min(...ys) - 50, y1: Math.max(...ys) });
     });
   }
@@ -482,7 +464,7 @@
   window.addEventListener("mouseup", (e) => {
     const d = room.drag; room.drag = null; if (!d || d.moved || e.target !== rc) return;
     const r = rc.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, hit = room.hits.slice().reverse().find((k) => x >= k.x0 && x <= k.x1 && y >= k.y0 && y <= k.y1);
-    D.agent = hit ? hit.id : null; agentCard();
+    if (hit) { D.botId = hit.id; D.tab = "overview"; show("bot"); }
   });
   function agentCard() {
     const el = $("agent"), a = agents().find((x) => x.id === D.agent); if (!a) { el.hidden = true; return; } el.hidden = false;
@@ -534,6 +516,7 @@
   window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v !== D.view && document.getElementById("v-" + v)) show(v); });
   get("/api/health").then((x) => { if (x.mainUrl && /^https?:\/\//.test(x.mainUrl)) { $("backLink").href = x.mainUrl; $("backLink").hidden = false; } if (x.mode === "local") $("signOut").hidden = true; }).catch(() => {});
   $("homeBtn").onclick = () => { G.open = false; show("globe"); };
+  $("roomBack").onclick = () => show("globe");
   const start = location.hash.slice(1); if (["globe", "overview", "lab", "research", "strategies", "rules", "room", "paper", "decisions", "costs", "machines"].includes(start)) show(start); else show("globe");
   loadBots(); loadSpider(); setInterval(loadBots, 30_000); setInterval(loadSpider, 5_000);
   requestAnimationFrame(frame);
