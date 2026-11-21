@@ -53,7 +53,9 @@
   async function loadBots() {
     const names = ["autopilot", "daytrader", "quanttrader", "strategy-lab", "desk-risk", "brief", "web/signals", "web/discoveries?limit=200", "system/health"];
     const res = await Promise.allSettled(names.map((n) => get("/api/" + n)));
-    const v = (i) => (res[i].status === "fulfilled" ? res[i].value : null);
+    // a request that fails (e.g. while the public server restarts after an update) keeps the last good answer
+    const keys = ["swing", "day", "quant", "lab", "desk", "brief", "signals", "finds", "sys"], prev = D.raw || {};
+    const v = (i) => (res[i].status === "fulfilled" ? res[i].value : prev[keys[i]] || null);
     D.raw = { swing: v(0), day: v(1), quant: v(2), lab: v(3), desk: v(4), brief: v(5), signals: v(6), finds: v(7), sys: v(8) };
     const bad = res.filter((r) => r.status === "rejected");
     $("errBox").innerHTML = bad.length === names.length ? `<div class="err">Bot HQ can't reach the bots (${h(bad[0].reason && bad[0].reason.message)}). Keep Market Desk running, or sign in.</div>` : "";
@@ -442,6 +444,7 @@
   // ---------------------------------------------------------------- animation loop + start
   function frame() { try { drawBrain(); drawMap(); drawRoom(); } catch (e) { console.warn(e); } requestAnimationFrame(frame); }
   window.addEventListener("resize", () => render());
+  window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (v !== D.view && document.getElementById("v-" + v)) show(v); });
   get("/api/health").then((x) => { if (x.mainUrl && /^https?:\/\//.test(x.mainUrl)) { $("backLink").href = x.mainUrl; $("backLink").hidden = false; } if (x.mode === "local") $("signOut").hidden = true; }).catch(() => {});
   const start = location.hash.slice(1); if (["overview", "lab", "research", "strategies", "rules", "room", "paper", "decisions", "costs", "machines"].includes(start)) show(start); else render();
   loadBots(); loadSpider(); setInterval(loadBots, 30_000); setInterval(loadSpider, 5_000);
