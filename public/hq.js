@@ -186,36 +186,83 @@
   }
 
   // ---------------------------------------------------------------- RESEARCH
-  const CLUSTERS = [["Company & movers", ["company", "mover", "news"]], ["SEC filings", ["filing", "insider", "fundamentals"]], ["Earnings", ["earnings"]], ["Macro & policy", ["macro", "policy", "market"]], ["Sectors & patterns", ["sector", "pattern"]], ["Your portfolio", ["portfolio", "ai_trader"]]];
+  const CLUSTERS = [["company", "Company & movers", ["company", "mover", "news"]], ["sec", "SEC filings", ["filing", "insider", "fundamentals"]], ["earnings", "Earnings", ["earnings"]],
+    ["macro", "Macro & policy", ["macro", "policy", "market"]], ["sectors", "Sectors & patterns", ["sector", "pattern"]], ["portfolio", "Your portfolio", ["portfolio", "ai_trader"]]];
+  const STEPS = [["fetch", "Fetching sources"], ["analyze", "Analyzing"], ["connect", "Connecting to what it knows"], ["discover", "Writing findings"], ["save", "Saving"]];
   const hash = (s) => { let x = 2166136261; for (const ch of String(s)) x = Math.imul(x ^ ch.charCodeAt(0), 16777619); return (x >>> 0) / 4294967296; };
+  const R2 = { kind: "all", q: "", open: null, stars: [], hover: null };
+  const clusterOf = (d) => (CLUSTERS.find((c) => c[2].includes(d.cat)) || CLUSTERS[0])[0];
+  const ago = (t) => { if (!t) return ""; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago"; };
+  function shown() {
+    const q = R2.q.trim().toLowerCase();
+    return finds().filter((d) => (R2.kind === "all" || clusterOf(d) === R2.kind) && (!q || (d.headline + " " + (d.tickers || []).join(" ") + " " + d.cat).toLowerCase().includes(q)));
+  }
   function research() {
-    const fs = finds(), sp = D.spider || {}, run = sp.running; $("mapNote").textContent = `${fs.length} recent findings`;
-    const sym = run && run.sym ? run.sym : null, rel = fs.filter((d) => (sym ? (d.tickers || []).includes(sym) : true)).slice(0, 5);
-    const done = run && run.started ? Math.min(0.95, (Date.now() - run.started) / 90e3) : 0;
-    $("readSrc").textContent = run ? (run.area || "") : "";
-    $("reading").innerHTML = run ? `<h4>${h(run.label)}</h4><div class="prog"><s style="width:${Math.round(done * 100)}%"></s></div><div class="dim mono" style="font-size:11px">${h(run.note || run.phase || "working")}</div>
-      <div class="quote">${rel.map((d, i) => `<span class="${i === 0 ? "cur" : ""}">${h(d.headline).replace(/\b([A-Z]{2,5})\b/g, (m) => ((d.tickers || []).includes(m) ? `<span class="hl">${m}</span>` : m))}</span>`).join("<br>") || "Collecting sources…"}</div>
-      <div class="chips">${[...new Set(rel.flatMap((d) => d.tickers || []))].slice(0, 6).map((t) => `<span>${h(t)}</span>`).join("")}</div>`
-      : `<h4>Idle</h4><div class="muted" style="font-size:13px">Next up: ${h((sp.queue && sp.queue[0] && sp.queue[0].label) || "nothing queued")}</div>`;
-    $("stream").innerHTML = (sp.recent || []).slice(0, 30).map((j) => `<div><span class="t">${h(tm(j.started))}</span><span>${h(j.label)}${j.summary ? ` · <span class="dim">${h(j.summary)}</span>` : ""}${j.status === "error" ? ' <span class="down">failed</span>' : ""}</span></div>`).join("") || '<div class="empty">No jobs yet.</div>';
+    const fs = finds(), sp = D.spider || {}, run = sp.running;
+    // kind filter buttons
+    const count = (k) => (k === "all" ? fs.length : fs.filter((d) => clusterOf(d) === k).length);
+    $("kinds").innerHTML = [["all", "Everything"], ...CLUSTERS.map((c) => [c[0], c[1]])].map(([k, l]) => `<button data-kind="${k}" class="${R2.kind === k ? "on" : ""}">${h(l)} <b>${count(k)}</b></button>`).join("");
+    document.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => { R2.kind = b.dataset.kind; R2.open = null; research(); }));
+    $("mapNote").textContent = `${shown().length} of ${fs.length} findings`;
+    // now reading
+    const log = run ? (sp.recent || []).find((j) => j.id === run.id) : null, doneSteps = new Set(((log && log.phases) || []).map((x) => x.p)), cur = run && run.phase;
+    const secs = run && run.started ? Math.round((Date.now() - run.started) / 1000) : 0;
+    $("readSrc").textContent = run ? run.area || "" : "";
+    const rel = run && run.sym ? fs.filter((d) => (d.tickers || []).includes(run.sym)).slice(0, 3) : [];
+    $("reading").innerHTML = run ? `<h4>${h(run.label)}</h4><div class="dim mono" style="font-size:11px">${h(run.note || "working")} · ${secs}s</div>
+      <div class="steps">${STEPS.map(([k, l]) => `<div class="${k === cur ? "on" : doneSteps.has(k) ? "done" : ""}">${h(l)}</div>`).join("")}</div>
+      ${rel.length ? `<div class="quote">${rel.map((d, i) => `<span class="${i === 0 ? "cur" : ""}">${h(d.headline)}</span>`).join("<br>")}</div>` : ""}
+      ${(run.why || []).length ? `<div class="note">Why now: ${h(run.why.join(" · "))}</div>` : ""}`
+      : `<h4>Resting between jobs</h4><div class="muted" style="font-size:13px">${sp.stats && sp.stats.budget ? `${sp.stats.budget.used} of ${sp.stats.budget.max} research jobs used this hour.` : ""} Next job starts on its schedule.</div>`;
+    // queue
+    const q = sp.queue || []; $("queueN").textContent = q.length ? `${sp.queued || q.length} waiting` : "";
+    $("queue").innerHTML = q.length ? q.slice(0, 6).map((j) => `<div class="qi"><span>${h(j.label)}<small>${h((j.why || [])[0] || j.area || "")}</small></span><span class="sc" title="priority score">${Number.isFinite(j.score) ? j.score.toFixed(2) : ""}</span></div>`).join("") : '<div class="empty">Nothing waiting.</div>';
+    // findings list
+    const L = shown().slice(0, 60), fkey = L.map((d) => d.id + d.u).join("|") + R2.open;
+    if (fkey !== R2.fkey) { R2.fkey = fkey; $("flist").innerHTML = L.length ? L.map((d) => { const open = R2.open === d.id, src = (d.sources || [])[0] || {};
+      return `<div class="fi ${open ? "sel" : ""}" data-f="${h(d.id)}"><div class="fh"><span class="ar ${d.tone > 0 ? "up" : d.tone < 0 ? "down" : "or"}">${d.tone > 0 ? "▲" : d.tone < 0 ? "▼" : "●"}</span><span>${h(d.headline)}</span></div>
+        <div class="meta">${(d.tickers || []).slice(0, 4).map((t) => `<span class="tk">${h(t)}</span>`).join("")}${h(d.cat)} · ${h(src.name || "spider")} · ${h(ago(d.u))}</div>
+        ${open ? `<div class="more">${h(d.summary || "")}${d.interp && d.interp.text ? `<div style="margin-top:6px"><b style="font-weight:500;color:var(--text)">What it means:</b> ${h(d.interp.text)}</div>` : ""}<div style="margin-top:6px">${(d.sources || []).filter((x) => x.url && /^https?:\/\//.test(x.url)).slice(0, 3).map((x) => `<a href="${h(x.url)}" target="_blank" rel="noopener noreferrer">${h(x.name)} ↗</a>`).join("")}</div></div>` : ""}</div>`; }).join("")
+      : `<div class="empty">${fs.length ? "No findings match." : "The spider hasn't stored any findings yet."}</div>`;
+    document.querySelectorAll("[data-f]").forEach((el) => (el.onclick = (e) => { if (e.target.closest("a")) return; R2.open = R2.open === el.dataset.f ? null : el.dataset.f; research(); })); }
+    // thought stream
+    $("stream").innerHTML = (sp.recent || []).slice(0, 30).map((j) => `<div><span class="t">${h(tm(j.started))}</span><span>${h(j.label)}${j.summary ? `<br><span class="dim">${h(j.summary)}</span>` : ""}${j.status === "error" ? ' <span class="down">failed</span>' : j.status === "running" ? ' <span class="or">running</span>' : ""}</span></div>`).join("") || '<div class="empty">No jobs yet.</div>';
   }
+  $("findQ").addEventListener("input", (e) => { R2.q = e.target.value; research(); });
   function drawMap() {
-    if (D.view !== "research") return; const k = setup($("map")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000, fs = finds();
-    const pos = [[0.32, 0.36], [0.64, 0.26], [0.74, 0.68], [0.24, 0.74], [0.5, 0.56], [0.86, 0.42]];
-    CLUSTERS.forEach(([label, cats], i) => {
-      const items = fs.filter((d) => cats.includes(d.cat)), cx = pos[i][0] * w, cy = pos[i][1] * hh;
-      const g = c.createRadialGradient(cx, cy, 0, cx, cy, 130); g.addColorStop(0, "rgba(255,153,31,.10)"); g.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = g; c.fillRect(cx - 130, cy - 130, 260, 260);
+    if (D.view !== "research") return; const k = setup($("map")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000, now = Date.now();
+    const vis = new Set(shown().map((d) => d.id)), fs = finds(), pos = { company: [0.27, 0.32], sec: [0.62, 0.24], earnings: [0.8, 0.62], macro: [0.22, 0.74], sectors: [0.5, 0.6], portfolio: [0.84, 0.25] };
+    R2.stars = [];
+    for (const [key, label] of CLUSTERS) {
+      const items = fs.filter((d) => clusterOf(d) === key), cx = pos[key][0] * w, cy = pos[key][1] * hh, dim = R2.kind !== "all" && R2.kind !== key;
+      const g = c.createRadialGradient(cx, cy, 0, cx, cy, 120); g.addColorStop(0, `rgba(255,153,31,${dim ? 0.03 : 0.1})`); g.addColorStop(1, "rgba(255,153,31,0)"); c.fillStyle = g; c.fillRect(cx - 120, cy - 120, 240, 240);
       items.forEach((d, j) => {
-        const a = hash(d.id || d.headline) * Math.PI * 2 + t * 0.02, r = 18 + hash((d.id || d.headline) + "r") * 85, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.8;
-        c.strokeStyle = "rgba(255,153,31,.10)"; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
-        const tw = 0.6 + 0.4 * Math.sin(t * 2 + j), col = d.tone > 0 ? "61,220,132" : d.tone < 0 ? "255,90,90" : "255,184,92";
-        c.fillStyle = `rgba(${col},${0.5 + 0.5 * tw})`; c.shadowColor = `rgb(${col})`; c.shadowBlur = 6; c.beginPath(); c.arc(x, y, 1.6 + (d.importance || 0.3) * 2, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
+        const a = hash(d.id || d.headline) * Math.PI * 2 + t * 0.015, r = 30 + hash((d.id || d.headline) + "r") * 105, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r * 0.75;
+        const on = vis.has(d.id) && !dim, fresh = Math.max(0.25, 1 - (now - (d.u || 0)) / (3 * 864e5)), col = d.tone > 0 ? "61,220,132" : d.tone < 0 ? "255,90,90" : "255,184,92", hov = R2.hover === d.id || R2.open === d.id;
+        c.strokeStyle = `rgba(255,153,31,${on ? 0.08 : 0.02})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+        const rad = (1.6 + (d.importance || 0.3) * 3) * (hov ? 1.8 : 1), tw = 0.75 + 0.25 * Math.sin(t * 2 + j);
+        c.fillStyle = `rgba(${col},${on ? fresh * tw : 0.12})`; if (on) { c.shadowColor = `rgb(${col})`; c.shadowBlur = hov ? 16 : 6; }
+        c.beginPath(); c.arc(x, y, rad, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
+        if (hov) { c.strokeStyle = "#fff"; c.beginPath(); c.arc(x, y, rad + 4, 0, Math.PI * 2); c.stroke(); }
+        if (on) R2.stars.push({ x, y, r: rad + 4, d });
       });
-      c.fillStyle = "#fff"; c.shadowColor = OR; c.shadowBlur = 18; c.beginPath(); c.arc(cx, cy, 3.5, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
-      c.strokeStyle = "rgba(255,255,255,.22)"; c.beginPath(); c.moveTo(cx - 60, cy); c.lineTo(cx + 60, cy); c.stroke();
-      c.textAlign = "center"; c.font = "12px sans-serif"; c.fillStyle = "#d8d8d8"; c.fillText(label, cx, cy - 16); c.font = "10px monospace"; c.fillStyle = "#6b6b6b"; c.fillText(`${items.length} findings`, cx, cy - 4); c.textAlign = "left";
-    });
+      c.fillStyle = dim ? "#444" : "#fff"; if (!dim) { c.shadowColor = OR; c.shadowBlur = 16; } c.beginPath(); c.arc(cx, cy, 3.5, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
+      c.textAlign = "center"; c.font = "600 12px sans-serif"; const tw2 = c.measureText(label).width + 16;
+      c.fillStyle = "rgba(6,6,6,.85)"; c.fillRect(cx - tw2 / 2, cy + 10, tw2, 30); c.fillStyle = dim ? "#555" : "#e0e0e0"; c.fillText(label, cx, cy + 24);
+      c.font = "10px monospace"; c.fillStyle = dim ? "#444" : "#8a8a8a"; c.fillText(`${items.length} finding${items.length === 1 ? "" : "s"}`, cx, cy + 36); c.textAlign = "left";
+    }
+    if (!fs.length) { c.fillStyle = "#6b6b6b"; c.font = "13px sans-serif"; c.textAlign = "center"; c.fillText("No findings stored yet — stars appear as the spider researches.", w / 2, hh / 2); c.textAlign = "left"; }
   }
+  const mapCv = $("map"), tip = $("mapTip");
+  const starAt = (e) => { const r = mapCv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; let best = null, bd = 1e9; for (const s of R2.stars) { const dd = Math.hypot(s.x - x, s.y - y); if (dd < Math.max(9, s.r) && dd < bd) { bd = dd; best = s; } } return { best, x, y }; };
+  mapCv.addEventListener("mousemove", (e) => {
+    const { best, x, y } = starAt(e); R2.hover = best ? best.d.id : null; mapCv.style.cursor = best ? "pointer" : "default";
+    if (!best) { tip.hidden = true; return; } const d = best.d, src = (d.sources || [])[0] || {};
+    tip.innerHTML = `${h(d.headline)}<small>${(d.tickers || []).slice(0, 3).map(h).join(" · ")}${(d.tickers || []).length ? " · " : ""}${h(d.cat)} · ${h(src.name || "spider")} · ${h(ago(d.u))}</small>`;
+    tip.hidden = false; tip.style.left = Math.min(x + 14, mapCv.clientWidth - 310) + "px"; tip.style.top = Math.max(6, y - 10) + "px";
+  });
+  mapCv.addEventListener("mouseleave", () => { R2.hover = null; tip.hidden = true; });
+  mapCv.addEventListener("click", (e) => { const { best } = starAt(e); if (!best) return; R2.open = best.d.id; R2.kind = "all"; R2.q = ""; $("findQ").value = ""; research(); const el = document.querySelector(`[data-f="${CSS.escape(best.d.id)}"]`); if (el) el.scrollIntoView({ block: "nearest", behavior: "smooth" }); });
 
   // ---------------------------------------------------------------- STRATEGIES
   function strategies() {
