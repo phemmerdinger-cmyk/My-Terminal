@@ -3380,6 +3380,26 @@ const strategyLab = LAB.createStrategyLab({
       i ? r.value.trim().split(/\r?\n/).slice(1).join("\n") : r.value.trim()).join("\n");
   },
   liveDesk: () => deskRisk.view(),
+  // inputs for the earnings-drift and insider-buying lab bots (the same free sources the swing bot and spider use)
+  events: async () => {
+    const sp = new Set(SP500.map((r) => r[0]));
+    const earnings = (await apEarnings()).filter((e) => e.epsActual != null && e.epsEstimate != null && Math.abs(e.epsEstimate) >= 0.01 && sp.has(e.symbol))
+      .map((e) => ({ symbol: ySym(e.symbol), date: e.date, hour: e.hour || null, surprise: (e.epsActual - e.epsEstimate) / Math.abs(e.epsEstimate) }))
+      .filter((e) => e.surprise >= 0.05).sort((a, b) => b.surprise - a.surprise).slice(0, 25);
+    const by = new Map();
+    try {
+      for (const d of SPIDER ? SPIDER.discoveries({ cat: "insider", since: Date.now() - 10 * 864e5, limit: 200 }).items : []) {
+        if (!(d.tone > 0)) continue;
+        // the spider writes "SYM: N insiders bought $X on the open market (90 days)" from Form 4 code-P trades
+        const m = /: (\d+) insiders? bought/.exec(d.headline || ""), buyers = m ? +m[1] : d.tone >= 2 ? 2 : 1;
+        for (const tk of (d.tickers || []).slice(0, 1)) {
+          const k = ySym(tk), e = by.get(k);
+          if (!e || d.u > e.lastAt) by.set(k, { symbol: k, buyers: Math.max(buyers, e ? e.buyers : 0), lastAt: d.u, headline: d.headline, source: (d.sources && d.sources[0] && d.sources[0].name) || "SEC Form 4" });
+        }
+      }
+    } catch {}
+    return { earnings, insider: [...by.values()].sort((a, b) => b.buyers - a.buyers).slice(0, 15) };
+  },
 });
 if (!process.env.AP_TEST && DEPLOY.runJobs) setTimeout(() => {
   strategyLab.tick();

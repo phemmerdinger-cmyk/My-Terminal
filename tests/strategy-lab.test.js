@@ -67,3 +67,24 @@ test("lab falls back to the Treasury's 3-month par yield when FRED is unreachabl
   assert.match(riskFree.source, /U.S. Treasury/);
   assert.deepEqual(errors, []);
 });
+
+test("lab fills the extra bots' queued orders at the verified open and lists them as experiments", async () => {
+  const Extra = require("../extra-bots-runner.js");
+  const day = "2026-11-18", opening = Date.parse(day + "T14:30:00Z"), observed = opening + 65_000;
+  const extra = Extra.freshExtraBots(opening);
+  extra.books.insider.pending.push({ side: "BUY", symbol: "ACME", openDay: day, signalDay: "2026-11-17", signalAt: opening - 16 * 3_600_000, reason: "2 insiders bought", slots: 6 });
+  let state = { since: opening - 86_400_000, swing: freshSwingShadows(opening), pairs: freshPairShadows(), extra, records: [], borrow: {} };
+  const lab = createStrategyLab({
+    store: { get: async () => state, set: async (_, next) => { state = next; } },
+    clock: () => ({ day, min: 571, trading: true, close: 960 }), now: () => observed,
+    bars: async (symbol) => (symbol === "ACME" ? [{ d: day, t: opening / 1000, o: 50 }] : []),
+    rates: async () => "observation_date,DGS3MO\n2026-11-17,4.25",
+  });
+  await lab.tick();
+  const pos = state.extra.books.insider.positions.ACME;
+  assert.ok(pos && pos.shares === Math.floor(5000 / pos.entry));
+  const view = await lab.view();
+  const row = view.experiments.find((e) => e.id === "extra-insider");
+  assert.equal(row.positions, 1);
+  assert.deepEqual(view.experiments.map((e) => e.id).filter((id) => id.startsWith("extra-")), ["extra-pullback", "extra-rotation", "extra-earnings", "extra-insider"]);
+});
