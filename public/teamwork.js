@@ -1,5 +1,5 @@
 /* Bots × spider teamwork UI (owner / private desk only; the server 404s these routes for visitors).
- *  - Morning Brief tab: overnight spider findings, each bot's plan for the open, today's earnings, risk flags,
+ *  - Morning brief pop-up (once a day, and from the ☀ Brief button): overnight spider findings, each bot's plan for the open, today's earnings, risk flags,
  *    plus the spider-vs-no-spider twin, lessons from losing trades and recent pre-buy checks.
  *  - Research → "Why" subtab: every bot's view of one stock and the spider's evidence.
  * Thin UI: all rules live in bot-teamwork-core.js on the server. Nothing here is estimated. */
@@ -25,22 +25,36 @@
 .tw-flag.high{color:var(--down,#ff5a5a)}.tw-flag.med{color:var(--orange,#ff991f)}.tw-flag.low{color:var(--muted,#8a8a8a)}
 .tw-big{font-size:22px;font-weight:700}.tw-kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0}
 .tw-tag{display:inline-block;border:1px solid var(--line,#333);border-radius:999px;padding:1px 8px;font-size:11px;margin:0 4px 4px 0}
+#briefModal .modal-box{width:min(1180px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:20px}
+.tw-head{display:flex;align-items:flex-start;gap:10px}.tw-head>div{flex:1}.tw-head h2{margin:4px 0 6px;font-size:22px}
 .tw-v-veto{color:var(--down,#ff5a5a);font-weight:700}.tw-v-ok{color:var(--up,#3ddc84);font-weight:700}.tw-v-caution{color:var(--orange,#ff991f);font-weight:700}`;
   document.head.appendChild(css);
 
   // ---------------------------------------------------------------- Morning Brief
   let briefBusy = false;
-  async function openBrief(force) {
-    const el = document.getElementById("tab-brief"); if (!el || briefBusy) return;
-    if (!el.dataset.ready || force) el.innerHTML = '<div class="fx-empty"><span class="spin"></span> Putting the morning brief together…</div>';
-    el.dataset.ready = "1"; briefBusy = true;
+  function modal() {
+    let m = document.getElementById("briefModal");
+    if (!m) {
+      m = document.createElement("div"); m.className = "modal"; m.id = "briefModal"; m.hidden = true;
+      m.innerHTML = '<div class="modal-box" role="dialog" aria-modal="true" aria-label="Morning brief"></div>';
+      m.onclick = (e) => { if (e.target === m || e.target.closest("[data-tw-close]")) m.hidden = true; };
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") m.hidden = true; });
+      document.body.appendChild(m);
+    }
+    return m;
+  }
+  async function openBrief() {
+    if (briefBusy) return;
+    const m = modal(), el = m.firstElementChild; m.hidden = false;
+    el.innerHTML = '<div class="fx-empty"><span class="spin"></span> Putting the morning brief together…</div>';
+    briefBusy = true;
     try {
       const [b, ap] = await Promise.all([get("/api/brief"), get("/api/autopilot").catch(() => null)]);
       el.innerHTML = briefHtml(b, ap && ap.teamwork);
       const r = el.querySelector("[data-tw-refresh]"); if (r) r.onclick = () => openBrief(true);
-      el.querySelectorAll("[data-tw-sym]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); if (typeof openQuote === "function") { openQuote(a.dataset.twSym); S.rq.sub = "why"; if (typeof setTab === "function") setTab("research"); } }));
+      el.querySelectorAll("[data-tw-sym]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); m.hidden = true; if (typeof openQuote === "function") { openQuote(a.dataset.twSym); S.rq.sub = "why"; if (typeof setTab === "function") setTab("research"); } }));
     } catch (e) {
-      el.innerHTML = `<div class="fx-empty">The morning brief is unavailable: ${h(e.message)}. It needs the private desk (the bots and the spider run on the server).</div>`;
+      el.innerHTML = `<div class="tw-head"><div></div><button class="ac-x" data-tw-close aria-label="Close">✕</button></div><div class="fx-empty">The morning brief is unavailable: ${h(e.message)}. It needs the private desk (the bots and the spider run on the server).</div>`;
     } finally { briefBusy = false; }
   }
   const symLink = (s) => `<a href="#research/${h(s)}" data-tw-sym="${h(s)}">${h(s)}</a>`;
@@ -49,8 +63,8 @@
     const found = b.overnight.length ? b.overnight.map((d) => `<div class="tw-row"><span class="${toneCls(d.tone)}">${d.tone > 0 ? "▲" : d.tone < 0 ? "▼" : "•"}</span> ${h(d.headline)} ${(d.tickers || []).slice(0, 3).map(symLink).join(" ")}<br><span class="tw-dim">${h(d.cat)} · ${when(d.at)}</span>${src(d.sources)}</div>`).join("") : '<div class="tw-row tw-dim">The spider has no new findings since the last close.</div>';
     const plans = b.plans.map((p) => `<div class="tw-row"><b>${h(p.bot)}</b>${p.at ? ` <span class="tw-dim">· planned ${when(p.at)}</span>` : ""}${p.orders.length ? p.orders.slice(0, 10).map((o) => `<div><span class="${o.side === "BUY" ? "up" : "down"}">${h(o.side)}</span> ${symLink(o.sym)} ${o.amount ? money(o.amount) : ""} <span class="tw-dim">${h(String(o.why || "").slice(0, 150))}</span></div>`).join("") : `<div class="tw-dim">${h(p.empty)}</div>`}</div>`).join("");
     const earn = b.earningsToday.length ? b.earningsToday.slice(0, 14).map((e) => `<div class="tw-kv"><span>${symLink(e.sym)}${e.relevant ? ' <span class="tw-tag">held / on the bots\' list</span>' : ""}</span><span class="tw-dim">${e.hour === "bmo" ? "before the open" : e.hour === "amc" ? "after the close" : "time not given"}${e.epsEstimate != null ? ` · EPS est. ${e.epsEstimate}` : ""}</span></div>`).join("") : '<div class="tw-row tw-dim">No earnings reports on the calendar today (Finnhub).</div>';
-    return `<div class="fx-head"><div><div class="fx-kick">☀ MORNING BRIEF · ${h(b.day)}</div><h1>Before the opening bell</h1>
-      <div class="tw-dim">Generated ${when(b.generatedAt)}. ${h(b.note)}</div></div><button class="btn ghost" data-tw-refresh>Refresh</button></div>
+    return `<div class="tw-head"><div><div class="fx-kick">☀ MORNING BRIEF · ${h(b.day)}</div><h2>Before the opening bell</h2>
+      <div class="tw-dim">Generated ${when(b.generatedAt)}. ${h(b.note)}</div></div><button class="btn ghost" data-tw-refresh>Refresh</button><button class="ac-x" data-tw-close aria-label="Close">✕</button></div>
       <div class="tw-grid">
         <section class="tw-card"><h3>Risk flags</h3>${flags}</section>
         <section class="tw-card"><h3>Bot plans for the open</h3>${plans}</section>
@@ -119,7 +133,10 @@
   }
 
   window.MDTeam = { openBrief, why };
-  // opened before this file finished loading
-  if (S.tab === "brief") openBrief();
+  // pops up by itself once per (New York) day, the first time the desk is opened
+  try {
+    const day = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    if (localStorage.getItem("md_brief_seen") !== day) { localStorage.setItem("md_brief_seen", day); openBrief(); }
+  } catch {}
   if (S.tab === "research" && S.rq && S.rq.sub === "why" && typeof renderResearchBody === "function") renderResearchBody();
 })();

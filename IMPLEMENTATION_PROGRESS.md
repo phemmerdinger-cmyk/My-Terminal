@@ -12,7 +12,7 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 - **Smarter defense mode:** full defense needs a broad selloff or two independent warnings (VIX ≥30 or +20%, S&P −2%, black-swan headline, the spider's own macro findings — not its mirror of the bot). High-risk holdings are trimmed first; the safe sleeve keeps its normal size; no new high-risk buys for the rest of the day. One warning = caution (high-risk buys paused, nothing sold).
 - **Spider-off twin:** a hypothetical copy of the swing bot without any spider input runs from the same holdings, filled at scan prices, to show whether the research helps.
 - **Why card:** Research → "Why (bots)" shows each bot's view of a stock (rank, score parts, holdings, plans, trades) and the spider's evidence with sources (`/api/why`, owner/desk only).
-- **Morning Brief:** AI Lab → Morning Brief lists overnight spider findings, each bot's plan for the open, today's earnings, risk flags, the twin comparison, lessons and pre-buy checks (`/api/brief`, owner/desk only; `public/teamwork.js`, lazy group `team`).
+- **Morning brief (pop-up):** opens by itself once a day the first time the owner opens the desk, and from the ☀ button in the top bar (no separate tab). It lists overnight spider findings, each bot's plan for the open, today's earnings, risk flags, the twin comparison, lessons and pre-buy checks (`/api/brief`, owner/desk only; `public/teamwork.js`, lazy group `team`).
 - Anthropic (ANT) is an ordinary stock again: no IPO shortcut, banner or special data handling, and not in the default watchlist (existing personal watchlists unchanged).
 
 ### Lists that update themselves (2026-11-21)

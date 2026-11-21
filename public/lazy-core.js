@@ -17,7 +17,7 @@
     workspace: Object.freeze(["/workspace-core.js", "/workspace.js"]),
     // THE WEB research spider (owner only; the public demo has no access to its data)
     web: Object.freeze(["/web.js", "/web-env.js", "/web-control.js"]),
-    // Bots × spider teamwork: Morning Brief tab and the Research "Why" card (owner / private desk only)
+    // Bots × spider teamwork: Morning brief pop-up and the Research "Why" card (owner / private desk only)
     team: Object.freeze(["/teamwork.js"]),
   });
 
@@ -25,7 +25,6 @@
   function groupForTab(tab) {
     if (tab === "quant" || tab === "backtest") return "quant";
     if (tab === "workspace") return "workspace";
-    if (tab === "brief") return "team";
     if (typeof tab === "string" && tab.startsWith("studio-")) return "studio";
     return null;
   }
