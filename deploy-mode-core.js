@@ -6,10 +6,14 @@
 //                 answers the owner's bot/data routes only for requests carrying DESK_TOKEN.
 //   MODE=local  — the owner's desk on their own computer. Listens on 127.0.0.1 only, so no password is
 //                 needed. Does not run the bots (the public server does); their routes and the owner's
-//                 saved data are forwarded to PUBLIC_URL with DESK_TOKEN.
+//                 saved data are forwarded to PUBLIC_URL with DESK_TOKEN. It also serves Bot HQ as a separate
+//                 site on HQ_PORT (default 3001), 127.0.0.1 only.
+//   MODE=hq     — Bot HQ as its own website (e.g. a second Render service): only the bot control room and its
+//                 read-only bot routes, behind the owner password (SITE_PASSWORD). Runs no bots; it reads them
+//                 from PUBLIC_URL with DESK_TOKEN, like the desk.
 const crypto = require("crypto");
 
-const MODES = Object.freeze(["", "public", "local"]);
+const MODES = Object.freeze(["", "public", "local", "hq"]);
 const MIN_TOKEN = 32;
 
 // Routes whose state lives on the server that runs the bots: paper bots, desk risk, strategy lab,
@@ -26,7 +30,7 @@ const isRemoteRoute = (p) => REMOTE_EXACT.has(p) || REMOTE_PREFIX.some((x) => St
 
 function parseMode(env = {}) {
   const mode = String(env.MODE || "").trim().toLowerCase();
-  if (!MODES.includes(mode)) throw new Error(`MODE must be "public", "local" or unset (got "${env.MODE}")`);
+  if (!MODES.includes(mode)) throw new Error(`MODE must be "public", "local", "hq" or unset (got "${env.MODE}")`);
   const token = String(env.DESK_TOKEN || "");
   if (token && token.length < MIN_TOKEN) throw new Error(`DESK_TOKEN must be at least ${MIN_TOKEN} characters`);
   let publicUrl = String(env.PUBLIC_URL || "").trim().replace(/\/+$/, "");
@@ -38,9 +42,10 @@ function parseMode(env = {}) {
   }
   return Object.freeze({
     mode, token, publicUrl,
-    runJobs: mode !== "local", // only one server may trade the paper books and write their state
+    runJobs: mode !== "local" && mode !== "hq", // only one server may trade the paper books and write their state
     host: mode === "local" ? "127.0.0.1" : undefined,
-    remoteReady: mode === "local" && !!publicUrl && !!token,
+    remoteReady: (mode === "local" || mode === "hq") && !!publicUrl && !!token,
+    hqPort: mode === "local" ? Number(env.HQ_PORT || 3001) || null : null,
   });
 }
 
@@ -83,4 +88,24 @@ function clientIp(headers = {}, remote = "") {
   return String(remote || "?");
 }
 
-module.exports = { MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute, clientIp };
+// ---- Bot HQ, the separate control-room site (MODE=hq, or the desk's second port)
+// Read-only bot and spider routes the control room uses; everything else on that site doesn't exist.
+const HQ_API = new Set(["/api/autopilot", "/api/daytrader", "/api/quanttrader", "/api/strategy-lab", "/api/desk-risk", "/api/brief",
+  "/api/web/status", "/api/web/signals", "/api/web/discoveries"]);
+const HQ_FILES = new Set(["/hq.js", "/hq-core.js", "/favicon-owner.svg"]);
+function hqAccess({ path, method = "GET", owner = false, remote = true }) {
+  if (path === "/api/login" || path === "/api/health") return "serve";
+  if (!HQ_API.has(path) || method !== "GET") return "notfound";
+  if (!owner) return "deny";
+  return remote ? "proxy" : "serve";
+}
+// { page } | { file } | { redirect } | { login } | { logout } | null (404)
+function hqPage(pathname, owner) {
+  if (pathname === "/" || pathname === "/index.html") return owner ? { page: "hq.html" } : { redirect: "/login" };
+  if (pathname === "/login") return owner ? { redirect: "/" } : { login: true };
+  if (pathname === "/logout") return { logout: true };
+  if (HQ_FILES.has(pathname)) return { file: pathname };
+  return null;
+}
+
+module.exports = { HQ_API, hqAccess, hqPage, MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute, clientIp };

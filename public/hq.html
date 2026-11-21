@@ -25,7 +25,7 @@ nav.side h6{margin:14px 8px 6px;font:600 10px var(--mono);letter-spacing:.18em;c
 nav.side button{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:0;color:var(--muted);padding:8px 10px;border-radius:6px;cursor:pointer;text-align:left}
 nav.side button:hover{color:var(--text);background:var(--panel)}nav.side button.on{color:var(--text);background:var(--panel2);box-shadow:inset 2px 0 var(--orange)}
 nav.side .badge{font:600 10px var(--mono);background:var(--orange);color:#000;border-radius:4px;padding:1px 5px}
-nav.side .back{margin-top:24px;font-size:12px}
+nav.side .back{display:block;margin-top:24px;font-size:12px}nav.side .back[hidden]{display:none}nav.side .signout{margin-top:8px;color:var(--dim)}
 main{padding:14px;min-width:0}
 .view{display:none}.view.on{display:block}
 .grid{display:grid;gap:12px}.g2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -92,7 +92,8 @@ td:first-child,th:first-child{text-align:left}td.why{text-align:left;color:var(-
     <button data-v="research">Spider</button>
     <h6>SYSTEM</h6>
     <button data-v="risk">Risk &amp; costs</button>
-    <a class="back" href="/">← Back to Market Desk</a>
+    <a class="back" id="backLink" href="#" hidden>← Open Market Desk</a>
+    <a class="back signout" href="/logout" id="signOut">Sign out</a>
   </nav>
   <main>
     <div id="errBox"></div>
