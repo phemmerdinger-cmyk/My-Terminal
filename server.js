@@ -3048,7 +3048,7 @@ if (DEPLOY.runJobs) setTimeout(() => { dtTick(); setInterval(dtTick, process.env
 // Once per trading day after the close (and once right away when the account is new) it reads the regime, ranks the
 // universe on momentum and low volatility, sizes by risk parity, targets 15% volatility, and trades the differences
 // at the next eligible regular-session open (5 bps per side). Paper money only. Rules live in quant-trader.js.
-const QTC = require("./quant-trader.js"), QMS = require("./public/qmath.js");
+const QTC = require("./quant-trader.js"), QMS = require("./public/qmath.js"), TOUGH = require("./robustness-core.js");
 // One-time Quant-only capital reset; include the global marker so future all-bot resets still work.
 const QT_RESET_ID = `${BOT_RESET_ID}:quant-30k-2026-11-16-1`;
 const QT_FILE = path.join(require("os").tmpdir(), "quanttrader-v1.json"), QT_KEY = "pft:quanttrader:v1";
@@ -3228,7 +3228,13 @@ async function qtPlan(t, close) {
   const now = Date.now(), pending = orders.length ? { signalDay: t.day, executeDay, at: now, orders: orders.map((order) => ({ ...order, referencePrice: prices[order.sym] })), why } : null;
   const decision = { t: now, d: t.day, fundCovered: Object.keys(fund.score).length, regime: D.regime, rawRegime: D.rawRegime, regimeNote: conf ? conf.note : null, spiderStress, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: 0 };
   const equity = QT.firstTrade ? [...QT.equity.filter((p) => p.d !== t.day), { t: now, d: t.day, v: +value.toFixed(2), s: spx }].slice(-1500) : QT.equity;
-  await qtCommit({ ...QT, pending, equity, decisions: [decision, ...QT.decisions].slice(0, 60), lastDay: t.day, lastError: null, regimeState: conf ? conf.state : QT.regimeState || null });
+  // toughness test, weekly: replay its own rules monthly on the same aligned closes (shown, never blocks the main bot)
+  let robust = QT.robust || null;
+  if (!robust || !robust.testedOn || Date.parse(t.day) - Date.parse(robust.testedOn) >= 6 * 864e5) {
+    try { robust = { ...TOUGH.quantToughness(QTC.decide, A.px, A.dates.map((d) => new Date(d * 1000).toISOString().slice(0, 10))), testedOn: t.day }; }
+    catch (e) { robust = { status: "error", label: "Test couldn't run: " + String(e.message || e).slice(0, 80), testedOn: t.day }; }
+  }
+  await qtCommit({ ...QT, pending, equity, decisions: [decision, ...QT.decisions].slice(0, 60), lastDay: t.day, lastError: null, regimeState: conf ? conf.state : QT.regimeState || null, robust });
   Object.assign(qtPx, prices);
 }
 
@@ -3380,6 +3386,13 @@ const strategyLab = LAB.createStrategyLab({
       i ? r.value.trim().split(/\r?\n/).slice(1).join("\n") : r.value.trim()).join("\n");
   },
   liveDesk: () => deskRisk.view(),
+  // toughness results for the three main bots (shown only; main bots aren't paused by it)
+  mainBots: () => {
+    const rec = (trades, sides) => { const c = (trades || []).filter((x) => sides.includes(x.side) && x.pnl != null); return { closed: c.length, wins: c.filter((x) => x.pnl > 0).length, realizedPnl: c.reduce((a, x) => a + x.pnl, 0) }; };
+    const live = (name, book) => { const r = TOUGH.liveRecord(book); return { bot: name, ...r, gate: "Shown for information: main bots keep trading.", why: "Uses news, analyst ratings or intraday bars that have no free history, so it's judged on its live paper record." }; };
+    return [QT.robust ? { bot: "Quant trader", ...QT.robust } : { bot: "Quant trader", status: "pending", label: "Runs after the next close" },
+      live("Swing bot", rec(AP.trades, ["SELL"])), live("Day trader", rec(DT.trades, ["SELL", "COVER"]))];
+  },
   // inputs for the earnings-drift and insider-buying lab bots (the same free sources the swing bot and spider use)
   events: async () => {
     const sp = new Set(SP500.map((r) => r[0]));

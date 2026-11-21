@@ -6,6 +6,7 @@ const PairRules = require("./quant-pairs-core.js");
 const RiskFree = require("./risk-free-core.js");
 const Extra = require("./extra-bots-runner.js");
 const ExtraRules = require("./extra-bots-core.js");
+const Tough = require("./robustness-core.js");
 const FRED = { source: "FRED · DGS3MO", url: "https://fred.stlouisfed.org/series/DGS3MO" };
 const TREASURY = { source: "U.S. Treasury · 3-month par yield", url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" };
 
@@ -75,7 +76,7 @@ function quarterlyComparison(facts, sessionDay, observedAt) {
     sales: sales.get(end).val, priorYearSales: sales.get(prior).val, periodEnd: end, source: "SEC EDGAR Company Facts" };
 }
 
-function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, treasuryRates, liveDesk, events = async () => ({ earnings: [], insider: [] }) }) {
+function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHistory, dailyData, bars, rates, treasuryRates, liveDesk, events = async () => ({ earnings: [], insider: [] }), mainBots = () => [] }) {
   let state, serial = Promise.resolve(), lastFault = null, rateCache = null, rateInFlight = null;
   const warm = new Map(), daily = new Map();
   let warmInFlight = null, dailyInFlight = null, openInFlight = null;
@@ -213,8 +214,19 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
         next.pairs = Pair.preparePairShadows(next.pairs, { sessions, adjustedCloses, signal: { day: t.day, time: asOf,
           adjustedPrices: latest(PAIR_UNIVERSE, "adjusted"), rawPrices: latest(PAIR_UNIVERSE, "raw") },
           borrow: next.borrow, executionCosts: pairCosts, executeDay, now: asOf, riskOff: regime.shock !== false }) || next.pairs;
+        // toughness test (weekly): replay pullback and rotation on ~2 years of daily bars; earnings and insider have no
+        // free history, so they're judged on their live paper record. A "fail" pauses that bot's new buys automatically.
+        if (!next.robust || !next.robust.day || Date.parse(t.day) - Date.parse(next.robust.day) >= 6 * 864e5) {
+          const pick = (syms) => Object.fromEntries(["SPY", ...syms].filter((sym) => barsBySymbol[sym]).map((sym) => [sym, barsBySymbol[sym]]));
+          const results = {};
+          try { results.pullback = Tough.toughness("pullback", pick(SWING_UNIVERSE), { universe: SWING_UNIVERSE }); } catch (e) { results.pullback = { status: "error", label: "Test couldn't run: " + String(e.message || e).slice(0, 80) }; }
+          try { results.rotation = Tough.toughness("rotation", pick(ExtraRules.SECTORS)); } catch (e) { results.rotation = { status: "error", label: "Test couldn't run: " + String(e.message || e).slice(0, 80) }; }
+          next.robust = { day: t.day, at: asOf, results };
+        }
+        for (const b of ["earnings", "insider"]) next.robust.results[b] = Tough.liveRecord(next.extra.books[b]);
+        const paused = Object.fromEntries(Object.entries(next.robust.results).map(([b, r]) => [b, Tough.paused(r)]));
         next.extra = Extra.prepareExtraBots(next.extra, { barsBySymbol, signalDay: t.day, asOf, nextSession: executeDay, sessions,
-          universe: SWING_UNIVERSE, earningsEvents: ev.earnings, insiderEvents: ev.insider }) || next.extra;
+          universe: SWING_UNIVERSE, earningsEvents: ev.earnings, insiderEvents: ev.insider, paused }) || next.extra;
         next.regime = regime;
         next.scannedDay = t.day;
         const desk = liveDesk(), sp = barsBySymbol.SPY.at(-1).close;
@@ -308,7 +320,9 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
         p.id === "swing-canslim" ? "Requires timestamped earnings and sales inputs" : p.bot === "day" ? "Locked experiment universe · 12 symbols · modeled costs" :
         p.bot === "quant" ? "Requires current borrow data and both opening prices" : "Completed daily data and opening prints";
       const latestNote = p.id.startsWith("extra-") && s.extra?.lastNotes ? s.extra.lastNotes[p.id.slice(6)] : null;
-      return { ...p, notice: latestNote ? `${notice} · ${latestNote}` : notice, sessions: s.records.length, shadowReturn, baselineReturn, drawdown, costStressReturn,
+      const tough = p.id.startsWith("extra-") ? s.robust?.results?.[p.id.slice(6)] || null : null;
+      const toughNote = tough ? `Toughness test: ${tough.label}` : p.id.startsWith("extra-") ? "Toughness test: runs after the next close" : null;
+      return { ...p, notice: [notice, latestNote, toughNote].filter(Boolean).join(" · "), toughness: tough, sessions: s.records.length, shadowReturn, baselineReturn, drawdown, costStressReturn,
         excessCash: shadowReturn != null && cashReturn != null ? shadowReturn - cashReturn : null };
     });
     return { asOf: now(), since: s.since, experiments, regime: s.regime?.reason ?? "Waiting for a completed session",
@@ -316,6 +330,8 @@ function createStrategyLab({ store, clock, now = Date.now, nextSession, minuteHi
       riskFree: { ...rf, cashReturn, ...fc.provider, method: "ACT/365 estimated cash benchmark. Observations precede the decision date." },
       borrowSymbols: PAIR_UNIVERSE, borrowEntries: Object.entries(s.borrow).map(([symbol, q]) => ({ symbol, ...q })),
       extraNotes: s.extra?.lastNotes || null,
+      toughness: { testedOn: s.robust?.day || null, mainBots: (() => { try { return mainBots(); } catch { return []; } })(),
+        rule: "Pass = made money after costs, in the later 40% of the period, with settings ±20%, with doubled costs, and in 1,000 bad-luck reshuffles. Two or more misses (or a loss) = fail, which pauses that lab bot's new buys automatically. No approval needed." },
       errors: [lastFault, fc.error].filter(Boolean), pairDiagnostics: s.pairs.diagnostics.slice(-10), sources: SOURCES };
   }
   return { tick, view, warmDay, onMinute, saveBorrow };

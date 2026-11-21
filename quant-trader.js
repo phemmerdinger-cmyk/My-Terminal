@@ -24,7 +24,7 @@ const z = (a) => { const v = a.filter(isFinite), m = QM.mean(v), s = QM.sd(v) ||
 // px: { SYM: aligned adjusted closes }, all the same length (oldest → newest). Returns target weights + the reasoning.
 // opts.putcall: the Zweig put/call reading (putcall-core.js) — nudges the equity sleeve ±10% at sentiment extremes.
 function decide(px, opts = {}) {
-  const n = px.SPY.length, last = n - 1;
+  const n = px.SPY.length, last = n - 1, TOP = opts.top ?? QT_TOP, VT = opts.volTarget ?? QT_VOL_TARGET; // overrides: toughness test only
   if (n < 280) throw new Error("need at least ~13 months of aligned history");
   const credit = px.HYG && px.IEF ? px.HYG.map((v, i) => v / px.IEF[i]) : null;
   const reg = QM.regimeAt(px.SPY, last, credit);
@@ -37,7 +37,7 @@ function decide(px, opts = {}) {
   const zm12 = z(raw.map((x) => x.m12)), zm3 = z(raw.map((x) => x.m3)), zlv = z(raw.map((x) => -x.vol));
   const fw = opts.fundWeight || 0, fund = opts.fund || {};
   raw.forEach((x, i) => { x.fund = fund[x.s] != null ? fund[x.s] : null; x.score = 0.5 * zm12[i] + 0.25 * zm3[i] + 0.25 * zlv[i] + fw * (x.fund || 0); }); // fund: Fin 370 ratio score −1…+1 (ETFs: none)
-  const ranked = [...raw].sort((a, b) => b.score - a.score), picks = ranked.filter((x) => x.trend).slice(0, QT_TOP);
+  const ranked = [...raw].sort((a, b) => b.score - a.score), picks = ranked.filter((x) => x.trend).slice(0, TOP);
   // ---- size each sleeve by risk parity on 6 months of daily returns
   const rp = (syms, cap) => { if (!syms.length) return {}; if (syms.length === 1) return { [syms[0]]: 1 }; const R = syms.map((s) => QM.returns(px[s].slice(-127))), C = QM.covMatrix(R);
     const hi = Math.max(cap, 1 / syms.length + 1e-9), w = QM.riskParity(C, 0, hi); return Object.fromEntries(syms.map((s, i) => [s, w[i]])); };
@@ -47,7 +47,7 @@ function decide(px, opts = {}) {
   for (const [s, v] of Object.entries(wDef)) w[s] = (w[s] || 0) + v * defShare;
   // ---- volatility target on the combined book (ex-ante, 6-month covariance)
   const syms = Object.keys(w), R = syms.map((s) => QM.returns(px[s].slice(-127))), C = QM.covMatrix(R).map((r) => r.map((x) => x * QM.DAYS)), wv = syms.map((s) => w[s]);
-  const exVol = Math.sqrt(QM.pVar(wv, C)), scale = exVol > QT_VOL_TARGET ? QT_VOL_TARGET / exVol : 1;
+  const exVol = Math.sqrt(QM.pVar(wv, C)), scale = exVol > VT ? VT / exVol : 1;
   for (const s of syms) w[s] *= scale;
   for (const k of Object.keys(w)) if (!(w[k] > 1e-9)) delete w[k];
   const cash = Math.max(0, 1 - Object.values(w).reduce((a, b) => a + b, 0)); if (cash > 0.001) w[QT_CASH] = (w[QT_CASH] || 0) + cash;

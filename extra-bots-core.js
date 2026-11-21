@@ -30,35 +30,36 @@ function rsi(c, n = 2) {
 const lastBarIs = (bars, day) => bars && bars.length && bars[bars.length - 1].day === day;
 
 // ---- exits shared by the stock bots: stop, profit/bounce rule, time limit (sessions counted on SPY's calendar)
-function exitFor(bot, pos, closes, sessionsHeld) {
-  const r = RULES[bot], px = closes[closes.length - 1];
+function exitFor(bot, pos, closes, sessionsHeld, r = RULES[bot]) {
+  const px = closes[closes.length - 1];
   if (r.stop && px <= pos.entry * (1 - r.stop)) return `Stop: down ${Math.round(r.stop * 100)}% from entry`;
   if (bot === "pullback") { const m5 = sma(closes, 5); if (m5 && px > m5) return "Bounced above its 5-day average"; }
   if (r.maxSessions && sessionsHeld >= r.maxSessions) return `Time exit after ${sessionsHeld} sessions`;
   return null;
 }
 
-function pullbackIdeas(barsBySymbol, day, universe) {
+function pullbackIdeas(barsBySymbol, day, universe, r = RULES.pullback) {
   const out = [];
   for (const symbol of universe) {
     const bars = barsBySymbol[symbol]; if (!lastBarIs(bars, day)) continue;
-    const c = closesTo(bars, day), m200 = sma(c, 200), r = rsi(c, 2);
-    if (m200 == null || r == null) continue;
-    if (c[c.length - 1] > m200 && r < RULES.pullback.rsiMax) out.push({ symbol, rank: r, reason: `Above its 200-day average after a sharp dip (2-day RSI ${r.toFixed(1)})` });
+    const c = closesTo(bars, day), m200 = sma(c, 200), v = rsi(c, 2);
+    if (m200 == null || v == null) continue;
+    if (c[c.length - 1] > m200 && v < r.rsiMax) out.push({ symbol, rank: v, reason: `Above its 200-day average after a sharp dip (2-day RSI ${v.toFixed(1)})` });
   }
   return out.sort((a, b) => a.rank - b.rank);
 }
 
-function rotationTargets(barsBySymbol, day) {
+function rotationTargets(barsBySymbol, day, r = RULES.rotation) {
+  const [l1, l2] = r.lookbacks;
   const rows = [];
   for (const symbol of SECTORS) {
     const bars = barsBySymbol[symbol]; if (!lastBarIs(bars, day)) continue;
-    const c = closesTo(bars, day); if (c.length < 201) continue;
+    const c = closesTo(bars, day); if (c.length < Math.max(201, l2 + 1)) continue;
     const ret = (n) => c[c.length - 1] / c[c.length - 1 - n] - 1;
-    rows.push({ symbol, score: (ret(63) + ret(126)) / 2, r3: ret(63), r6: ret(126), above200: c[c.length - 1] > sma(c, 200) });
+    rows.push({ symbol, score: (ret(l1) + ret(l2)) / 2, r3: ret(l1), r6: ret(l2), above200: c[c.length - 1] > sma(c, 200) });
   }
   rows.sort((a, b) => b.score - a.score);
-  const targets = rows.slice(0, RULES.rotation.slots).filter((x) => x.above200).map((x) => x.symbol);
+  const targets = rows.slice(0, r.slots).filter((x) => x.above200).map((x) => x.symbol);
   return { ranked: rows, targets, complete: rows.length === SECTORS.length };
 }
 

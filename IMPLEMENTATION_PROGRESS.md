@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Toughness test with automatic gating (2026-11-21)
+- `robustness-core.js` replays a bot's own rules on past daily prices and checks: profit after costs, the later 40% of the period on its own, settings ±20%, doubled costs, and 1,000 bad-luck reshuffles (5th-percentile result > −15%, 95th-percentile drawdown < 30%). One miss = borderline; a loss or two misses = fail; under 15 trades = too few to judge. Limits (today's stock list, daily bars, modeled costs, hypothetical) are shown with every result.
+- Runs weekly after the close inside the Strategy Lab (pullback, sector rotation) and the Quant trader's planning step (monthly replay of `decide()`; put/call tilt and ratio score off — no free history). Earnings-drift, insider-buying, the swing bot and the day trader have no free history for their inputs, so they're judged on their live paper record after 20 closed trades.
+- No approvals: a failing lab bot's new buys pause automatically until a re-test passes; exits keep running. The three main bots show their result but keep trading. Results appear in the existing Strategy Lab rows and notes (no new section).
+
 ### Four more paper bots in the Strategy Lab (2026-11-21)
 - New rows in the existing Strategy Lab table (AI Lab → Bots vs S&P 500), no new page: **2-day pullback** (Connors RSI(2) < 10 above the 200-day, exit above the 5-day average, 8% stop, 7 sessions), **monthly sector rotation** (top 3 of 11 sector funds by 3/6-month return, only above their 200-day), **post-earnings drift** (≥5% EPS beat confirmed by a ≥2% up day, 10% stop, 40 sessions), **insider buying** (≥2 different open-market insider buyers in a spider Form 4 finding from the last 10 days, not >20% below the 200-day, 12% stop, 60 sessions).
 - Rules: `extra-bots-core.js`; books: `extra-bots-runner.js` (decide after the close on final daily bars, fill only at the verified 9:30 open with modeled costs; unfilled buys expire, unfilled sells retry). Each $30k paper book. Tests: `tests/extra-bots.test.js`, lab test in `tests/strategy-lab.test.js`.
