@@ -82,7 +82,7 @@ canvas.chart{width:100%;height:260px;display:block}canvas.chart.sm{height:120px}
 .bars i{display:block;border-radius:2px 2px 0 0;min-height:2px;background:var(--line2)}.bars i.w{background:var(--up)}.bars i.l{background:var(--down)}
 table{width:100%;border-collapse:collapse;font-size:12.5px}th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}th{font:500 9.5px var(--mono);letter-spacing:.12em;color:var(--dim)}
 td:first-child,th:first-child{text-align:left}td.why{text-align:left;color:var(--muted)}
-.map{position:relative;height:560px;background:radial-gradient(ellipse at 40% 40%,#0e0e0e,#050505 70%)}.map canvas{position:absolute;inset:0;width:100%;height:100%}
+.map{position:relative;height:500px;background:radial-gradient(ellipse at 40% 40%,#0e0e0e,#050505 70%)}.map canvas{position:absolute;inset:0;width:100%;height:100%}
 .reading h4{margin:4px 0 8px;font-size:18px;font-weight:500}.prog{height:3px;background:var(--line2);border-radius:2px;overflow:hidden;margin:6px 0}.prog s{display:block;height:100%;background:var(--orange);transition:width .6s}
 .quote{background:#090909;border:1px solid var(--line);border-radius:5px;padding:10px 12px;font:12px/1.7 var(--mono);color:var(--dim);margin-top:10px}.quote .hl{color:#111;background:var(--orange);border-radius:3px;padding:0 4px}.quote .cur{color:var(--text);border-left:2px solid var(--orange);padding-left:8px;display:block}
 .chips span{display:inline-block;background:var(--orange);color:#111;border-radius:999px;padding:3px 10px;font:500 11px var(--mono);margin:8px 6px 0 0}
@@ -101,6 +101,18 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
 .agentcard canvas{width:100%;height:120px;margin-top:8px;background:#080808;border:1px solid var(--line);border-radius:4px;display:block}
 .agentcard .back{width:100%;margin-top:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:7px;cursor:pointer;font:11px var(--mono);color:var(--muted)}
 .roomhint{font:10.5px var(--mono);color:var(--dim);padding:0 14px 10px}
+.kinds{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.kinds button{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line2);border-radius:5px;padding:7px 12px;cursor:pointer;color:var(--muted);font-size:12.5px}
+.kinds button b{font:500 13px var(--mono);color:var(--text)}.kinds button.on{border-color:var(--orange);color:var(--text);background:#140e05}
+.map .tip{position:absolute;max-width:300px;background:rgba(8,8,8,.96);border:1px solid var(--line2);border-left:2px solid var(--orange);border-radius:4px;padding:8px 10px;font-size:12.5px;line-height:1.4;pointer-events:none;z-index:2}
+.map .tip small{display:block;font:10.5px var(--mono);color:var(--dim);margin-top:4px}
+.flist{max-height:520px;overflow:auto;padding-top:4px}.fi{border-top:1px solid var(--line);padding:9px 0;cursor:pointer}.fi:first-child{border-top:0}.fi:hover .fh{color:#fff}
+.fi .fh{display:flex;gap:8px;align-items:baseline;font-size:13.5px;line-height:1.4}.fi .ar{font-size:11px;flex:none}.fi .meta{margin:3px 0 0 19px;font:10.5px var(--mono);color:var(--dim)}
+.fi .tk{display:inline-block;border:1px solid var(--line2);border-radius:3px;padding:0 5px;margin-right:4px;color:var(--amber)}
+.fi .more{margin:8px 0 2px 19px;font-size:12.5px;color:var(--muted);line-height:1.5}.fi .more a{font-size:11.5px;margin-right:10px}.fi.sel{background:#0f0f0f}
+#findQ{background:var(--panel2);border:1px solid var(--line2);border-radius:4px;color:var(--text);font:11.5px var(--mono);padding:4px 8px;width:220px}
+.qi{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px}.qi:first-child{border-top:0}.qi small{display:block;color:var(--dim);font-size:11px;margin-top:2px}
+.qi .sc{font:11px var(--mono);color:var(--orange);flex:none}
+.steps{margin-top:10px}.steps div{display:flex;gap:8px;font:11.5px var(--mono);color:var(--dim);padding:2px 0}.steps div.on{color:var(--text)}.steps div::before{content:"○";color:var(--dim)}.steps div.done::before{content:"●";color:var(--up)}.steps div.on::before{content:"●";color:var(--orange)}
 .err{background:#1a0b0b;border:1px solid #5a2020;color:#ffb3b3;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}
 @media (max-width:1200px){.strip{grid-template-columns:repeat(4,minmax(0,1fr))}.kc{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.split,.rule{grid-template-columns:minmax(0,1fr)}.src{width:130px}.agentcard{position:static;width:auto;margin-top:10px}}
 @media (max-width:760px){.shell{grid-template-columns:minmax(0,1fr)}nav.side{position:static;height:auto;display:flex;overflow-x:auto}nav.side h6,nav.side .foot{display:none}nav.side button{white-space:nowrap}.top .hs{display:none}.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.src{display:none}}
@@ -153,12 +165,19 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
     </section>
     <section class="view" id="v-lab"><div class="card"><div class="ch">Lab <em>· toughness test and bad-luck reshuffles of each bot's own trades</em></div><div class="cb" id="lab"></div></div></section>
     <section class="view" id="v-research">
-      <div class="grid" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
-        <div class="card"><div class="ch">Findings by kind <em>· every star is a finding</em><span class="r" id="mapNote"></span></div><div class="map"><canvas id="map"></canvas></div></div>
+      <div class="kinds" id="kinds"></div>
+      <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+        <div class="card"><div class="ch">Research map <em>· every star is a finding · hover to read it, click to open it</em><span class="r" id="mapNote"></span></div>
+          <div class="map"><canvas id="map"></canvas><div class="tip" id="mapTip" hidden></div></div>
+          <div class="legend"><span><i style="background:var(--up)"></i>good news</span><span><i style="background:var(--down)"></i>bad news</span><span><i style="background:var(--amber)"></i>neutral</span><span style="margin-left:auto">bigger star = more important · brighter = newer</span></div></div>
         <div class="grid" style="align-content:start">
           <div class="card"><div class="ch">Now reading<span class="r" id="readSrc"></span></div><div class="cb reading" id="reading"></div></div>
-          <div class="card"><div class="ch">Thought stream <em>· spider</em></div><div class="cb stream" id="stream"></div></div>
+          <div class="card"><div class="ch">Up next <em>· the spider's queue, highest priority first</em><span class="r" id="queueN"></span></div><div class="cb" id="queue"></div></div>
         </div>
+      </div>
+      <div class="grid" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);margin-top:12px">
+        <div class="card"><div class="ch">Findings <em>· newest first · click one for the details and sources</em><span class="r"><input id="findQ" placeholder="search, e.g. NVDA or insider" autocomplete="off"></span></div><div class="cb flist" id="flist"></div></div>
+        <div class="card"><div class="ch">Thought stream <em>· what the spider did, step by step</em></div><div class="cb stream" id="stream"></div></div>
       </div>
     </section>
     <section class="view" id="v-strategies"><div class="split"><div class="card slist" id="slist"></div><div id="sdetail"></div></div></section>
