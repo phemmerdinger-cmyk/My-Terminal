@@ -105,3 +105,11 @@ test("multi-screen panes are normalized and point at the chrome-less pane page",
   assert.equal(C.paneUrl({ fn: "news" }, { path: "/demo", visitor: true }), "/demo?pane=1&visitor#news");
   assert.ok(!C.PANE_FUNCS.some(([k]) => k === "workspace"), "a pane never nests the workspace");
 });
+
+test("each screen keeps its own zoom between 50% and 200%", () => {
+  const C = require("../public/workspace-core.js");
+  assert.equal(C.stepZoom(1, 1), 1.1); assert.equal(C.stepZoom(2, 1), 2); assert.equal(C.stepZoom(0.5, -1), 0.5);
+  assert.equal(C.clampZoom("x"), 1);
+  const p = C.normalizePanes([{ fn: "news", zoom: 0.8 }, { fn: "research", sym: "aapl", zoom: 7 }, { fn: "nyse", zoom: 1 }], 4);
+  assert.equal(p[0].zoom, 0.8); assert.equal(p[1].zoom, 2); assert.equal(p[1].sym, "AAPL"); assert.equal("zoom" in p[2], false);
+});

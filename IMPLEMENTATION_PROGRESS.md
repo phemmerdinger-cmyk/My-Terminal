@@ -5,6 +5,7 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 ## Done
 ### Multi-screen, Bloomberg style (2026-11-21)
 - Research → Workspace → **Multi-screen**: 2, 3, 4 or 6 live screens at once, each showing any site tool (news, heatmap, stock research for any ticker, macro, portfolio, bots, labs…), with reload, enlarge (Esc to shrink), pop out into its own window, and a ⛶ full-screen grid. Layout and choices are saved.
+- Each screen zooms on its own (− / % / + buttons or Ctrl + scroll inside it, 50%–200%, saved with the layout).
 - Each screen is the normal site at `?pane=1` (top bar, menus, watchlist and pop-ups hidden), so every tool works as usual. Pane helpers in `public/workspace-core.js` (tested).
 - Framing policy is now same-site only (`X-Frame-Options: SAMEORIGIN`, `frame-ancestors 'self'`): other websites still can't embed Market Desk.
 
