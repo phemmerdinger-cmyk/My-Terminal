@@ -19,7 +19,7 @@
 | File | Role |
 |---|---|
 | `workspace-core.js` / `workspace.js` | Research → Workspace: chart, key stats, news and SEC financials for one ticker; on-demand group `workspace` |
-| `teamwork.js` | Morning Brief tab + Research "Why (bots)" card; lazy group `team` |
+| `teamwork.js` | Morning brief pop-up (once a day + ☀ top-bar button) + Research "Why (bots)" card; lazy group `team` |
 | `lazy-core.js` | `MDLazyCore.GROUPS` (quant / studio / web / team script lists) + `createLoader`; `window.MDLazy` in index.html loads a group when `setTab` opens a tool |
 | `index.html` | Shell, all legacy pages inline. `NAV`/`TABS`/`setTab()` ≈ 1935–2105. Global state `S` (S.pfs portfolios, S.pfActive, S.wl, S.quotes, S.news, S.earn). `store` = localStorage (no-op for visitors). Helpers `api()`, `$`, `esc`, `fmt`, `pct`, `put()`. `riskStats()`, `pfcCombine()` portfolio math |
 | `data.js` | `window.MD`: `hist`, `histDays`, `cached`, `earnings`, `macro`, `discoveries`, `sp500` |

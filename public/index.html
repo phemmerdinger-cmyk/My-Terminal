@@ -1500,6 +1500,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     <button class="iconbtn" id="installBtn" hidden title="Install Market Desk as an app">⤓ Install app</button>
     <button class="iconbtn sp-btn no-vo" id="spBtn" type="button" title="Send the spider to examine this page and write a report" onclick="window.spiderScan&&spiderScan()"><span class="sp-ico">🕷</span> Spider</button>
     <button class="iconbtn di-btn" id="diBtn" type="button" title="Market data status"><span class="dl">DATA</span><span id="diLbl">Validating…</span></button>
+    <button class="iconbtn" id="briefBtn" title="Morning brief: overnight research, bot plans, earnings and risk flags" aria-label="Morning brief" hidden>☀</button>
     <button class="iconbtn" id="syncBtn" title="Sync across your devices">☁ <span id="syncLbl">Sync</span></button>
     <a class="iconbtn no-vo" id="logoutBtn" href="/logout" title="Sign out of your private site">⎋ <span class="tlong">Sign out</span></a>
     <button class="iconbtn" id="notifBtn" title="Desktop alerts for headlines on your stocks">🔔 Alerts</button>
@@ -1705,7 +1706,6 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="fx-bar"><select class="field" id="rkSrc" style="max-width:320px"></select><button class="btn" type="button" id="rkRun">Analyze</button></div>
       <div id="rkOut"><div class="fx-empty">Choose a portfolio and press Analyze.</div></div>
     </section>
-    <section id="tab-brief" class="pad" hidden></section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">📈 PAPER TRADING EXPERIMENT</div><h1>Trading bots vs. the S&amp;P 500</h1><p class="ap-sub">Rule-based strategies I designed with Claude's help. The rules decide every trade; no AI model trades. Paper money only.</p></div>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
@@ -1963,21 +1963,21 @@ const STUDIO_ROUTES = {
   "studio-quant": "quant", "studio-ask": "ask",
   "studio-alerts": "alerts", "studio-settings": "settings"
 };
-const TABS = ["news","data","macro","workspace","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","brief","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
+const TABS = ["news","data","macro","workspace","research","fin","dcf","portfolio","risk","analysis","nyse","aitrade","leader",...(SHOW_SIGNALS?["signals"]:[]),"predict","health","backtest","quant",...Object.keys(STUDIO_ROUTES)];
 // Sections → pages. Hash links (#news, #portfolio, #aitrade…) keep working; each section remembers its last page.
 const NAV=[
   ["markets",[["news","News"],["data","Overview"],["nyse","Heatmap"],["analysis","Analysis"],["macro","Macro"],...(SHOW_SIGNALS?[["signals","Signals"]]:[]),["health","Data Health"],["studio-settings","Appearance"]]],
   ["research",[["workspace","Workspace"],["research","Stock Research"],["fin","Financials"],["dcf","DCF Valuation"],["studio-research","Market Intelligence"],["studio-graph","Market Charts"]]],
   ["portfolio",[["portfolio","My Portfolio"],["risk","Risk & Stress"],["studio-scenario","Shock Simulator"],["studio-alerts","Smart Alerts"]]],
   ["quant",[["quant","Quant Lab"],["backtest","Backtest Lab"]]],
-  ["ailab",[["aitrade","Bots vs S&P 500"],["brief","Morning Brief"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
+  ["ailab",[["aitrade","Bots vs S&P 500"],["predict","Claude Predictor","claude no-vo"],["leader","Prediction Accuracy"],["studio-ask","Research Assistant"]]],
 ];
 const groupOf=t=>(t==="studio-strategies"||t==="studio-quant")?"quant":(NAV.find(([,l])=>l.some(([k])=>k===t))||NAV[0])[0];
 const NAV_LAST={};
 function navSync(t){
   const g=groupOf(t); if(NAV.find(([key])=>key===g)[1].some(([k])=>k===t)) NAV_LAST[g]=t; // hidden advanced tools never replace Quant Lab navigation
   document.querySelectorAll("#tabs [data-group]").forEach(b=>b.classList.toggle("on",b.dataset.group===g));
-  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||k==="leader"||k==="brief"||!!STUDIO_ROUTES[k])));
+  const items=NAV.find(([k])=>k===g)[1].filter(([k])=>!(VIEW&&(k==="predict"||k==="health"||k==="leader"||!!STUDIO_ROUTES[k])));
   const html=items.map(([k,label,c])=>`<button role="tab" data-tab="${k}" class="${c||""} ${k===t?"on":""}" aria-selected="${k===t}">${esc(label)}${k==="news"?'<span class="k" id="newsCount'+'"></span>':""}</button>`).join("");
   for(const id of ["subtabs","subtabsM"]){ const el=$(id); el.innerHTML=html.replace(' id="newsCount"',id==="subtabs"?' id="newsCount"':""); }
   if(window.__nc&&$("newsCount")) $("newsCount").textContent=window.__nc;
@@ -2124,7 +2124,6 @@ function setTab(t){
   if(t==="signals"){ sigOpen(); }
   if(t==="nyse"){ nyOpen(); }
   if(t==="analysis"){ anOpen(); }
-  if(t==="brief"&&window.MDTeam) MDTeam.openBrief();
   if(t==="aitrade"){ apLoadView(); S._sigAt=0; apSignals(); S._pcAt=0; apPutCall(); }
   if(t==="fin"||t==="dcf"){ fxOpen(t); }
   if(t==="macro"){ mcOpen(); }
@@ -5433,7 +5432,8 @@ $("tab-analysis").addEventListener("click",e=>{ if(e.target.closest("a")) return
   const L=MDLazyCore.createLoader(document);
   window.MDLazy={ load:L.load, ready:g=>MDLazyCore.GROUPS[g].every(L.loaded) };
   const g=MDLazyCore.groupForTab(S.tab); if(g) L.load(g).catch(e=>console.warn(e.message)); // the page opened straight on a tool
-  if(!VIEW){ const web=()=>L.load("web").catch(e=>console.warn(e.message)); if("requestIdleCallback" in window) requestIdleCallback(web,{timeout:2000}); else setTimeout(web,500); }
+  if(!VIEW){ const bb=$("briefBtn"); bb.hidden=false; bb.onclick=()=>L.load("team").then(()=>MDTeam.openBrief(true)).catch(e=>toast(e.message)); }
+  if(!VIEW){ const web=()=>L.load("web").then(()=>L.load("team")).catch(e=>console.warn(e.message)); if("requestIdleCallback" in window) requestIdleCallback(web,{timeout:2000}); else setTimeout(web,500); }
 })();
 </script>
 </body>
