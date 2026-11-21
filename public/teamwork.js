@@ -136,7 +136,7 @@
   // pops up by itself once per (New York) day, the first time the desk is opened
   try {
     const day = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-    if (!document.documentElement.classList.contains("pane") && localStorage.getItem("md_brief_seen") !== day) { localStorage.setItem("md_brief_seen", day); openBrief(); }
+    if (localStorage.getItem("md_brief_seen") !== day) { localStorage.setItem("md_brief_seen", day); openBrief(); }
   } catch {}
   if (S.tab === "research" && S.rq && S.rq.sub === "why" && typeof renderResearchBody === "function") renderResearchBody();
 })();
