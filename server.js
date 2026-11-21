@@ -4302,6 +4302,7 @@ function serveFile(req, res, file) {
 }
 // ---- Bot HQ as its own website: MODE=hq, or the desk's second port (127.0.0.1:HQ_PORT)
 const HQ_LOGIN_HTML = LOGIN_HTML.replace("<title>Market Desk · Sign in</title>", "<title>Bot HQ · Sign in</title>")
+  .replace(/href="\/favicon-owner\.svg[^"]*"/, 'href="/hq-favicon.svg"').replace(/<link rel="apple-touch-icon"[^>]*>/, "")
   .replace(/MARKET <span>DESK<\/span>/, "BOT <span>HQ</span>").replace(/<h1>[^<]*<\/h1><p>[^<]*<\/p>/, "<h1>Bot HQ sign-in</h1><p>Peter's private control room for the paper-trading bots.</p>")
   .replace(/<a href="\/demo">[^<]*<\/a>/, "");
 async function handleHq(req, res, u) {

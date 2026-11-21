@@ -92,7 +92,7 @@ function clientIp(headers = {}, remote = "") {
 // Read-only bot and spider routes the control room uses; everything else on that site doesn't exist.
 const HQ_API = new Set(["/api/autopilot", "/api/daytrader", "/api/quanttrader", "/api/strategy-lab", "/api/desk-risk", "/api/brief",
   "/api/web/status", "/api/web/signals", "/api/web/discoveries", "/api/system/health"]);
-const HQ_FILES = new Set(["/hq.js", "/hq-core.js", "/hq-rules.js", "/favicon-owner.svg"]);
+const HQ_FILES = new Set(["/hq.js", "/hq-core.js", "/hq-rules.js", "/hq-favicon.svg"]);
 function hqAccess({ path, method = "GET", owner = false, remote = true }) {
   if (path === "/api/login" || path === "/api/health") return "serve";
   if (!HQ_API.has(path) || method !== "GET") return "notfound";
