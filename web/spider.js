@@ -1159,6 +1159,24 @@ function createSpider(deps) {
     return { at: t, rule: "Signals are rules over the spider's stored findings; inputs and their sources are listed. They feed research and paper trading only.", items: out.sort((a, b) => b.inputs.length - a.inputs.length) };
   }
 
+  // The spider's OWN read of market stress, from its stored macro/policy/market findings (not the swing bot's state,
+  // which the spider also mirrors). Used by the bots as an independent second opinion.
+  function marketStress(o = {}) {
+    const t = now(), win = (o.days || 2) * DAY;
+    const neg = DISC.filter((d) => ["macro", "policy", "market"].includes(d.cat) && d.u >= t - win && d.tone < 0);
+    const strong = neg.filter((d) => d.tone <= -2 || (d.importance || 0) >= 0.7);
+    const on = neg.length >= 3 || strong.length >= 2;
+    const top = neg.slice().sort((a, b) => (a.tone - b.tone) || (b.importance || 0) - (a.importance || 0)).slice(0, 3);
+    return { on, n: neg.length, strong: strong.length, note: on ? `${neg.length} negative macro/market finding${neg.length === 1 ? "" : "s"} in ${o.days || 2} days — “${(top[0] || {}).headline || ""}”`.slice(0, 160) : null,
+      items: top.map((d) => ({ id: d.id, headline: d.headline, cat: d.cat, tone: d.tone, at: d.u, sources: (d.sources || []).slice(0, 2) })) };
+  }
+  const researchedAt = (sym) => ST.researched[String(sym || "").toUpperCase()] || null;
+  // Overnight findings for the Morning brief: everything new since `since`, most important first.
+  function overnight(since, limit = 8) {
+    return DISC.filter((d) => d.u >= since && !ownPortfolio(d)).sort((a, b) => (b.importance || 0) - (a.importance || 0) || b.u - a.u).slice(0, limit)
+      .map((d) => ({ id: d.id, headline: d.headline, cat: d.cat, tone: d.tone, importance: d.importance, tickers: d.tickers, at: d.u, sources: (d.sources || []).slice(0, 2) }));
+  }
+
   // ------------------------------------------------------------ controls, backup and company timelines
   function setCtrl(c = {}) {
     const C = ST.ctrl, sym = (x) => String(x || "").toUpperCase().trim();
@@ -1197,7 +1215,7 @@ function createSpider(deps) {
   }
 
   const self = {
-    setCtrl, exportData, importData, timeline, researchSignals,
+    setCtrl, exportData, importData, timeline, researchSignals, marketStress, researchedAt, overnight,
     load, save, start, stop, tick, runNow, liveSummary, enqueue, setContext, status, discoveries, getDiscovery, briefings, briefing, packet, signal, traderAdjust, traderView, promptContext, session, marketOpen,
     graph: (o) => require("./intel").graph({ ST, DISC, SP, sectorOf, industryOf, nameOf, held: held(), tracked: tracked(), traderHeld: traderHeld(), MACRO_LINKS, now: now(), ...o }),
     ask: (question, opts = {}) => require("./intel").ask({ question, spider: self, ST, DISC, BIDX, SP, sectorOf, nameOf, held: held(), tracked: tracked(), now: now(), ...opts }),

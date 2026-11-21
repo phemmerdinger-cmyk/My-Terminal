@@ -513,13 +513,11 @@ async function getSmart() {
 // ---------------------------------------------------------------- quotes (Yahoo Finance chart API)
 const { getExtendedQuotes } = require("./market-session-core.js");
 function firstTradingDay(sym, meta) {
-  if (sym === "ANT") return "2026-11-19";
   return Number.isFinite(meta.firstTradeDate) && meta.firstTradeDate > 0 ? etParts(new Date(meta.firstTradeDate * 1000)).day : null;
 }
 async function quote(sym) {
   return cached("q:" + sym, 15_000, async () => {
-    const minuteBars = sym === "ANT";
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=${minuteBars ? "1m" : "5m"}&includePrePost=true`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m&includePrePost=true`;
     const j = JSON.parse(await get(url, "application/json"));
     const r = j.chart && j.chart.result && j.chart.result[0];
     if (!r) throw new Error("no data");
@@ -554,7 +552,7 @@ async function quote(sym) {
       ...(regular?.start < regular?.end ? { regularSession: { start: regular.start * 1000, end: regular.end * 1000 } } : {}),
       marketTime: (debut && !verifiedDebutMeta ? (firstPrint >= 0 ? r.timestamp[firstPrint] : 0) : m.regularMarketTime || 0) * 1000,
       ...(debut && firstPrint < 0 ? { status: "awaiting-market-print" } : {}),
-      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut, barSeconds: minuteBars ? 60 : 300 }),
+      ...getExtendedQuotes(m, r.timestamp || [], bars, { debut: !!debut, barSeconds: 300 }),
       dayHigh: price == null && debut ? null : m.regularMarketDayHigh,
       dayLow: price == null && debut ? null : m.regularMarketDayLow,
       volume: m.regularMarketVolume,
@@ -597,14 +595,14 @@ async function history(sym, range = "6mo", interval) {
         if (i) await new Promise((ok) => setTimeout(ok, 600 * i));
         const j = JSON.parse(await get(`https://${host}.finance.yahoo.com/v8/finance/chart/${qs}`, "application/json"));
         res = j.chart && j.chart.result && j.chart.result[0];
-        if (res && (res.timestamp || sym === "ANT")) break;
+        if (res && res.timestamp) break;
         if (j.chart && j.chart.error) { lastErr = new Error(j.chart.error.description || "no history"); break; } // a bad symbol: don't retry
         res = null;
       } catch (e) { lastErr = e; }
     }
     if (!res) { if (HIST_LAST.has(key)) return HIST_LAST.get(key); throw lastErr || new Error("no history"); }
     const q = res.indicators?.quote?.[0] || {};
-    const ipo = sym === "ANT" || firstTradingDay(sym, res.meta) === etParts().day;
+    const ipo = firstTradingDay(sym, res.meta) === etParts().day;
     const candles = [];
     (res.timestamp || []).forEach((t, i) => {
       const open = q.open?.[i], high = q.high?.[i], low = q.low?.[i], close = q.close?.[i], volume = q.volume?.[i] || 0;
@@ -1641,6 +1639,7 @@ const BOT_RESET_ID = "2026-11-17-paper-execution-30k";
 // with its full records (never edited afterwards) and a new $30,000 run starts under the new version. Busts are archived
 // the same way. Archives live in Upstash lists (pft:archive:v1:<bot>) when configured, plus a local file.
 const RISK = require("./risk-core.js");
+const TEAM = require("./bot-teamwork-core.js");
 const STRATS = {
   swing: { id: "sarah-swing", version: 3, trader: "Swing Trader", since: "2026-11-17",
     hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
@@ -1999,6 +1998,39 @@ async function apHealthJob(syms) {
   } finally { apHealthBusy = false; }
 }
 const AP_GRADE_ADJ = { A: 0.04, B: 0.02, C: 0, D: -0.06, F: -0.15 };
+// ---- bots × spider teamwork (bot-teamwork-core.js)
+let apPmCache = { n: -1, v: null }, apLastList = { t: 0, by: new Map(), n: 0 };
+function apPostMortems() {
+  const key = AP.trades.length + ":" + (AP.trades[0] ? AP.trades[0].t : 0);
+  if (apPmCache.n !== key) apPmCache = { n: key, v: TEAM.postMortems(AP.trades) };
+  return apPmCache.v;
+}
+// next report within ~a week (trading days away), from the same Finnhub calendar the bot already reads
+function apEarnNext(sym, cal, today) {
+  const s = sym.replace("-", "."), rows = cal.filter((e) => e.symbol === s && e.epsActual == null && e.date >= today).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!rows.length) return null;
+  const days = TEAM.tradingDaysUntil(today, rows[0].date);
+  return days == null ? null : { date: rows[0].date, hour: rows[0].hour || null, days };
+}
+const AP_CHECKS = []; // recent pre-buy checks that vetoed or cautioned (newest first)
+function apSpiderChecks(out) {
+  if (!SPIDER) return;
+  const sorted = out.slice().sort((a, b) => b.score - a.score), look = sorted.filter((x, i) => i < 30 || AP.positions[x.sym]);
+  let sig = { items: [] }; try { sig = SPIDER.researchSignals({ symbols: look.map((x) => x.sym) }); } catch {}
+  const day = etParts().day;
+  for (const [i, x] of look.entries()) {
+    try {
+      x.research = SPIDER.signal(x.sym);
+      if (AP.positions[x.sym]) continue; // the check is for new buys
+      x.check = TEAM.preBuyCheck({ sym: x.sym, signals: sig.items, trader: SPIDER.signal(x.sym, { trader: true }), researchedAt: SPIDER.researchedAt(x.sym) });
+      if (x.check.wantResearch && i < 15) SPIDER.enqueue("company_snapshot", x.sym, { boost: 0.5, reason: "the swing bot is considering buying it" });
+      if ((x.check.verdict === "veto" || x.check.verdict === "caution") && !AP_CHECKS.some((c) => c.sym === x.sym && c.day === day && c.verdict === x.check.verdict)) {
+        AP_CHECKS.unshift({ t: Date.now(), day, sym: x.sym, rank: i + 1, verdict: x.check.verdict, note: x.check.note, evidence: x.check.evidence });
+        AP_CHECKS.length = Math.min(AP_CHECKS.length, 60);
+      }
+    } catch {}
+  }
+}
 // Scores every candidate. Returns the ranked list plus market-level signals.
 async function apScore(live) {
   const t = etParts(), ranked = bbRank().all;
@@ -2031,12 +2063,18 @@ async function apScore(live) {
   }
   const pr = (k) => { const v = out.filter((x) => x[k] != null).map((x) => x[k]).sort((a, b) => a - b); return (x) => (x == null || !v.length ? 0.5 : v.filter((y) => y <= x).length / v.length); };
   const ra = pr("adj"), rm = pr("mom");
+  // sleeves are set before scoring so the post-mortem lessons can match a candidate's pattern
+  { const vs = out.map((x) => x.vol).sort((a, b) => a - b), cut0 = vs[Math.floor(vs.length * 0.4)] || 0; for (const x of out) x.sleeve = x.vol > cut0 ? "risk" : "safe"; }
+  const pm = apPostMortems();
   for (const x of out) {
     const e = x.earn, eAdj = !e ? 0 : e.kind === "beat" ? Math.min(0.2, 0.08 + e.surprise) : e.kind === "miss" ? -0.35 : 0;
     const hg = AP_HEALTH.get(x.sym); x.health = hg && hg.grade ? { grade: hg.grade, flags: hg.flags, fy: hg.fy } : null;
     x.score = 0.3 * ra(x.adj) + 0.2 * rm(x.mom) + 0.2 * x.trend + 0.2 * ((x.news + 4) / 8) + 0.1 * clamp((x.day - spyDay) / 6 + 0.5, 0, 1) + eAdj + (x.health ? AP_GRADE_ADJ[x.health.grade] || 0 : 0);
     // THE WEB: research the bot doesn't already score (insider buying, earnings-release tone, sector news patterns), at most ±SPIDER_TRADER_WEIGHT
     try { const sa = SPIDER && SPIDER_W > 0 ? SPIDER.traderAdjust(x.sym, SPIDER_W) : null; x.spider = sa && sa.adj ? { adj: sa.adj, note: sa.note } : null; if (x.spider) x.score += x.spider.adj; } catch { x.spider = null; }
+    // lessons from its own losing trades: patterns that keep losing (e.g. chasing big gaps) count against new picks
+    const ls = TEAM.lessonPenalty(pm.lessons, TEAM.candidateTags(x)); x.lesson = ls.penalty ? ls : null; if (x.lesson) x.score += x.lesson.penalty;
+    x.earnNext = apEarnNext(x.sym, cal, t.day);
   }
   // Fin 370 ratio indicator: each stock's profitability/DuPont, leverage, efficiency and valuation ratios vs the other
   // candidates and vs its own prior year (ratio-core.js). Only stocks with two 10-K years count; others get 0.
@@ -2046,6 +2084,7 @@ async function apScore(live) {
     for (const x of out) { const r = rs[x.sym]; x.ratios = r && r.score != null ? r : null; if (x.ratios) x.score += STRATS.swing.params.ratioWeight * x.ratios.score; }
   } catch { /* ratios are an extra input; never block scoring */ }
   out.sort((a, b) => b.score - a.score); out.forEach((x, i) => { x.rank = i + 1; apPx[x.sym] = x.px; apScoreOf[x.sym] = x.score; });
+  apLastList = { t: Date.now(), by: new Map(out.map((x) => [x.sym, x])), n: out.length };
   apHealthJob(out.map((x) => x.sym)).catch(() => {}); // grade anything new in the background
   // 80% risk: the more volatile 60% of names feed the risk sleeve (8 slots), the calmest 40% the safe sleeve (2 slots)
   const vols = out.map((x) => x.vol).sort((a, b) => a - b), cut = vols[Math.floor(vols.length * 0.4)] || 0;
@@ -2053,10 +2092,16 @@ async function apScore(live) {
   let spx = null; try { const h = await history("^GSPC", "1y"); const cl = apClosedCloses(h.candles, t.day); const current = PAPER.usableQuote(q["^GSPC"], Date.now()) ? q["^GSPC"] : null; spx = { px: current?.price || cl[cl.length - 1], m200: sma(cl, 200), day: current?.changePct }; } catch {}
   const vix = PAPER.usableQuote(q["^VIX"], Date.now(), 0, 20 * 60_000) ? q["^VIX"] : null; // index feed is intentionally delayed and used only as a signal
   const riskOff = !!(spx && spx.m200 && spx.px < spx.m200);
-  // defense mode needs the market to agree: a scary headline alone (often opinion pieces) isn't enough
-  const marketShaky = (vix && vix.price >= 25) || (spx && spx.day != null && spx.day <= -1.5);
-  const stress = (vix && (vix.price >= 35 || vix.changePct >= 25)) ? `VIX fear index at ${vix.price.toFixed(1)}` : spx && spx.day <= -3 ? `S&P 500 down ${spx.day.toFixed(1)}% today` : news.swan && marketShaky ? `Black-swan headline with the market under stress: “${news.swan.slice(0, 110)}”` : null;
-  return { list: out, riskOff, stress, macro: news.macro, vix: vix && vix.price, spyDay, putcall: pcBrief() };
+  // THE WEB: spider research for the names the bot might buy or already holds — pre-buy red-flag check and the
+  // research signal used by the earnings warning. Stocks the spider hasn't looked at are queued for research.
+  apSpiderChecks(out);
+  // defense mode: a broad selloff, or two INDEPENDENT warnings (VIX, S&P drop, black-swan headline, the spider's own
+  // macro research). One warning only pauses new high-risk buys.
+  let spiderStress = null; try { const ms = SPIDER ? SPIDER.marketStress() : null; spiderStress = ms && ms.on ? ms.note : null; } catch {}
+  const lv = live ? out.filter((x) => !x.stale) : [], breadth = lv.length >= 20 ? lv.filter((x) => x.day <= -2).length / lv.length : null;
+  const defenseIn = { vix: vix ? vix.price : null, vixChg: vix ? vix.changePct : null, spxDay: spx && spx.day != null ? spx.day : null, swan: news.swan, spider: spiderStress, breadth };
+  const defense = TEAM.defenseDecision(defenseIn);
+  return { list: out, riskOff, stress: defense.on ? defense.reason : null, caution: defense.caution ? defense.reason : null, defense, defenseIn, macro: news.macro, vix: vix && vix.price, spyDay, putcall: pcBrief(), lessons: pm.lessons.slice(0, 6) };
 }
 // Trading pace: about 2 trades a day, ~14 a week. A "swap" (sell the weakest holding, buy a better-ranked stock) is
 // 2 trades. One swap is allowed per day while fewer than 2 trades have happened today; a second only if the week is
@@ -2096,13 +2141,25 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   const pcT = PCC.exposureTilt(sc.stress ? 0.5 : sc.riskOff ? 0.8 : 0.99, sc.putcall, { stress: !!sc.stress, riskOff: sc.riskOff });
   const exposure = pcT.exposure;
   const target = (val() * exposure) / AP_SLOTS;
-  // 2) trims
+  // 1b) earnings early warning: holdings that report within 5 trading days were researched by the spider; hold or trim
+  const recentTrades = [...(st.trades || []), ...(st.isTwin ? [] : AP.trades.slice(0, 200))];
   for (const [sym, p] of Object.entries(st.positions)) {
-    const x = by[sym]; if (!x || x.stale) continue; const v = p.shares * x.px;
-    if (v > target * 1.6) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, sc.stress ? `Defense mode — ${sc.stress}` : pcT.note ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
+    const x = by[sym]; if (!x || x.stale || !x.earnNext) continue;
+    const act = TEAM.earningsAction({ held: true, days: x.earnNext.days, pnlPct: x.px / p.cost - 1, sleeve: slv(sym), research: sc.spiderOff ? null : x.research });
+    const done = recentTrades.some((tr) => tr.sym === sym && /before the report/.test(tr.why || "") && now - tr.t < 8 * 864e5);
+    if (act.action === "trim" && !done) apTrade(st, "SELL", sym, p.shares * act.fraction, x.px, act.reason);
+  }
+  // 2) trims. In defense mode the high-risk sleeve is cut back first; the safe sleeve keeps its normal size.
+  const normalTarget = (val() * PCC.exposureTilt(sc.riskOff ? 0.8 : 0.99, sc.putcall, { stress: false, riskOff: sc.riskOff }).exposure) / AP_SLOTS;
+  for (const [sym, p] of Object.entries(st.positions)) {
+    const x = by[sym]; if (!x || x.stale) continue; const v = p.shares * x.px, risk = slv(sym) === "risk";
+    if (sc.stress && risk) { if (v > target * 1.1) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, `Defense mode — high-risk holdings trimmed first: ${sc.stress}`); continue; }
+    const tgt = sc.stress ? normalTarget : target;
+    if (v > tgt * 1.6) apTrade(st, "SELL", sym, (v - tgt) / x.px, x.px, pcT.note && !sc.stress ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
   }
   if (sc.stress) return;
-  const ok = (x, sl) => x.sleeve === sl && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
+  const ok = (x, sl) => x.sleeve === sl && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
@@ -2112,6 +2169,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (x.health) bits.push(`10-K health grade ${x.health.grade}`);
     if (x.ratios && Math.abs(x.ratios.score) >= 0.15) bits.push(`ratios ${x.ratios.score > 0 ? "beat" : "trail"} peers (${(x.ratios.score > 0 ? x.ratios.best : x.ratios.worst)[0] || ""})`);
     if (x.spider && x.spider.note) bits.push(x.spider.note.replace(/^Spider: /, "Spider research: "));
+    if (x.check && !sc.spiderOff) bits.push(x.check.verdict === "ok" ? "spider pre-buy check: no red flags" : x.check.verdict === "caution" ? x.check.note.replace(/^Spider caution/, "spider pre-buy caution") : "not yet researched by the spider");
     bits.push(`${x.mom >= 0 ? "+" : ""}${(x.mom * 100).toFixed(0)}% over 3 months`);
     if (Math.abs(x.day) >= 1) bits.push(`${x.day >= 0 ? "+" : ""}${x.day.toFixed(1)}% today`);
     if (sc.putcall && sc.putcall.signal === "BUY") bits.push("Zweig put/call buy signal (crowd heavy in puts — contrarian bullish)");
@@ -2144,11 +2202,115 @@ function apSummary(end, busted, spxNow) {
     trades: AP.trades.length, days: AP.equity.length, spxRet: AP.spx0 && spxNow ? +((spxNow / AP.spx0 - 1) * 100).toFixed(2) : null, busted };
 }
 function apSignals(sc) {
-  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null, ratios: x.ratios || null });
-  return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, macro: +sc.macro.toFixed(2), vix: sc.vix, putcall: sc.putcall || null,
+  const pick = (x) => ({ sleeve: x.sleeve, vol: +(x.vol || 0).toFixed(3), sym: x.sym, name: x.name, rank: x.rank, score: +x.score.toFixed(3), news: +x.news.toFixed(2), headline: x.headlines[0] || null, earn: x.earn, mom: +x.mom.toFixed(4), adj: x.adj == null ? null : +x.adj.toFixed(2), trend: x.trend, day: +(x.day || 0).toFixed(2), held: !!AP.positions[x.sym], grade: x.health ? x.health.grade : null, spider: x.spider || null, ratios: x.ratios || null,
+    check: x.check ? { verdict: x.check.verdict, note: x.check.note } : null, lesson: x.lesson || null, earnNext: x.earnNext || null });
+  return { t: Date.now(), riskOff: sc.riskOff, stress: sc.stress, caution: sc.caution || null, defense: sc.defense || null, pauseRisk: !!sc.pauseRisk,
+    checks: AP_CHECKS.slice(0, 12).map(({ evidence, ...c }) => c), lessons: sc.lessons || [], macro: +sc.macro.toFixed(2), vix: sc.vix, putcall: sc.putcall || null,
     top: sc.list.slice(0, 15).map(pick),
     news: sc.list.filter((x) => Math.abs(x.news) >= 1).sort((a, b) => Math.abs(b.news) - Math.abs(a.news)).slice(0, 8).map(pick),
     earnings: sc.list.filter((x) => x.earn).sort((a, b) => (a.earn.kind === "soon") - (b.earn.kind === "soon")).slice(0, 12).map(pick) };
+}
+// ---- spider-off twin (#5): the same swing bot run WITHOUT the spider (no score nudges, no pre-buy checks, no spider
+// input to defense or earnings decisions). Hypothetical paper book that fills at scan prices, to measure whether
+// the spider's research actually helps. Starts from the real account's holdings so both diverge from one point.
+function apTwinInit(now = Date.now()) {
+  if (AP.twin && AP.twin.run === AP.run) return AP.twin;
+  const value = AP.cash + Object.entries(AP.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
+  AP.twin = { isTwin: true, run: AP.run, since: now, start: +value.toFixed(2), realStart: +value.toFixed(2), cash: AP.cash, positions: structuredClone(AP.positions), recent: {}, trades: [], equity: [] };
+  return AP.twin;
+}
+async function apTwinStops(q) {
+  const T = AP.twin; if (!T || T.run !== AP.run) return;
+  const syms = Object.keys(T.positions); if (!syms.length) return;
+  const miss = syms.filter((s) => !q[s]), q2 = miss.length ? (await getQuotes(miss)).quotes : {};
+  for (const s of syms) {
+    const p = T.positions[s], x = q[s] || q2[s]; if (!PAPER.usableQuote(x, Date.now())) continue;
+    p.peak = Math.max(p.peak || p.cost, x.price);
+    const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), p.peak * (1 - tr));
+    if (x.price <= stop) apTrade(T, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
+  }
+  T.trades = T.trades.slice(0, 300);
+}
+function apTwinStep(sc, opening, t) {
+  const T = apTwinInit();
+  const list = sc.list.map((x) => ({ ...x, score: x.score - (x.spider ? x.spider.adj : 0), spider: null, check: null, research: null }))
+    .sort((a, b) => b.score - a.score);
+  list.forEach((x, i) => { x.rank = i + 1; });
+  let rr = 0, sr = 0; for (const x of list) x.srank = x.sleeve === "risk" ? ++rr : ++sr;
+  const defense = TEAM.defenseDecision({ ...sc.defenseIn, spider: null });
+  if (defense.on) T.defenseDay = t.day;
+  const sc2 = { ...sc, list, spiderOff: true, stress: defense.on ? defense.reason : null, caution: defense.caution ? defense.reason : null, pauseRisk: !!(defense.caution || T.defenseDay === t.day) };
+  apDecide(T, sc2, opening, apPace(T.trades, t));
+  T.trades = T.trades.slice(0, 300);
+  const v = T.cash + Object.entries(T.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
+  const real = AP.cash + Object.entries(AP.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
+  const pt = { d: t.day, v: +v.toFixed(2), real: +real.toFixed(2) };
+  if (T.equity.length && T.equity[T.equity.length - 1].d === pt.d) T.equity[T.equity.length - 1] = pt; else T.equity.push(pt);
+  T.equity = T.equity.slice(-400);
+}
+function apTwinView() {
+  const T = AP.twin; if (!T || T.run !== AP.run) return null;
+  const last = T.equity[T.equity.length - 1];
+  const value = last ? last.v : T.start, real = last ? last.real : T.realStart;
+  return { since: T.since, start: T.start, value, realValue: real, positions: Object.keys(T.positions).length, trades: T.trades.slice(0, 25), equity: T.equity.slice(-120),
+    compare: TEAM.twinCompare({ start: T.realStart, value: real }, { start: T.start, value }) };
+}
+// ---- "Why" card (#7): every bot's view of one stock plus the spider's evidence. Owner/desk only.
+async function whyView(symIn) {
+  const sym = String(symIn || "").toUpperCase().replace(/[^A-Z0-9.\-^=]/g, "").slice(0, 12); if (!sym) return { error: "symbol required" };
+  const ys = ySym(sym), x = apLastList.by.get(ys), r2 = (v) => (v == null ? null : Math.round(v * 1000) / 1000);
+  const tradesOf = (L, n = 5) => (L || []).filter((t) => t.sym === sym || t.sym === ys).slice(0, n).map((t) => ({ t: t.t, side: t.side, shares: t.shares, price: t.price, pnl: t.pnl ?? null, why: t.why || t.reason || null }));
+  const ap = AP.positions[ys], plan = AP.plan && AP.plan.orders ? AP.plan.orders.filter((o) => o.sym === ys) : [], pend = AP.pending ? AP.pending.orders.filter((o) => o.sym === ys) : [];
+  const swing = {
+    scanned: x ? { at: apLastList.t, rank: x.rank, of: apLastList.n, score: r2(x.score), sleeve: x.sleeve, analysts: x.adj == null ? null : r2(x.adj), momentum3m: r2(x.mom), trend: x.trend, news: r2(x.news), headline: (x.headlines || [])[0] || null,
+      grade: x.health ? x.health.grade : null, ratios: x.ratios ? r2(x.ratios.score) : null, spiderNudge: x.spider ? x.spider.adj : null, lesson: x.lesson, check: x.check || null, earnNext: x.earnNext || null } : null,
+    holding: ap ? { shares: ap.shares, cost: ap.cost, since: ap.at, sleeve: ap.sleeve, price: apPx[ys] || null } : null,
+    plans: [...plan.map((o) => ({ ...o, when: "planned for the open" })), ...pend.map((o) => ({ side: o.side, sym: o.sym, why: o.why, when: "waiting for a fresh quote" }))],
+    trades: tradesOf(AP.trades),
+    note: x ? null : "Not in the swing bot's current candidate list (it ranks the analyst top 60, fresh earnings beats and its holdings).",
+  };
+  const dp = DT.positions[sym], day = { holding: dp ? { dir: dp.dir, shares: dp.shares, entry: dp.entry ?? null, stop: dp.stop ?? null, setup: dp.setup || null, why: dp.why || null } : null, queued: DT.entries && DT.entries[sym] ? true : false, trades: tradesOf(DT.trades) };
+  const qd = QT.decisions && QT.decisions[0], qp = QT.positions[sym], qr = qd && qd.ranked ? qd.ranked.find((y) => y.s === sym) : null;
+  const quant = { inUniverse: [...QTC.QT_EQUITY, ...QTC.QT_DEFENSIVE, QTC.QT_CASH].includes(sym), regime: qd ? qd.regime : null, rawRegime: qd ? qd.rawRegime || qd.regime : null,
+    target: qd && qd.target ? qd.target[sym] ?? 0 : null, ranked: qr || null, holding: qp ? { shares: qp.shares, cost: qp.cost } : null,
+    queued: QT.pending ? QT.pending.orders.filter((o) => o.sym === sym).map((o) => ({ side: o.side, shares: o.shares, to: o.to })) : [], trades: tradesOf(QT.trades) };
+  let spider = null;
+  try { if (SPIDER) { const pk = SPIDER.packet(ys), sig = SPIDER.researchSignals({ symbols: [ys] }).items.filter((i) => i.sym === ys);
+    spider = { lastResearched: pk.coverage.lastResearched, discoveries: pk.coverage.recent, signal: pk.signal, traderSignal: pk.traderSignal, signals: sig.slice(0, 5),
+      developments: pk.developments.slice(0, 5), risks: pk.risks.slice(0, 4), catalysts: pk.catalysts, upcoming: pk.earnings.upcoming, note: pk.note }; } } catch {}
+  return { sym, at: Date.now(), swing, day, quant, spider, note: "Paper trading only. Each bot's view comes from its latest scan or decision; spider evidence lists its sources." };
+}
+// ---- Morning brief (#8)
+async function briefView() {
+  const t = etParts(), now = Date.now();
+  // "overnight" = since the most recent regular close (4 PM ET on the last weekday)
+  let since = Date.parse(`${t.day}T21:00:00Z`); if (t.min < 16 * 60 || t.wd === "Sat" || t.wd === "Sun") { since -= 864e5; while ([0, 6].includes(new Date(since).getUTCDay())) since -= 864e5; }
+  if (since > now) since -= 864e5;
+  const cal = await apEarnings().catch(() => []);
+  const held = { swing: Object.keys(AP.positions), day: Object.keys(DT.positions), quant: Object.keys(QT.positions) };
+  const earningsHeld = [];
+  for (const sym of new Set([...held.swing, ...held.day, ...held.quant])) {
+    const e = apEarnNext(sym, cal, t.day); if (!e || e.days > 5) continue;
+    const bots = Object.entries(held).filter(([, L]) => L.includes(sym)).map(([k]) => k);
+    let research = null; try { research = SPIDER ? SPIDER.signal(sym) : null; } catch {}
+    const p = AP.positions[sym], act = TEAM.earningsAction({ held: true, days: e.days, pnlPct: p && apPx[sym] ? apPx[sym] / p.cost - 1 : 0, sleeve: p ? p.sleeve : "risk", research });
+    earningsHeld.push({ sym, days: e.days, date: e.date, bots, action: act.reason || act.action });
+  }
+  const inScope = new Set([...held.swing, ...held.day, ...held.quant, ...[...apLastList.by.values()].slice(0, 40).map((x) => x.sym)]);
+  const today = cal.filter((e) => e.date === t.day && e.epsActual == null).map((e) => ({ sym: ySym(e.symbol), hour: e.hour || null, epsEstimate: e.epsEstimate ?? null, relevant: inScope.has(ySym(e.symbol)) }))
+    .sort((a, b) => b.relevant - a.relevant);
+  let findings = [], heldSignals = [], desk = null;
+  try { if (SPIDER) { findings = SPIDER.overnight(since, 8); heldSignals = SPIDER.researchSignals({ symbols: [...held.swing, ...held.day, ...held.quant] }).items.filter((i) => i.sym && inScope.has(i.sym)); } } catch {}
+  try { const dv = deskRisk.view(); desk = dv && dv.mode ? { mode: dv.mode, reason: dv.reason } : null; } catch {}
+  const qd = QT.decisions && QT.decisions[0];
+  const plans = [
+    { bot: "Swing bot", orders: (AP.plan && AP.plan.orders || []).map((o) => ({ side: o.side, sym: o.sym, amount: o.amount, why: o.why })), at: AP.plan ? AP.plan.t : null, empty: "No trades planned for the open" },
+    { bot: "Quant trader", orders: (QT.pending ? QT.pending.orders : []).map((o) => ({ side: o.side, sym: o.sym, amount: o.shares && o.referencePrice ? +(o.shares * o.referencePrice).toFixed(2) : null, why: QT.pending.why })), at: QT.pending ? QT.pending.at : null, empty: qd ? `No rebalance queued · ${qd.regime}` : "No rebalance queued" },
+    { bot: "Day trader", orders: [], at: null, empty: Object.keys(DT.positions).length ? `${Object.keys(DT.positions).length} open position(s); new trades are decided intraday` : "Decides intraday from 5-minute bars — nothing pre-planned" },
+  ];
+  const sig = apSig || {};
+  return TEAM.buildBrief({ day: t.day, now, since, findings, plans, earningsToday: today, earningsHeld, heldSignals, desk,
+    defense: sig.defense || null, riskOff: !!sig.riskOff, regime: QT.regimeState || null, vetoes: AP_CHECKS.filter((c) => c.verdict === "veto" && c.t >= since) });
 }
 async function apTick() {
   if (apBusy) return; apBusy = true;
@@ -2163,7 +2325,7 @@ async function apTick() {
       // overnight / weekend: keep reading news + earnings and plan the opening trades (every 10 minutes)
       if (now - apLastPlan >= 10 * 60e3) {
         apLastPlan = now;
-        const sc = await apScore(false); apSig = apSignals(sc);
+        const sc = await apScore(false); sc.pauseRisk = !!sc.caution; apSig = apSignals(sc);
         const copy = JSON.parse(JSON.stringify({ cash: AP.cash, positions: AP.positions, trades: [], recent: AP.recent }));
         apDecide(copy, sc, true, apPace(AP.trades, m.t));
         AP.plan = { t: now, orders: copy.trades.reverse().map((x) => ({ side: x.side, sym: x.sym, amount: x.amount, why: x.why.replace(/ \([+−]\$\d+\)$/, "") })) };
@@ -2216,15 +2378,20 @@ async function apTick() {
       const [sl, tr] = apStops(p), stop = Math.max(p.cost * (1 - sl), p.peak * (1 - tr));
       if (x.price <= stop) apTrade(draft, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
     }
+    try { await apTwinStops(q); } catch (e) { diagErr("swing", e); }
     // full re-score every 10 minutes (and right at the opening bell)
     const opening = AP.lastRebalance !== m.t.day;
     if (opening || now - apLastScore >= 10 * 60e3) {
       apLastScore = now;
-      const sc = await apScore(true); apSig = apSignals(sc);
+      const sc = await apScore(true);
+      if (sc.stress) AP.defenseDay = m.t.day; // after a defense day, no new high-risk buys until tomorrow
+      sc.pauseRisk = !!(sc.caution || AP.defenseDay === m.t.day);
+      apSig = apSignals(sc);
       BOTDIAG.swing.lastScan = { t: now, candidates: sc.list.length, stress: sc.stress, riskOff: sc.riskOff, buysBefore: AP.trades.length };
       if (!AP.spx0) { try { AP.spx0 = (await quote("^GSPC")).price; AP.firstTrade = now; } catch {} }
       const pace = apPace(AP.trades, m.t); BOTDIAG.swing.pace = { today: pace.today, week: pace.week };
       apDecide(draft, sc, opening, pace);
+      try { apTwinStep(sc, opening, m.t); } catch (e) { diagErr("swing", e); }
       BOTDIAG.swing.lastScan.ordersQueued = draft.intents.length;
       BOTDIAG.swing.lastScan.tradesMade = 0;
       AP.lastRebalance = m.t.day; AP.lastScan = apSig; AP.plan = null;
@@ -2253,7 +2420,7 @@ async function apTick() {
     await apSave();
   } catch (e) { console.error("autopilot", e.message); diagErr("swing", e); } finally { apBusy = false; BOTDIAG.swing.lastTick = Date.now(); }
 }
-async function apView() {
+async function apView(priv = false) {
   if (!apLoaded) await apLoad();
   const syms = Object.keys(AP.positions);
   const q = (await getQuotes([...syms, "^GSPC"])).quotes;
@@ -2280,7 +2447,10 @@ async function apView() {
     sharpe: dr.length >= 20 && sd ? (mean / sd) * Math.sqrt(252) : null, turnover: avgEq ? traded / avgEq : null, traded,
     costs: AP.trades.reduce((a, t) => a + (t.cost != null ? t.cost : t.amount * 0.0005), 0), totalReturn: ret, benchmarkReturn: spxRet, excessReturn: spxRet != null ? ret - spxRet : null };
   analytics.expectancy = RISK.expectancyOf(sells.map((t) => t.pnl));
-  return { ...AP, strategy: { ...STRATS.swing, active: AP.strategy || null }, diag: { market: BOTDIAG.market, ...BOTDIAG.swing }, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
+  const { twin: _twin, ...apOut } = AP, pmv = apPostMortems();
+  const teamwork = { twin: apTwinView(), checks: AP_CHECKS.slice(0, 20).map((c) => (priv ? c : { ...c, evidence: undefined })), defenseDay: AP.defenseDay || null,
+    postMortems: { closed: pmv.closed, causes: pmv.causes, lessons: pmv.lessons, losses: pmv.losses.slice(0, 12), rule: pmv.rule } };
+  return { ...apOut, teamwork, strategy: { ...STRATS.swing, active: AP.strategy || null }, diag: { market: BOTDIAG.market, ...BOTDIAG.swing }, trades: tradesOut, analytics, positions, value, startValue: AP_START, bustAt: AP_BUST, spxNow: q["^GSPC"] && q["^GSPC"].price, marketOpen: open, status: mode, current, durable: !!(UP_URL && UP_TOKEN) };
 }
 // The owner's browser keeps a backup; if a redeploy wiped the server copy, it posts it back.
 function apRestore(doc) {
@@ -2987,6 +3157,9 @@ async function qtExecute(t, started) {
     try {
       for (const order of remaining) {
         const price = prices[order.sym], riskPerShare = price * (0.02 + 2 * QTC.QT_COST);
+        // BIL is the cash sleeve (1–3 month T-bills): it adds no stop risk, so the desk's per-trade risk cap doesn't clip it.
+        // Before this, a 2% "stop" on BIL capped each buy near $3k and left most of the account in plain cash.
+        if (order.sym === QTC.QT_CASH) { orders.push({ ...order, riskPerShare: price * 0.001, approvalPrice: price }); continue; }
         const ticket = deskRisk.reserve({ bot: "quant", sym: order.sym, sign: 1, shares: order.shares, price, riskPerShare });
         if (!ticket.shares) { BOTDIAG.quant.desk = ticket.reason; continue; }
         tickets.push(ticket);
@@ -3040,18 +3213,22 @@ async function qtPlan(t, close) {
   const A = QMS.align(series);
   if (A.dates.at(-1) !== Date.parse(t.day) / 1000) throw new Error("Aligned series lack the latest final close");
   const fund = await qtFundamentals(series);
-  const D = QTC.decide(A.px, { putcall: pcBrief(), fund: fund.score, fundWeight: STRATS.quant.params.fundWeight });
+  // regime changes are confirmed first: 3 trading days in a row, or sooner toward safety when the spider's own market research agrees
+  let spiderStress = null; try { const ms = SPIDER ? SPIDER.marketStress() : null; spiderStress = ms && ms.on ? ms.note : null; } catch {}
+  let conf = null;
+  const D = QTC.decide(A.px, { putcall: pcBrief(), fund: fund.score, fundWeight: STRATS.quant.params.fundWeight,
+    regimeLabel: (raw) => (conf = TEAM.confirmRegime(QT.regimeState, raw, t.day, { spiderStress })).label });
   const prices = Object.fromEntries(Object.entries(series).map(([s, row]) => [s, row.close.at(-1)]));
   if (Object.keys(D.w).some((s) => !(prices[s] > 0))) throw new Error("Final closes unavailable for target allocation");
   const value = qtValue(prices), holdings = Object.fromEntries(Object.entries(QT.positions).map(([s, p]) => [s, p.shares]));
   const orders = QTC.orders(D.w, holdings, prices, value);
   const executeDay = QTC.nextTradingDay(t.day, NYSE_HOLIDAYS);
   if (etParts().day >= executeDay) throw new Error("Decision missed its overnight planning window");
-  const why = `${D.regime} · ${Math.round(D.split * 100)}% equity sleeve${D.pcTilt ? ` (Zweig put/call ${D.pcTilt > 0 ? "+" : "−"}${Math.round(Math.abs(D.pcTilt) * 100)}%)` : ""} · vol ${(D.vol * 100).toFixed(1)}%`;
+  const why = `${D.regime}${D.rawRegime !== D.regime ? ` (raw signal ${D.rawRegime}, not yet confirmed)` : ""} · ${Math.round(D.split * 100)}% equity sleeve${D.pcTilt ? ` (Zweig put/call ${D.pcTilt > 0 ? "+" : "−"}${Math.round(Math.abs(D.pcTilt) * 100)}%)` : ""} · vol ${(D.vol * 100).toFixed(1)}%`;
   const now = Date.now(), pending = orders.length ? { signalDay: t.day, executeDay, at: now, orders: orders.map((order) => ({ ...order, referencePrice: prices[order.sym] })), why } : null;
-  const decision = { t: now, d: t.day, fundCovered: Object.keys(fund.score).length, regime: D.regime, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: 0 };
+  const decision = { t: now, d: t.day, fundCovered: Object.keys(fund.score).length, regime: D.regime, rawRegime: D.rawRegime, regimeNote: conf ? conf.note : null, spiderStress, score: D.score, ind: D.ind, split: D.split, vol: D.vol, exVol: D.exVol, scale: D.scale, enb: D.enb, ranked: D.ranked, target: D.w, trades: 0 };
   const equity = QT.firstTrade ? [...QT.equity.filter((p) => p.d !== t.day), { t: now, d: t.day, v: +value.toFixed(2), s: spx }].slice(-1500) : QT.equity;
-  await qtCommit({ ...QT, pending, equity, decisions: [decision, ...QT.decisions].slice(0, 60), lastDay: t.day, lastError: null });
+  await qtCommit({ ...QT, pending, equity, decisions: [decision, ...QT.decisions].slice(0, 60), lastDay: t.day, lastError: null, regimeState: conf ? conf.state : QT.regimeState || null });
   Object.assign(qtPx, prices);
 }
 
@@ -3137,7 +3314,7 @@ const deskRisk = createDeskRisk({
       risk: (price) => Math.max(0, (p.dir === "short" ? -1 : 1) * (price - p.stop), Math.abs(p.entry - p.stop0)) + (2 * DT_COST + (p.dir === "short" ? DT_FEE_SHORT : 0)) * price })),
       queued: Object.entries(DT.entries).map(([sym, f]) => ({ sym, sign: f.side, ...f.approval })) },
     { bot: "quant", cash: QT.cash, lots: Object.entries(QT.positions).map(([sym, p]) => ({ sym, shares: p.shares,
-      sign: 1, risk: (price) => price * (0.02 + 2 * QTC.QT_COST) })),
+      sign: 1, risk: (price) => price * (sym === QTC.QT_CASH ? 0.001 : 0.02 + 2 * QTC.QT_COST) })),
       queued: QT.pending?.approvedAt ? QT.pending.orders.map((o) => ({ sym: o.sym, sign: 1, shares: o.shares, riskPerShare: o.riskPerShare, price: o.approvalPrice })) : [] },
   ],
 });
@@ -4129,7 +4306,9 @@ async function handle(req, res) {
         try { return send(res, 200, await secFundamentals(u.searchParams.get("symbol"))); }
         catch (e) { return send(res, 502, { error: "SEC data is unavailable right now (" + String(e.message || e) + "). Try again in a minute." }); }
       }
-      if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView());
+      if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView(owner || token));
+      if (u.pathname === "/api/why" && req.method === "GET") { const w = await whyView(u.searchParams.get("symbol")); return send(res, w.error ? 400 : 200, w); }
+      if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
       if (u.pathname === "/api/quanttrader/run" && req.method === "POST") { qtTick(); return send(res, 202, { ok: true }); } // owner-only (signed-in cookie checked above)

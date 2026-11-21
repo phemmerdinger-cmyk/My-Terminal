@@ -16,7 +16,7 @@ const MIN_TOKEN = 32;
 // THE WEB, system health (reports on the bots), device sync and the owner's desk store.
 const REMOTE_EXACT = new Set([
   "/api/autopilot", "/api/autopilot/restore", "/api/daytrader", "/api/daytrader/restore",
-  "/api/quanttrader", "/api/quanttrader/run", "/api/desk-risk", "/api/desk-risk/review",
+  "/api/quanttrader", "/api/quanttrader/run", "/api/why", "/api/brief", "/api/desk-risk", "/api/desk-risk/review",
   "/api/strategy-lab", "/api/strategy-lab/borrow", "/api/day-volume", "/api/system/health",
   "/api/pub/botslive", "/api/pub/archive", "/api/pub/leaderboard", "/api/pub/putcall", "/api/pub/strategies",
   "/api/sync", "/api/desk",

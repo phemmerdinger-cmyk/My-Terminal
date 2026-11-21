@@ -3,6 +3,18 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Bots and the spider work together (2026-11-21)
+- **Pre-buy check:** before the swing bot buys, the spider's research on that stock is checked (`bot-teamwork-core.preBuyCheck`). Negative regulatory, negative earnings or negative filing findings, or a strongly negative research signal, veto the buy; insider selling or a news spike is logged as a caution. Stocks the spider hasn't researched in 7 days are queued for research and allowed.
+- **Quant regime confirmation:** a new regime is used only after it shows up 3 trading days in a row, or sooner toward safety when the spider's own macro research shows stress (`confirmRegime`). Raw vs confirmed regime is stored with each decision.
+- **Quant cash fix:** BIL (T-bills) was treated like a stock with a 2% stop, so the desk's per-trade risk cap clipped each BIL buy near $3k and left most of the account in plain cash. BIL now counts as near-zero stop risk.
+- **Post-mortems:** every closed swing trade is paired with its buy and its loss classified (earnings, bad news, market selloff, stop, trend break, rank decay). Buy patterns (e.g. chasing a 3%+ gap) with ≥4 trades, <40% wins and a net loss lower new picks' scores by up to 0.06.
+- **Earnings early warning:** holdings reporting within 5 trading days are held, or trimmed (half if the spider's research leans negative; a third of a big high-risk winner the day before). New buys wait for the report unless research leans positive (never within 1 day).
+- **Smarter defense mode:** full defense needs a broad selloff or two independent warnings (VIX ≥30 or +20%, S&P −2%, black-swan headline, the spider's own macro findings — not its mirror of the bot). High-risk holdings are trimmed first; the safe sleeve keeps its normal size; no new high-risk buys for the rest of the day. One warning = caution (high-risk buys paused, nothing sold).
+- **Spider-off twin:** a hypothetical copy of the swing bot without any spider input runs from the same holdings, filled at scan prices, to show whether the research helps.
+- **Why card:** Research → "Why (bots)" shows each bot's view of a stock (rank, score parts, holdings, plans, trades) and the spider's evidence with sources (`/api/why`, owner/desk only).
+- **Morning Brief:** AI Lab → Morning Brief lists overnight spider findings, each bot's plan for the open, today's earnings, risk flags, the twin comparison, lessons and pre-buy checks (`/api/brief`, owner/desk only; `public/teamwork.js`, lazy group `team`).
+- Anthropic (ANT) is an ordinary stock again: no IPO shortcut, banner or special data handling, and not in the default watchlist (existing personal watchlists unchanged).
+
 ### Lists that update themselves (2026-11-21)
 - The S&P 500 list refreshes daily from github.com/datasets/s-and-p-500-companies (`sp500-core.js`, tests in `tests/sp500-core.test.js`); `/sp500.json` is served from memory with `asOf`, `joined`, `left`; a bad download keeps the last good list. Bots and screens using `SP500` see the update in place.
 - The instant search list adds S&P joiners and the exchange catalog's new listings (past week) on page load, so new IPOs appear without editing `tickers.js`.
