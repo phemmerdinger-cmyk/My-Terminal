@@ -853,9 +853,9 @@ h1{margin:4px 0 0;font-size:22px;letter-spacing:-.01em}p{margin:0;color:#8b95a3;
 input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid #2d3540;background:#0b0d10;color:#e8ecf1;font-size:16px}input:focus{outline:2px solid #ff6fae;border-color:transparent}
 button{padding:12px;border:0;border-radius:10px;background:#ff6fae;color:#1a0b12;font-weight:700;font-size:15px;cursor:pointer}button:disabled{opacity:.6}
 .e{color:#ff6b6b;font-size:13px;min-height:18px}a{color:#8b95a3;font-size:13px;text-align:center}
-</style></head><body><form id="f"><div class="b"><i></i>MARKET <span>DESK</span></div><h1>Owner sign-in</h1><p>This is Peter's private site. Recruiters and visitors: the public demo is open to everyone.</p>
+</style></head><body><form id="f"><div class="b"><i></i>MARKET <span>DESK</span></div><h1>Owner sign-in</h1><p>This is Peter's private site.</p>
 <input type="text" name="username" value="owner" autocomplete="username" hidden><input id="p" type="password" placeholder="Password" autocomplete="current-password" autofocus required>
-<div class="e" id="e"></div><button id="b">Sign in</button><a href="/demo">Open the public demo →</a></form>
+<div class="e" id="e"></div><button id="b">Sign in</button></form>
 <script>document.getElementById("f").onsubmit=async function(ev){ev.preventDefault();var b=document.getElementById("b"),e=document.getElementById("e");b.disabled=true;e.textContent="";
 try{var r=await fetch("/api/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password:document.getElementById("p").value})});var j=await r.json().catch(function(){return{}});
 if(!r.ok)throw new Error(j.error||"Wrong password.");try{localStorage.setItem("ownerMode","1")}catch(x){}var n=new URLSearchParams(location.search).get("next")||"/";location.replace(/^\\/(?!\\/)/.test(n)?n:"/");}
@@ -4271,8 +4271,22 @@ function send(res, code, body, type = "application/json", extra = {}) {
 process.on("unhandledRejection", (e) => console.error("unhandled:", e && e.message));
 process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message));
 
+// The hosted worker only serves the desktop's authenticated API and the readiness probe.
+function handleDashboard(req, res) {
+  const pathname = new URL(req.url, "http://x").pathname;
+  const noStore = { "Cache-Control": "no-store" };
+  if (/^\/demo(?:\/|$)/i.test(pathname)) return send(res, 404, "Not found", "text/plain", noStore);
+  if (DEPLOY.mode === "public") {
+    if (pathname === "/api/health" && (req.method === "GET" || req.method === "HEAD")) return send(res, 200, { ok: true }, "application/json", noStore);
+    if (!DM.isRemoteRoute(pathname) || !DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token)) return send(res, 404, { error: "Not found" }, "application/json", noStore);
+  } else if (DEPLOY.mode === "" && pathname.startsWith("/api/") && pathname !== "/api/login" && pathname !== "/api/health" && !isOwner(req)) {
+    return send(res, 401, { error: "This part of Market Desk is private.", code: "private" }, "application/json", noStore);
+  }
+  return handle(req, res);
+}
+
 http
-  .createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
+  .createServer((req, res) => costCtx.run({ cost: 0 }, () => handleDashboard(req, res)))
   .listen(PORT, DEPLOY.host, () => console.log(`${DEPLOY.mode === "hq" ? "Bot HQ" : "Market Desk"} (${DEPLOY.mode || "legacy"} mode) running at http://${DEPLOY.host || "localhost"}:${PORT}`));
 if (DEPLOY.hqPort && DEPLOY.hqPort !== +PORT) {
   http.createServer((req, res) => costCtx.run({ cost: 0 }, () => handle(req, res)))
@@ -4503,7 +4517,7 @@ async function handle(req, res) {
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
-      // pages: the real site is owner-only; /demo is the public recruiter view
+      // The dashboard is owner-only.
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
       { const to = DM.pageRedirect(DEPLOY.mode, u.pathname); if (to) return go(to); }
@@ -4511,10 +4525,9 @@ async function handle(req, res) {
       if (u.pathname === "/logout") return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
       if (u.pathname === "/sp500.json") return send(res, 200, { ...SP500_META, rows: SP500 }, "application/json", { "Cache-Control": "public, max-age=3600" });
       let page = null;
-      if (u.pathname === "/demo" || u.pathname === "/demo/") page = "index.html";
-      else if (u.pathname === "/" || u.pathname === "/index.html" || u.pathname === "/ai-vs-sp500") {
-        if (u.searchParams.has("visitor")) return go("/demo");
-        if (!owner) return go(u.pathname === "/ai-vs-sp500" ? "/demo#aitrade" : "/login");
+      if (u.pathname === "/" || u.pathname === "/index.html" || u.pathname === "/ai-vs-sp500") {
+        if (u.searchParams.has("visitor")) return go(u.pathname);
+        if (!owner) return go("/login");
         page = "index.html";
       }
       const file = path.normalize(path.join(PUBLIC, page || u.pathname));
