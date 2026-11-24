@@ -46,13 +46,13 @@
     document.head.appendChild(css);
   }
   // broker-style actions: what you can do depends on what you hold in the ticker (like Schwab's Buy / Sell / Sell All / Short)
-  const ACT = { BUY: "Buy", SELL: "Sell", SHORT: "Sell short", COVER: "Buy to cover" };
+  const ACT = { BUY: "Buy", SELL: "Sell", SHORT: "Sell short", COVER: "Buy back (close short)" };
   const VERB = { BUY: "buy", SELL: "sell", SHORT: "short sale", COVER: "buy to cover" };
   const symOf = () => (MT.vals.sym || "").trim().toUpperCase();
   const posOf = (d, sym) => (sym ? d.positions.find((x) => x.sym === sym) : null);
   function actions(p) {
     if (!p) return [["BUY", "shares", "Buy"], ["SHORT", "shares", "Sell short"]];
-    if (p.dir === "short") return [["COVER", "shares", "Buy to cover"], ["COVER", "all", "Cover all"], ["SHORT", "shares", "Short more"]];
+    if (p.dir === "short") return [["COVER", "shares", "Buy back some"], ["COVER", "all", "Close whole short"], ["SHORT", "shares", "Short more"]];
     return [["SELL", "shares", "Sell"], ["SELL", "all", "Sell all"], ["BUY", "shares", "Buy more"]];
   }
   function fitAction(d) { // keep the chosen action valid for what you hold
@@ -101,7 +101,7 @@
   }
   const row = (l, v, c = "") => `<div class="mt-row ${c}"><span>${l}</span><b>${v}</b></div>`;
   function estRows(d, pv) {
-    let r = row("Shares", sh(pv.shares)) + row("Last price", usd(pv.price)) + row(`Est. fill (incl. ${(d.rules.cost * 1e4).toFixed(1)} bps)`, usd(pv.fill));
+    let r = row("Shares", sh(pv.shares)) + row("Last price", usd(pv.price)) + row(`Est. fill price (incl. ${(d.rules.cost * 100).toFixed(3).replace(/0+$/, "")}% trading cost)`, usd(pv.fill));
     if (pv.side === "BUY") r += row("Estimated cost", usd(pv.amount), "big") + row("Free cash after", usd(pv.freeAfter, 0)) + row("Share of your account", Math.round(pv.weight * 100) + "%");
     if (pv.side === "SHORT") r += row("Estimated proceeds", usd(pv.amount), "big") + row("Cash set aside to back it", usd(pv.setAside, 0)) + row("Borrow fee (modeled)", `${usd(pv.borrowDay)}/day · ${usd(pv.borrowMonth)}/mo`) + row("Automatic buy-back at", usd(pv.autoCover)) + row("Free cash after", usd(pv.freeAfter, 0));
     if (pv.side === "SELL") r += row("Estimated proceeds", usd(pv.amount), "big") + row("Gain / loss vs your cost", `<span class="${cls(pv.pnl)}">${sgn(pv.pnl)} (${pct(pv.pnlPct * 100)})</span>`);
@@ -117,6 +117,7 @@
     return infoCard(sym, x);
   }
   function estLine(d) {
+    if (!symOf()) return `<span class="dim">Type a ticker to see its price and what the order would cost.</span>`;
     const pv = estimate(d);
     if (!pv.ok) return `<span class="dim">${esc(pv.why)}</span>`;
     const lab = pv.side === "BUY" ? "Estimated cost" : pv.side === "COVER" ? "Estimated cost to cover" : "Estimated proceeds";
@@ -146,10 +147,10 @@
     return `<div class="mt-t" id="mtTicket">${head}<div class="mt-wrap"><form class="mt-tk" id="mtForm" autocomplete="off">
       <label><small>Symbol</small><input id="mtSym" list="mtOwn" placeholder="e.g. NVDA" value="${esc(MT.vals.sym)}" style="text-transform:uppercase" required><datalist id="mtOwn">${d.positions.map((x) => `<option value="${esc(x.sym)}">`).join("")}</datalist></label>
       ${sym ? `<div class="mt-hold">${hold}</div>` : ""}
-      <label><small>Action</small><div class="mt-acts" id="mtSide">${acts.map(([s, m, l]) => `<button type="button" data-s="${s}" data-m="${m}" class="${MT.side === s && (m === "all") === all ? "on " + (s === "BUY" || s === "COVER" ? "b" : "s") : ""}">${l}</button>`).join("")}</div></label>
-      ${all ? `<div class="mt-hold">The whole position: ${p ? sh(p.shares) : 0} shares</div>` : `<div class="mt-two"><label><small>Quantity in</small><div class="apseg" id="mtMode">${[["shares", "Shares"], ["amount", "Dollars"]].map(([v, l]) => `<button type="button" data-v="${v}" class="${MT.mode === v ? "on" : ""}">${l}</button>`).join("")}</div></label>
+      <div class="mt-fld" role="group" aria-labelledby="mtSideL"><small id="mtSideL">Action</small><div class="mt-acts" id="mtSide">${acts.map(([s, m, l]) => { const on = MT.side === s && (m === "all") === all; return `<button type="button" data-s="${s}" data-m="${m}" aria-pressed="${on}" class="${on ? "on " + (s === "BUY" || s === "COVER" ? "b" : "s") : ""}">${on ? "✓ " : ""}${l}</button>`; }).join("")}</div></div>
+      ${all ? `<div class="mt-hold">The whole position: ${p ? sh(p.shares) : 0} shares</div>` : `<div class="mt-two"><div class="mt-fld" role="group" aria-labelledby="mtModeL"><small id="mtModeL">Quantity in</small><div class="apseg" id="mtMode">${[["shares", "Shares"], ["amount", "Dollars"]].map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${MT.mode === v}" class="${MT.mode === v ? "on" : ""}">${l}</button>`).join("")}</div></div>
         <label><small>${MT.mode === "amount" ? "Dollars" : "Shares"}</small><input id="mtQty" type="number" min="0" step="any" value="${esc(MT.vals.qty)}" required placeholder="${MT.mode === "amount" ? "e.g. 2500" : "e.g. 10"}"></label></div>`}
-      <div class="mt-two"><label><small>Order type</small><div class="mt-fixed">Market</div></label><label><small>Timing</small><div class="mt-fixed">${d.marketOpen ? "Now" : "Next open"}</div></label></div>
+      <div class="mt-two"><div class="mt-fld"><small>Order type</small><div class="mt-fixed">Market (fills at the current price)</div></div><div class="mt-fld"><small>Timing</small><div class="mt-fixed">${d.marketOpen ? "Now" : "Next open"}</div></div></div>
       <label><small>Why (optional, shows in your trade log)</small><input id="mtNote" maxlength="280" value="${esc(MT.vals.note)}" placeholder="e.g. uncertainty about Jensen Huang"></label>
       <div class="mt-est" id="mtEst">${estLine(d)}</div>
       <div class="mt-ctx">Free cash <b>${usd(d.buyingPower ?? d.cash, 0)}</b>${d.shortReserve ? ` · set aside for shorts <b>${usd(d.shortReserve, 0)}</b>` : ""}</div>
@@ -192,14 +193,14 @@
   function mtRender(d) {
     const ret = d.value / d.startValue - 1, started = !!d.firstTrade, spxRet = d.spx0 && d.spxNow ? d.spxNow / d.spx0 - 1 : null, spxV = spxRet == null ? null : d.startValue * (1 + spxRet), lead = spxV == null ? null : d.value - spxV;
     $("apVs").innerHTML = `<div class="ap-vs"><div class="ap-side ai ${started && lead >= 0 ? "lead" : ""}"><span>🧑 My Trader</span><b>${usd(d.value, 0)}</b><small class="${cls(ret)}">${pct(ret * 100)}</small></div>
-      <div class="ap-mid">${started && lead != null ? `<b class="${cls(lead)}">${lead >= 0 ? "You lead" : "S&amp;P leads"}</b><small>by ${usd(Math.abs(lead), 0)}</small>` : `<b>VS</b><small>starts with your first trade</small>`}</div>
+      <div class="ap-mid">${started && lead != null ? `<b class="${cls(lead)}">${esc(typeof apLead === "function" ? apLead(ret, lead) : lead >= 0 ? "You lead" : "S&P leads")}</b><small>by ${usd(Math.abs(lead), 0)} · same starting money</small>` : `<b>VS</b><small>starts with your first trade</small>`}</div>
       <div class="ap-side sp ${started && lead < 0 ? "lead" : ""}"><span>📈 S&amp;P 500</span><b>${spxV == null ? usd(d.startValue, 0) : usd(spxV, 0)}</b><small class="${cls(spxRet || 0)}">${spxRet == null ? "—" : pct(spxRet * 100)}</small></div></div>
       <div class="ap-live ${d.marketOpen ? "on" : ""}"><i></i><b>My Trader</b> · <span class="ap-tag own">you · paper money</span> ${d.marketOpen ? "Market open" : "Market closed"}${d.durable ? "" : ' · <span class="down">not saved between restarts on this server</span>'}</div>${ticket(d)}`;
     const eq = d.equity || [], lab = eq.map((p) => new Date(p.d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }));
     const ser = [{ v: eq.map((p) => p.v / d.startValue - 1), c: "#ff991f", n: "You", area: true, up: "#21c37a", down: "#ff6b6b", ao: 0.16 }];
     if (d.spx0 && eq.some((p) => p.spx)) ser.push({ v: eq.map((p) => (p.spx ? p.spx / d.spx0 - 1 : null)), c: "#9a9a9a", n: "S&P 500", dash: true, w: 1.4 });
     const pc = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
-    const chart = eq.length >= 2 ? apSvgChart("mtC", lab, ser, { zero: true, fmt: pc, h: 220 }).replace('<div class="apc" id="mtC">', '<div class="apc" id="mtC" data-zero="1">') : `<div class="ap-empty" style="padding:24px 10px">Your curve starts after your first trade and its second day.</div>`;
+    const chart = eq.length >= 2 ? apSvgChart("mtC", lab, ser, { zero: true, fmt: pc, h: 220 }).replace('<div class="apc" id="mtC">', '<div class="apc" id="mtC" data-zero="1">') : `<div class="ap-empty" style="padding:24px 10px">Your chart appears after your first full trading day.</div>`;
     const s = d.stats || {};
     const shorts = d.positions.filter((p) => p.dir === "short");
     const tiles = [["Free cash", usd(d.buyingPower ?? d.cash, 0), d.shortReserve ? `${usd(d.shortReserve, 0)} set aside for shorts` : `${d.value ? Math.round((d.cash / d.value) * 100) : 0}% of the account`], ["Open positions", String(d.positions.length) + (shorts.length ? ` <small style="font-size:12px">(${shorts.length} short)</small>` : ""), d.pending.length ? `${d.pending.length} order(s) waiting` : "no orders waiting"],
@@ -208,8 +209,8 @@
     $("apBox").innerHTML = `
       <div class="ap-mini">${tiles.map(([l, v, x]) => `<div><span>${l}</span><b>${v}</b><small>${x}</small></div>`).join("")}</div>
       <div class="bt-card"><h4>You vs. the S&amp;P 500 <em>return since your first trade</em></h4>${chart}</div>
-      <div class="bt-card"><h4>Holdings <em>${d.positions.length} open</em></h4>${d.positions.length ? `<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Avg entry</th><th>Price</th><th>Value</th><th>Weight</th><th>Today</th><th>P&amp;L</th><th></th></tr></thead><tbody>
-        ${d.positions.map((p) => `<tr><td class="n"><b>${esc(p.sym)}</b></td><td><span class="sd ${p.dir === "short" ? "SELL" : "BUY"}">${p.dir === "short" ? "SHORT" : "LONG"}</span></td><td>${sh(p.shares)}</td><td>${usd(p.cost)}</td><td>${p.priced ? usd(p.price) : '<span class="dim">unavailable</span>'}</td><td>${usd(p.value, 0)}</td><td>${p.weight != null ? Math.round(p.weight * 100) + "%" : "—"}</td><td class="${cls(p.dayPct || 0)}">${p.dayPct != null ? pct(p.dayPct) : "—"}</td><td class="${p.pnl != null ? cls(p.pnl) : ""}">${p.pnl != null ? `${sgn(p.pnl)} (${pct(p.pnlPct * 100)})` : "—"}</td><td>${window.__VISITOR ? "" : `<button class="btn ghost" style="white-space:nowrap" data-mtq="${esc(p.sym)}" data-act="${p.dir === "short" ? "COVER" : "SELL"}">${p.dir === "short" ? "Buy to cover" : "Sell"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : '<div class="hd-empty">Nothing held yet. Use the ticket above to make your first trade.</div>'}
+      <div class="bt-card"><h4>Holdings <em>${d.positions.length} open</em></h4>${d.positions.length ? `<div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Stock</th><th>Side</th><th>Shares</th><th>Avg entry</th><th>Price</th><th>Value</th><th>Share of account</th><th>Stock today</th><th>Your P&amp;L</th><th></th></tr></thead><tbody>
+        ${d.positions.map((p) => `<tr><td class="n"><b>${esc(p.sym)}</b></td><td><span class="sd ${p.dir === "short" ? "SELL" : "BUY"}">${p.dir === "short" ? "SHORT" : "LONG"}</span></td><td>${sh(p.shares)}</td><td>${usd(p.cost)}</td><td>${p.priced ? usd(p.price) : '<span class="dim">unavailable</span>'}</td><td>${usd(p.value, 0)}</td><td>${p.weight != null ? Math.round(p.weight * 100) + "%" : "—"}</td><td class="${cls(p.dayPct || 0)}">${p.dayPct != null ? pct(p.dayPct) : "—"}</td><td class="${p.pnl != null ? cls(p.pnl) : ""}">${p.pnl != null ? `${sgn(p.pnl)} (${pct(p.pnlPct * 100)})` : "—"}</td><td>${window.__VISITOR ? "" : `<button class="btn ghost" style="white-space:nowrap" data-mtq="${esc(p.sym)}" data-act="${p.dir === "short" ? "COVER" : "SELL"}">${p.dir === "short" ? "Close short" : "Sell"}</button>`}</td></tr>`).join("")}</tbody></table></div>` : '<div class="hd-empty">Nothing held yet. Use the ticket above to make your first trade.</div>'}
       ${shorts.length ? `<div class="ap-note">Shorts are bought back automatically if the price rises ${Math.round(d.rules.shortStop * 100)}% above your entry: ${shorts.map((p) => `${esc(p.sym)} at ${usd(p.autoCoverAt)}`).join(" · ")}.</div>` : ""}
       ${d.unpriced && d.unpriced.length ? `<div class="ap-note">No live price for ${d.unpriced.map(esc).join(", ")}; valued at cost until one arrives.</div>` : ""}</div>`;
     $("apMore").innerHTML = `${d.pending.length ? `<div class="bt-card"><h4>Waiting orders <em>fill at the first fresh price after you placed them</em></h4><div class="ap-wrap"><table class="ap-tbl"><thead><tr><th>Placed</th><th>Order</th><th>Size</th><th>Why</th><th></th></tr></thead><tbody>
@@ -219,9 +220,9 @@
       <div class="bt-card"><h4>House rules <em>the same as the bots, so the race is fair</em></h4><ul class="ap-rules">
         <li><b>$30,000 of paper money</b>, the same start as each bot.</li>
         <li><b>Fills:</b> during regular hours an order fills at a live quote no more than ${Math.round(d.rules.maxQuoteAge / 60000)} minutes old. Otherwise it waits for the first fresh quote <i>after</i> you placed it, so you can't trade on a price you already saw.</li>
-        <li><b>Costs:</b> ${(d.rules.cost * 1e4).toFixed(1)} bps of modeled spread and slippage on every buy and sell.</li>
+        <li><b>Costs:</b> ${(d.rules.cost * 100).toFixed(3).replace(/0+$/, "")}% of every buy and sell (${(d.rules.cost * 1e4).toFixed(1)} basis points) for the bid-ask spread and slippage, so fills aren't flattering.</li>
         <li><b>Long:</b> Buy and Sell, no margin. Fractional shares are allowed when you trade in dollars.</li>
-        <li><b>Short:</b> Short sells shares you borrow; Cover buys them back. Each short sets aside twice its value in cash (the sale proceeds plus the same again of yours), so your shorts can't add up to more than your account.</li>
+        <li><b>Short:</b> Selling short means selling borrowed shares to bet the price falls; buying them back closes the short. You make money if the price drops and lose if it rises. Each short sets aside twice its value in cash (the sale proceeds plus the same again of yours), so your shorts can't add up to more than your account.</li>
         <li><b>Short costs and safety:</b> a modeled ${(d.rules.borrowYr * 100).toFixed(0)}% a year borrow fee, charged daily, and an automatic buy-back if a short rises ${Math.round(d.rules.shortStop * 100)}% above your entry. Dividends a real short would owe and hard-to-borrow fees aren't modeled.</li>
         <li>The S&amp;P 500 comparison starts the day of your first trade.</li></ul></div>`;
     if (eq.length >= 2) apWireChart("mtC", lab, ser, pc);
