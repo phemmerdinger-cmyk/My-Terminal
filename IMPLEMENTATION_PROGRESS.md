@@ -5,7 +5,7 @@ Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phas
 ## Done
 ### Bots vs S&P 500 — easier to read for a personal trader (2026-11-24)
 - Page order: scoreboard → the race chart and holdings → under the hood → test runs. Risk desk, Strategy Lab, day-volume panel, put/call gauge and market signals moved into a collapsed "Advanced" section; a "What the terms on this page mean" glossary sits under it.
-- No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline never calls a losing bot a winner ("Swing bot is down, but less than the S&P"). Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).
+- No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline between the two big numbers just says "Ahead of the S&P" / "Behind the S&P" and by how many dollars. Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).
 - Bot cards say "S&P x% over the same dates (since <first trade>)" so the differing S&P numbers make sense.
 - Head to head hides volatility and Sharpe until 20 trading days, volatility no longer shows a "+", and the table notes it's built from daily closes.
 - Accessibility: 12px minimum text in the section, lighter `--dim`, focus outlines, charts have `role="img"` labels and arrow-key stepping, bot buttons use `aria-pressed`.

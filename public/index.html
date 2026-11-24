@@ -1726,10 +1726,10 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
     </section>
     <section id="tab-aitrade" class="pad aitrade" hidden>
       <div class="ap-head"><div class="ap-kick">📈 PAPER TRADING EXPERIMENT</div><h1>Trading bots vs. the S&amp;P 500</h1><p class="ap-sub">Rule-based strategies I designed with Claude's help. The rules decide every trade; no AI model trades. Paper money only.</p></div>
-      <script src="/bots-verdict-core.js?v=3"></script>
+      <script src="/bots-verdict-core.js?v=4"></script>
       <div class="ap-score"><div class="bot-sw" id="apSwitch"></div><div id="apVs"></div></div>
       <script defer src="/order-preview-core.js?v=1"></script>
-      <script defer src="/my-trader.js?v=6"></script>
+      <script defer src="/my-trader.js?v=7"></script>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
         <aside class="ap-hold" id="apNote"></aside>
@@ -3340,7 +3340,7 @@ const $m=n=>n==null||isNaN(n)?"—":(n<0?"−$":"$")+fmt(Math.abs(n));
 const AP_NAMES={swing:"Swing bot",day:"Day trader",quant:"Quant trader",me:"You"};
 function apBotName(){ return AP_NAMES[BOTS.sel]||"Bot"; }
 function apLead(ret,lead){ return window.MDBotsVerdict?MDBotsVerdict.leadText(ret,lead,apBotName()):(lead>=0?apBotName()+" leads":"S&P leads"); }
-const apBy=lead=>"by "+$m(Math.abs(lead))+" · same starting money";
+const apBy=lead=>"by "+$m(Math.abs(lead));
 function apChart(eq,startV,spx0,intra){
   let pts=(eq||[]).filter(p=>p&&p.v), label=null;
   if(pts.length<2&&(intra||[]).length>=2){ pts=intra; label="today"; }
