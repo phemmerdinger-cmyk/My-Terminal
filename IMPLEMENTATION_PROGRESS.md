@@ -215,6 +215,10 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Server: `/api/mytrader` (view), `/api/mytrader/order`, `/api/mytrader/cancel`, owner-only remote routes on the bot server; state in Upstash (`my-trader-v1`) when configured; a one-minute tick fills waiting orders and records one equity point per day plus intraday points.
 - Leaderboard (`/api/pub/leaderboard`) ranks "My Trader" beside the bots once it trades; the bots' combined total vs the S&P excludes it. The comparison chart adds "You".
 
+### My Trader: shorting + cleaner ticket (2026-11-24)
+- Actions Buy / Sell / Short / Cover. Each short sets aside 2× its value in cash (proceeds + the same again), so shorts can't exceed the account; modeled 3%/yr borrow fee charged daily; automatic buy-back if a short rises 50% above entry. Dividends owed and hard-to-borrow fees aren't modeled (stated on the page).
+- The trade ticket now sits inside the scoreboard, directly under the four trader cards and the you-vs-S&P result; it shows what you hold in the typed ticker and your free cash. Holdings table has a Long/Short column.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.

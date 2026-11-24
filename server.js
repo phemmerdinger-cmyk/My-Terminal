@@ -2359,8 +2359,9 @@ async function mtTick() {
     const m = await apMarketOpen(), syms = [...new Set([...Object.keys(st.positions), ...st.pending.map((o) => o.sym)])];
     const q = (await getQuotes([...syms, "^GSPC"])).quotes;
     const done = MYT.work(st, q, { now: Date.now(), open: m.open });
+    const fee = MYT.borrow(st, { day: etParts().day, px: Object.fromEntries(Object.keys(st.positions).filter((x) => q[x] && q[x].price > 0).map((x) => [x, q[x].price])) });
     await mtMark(st, q);
-    if (done.length || m.open || !st.lastSaved || Date.now() - st.lastSaved > 30 * 60e3) { st.lastSaved = Date.now(); await mtStore.set("book", st); }
+    if (done.length || fee || m.open || !st.lastSaved || Date.now() - st.lastSaved > 30 * 60e3) { st.lastSaved = Date.now(); await mtStore.set("book", st); }
   });
 }
 if (DEPLOY.runJobs) setTimeout(() => { mtTick().catch((e) => diagErr("my", e)); setInterval(() => mtTick().catch((e) => diagErr("my", e)), 60e3); }, process.env.AP_TEST ? 4000 : 50_000);
@@ -2369,12 +2370,16 @@ async function mtView() {
   let q = {}; try { q = (await getQuotes([...syms, "^GSPC"])).quotes; } catch {}
   const v = MYT.value(st, Object.fromEntries(syms.filter((s) => q[s] && q[s].price > 0).map((s) => [s, q[s].price])));
   const m = await apMarketOpen().catch(() => ({ open: false }));
-  const positions = syms.map((s) => { const p = st.positions[s], px = q[s] && q[s].price > 0 ? q[s].price : null, val = p.shares * (px ?? p.cost);
-    return { sym: s, shares: p.shares, cost: +p.cost.toFixed(4), price: px, value: +val.toFixed(2), pnl: px == null ? null : +((px - p.cost) * p.shares).toFixed(2), pnlPct: px == null ? null : px / p.cost - 1, dayPct: q[s] ? q[s].changePct ?? null : null, weight: v.value > 0 ? val / v.value : null, at: p.at, priced: px != null }; })
+  const pxMap = {};
+  const positions = syms.map((s) => { const p = st.positions[s], short = p.dir === "short", px = q[s] && q[s].price > 0 ? q[s].price : null, val = p.shares * (px ?? p.cost);
+    if (px != null) pxMap[s] = px;
+    return { sym: s, dir: short ? "short" : "long", shares: p.shares, cost: +p.cost.toFixed(4), price: px, value: +val.toFixed(2), pnl: px == null ? null : +((short ? p.cost - px : px - p.cost) * p.shares).toFixed(2), pnlPct: px == null ? null : short ? 1 - px / p.cost : px / p.cost - 1,
+      dayPct: q[s] ? q[s].changePct ?? null : null, weight: v.value > 0 ? val / v.value : null, at: p.at, priced: px != null, autoCoverAt: short ? +(p.cost * (1 + MYT.SHORT_STOP)).toFixed(2) : null }; })
     .sort((a, b) => b.value - a.value);
   return { startValue: st.start, value: v.value, cash: st.cash, positions, pending: st.pending, trades: st.trades.slice(0, 300), equity: st.equity, intraday: st.intraday, spx0: st.spx0,
     spxNow: q["^GSPC"] && q["^GSPC"].price > 0 ? q["^GSPC"].price : null, firstTrade: st.firstTrade, marketOpen: !!m.open, unpriced: v.missing, stats: MYT.stats(st),
-    rules: { cost: MYT.COST, start: MYT.START, maxQuoteAge: MYT.MAX_QUOTE_AGE }, durable: mtStore.durable };
+    buyingPower: MYT.buyingPower(st, pxMap), shortReserve: +MYT.shortReserve(st, pxMap).toFixed(2),
+    rules: { cost: MYT.COST, start: MYT.START, maxQuoteAge: MYT.MAX_QUOTE_AGE, borrowYr: MYT.BORROW_YR, shortStop: MYT.SHORT_STOP }, durable: mtStore.durable };
 }
 async function mtOrder(body) {
   return mtLocked(async () => {
@@ -3525,7 +3530,7 @@ const TRADERS = {
   swing: { name: "Swing Trader", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
   quant: { name: "Quant Trader", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
   day: { name: "Day Trader", role: "Intraday trader", focus: "Confirmed momentum and ETF VWAP reversals, with a ten-minute maximum hold" },
-  me: { name: "My Trader", role: "Human (Peter)", focus: "Hand-picked trades, same $30,000 start and the same modeled costs as the bots", human: true },
+  me: { name: "My Trader", role: "Human (Peter)", focus: "Hand-picked long and short trades, same $30,000 start and the same modeled costs as the bots", human: true },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {
@@ -3548,8 +3553,8 @@ async function leaderboard() {
     const st = await mtLoad();
     if (st.firstTrade) { const syms = Object.keys(st.positions); let q = {}; try { q = (await getQuotes(syms)).quotes; } catch {}
       const v = MYT.value(st, Object.fromEntries(syms.filter((x) => q[x] && q[x].price > 0).map((x) => [x, q[x].price]))).value, ms = MYT.stats(st);
-      bots.me = { value: v, start: st.start, spx0: st.spx0, eq: st.equity, run: 1, since: st.firstTrade, strategy: null, trades: ms.fills, costs: ms.costs, pnls: st.trades.filter((t) => t.side === "SELL" && t.pnl != null).map((t) => t.pnl),
-        exposure: v > 0 ? 1 - st.cash / v : null, latest: st.trades[0] ? `${st.trades[0].side} ${st.trades[0].sym}${st.trades[0].note ? ": " + st.trades[0].note.slice(0, 140) : ""}` : "No trades yet", thesis: null }; }
+      bots.me = { value: v, start: st.start, spx0: st.spx0, eq: st.equity, run: 1, since: st.firstTrade, strategy: null, trades: ms.fills, costs: ms.costs, pnls: st.trades.filter((t) => (t.side === "SELL" || t.side === "COVER") && t.pnl != null).map((t) => t.pnl),
+        exposure: v > 0 ? Object.values(st.positions).reduce((a, p) => a + p.shares * p.cost, 0) / v : null, latest: st.trades[0] ? `${st.trades[0].side} ${st.trades[0].sym}${st.trades[0].note ? ": " + st.trades[0].note.slice(0, 140) : ""}` : "No trades yet", thesis: null }; }
   } catch {}
   const out = { t: Date.now(), today, spxNow, limits: COMP.LIMITS, periods: COMP.PERIODS.map(([k, label]) => ({ k, label })), boards: {}, traders: {} };
   for (const [k, b] of Object.entries(bots)) {

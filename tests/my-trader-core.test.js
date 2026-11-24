@@ -35,11 +35,11 @@ test("orders wait when the market is closed or the quote is stale, and fill only
   assert.equal(M.work(st, {}, { now: NOW + 60_000, open: false }).length, 0, "nothing fills while closed");
 });
 
-test("sells realize profit after costs; no shorting, no selling more than you own", () => {
+test("sells realize profit after costs; can't sell what you don't own or more than you own", () => {
   const st = M.fresh(NOW);
   M.place(st, { side: "BUY", sym: "KO", shares: 10 }, { now: NOW, open: true, quote: q(60) });
-  assert.match(M.place(st, { side: "SELL", sym: "PEP", shares: 1 }, { now: NOW, open: true, quote: q(1) }).error, /Shorting/);
-  assert.match(M.place(st, { side: "SELL", sym: "KO", shares: 11 }, { now: NOW, open: true, quote: q(70) }).error, /only own 10/);
+  assert.match(M.place(st, { side: "SELL", sym: "PEP", shares: 1 }, { now: NOW, open: true, quote: q(1) }).error, /choose Short/);
+  assert.match(M.place(st, { side: "SELL", sym: "KO", shares: 11 }, { now: NOW, open: true, quote: q(70) }).error, /only have 10/);
   const r = M.place(st, { side: "SELL", sym: "KO", all: true }, { now: NOW + 1, open: true, quote: q(70) });
   assert.equal(r.filled, true); assert.equal(st.positions.KO, undefined);
   assert.ok(Math.abs(r.trade.pnl - (70 * (1 - M.COST) - 60 * (1 + M.COST)) * 10) < 0.02);
@@ -78,4 +78,47 @@ test("mark keeps one point per day and starts the S&P benchmark at the first mar
   M.mark(st, { day: "2026-11-25", value: 30050, spx: 6020, now: NOW + 864e5 });
   assert.equal(st.spx0, 6000);
   assert.deepEqual(st.equity.map((p) => p.v), [30020, 30050]);
+});
+
+test("short then cover: proceeds come in, profit when the price falls, value counts the short as owed", () => {
+  const st = M.fresh(NOW);
+  const r = M.place(st, { side: "SHORT", sym: "NVDA", shares: 40, note: "Uncertainty" }, { now: NOW, open: true, quote: q(180) });
+  assert.equal(r.filled, true);
+  assert.equal(st.positions.NVDA.dir, "short");
+  assert.ok(Math.abs(st.cash - (30000 + 40 * 180 * (1 - M.COST))) < 0.02);
+  assert.ok(Math.abs(M.value(st, { NVDA: 170 }).value - (st.cash - 40 * 170)) < 0.02);
+  assert.match(M.place(st, { side: "BUY", sym: "NVDA", shares: 1 }, { now: NOW, open: true, quote: q(170) }).error, /Cover it before buying/);
+  assert.match(M.place(st, { side: "SELL", sym: "NVDA", shares: 1 }, { now: NOW, open: true, quote: q(170) }).error, /Use Cover/);
+  const c = M.place(st, { side: "COVER", sym: "NVDA", all: true }, { now: NOW + 1, open: true, quote: q(170) });
+  assert.equal(c.filled, true); assert.equal(st.positions.NVDA, undefined);
+  assert.ok(Math.abs(c.trade.pnl - (180 * (1 - M.COST) - 170 * (1 + M.COST)) * 40) < 0.05);
+  assert.ok(Math.abs(st.cash - (30000 + c.trade.pnl)) < 0.05);
+  assert.equal(M.stats(st).closed, 1);
+});
+
+test("shorts must be backed by free cash, so total shorts can't exceed the account", () => {
+  const st = M.fresh(NOW);
+  assert.equal(M.place(st, { side: "SHORT", sym: "TSLA", amount: 29000 }, { now: NOW, open: true, quote: q(250) }).ok, true);
+  assert.ok(M.buyingPower(st, { TSLA: 250 }) < 1100);
+  assert.match(M.place(st, { side: "SHORT", sym: "AMD", amount: 5000 }, { now: NOW, open: true, quote: q(100) }).error, /free cash/);
+  assert.match(M.place(st, { side: "BUY", sym: "AMD", amount: 5000 }, { now: NOW, open: true, quote: q(100) }).error, /Not enough cash/);
+});
+
+test("a short that loses half its entry price is bought back automatically", () => {
+  const st = M.fresh(NOW);
+  M.place(st, { side: "SHORT", sym: "GME", shares: 10 }, { now: NOW, open: true, quote: q(20) });
+  assert.equal(M.work(st, { GME: { price: 25, marketTime: NOW + 50_000 } }, { now: NOW + 60_000, open: true }).length, 0);
+  const done = M.work(st, { GME: { price: 31, marketTime: NOW + 110_000 } }, { now: NOW + 120_000, open: true });
+  assert.equal(done.length, 1); assert.equal(st.positions.GME, undefined);
+  assert.match(st.trades[0].auto, /Automatic buy-back/); assert.ok(st.trades[0].pnl < 0);
+});
+
+test("borrow fee is charged once per day on open shorts", () => {
+  const st = M.fresh(NOW);
+  M.place(st, { side: "SHORT", sym: "SPY", amount: 10000 }, { now: NOW, open: true, quote: q(500) });
+  assert.equal(M.borrow(st, { day: "2026-11-24", px: { SPY: 500 } }), 0, "first day starts the clock");
+  const cash = st.cash, fee = M.borrow(st, { day: "2026-11-25", px: { SPY: 500 } });
+  assert.ok(Math.abs(fee - st.positions.SPY.shares * 500 * M.BORROW_YR / 360) < 0.01);
+  assert.equal(M.borrow(st, { day: "2026-11-25", px: { SPY: 500 } }), 0, "not twice in one day");
+  assert.ok(Math.abs(st.cash - (cash - fee)) < 0.01);
 });
