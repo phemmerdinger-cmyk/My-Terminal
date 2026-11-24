@@ -17,13 +17,14 @@ const login = (pw) => fetch(BASE + "/api/login", { method: "POST", headers: { "c
 
 test("the real site needs a login", async () => {
   for (const p of ["/", "/index.html", "/?owner"]) { const r = await get(p); assert.equal(r.status, 302, p); assert.equal(r.headers.get("location"), "/login"); }
-  assert.equal((await get("/ai-vs-sp500")).headers.get("location"), "/demo#aitrade");
+  assert.equal((await get("/ai-vs-sp500")).headers.get("location"), "/login");
 });
-test("old visitor links go to the public demo", async () => {
-  const r = await get("/?visitor"); assert.equal(r.status, 302); assert.equal(r.headers.get("location"), "/demo");
+test("the public demo is gone: old visitor and demo links lead to the sign-in", async () => {
+  const r = await get("/?visitor"); assert.equal(r.status, 302); assert.equal(r.headers.get("location"), "/");
+  assert.equal((await get("/demo")).status, 404);
 });
-test("the demo is public, compressed and sends security headers", async () => {
-  const r = await get("/demo", { "accept-encoding": "gzip" });
+test("the sign-in page is compressed and sends security headers", async () => {
+  const r = await get("/login", { "accept-encoding": "gzip" });
   assert.equal(r.status, 200);
   assert.match(r.headers.get("content-security-policy"), /frame-ancestors 'self'/);
   assert.equal(r.headers.get("x-frame-options"), "SAMEORIGIN");
@@ -32,7 +33,7 @@ test("the demo is public, compressed and sends security headers", async () => {
   assert.match(await r.text(), /Market Desk|MARKET/i);
 });
 test("private APIs are blocked for visitors, public data APIs are open", async () => {
-  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health", "/api/quanttrader/run", "/api/web/control", "/api/web/export", "/api/web/import", "/api/web/timeline?symbol=AAPL", "/api/web/signals"]) {
+  for (const p of ["/api/sync?code=abcdefghijkl", "/api/autopilot/restore", "/api/unlock", "/api/ask", "/api/predict?symbol=AAPL", "/api/web/status", "/api/web/discoveries", "/api/web/briefing?id=latest", "/api/web/research?symbol=AAPL", "/api/web/graph", "/api/system/health", "/api/quanttrader/run", "/api/web/control", "/api/web/export", "/api/web/import", "/api/web/timeline?symbol=AAPL", "/api/web/signals", "/api/coach"]) {
     const r = await get(p); assert.equal(r.status, 401, p); assert.equal((await r.json()).code, "private");
   }
   assert.equal((await get("/api/health")).status, 200);
@@ -58,7 +59,8 @@ test("a spoofed X-Forwarded-For can't dodge the password lockout", async () => {
 });
 test("rate limit kicks in for a flood of API requests", async () => {
   const h = { "true-client-ip": "10.7.7.7" }; let last;
-  for (let i = 0; i < 185; i++) last = await get("/api/nothing-here", h);
+  const cookie = (await login("test-site-password-123")).headers.get("set-cookie").split(";")[0];
+  for (let i = 0; i < 605; i++) last = await get("/api/nothing-here", { ...h, cookie }); // owners get 600 a minute
   assert.equal(last.status, 429);
 });
 test("index.html can't be fetched directly around the login", async () => {
@@ -71,18 +73,21 @@ test("Claude spending is capped by a dollar budget (default $4, $1/day) and need
   assert.ok(j.claudeBudget.left <= j.claudeBudget.budget);
   const r = await fetch(BASE + "/api/ask", { redirect: "manual", method: "POST", headers: { "content-type": "application/json" }, body: "{}" }); assert.ok([302, 401, 403].includes(r.status), "visitors can't spend credits: " + r.status);
 });
-test("the data-integrity status is public and honest when sources are unreachable", async () => {
-  const r = await get("/api/pub/integrity/status"); assert.equal(r.status, 200);
+test("the data-integrity status is owner-only and honest when sources are unreachable", async () => {
+  assert.equal((await get("/api/pub/integrity/status")).status, 401);
+  const cookie = (await login("test-site-password-123")).headers.get("set-cookie").split(";")[0];
+  const r = await get("/api/pub/integrity/status", { cookie }); assert.equal(r.status, 200);
   const j = await r.json(); assert.ok(["current", "delayed", "stale", "unavailable"].includes(j.status)); assert.ok(Array.isArray(j.rows));
 });
 
 test("the in-site reader only fetches allowlisted public-domain hosts over https", async () => {
+  const cookie = (await login("test-site-password-123")).headers.get("set-cookie").split(";")[0], getO = (p) => get(p, { cookie });
   for (const u of ["file:///etc/passwd", "http://www.federalreserve.gov/x", "https://user:pw@www.sec.gov/x", "https://www.sec.gov:8443/x", "gopher://x"]) {
-    const r = await get("/api/article?url=" + encodeURIComponent(u)); assert.equal(r.status, 400, u);
+    const r = await getO("/api/article?url=" + encodeURIComponent(u)); assert.equal(r.status, 400, u);
   }
   // a host that isn't allowlisted is never fetched for full text: only metadata, no paragraphs
   for (const u of ["https://169.254.169.254/latest/meta-data", "https://localhost/admin", "https://example.com/story"]) {
-    const j = await (await get("/api/article?url=" + encodeURIComponent(u))).json(); assert.equal(j.full, false, u); assert.deepEqual(j.paragraphs, [], u);
+    const j = await (await getO("/api/article?url=" + encodeURIComponent(u))).json(); assert.equal(j.full, false, u); assert.deepEqual(j.paragraphs, [], u);
   }
 });
 

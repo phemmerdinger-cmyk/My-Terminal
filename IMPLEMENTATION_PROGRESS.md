@@ -200,6 +200,13 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Sarah v3: +0.08 × ratio score in the ranking; buy reasons cite the strongest/weakest ratio. Daniel v3: +0.25 × ratio score in the stock ranking (ETFs 0). Both weights are fixed priors, labeled in STRATS, to be tested out of sample. Alex unchanged (annual ratios have no 1-minute signal).
 - Leaderboard portraits removed at the owner's request (2026-11-17).
 
+### Coach agent + chart read (2026-11-24)
+- `public/coach-core.js` (UMD, tests/coach-core.test.js): rule-based chart read (support/resistance from clustered pivots, 20/50/200-day averages, RSI 14, 3-month momentum, 60-day trend → Buy/Hold/Sell with a stop under support and target at resistance), journal review of each bot's last 20 closed trades (win rate, profit factor, recurring mistakes, up to 3 rules), and a hypothetical −20% market test (1-year beta to SPY, >20% positions, pairs correlated ≥0.80, stock held by several bots, inverse-fund hedge and trims).
+- `/api/coach` (owner-only, remote route, in HQ_API): built on the bot server from the bots' books and Yahoo daily closes, cached 2 hours. Missing history is reported, never estimated. The Coach never trades.
+- Bot HQ: seventh desk "COACH" in the agent room; its page shows To fix, journals, the −20% test and chart reads. `#bot/<id>` deep links.
+- Market Desk Research → Why (bots): a "Chart read" card at the top (coach-core in the lazy `team` group, adjusted closes via MD.hist).
+- Tests updated for the owner's removal of the public demo (sign-in only; integrity/article routes are owner-only) and a spider retry test that depended on today's date.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.

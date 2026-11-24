@@ -50,7 +50,7 @@ test("runaway protection: time limits, bounded retries, queue cap and follow-up 
   const log = await sp.runNow("insiders", "NVDA");
   assert.equal(log.status, "error"); assert.match(log.error, /timed out/);
   const retry = sp._internal.ST.queue.find((j) => j.key === "insiders:NVDA");
-  assert.ok(retry && retry.tries === 1 && retry.notBefore > Date.now() - 1e9, "one retry queued with a delay");
+  assert.ok(retry && retry.tries === 1 && retry.notBefore > log.started, "one retry queued with a delay");
   for (let i = 0; i < 100; i++) sp.enqueue("company_snapshot", "S" + i, {});
   assert.ok(sp._internal.ST.queue.length <= 60, "queue is capped");
   assert.equal(sp.enqueue("fundamentals", "AAPL", { depth: 3 }), null, "follow-up chains stop at depth 2");

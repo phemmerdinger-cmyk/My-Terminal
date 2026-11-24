@@ -96,8 +96,28 @@
     try {
       const c = whyCache.get(sym), w = c && Date.now() - c.at < 60e3 ? c.w : await get("/api/why?symbol=" + encodeURIComponent(sym));
       whyCache.set(sym, { at: Date.now(), w });
-      if (S.rq && S.rq.sym === sym && S.rq.sub === "why") el.innerHTML = whyHtml(w);
+      if (S.rq && S.rq.sym === sym && S.rq.sub === "why") { el.innerHTML = '<div class="tw-grid" style="margin-bottom:12px"><section class="tw-card" id="twChart"><h3>Chart read</h3><div class="tw-dim"><span class="spin"></span> Reading the daily chart…</div></section></div>' + whyHtml(w); chartCard(el.querySelector("#twChart"), sym); }
     } catch (e) { el.innerHTML = `<div class="fx-empty">The Why card is unavailable: ${h(e.message)}.</div>`; }
+  }
+  // the Coach's rule-based chart read (public/coach-core.js) on one year of real daily closes
+  async function chartCard(box, sym) {
+    if (!box) return;
+    try {
+      if (!window.MDCoach || !window.MD) throw new Error("chart tools not loaded");
+      const j = await MD.hist(sym, MD.daysAgo(400)), r = MDCoach.chartRead(j.adj && j.adj.every(Number.isFinite) ? j.adj : j.close, { sym });
+      if (!box.isConnected) return;
+      if (!r.ok) { box.innerHTML = `<h3>Chart read</h3><div class="tw-dim">${h(r.why)}</div>`; return; }
+      const usd = (x) => (x == null ? "—" : "$" + x.toFixed(2)), tone = r.signal === "Buy" ? "up" : r.signal === "Sell" ? "down" : "";
+      box.innerHTML = `<h3>Chart read · <span class="${tone}">${h(r.signal)}</span></h3>
+        <div class="tw-kv"><span>Trend (60 days)</span><b>${h(r.trend)}${r.trendPerMonth != null ? ` · ${r.trendPerMonth >= 0 ? "+" : ""}${r.trendPerMonth.toFixed(1)}%/mo` : ""}</b></div>
+        <div class="tw-kv"><span>Support</span><b>${r.support ? `${usd(r.support.price)} · ${r.support.touches} touches` : "none found"}</b></div>
+        <div class="tw-kv"><span>Resistance</span><b>${r.resistance ? `${usd(r.resistance.price)} · ${r.resistance.touches} touches` : "none found"}</b></div>
+        <div class="tw-kv"><span>20 / 50 / 200-day avg</span><b>${usd(r.sma20)} / ${usd(r.sma50)} / ${usd(r.sma200)}</b></div>
+        <div class="tw-kv"><span>RSI (14) · 1m · 3m</span><b>${r.rsi ?? "—"} · ${r.mom1m ?? "—"}% · ${r.mom3m ?? "—"}%</b></div>
+        ${r.plan.stop != null || r.plan.target != null ? `<div class="tw-kv"><span>Stop under support · target</span><b>${usd(r.plan.stop)} · ${usd(r.plan.target)}${r.plan.rewardRisk != null ? ` (reward/risk ${r.plan.rewardRisk})` : ""}</b></div>` : ""}
+        ${r.points.map((p) => `<div class="tw-row"><span class="${p.n > 0 ? "up" : p.n < 0 ? "down" : ""}">${p.n > 0 ? "▲" : p.n < 0 ? "▼" : "•"}</span> ${h(p.text)}</div>`).join("")}
+        <div class="tw-dim">${h(r.note)} Uses split/dividend-adjusted daily closes.</div>`;
+    } catch (e) { if (box.isConnected) box.innerHTML = `<h3>Chart read</h3><div class="tw-dim">Chart read unavailable: ${h(e.message)}.</div>`; }
   }
   const trades = (L) => (L && L.length ? L.map((t) => `<div class="tw-dim"><span class="${t.side === "BUY" ? "up" : "down"}">${h(t.side)}</span> ${when(t.t)} @ ${Number.isFinite(t.price) ? "$" + t.price.toFixed(2) : "—"}${t.pnl != null ? ` <span class="${cls(t.pnl)}">${money(t.pnl)}</span>` : ""} — ${h(String(t.why || "").slice(0, 140))}</div>`).join("") : '<div class="tw-dim">No trades in this stock.</div>');
   function whyHtml(w) {

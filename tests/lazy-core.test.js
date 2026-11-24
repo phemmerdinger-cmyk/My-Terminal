@@ -48,7 +48,7 @@ test("the page loads tools on demand and keeps the spider out of the demo", () =
 test("the Morning brief pop-up loads the teamwork UI on demand", () => {
   const L = require("../public/lazy-core.js");
   assert.equal(L.groupForTab("brief"), null, "the brief is a pop-up, not a tab");
-  assert.deepEqual([...L.GROUPS.team], ["/teamwork.js"]);
+  assert.deepEqual([...L.GROUPS.team], ["/coach-core.js", "/teamwork.js"]);
   const html = require("node:fs").readFileSync(require("node:path").join(__dirname, "../public/index.html"), "utf8");
   assert.ok(!html.includes('<script src="/teamwork.js"'), "teamwork.js is not loaded eagerly");
 });
