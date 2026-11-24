@@ -102,10 +102,11 @@ test("My Trader: visitors can't trade; the owner's order is checked, queued with
   assert.equal((await post("/api/mytrader/order", { side: "BUY", sym: "AAPL", shares: 1 })).status, 401);
   const cookie = (await login("test-site-password-123")).headers.get("set-cookie").split(";")[0];
   assert.equal((await post("/api/mytrader/order", { side: "SELL", sym: "AAPL", shares: 1 }, { cookie })).status, 400, "no shorting");
+  const before = await (await get("/api/mytrader", { cookie })).json(); // the book may hold orders from earlier local runs
   const r = await post("/api/mytrader/order", { side: "BUY", sym: "AAPL", shares: 1, note: "test" }, { cookie }), j = await r.json();
   assert.equal(r.status, 200); assert.equal(j.filled, false, "no live price offline, so it waits instead of guessing a fill");
   const v = await (await get("/api/mytrader", { cookie })).json();
-  assert.equal(v.startValue, 30000); assert.equal(v.cash, 30000); assert.equal(v.pending.length, 1);
+  assert.equal(v.startValue, 30000); assert.equal(v.cash, before.cash, "nothing spent until it fills"); assert.equal(v.pending.length, before.pending.length + 1);
   assert.equal((await post("/api/mytrader/cancel", { id: j.order.id }, { cookie })).status, 200);
-  assert.equal((await (await get("/api/mytrader", { cookie })).json()).pending.length, 0);
+  assert.equal((await (await get("/api/mytrader", { cookie })).json()).pending.length, before.pending.length);
 });
