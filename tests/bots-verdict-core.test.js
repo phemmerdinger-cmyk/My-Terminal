@@ -52,10 +52,8 @@ test("missing benchmark data is never estimated", () => {
   assert.equal(r.gap, null);
 });
 
-test("lead text never calls a losing bot a winner", () => {
-  assert.equal(leadText(-0.0117, 118, "Swing bot"), "Swing bot is down, but less than the S&P");
-  assert.equal(leadText(0.02, 300, "Swing bot"), "Swing bot is beating the S&P");
-  assert.equal(leadText(0.01, -50, "Day trader"), "Day trader is up, but trailing the S&P");
-  assert.equal(leadText(-0.03, -200, "Day trader"), "Day trader is behind the S&P");
-  assert.equal(leadText(-0.003, -246, "You"), "You are behind the S&P");
+test("lead text is a short ahead/behind label", () => {
+  assert.equal(leadText(-0.0117, 118, "Swing bot"), "Ahead of the S&P");
+  assert.equal(leadText(0.01, -50, "Day trader"), "Behind the S&P");
+  assert.equal(leadText(0.01, null, "You"), "vs. the S&P 500");
 });

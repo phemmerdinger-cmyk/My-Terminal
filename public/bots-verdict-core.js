@@ -31,10 +31,8 @@
 
   // Headline words for the big "who's ahead" box. `lead` is in dollars (bot minus S&P).
   function leadText(ret, lead, name) {
-    if (!num(ret) || !num(lead)) return name + " vs. the S&P 500";
-    const be = name === "You" ? " are" : " is";
-    if (lead >= 0) return ret >= 0 ? name + be + " beating the S&P" : name + be + " down, but less than the S&P";
-    return ret >= 0 ? name + be + " up, but trailing the S&P" : name + be + " behind the S&P";
+    if (!num(lead)) return "vs. the S&P 500";
+    return lead >= 0 ? "Ahead of the S&P" : "Behind the S&P";
   }
 
   function raceLine(r) {
