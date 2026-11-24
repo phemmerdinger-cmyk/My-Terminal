@@ -98,3 +98,8 @@ test("the Coach route reaches the bot server and Bot HQ, read-only and owner-onl
   assert.equal(DM.hqAccess({ path: "/api/coach", method: "GET", owner: false }), "deny");
   assert.equal(DM.hqAccess({ path: "/api/coach", method: "POST", owner: true }), "notfound");
 });
+
+test("My Trader routes live on the bot server", () => {
+  const DM = require("../deploy-mode-core.js");
+  for (const p of ["/api/mytrader", "/api/mytrader/order", "/api/mytrader/cancel"]) assert.equal(DM.isRemoteRoute(p), true, p);
+});

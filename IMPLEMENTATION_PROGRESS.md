@@ -210,6 +210,11 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Bot HQ trading floor (2026-11-24)
 - Agent room redrawn as a trading floor: a status strip (paper equity, since start, open positions, fills, regime, risk desk, Coach flags, spider), a video wall with every main bot's return curve and a scrolling holdings board, an LED ticker of holdings with P&L, the Coach's to-fix list on the wall, three angled monitors per desk with each agent's real data (equity, positions P&L, vs S&P 500; spider findings; lab returns; risk gauges; Coach counts), name plates with returns, chairs and headsets, data packets from the spider. Screens with no data say NO DATA.
 
+### My Trader (2026-11-24)
+- The owner's own $30,000 paper account on "Trading bots vs. the S&P 500" (4th card, `public/my-trader.js`). Rules in `my-trader-core.js` (tests/my-trader-core.test.js): fills at a quote ≤3 min old during regular hours, otherwise at the first fresh quote stamped after the order; 7.5 bps modeled cost per side (same as the swing bot); long only, no margin/shorting; fractional shares for dollar orders; waiting orders cancellable.
+- Server: `/api/mytrader` (view), `/api/mytrader/order`, `/api/mytrader/cancel`, owner-only remote routes on the bot server; state in Upstash (`my-trader-v1`) when configured; a one-minute tick fills waiting orders and records one equity point per day plus intraday points.
+- Leaderboard (`/api/pub/leaderboard`) ranks "My Trader" beside the bots once it trades; the bots' combined total vs the S&P excludes it. The comparison chart adds "You".
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
