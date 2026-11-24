@@ -3,6 +3,14 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Bots vs S&P 500 — easier to read for a personal trader (2026-11-24)
+- Page order: scoreboard → the race chart and holdings → under the hood → test runs. Risk desk, Strategy Lab, day-volume panel, put/call gauge and market signals moved into a collapsed "Advanced" section; a "What the terms on this page mean" glossary sits under it.
+- No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline never calls a losing bot a winner ("Swing bot is down, but less than the S&P"). Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).
+- Bot cards say "S&P x% over the same dates (since <first trade>)" so the differing S&P numbers make sense.
+- Head to head hides volatility and Sharpe until 20 trading days, volatility no longer shows a "+", and the table notes it's built from daily closes.
+- Accessibility: 12px minimum text in the section, lighter `--dim`, focus outlines, charts have `role="img"` labels and arrow-key stepping, bot buttons use `aria-pressed`.
+- My Trader: full-width view (the bots' holdings panel is hidden there so the holdings table isn't cut off), plain words ("Close short", "Your P&L", costs as 0.075%), Action / Quantity toggles are labelled groups with `aria-pressed` and a ✓ (clicking "Action" no longer triggers Buy), clearer empty-ticket and empty-chart messages.
+
 ### Workspace tab removed (2026-11-21, owner's request)
 - Research → Workspace (and its Multi-screen layout) is gone: `public/workspace.js`, `public/workspace-core.js` and their tests deleted, the tab, lazy group and `?pane=1` page mode removed. Saved `md_ws` layouts are simply ignored.
 
