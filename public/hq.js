@@ -485,34 +485,173 @@
       why: "Never trades. Checks the other bots' work with fixed rules and real prices.", found: k && k.flags[0] ? k.flags[0] : "—", next: "Re-checks every 2 hours." };
   }
   const room = { hits: [], drag: null };
-  function P(x, y, z, w, hh) { const a = D.rot, X = x * Math.cos(a) - z * Math.sin(a), Z = x * Math.sin(a) + z * Math.cos(a), s = Math.min(w / 17, hh / 12.5); return [w / 2 + (X - Z) * 0.87 * s, hh * 0.44 + (X + Z) * 0.5 * s - y * s, X + Z]; }
+  function P(x, y, z, w, hh) { const a = D.rot, X = x * Math.cos(a) - z * Math.sin(a), Z = x * Math.sin(a) + z * Math.cos(a), s = Math.min(w / 17.5, hh / 15); return [w / 2 + (X - Z) * 0.87 * s, hh * 0.57 + (X + Z) * 0.5 * s - y * s, X + Z]; }
+  // draw flat 2D content (w × h local pixels) onto a 3D rectangle: o = top-left corner, ex = top-right, ey = bottom-left (all projected)
+  function onPlane(c, o, ex, ey, w, h, fn) { c.save(); c.transform((ex[0] - o[0]) / w, (ex[1] - o[1]) / w, (ey[0] - o[0]) / h, (ey[1] - o[1]) / h, o[0], o[1]); try { fn(c); } finally { c.restore(); } }
+  function lineIn(c, vals, x, y, w, h, color, width = 2) {
+    const v = vals.filter(Number.isFinite); if (v.length < 2) return false; const mn = Math.min(...v), mx = Math.max(...v), rg = mx - mn || 1;
+    c.strokeStyle = color; c.lineWidth = width; c.beginPath(); v.forEach((q, i) => { const X = x + (i / (v.length - 1)) * w, Y = y + h - ((q - mn) / rg) * h; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke(); c.lineWidth = 1; return true;
+  }
+  const UPC = "#3ddc84", DNC = "#ff5f5f";
+  // what each agent's three screens show — real numbers only; "NO DATA" when there are none
+  function screens(a) {
+    if (a.b) {
+      const b = a.b, eq = b.equity.map((p) => p.v), bench = b.equity.map((p) => p.b);
+      return [{ title: "EQUITY", kind: "line", vals: eq, color: b.ret >= 0 ? UPC : DNC, foot: pct(b.ret, 1) },
+        { title: "POSITIONS", kind: "bars", bars: b.positions.filter((x) => Number.isFinite(x.pnl)).slice(0, 8).map((x) => ({ k: x.sym, v: x.pnl })) },
+        { title: "VS S&P 500", kind: "line", vals: bench.filter(Number.isFinite).length > 1 ? eq.map((v, i) => (Number.isFinite(bench[i]) && bench[i] > 0 ? v / bench[i] : NaN)) : [], color: OR, foot: b.benchRet != null ? "S&P " + pct(b.benchRet, 1) : "" }];
+    }
+    if (a.id === "spider") { const fs = finds(), up = fs.filter((d) => d.tone > 0).length, dn = fs.filter((d) => d.tone < 0).length, sp = D.spider || {};
+      return [{ title: "FINDINGS", kind: "big", text: String(fs.length), sub: `${up}▲ ${dn}▼` }, { title: "TONE", kind: "bars", bars: fs.length ? [{ k: "UP", v: up }, { k: "DOWN", v: -dn }] : [] },
+        { title: "JOBS", kind: "big", text: String((sp.recent || []).length), sub: sp.running ? "RUNNING" : "IDLE" }]; }
+    if (a.id === "lab") { const L = D.bots.filter((x) => x.group === "lab");
+      return [{ title: "EXPERIMENTS", kind: "big", text: String(L.length), sub: `${L.reduce((s, x) => s + (x.openCount || 0), 0)} OPEN` },
+        { title: "RETURNS", kind: "bars", bars: L.filter((x) => Number.isFinite(x.ret)).map((x) => ({ k: x.name.split(" ")[0].slice(0, 6).toUpperCase(), v: x.ret })) },
+        { title: "PAUSED", kind: "big", text: String(L.filter((x) => x.toughness && x.toughness.status === "fail").length), sub: "TOUGHNESS" }]; }
+    if (a.id === "risk") { const dk = D.raw.desk, st = dk && dk.state, pol = dk && dk.policy;
+      return [{ title: "MODE", kind: "big", text: dk ? String(dk.mode).toUpperCase() : "—", sub: "" },
+        { title: "DAILY LOSS", kind: "gauge", v: st && pol && pol.hardDaily ? st.dailyLoss / pol.hardDaily : null, sub: st ? money(st.dailyLoss) : "" },
+        { title: "DRAWDOWN", kind: "gauge", v: st && pol && pol.peakStop ? st.drawdown / pol.peakStop : null, sub: st ? money(st.drawdown) : "" }]; }
+    if (a.id === "coach") { const k = D.coach, st = k && k.stress, ch = k ? k.charts.filter((c) => c.ok) : [];
+      return [{ title: "TO FIX", kind: "big", text: k ? String(k.flags.length) : "—", sub: "FLAGS" },
+        { title: "CHART READS", kind: "bars", bars: k ? [{ k: "BUY", v: ch.filter((c) => c.signal === "Buy").length }, { k: "SELL", v: -ch.filter((c) => c.signal === "Sell").length }] : [] },
+        { title: "−20% TEST", kind: "big", text: st && st.ok ? money(st.totalHit) : "—", sub: "HYPOTHETICAL" }]; }
+    return [];
+  }
+  function drawScreen(c, sc, W, H, on, t) {
+    c.fillStyle = "#07090b"; c.fillRect(0, 0, W, H);
+    c.strokeStyle = on ? "rgba(255,153,31,.55)" : "#2a2a2a"; c.lineWidth = 3; c.strokeRect(1.5, 1.5, W - 3, H - 3); c.lineWidth = 1;
+    c.fillStyle = on ? OR : "#7a7a7a"; c.font = "600 11px monospace"; c.textAlign = "left"; c.fillText(sc.title, 8, 15);
+    let drew = false;
+    if (sc.kind === "line") { drew = lineIn(c, sc.vals || [], 8, 22, W - 16, H - 44, sc.color); if (sc.foot) { c.fillStyle = sc.color; c.font = "600 12px monospace"; c.textAlign = "right"; c.fillText(sc.foot, W - 8, H - 7); } }
+    else if (sc.kind === "bars" && sc.bars && sc.bars.length) { drew = true; const n = sc.bars.length, mx = Math.max(...sc.bars.map((b) => Math.abs(b.v))) || 1, mid = 22 + (H - 40) / 2, bw = (W - 16) / n;
+      c.strokeStyle = "#333"; c.beginPath(); c.moveTo(8, mid); c.lineTo(W - 8, mid); c.stroke();
+      sc.bars.forEach((b, i) => { const hgt = (Math.abs(b.v) / mx) * (H - 44) / 2; c.fillStyle = b.v >= 0 ? UPC : DNC; c.fillRect(8 + i * bw + 2, b.v >= 0 ? mid - hgt : mid, bw - 4, Math.max(1, hgt));
+        if (n <= 8) { c.fillStyle = "#8a8a8a"; c.font = "9px monospace"; c.textAlign = "center"; c.fillText(String(b.k).slice(0, 5), 8 + i * bw + bw / 2, H - 5); } }); }
+    else if (sc.kind === "big") { drew = true; c.textAlign = "center"; c.fillStyle = "#f2f2f2"; c.font = `600 ${sc.text.length > 6 ? 22 : 34}px monospace`; c.fillText(sc.text, W / 2, H / 2 + 10); c.fillStyle = "#8a8a8a"; c.font = "10px monospace"; c.fillText(sc.sub || "", W / 2, H - 9); }
+    else if (sc.kind === "gauge" && Number.isFinite(sc.v)) { drew = true; const f = Math.max(0, Math.min(1, sc.v)), cx = W / 2, cy = H - 18, r = Math.min(W / 2 - 12, H - 34);
+      c.lineWidth = 8; c.strokeStyle = "#222"; c.beginPath(); c.arc(cx, cy, r, Math.PI, 0); c.stroke(); c.strokeStyle = f > 0.75 ? DNC : f > 0.4 ? OR : UPC; c.beginPath(); c.arc(cx, cy, r, Math.PI, Math.PI + f * Math.PI); c.stroke(); c.lineWidth = 1;
+      c.fillStyle = "#d0d0d0"; c.font = "10px monospace"; c.textAlign = "center"; c.fillText(sc.sub || "", cx, cy + 2); }
+    if (!drew) { c.fillStyle = "#4a4a4a"; c.font = "10px monospace"; c.textAlign = "center"; c.fillText("NO DATA", W / 2, H / 2 + 6); }
+    c.fillStyle = "rgba(255,255,255,.035)"; const sl = (t * 40) % H; c.fillRect(0, sl, W, 3); c.textAlign = "left"; // scanline
+  }
+  // the big wall: every bot's return since start, and a board of what they hold
+  function drawWall(c, W, H, t) {
+    c.fillStyle = "#06080a"; c.fillRect(0, 0, W, H); c.strokeStyle = "rgba(255,153,31,.6)"; c.lineWidth = 4; c.strokeRect(2, 2, W - 4, H - 4); c.lineWidth = 1;
+    c.fillStyle = OR; c.font = "600 18px monospace"; c.fillText("MARKET DESK · TRADING FLOOR", 18, 30);
+    const main = D.bots.filter((x) => x.group === "main"), tot = main.reduce((s, x) => s + (x.value || 0), 0), st = main.reduce((s, x) => s + (x.start || 0), 0);
+    c.textAlign = "right"; c.fillStyle = "#e8e8e8"; c.font = "600 18px monospace"; c.fillText(main.length ? `PAPER ${money(tot)}  ${pct(st ? tot / st - 1 : null, 2)}` : "PAPER —", W - 18, 30); c.textAlign = "left";
+    // left: return curves (% since each bot's start)
+    const cw = W * 0.56, x0 = 18, y0 = 48, ch = H - 70, cols = [OR, "#f2f2f2", "#9a9a9a"];
+    c.strokeStyle = "#1c1c1c"; for (let i = 0; i <= 4; i++) { c.beginPath(); c.moveTo(x0, y0 + (i * ch) / 4); c.lineTo(x0 + cw, y0 + (i * ch) / 4); c.stroke(); }
+    const series = main.map((b) => b.equity.map((p) => p.v / (b.start || 1) - 1)), all = series.flat().filter(Number.isFinite);
+    if (all.length > 1) { const mn = Math.min(0, ...all), mx = Math.max(0, ...all), rg = mx - mn || 1, Y = (v) => y0 + ch - ((v - mn) / rg) * ch;
+      c.strokeStyle = "#444"; c.setLineDash([4, 4]); c.beginPath(); c.moveTo(x0, Y(0)); c.lineTo(x0 + cw, Y(0)); c.stroke(); c.setLineDash([]);
+      series.forEach((sr, k) => { const v = sr.filter(Number.isFinite); if (v.length < 2) return; c.strokeStyle = cols[k % 3]; c.lineWidth = 2.5; c.beginPath(); v.forEach((q, i) => { const X = x0 + (i / (v.length - 1)) * cw; i ? c.lineTo(X, Y(q)) : c.moveTo(X, Y(q)); }); c.stroke(); c.lineWidth = 1;
+        c.fillStyle = cols[k % 3]; c.font = "12px monospace"; c.fillText(`${main[k].name.toUpperCase()} ${pct(main[k].ret, 1)}`, x0 + 6 + k * (cw / 3), y0 + ch + 18); });
+      c.fillStyle = "#6b6b6b"; c.font = "10px monospace"; c.fillText(pct(mx, 1), x0 + 2, y0 + 10); c.fillText(pct(mn, 1), x0 + 2, y0 + ch - 2);
+    } else { c.fillStyle = "#4a4a4a"; c.font = "14px monospace"; c.fillText("NO EQUITY HISTORY YET", x0 + 10, y0 + ch / 2); }
+    // right: holdings board
+    const bx = x0 + cw + 24, bw = W - bx - 18, rows = [];
+    for (const b of main) for (const p of b.positions) if (Number.isFinite(p.pnl)) rows.push({ sym: p.sym, bot: b.name.split(" ")[0].toUpperCase(), pnl: p.pnl, val: p.value });
+    rows.sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
+    c.fillStyle = "#8a8a8a"; c.font = "600 11px monospace"; c.fillText("SYM", bx, y0 + 8); c.fillText("BOT", bx + bw * 0.28, y0 + 8); c.textAlign = "right"; c.fillText("VALUE", bx + bw * 0.74, y0 + 8); c.fillText("P&L", bx + bw, y0 + 8); c.textAlign = "left";
+    const rh = 19, fit = Math.floor((H - y0 - 30) / rh), list = rows.length > fit ? rows.concat(rows) : rows, off = rows.length > fit ? (t * 8) % (rows.length * rh) : 0;
+    c.save(); c.beginPath(); c.rect(bx - 4, y0 + 14, bw + 8, H - y0 - 30); c.clip();
+    list.forEach((r, i) => { const y = y0 + 30 + i * rh - off; if (y < y0 || y > H) return; c.font = "13px monospace"; c.fillStyle = "#f2f2f2"; c.fillText(r.sym, bx, y); c.fillStyle = "#8a8a8a"; c.fillText(r.bot, bx + bw * 0.28, y);
+      c.textAlign = "right"; c.fillText(money(r.val), bx + bw * 0.74, y); c.fillStyle = r.pnl >= 0 ? UPC : DNC; c.fillText((r.pnl >= 0 ? "+" : "") + money(r.pnl), bx + bw, y); c.textAlign = "left"; });
+    if (!rows.length) { c.fillStyle = "#4a4a4a"; c.font = "13px monospace"; c.fillText("NO OPEN POSITIONS", bx, y0 + 40); }
+    c.restore();
+  }
+  function hud() {
+    const el = $("roomHud"); if (!el) return; const main = D.bots.filter((x) => x.group === "main"), tot = main.reduce((s, x) => s + (x.value || 0), 0), st = main.reduce((s, x) => s + (x.start || 0), 0);
+    const open = main.reduce((s, x) => s + x.positions.length, 0), today = Date.now() - 864e5, fills = main.reduce((s, x) => s + x.trades.filter((t) => t.t > today).length, 0);
+    const q = D.raw.quant && D.raw.quant.latest, dk = D.raw.desk, k = D.coach;
+    const cell = (l, v, c = "") => `<div><small>${l}</small><b class="${c}">${v}</b></div>`;
+    const html = cell("PAPER EQUITY", main.length ? money(tot) : "—") + cell("SINCE START", main.length && st ? pct(tot / st - 1, 2) : "—", cls(tot - st)) + cell("OPEN POSITIONS", String(open)) + cell("FILLS · 24H", String(fills))
+      + cell("REGIME", q ? h(String(q.regime).toUpperCase()) : "—") + cell("RISK DESK", dk ? h(String(dk.mode).toUpperCase()) : "—", dk && dk.mode !== "armed" ? "or" : "") + cell("COACH FLAGS", k ? String(k.flags.length) : "—", k && k.flags.length ? "or" : "")
+      + cell("SPIDER", D.spider && D.spider.running ? "WORKING" : "IDLE", D.spider && D.spider.running ? "or" : "");
+    if (el.innerHTML !== html) el.innerHTML = html;
+  }
   function drawRoom() {
     if (D.view !== "room") return; const k = setup($("room")); if (!k) return; const { c, w, hh } = k, t = performance.now() / 1000, p = (x, y, z) => P(x, y, z, w, hh);
-    const bg = c.createRadialGradient(w / 2, hh / 2, 40, w / 2, hh / 2, w * 0.7); bg.addColorStop(0, "#16110a"); bg.addColorStop(1, "#050505"); c.fillStyle = bg; c.fillRect(0, 0, w, hh);
-    c.strokeStyle = "rgba(255,153,31,.07)"; for (let i = -6; i <= 6; i++) { let a = p(i, 0, -6), b = p(i, 0, 6); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); a = p(-6, 0, i); b = p(6, 0, i); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
-    c.strokeStyle = "rgba(255,153,31,.45)"; c.lineWidth = 2; c.beginPath(); [[-6, -6], [6, -6], [6, 6], [-6, 6], [-6, -6]].forEach(([x, z], i) => { const q = p(x, 0, z); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.stroke(); c.lineWidth = 1;
-    const A = agents(); room.hits = [];
-    const s0 = A[0]; for (const a of A.slice(1)) { const p1 = p(s0.x, 0.05, s0.z), p2 = p(a.x, 0.05, a.z); c.setLineDash([3, 6]); c.lineDashOffset = -t * 18; c.strokeStyle = "rgba(255,153,31,.35)"; c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.stroke(); c.setLineDash([]); }
+    if (!drawRoom.hudAt || t - drawRoom.hudAt > 1) { drawRoom.hudAt = t; hud(); }
+    const bg = c.createRadialGradient(w / 2, hh * 0.45, 40, w / 2, hh / 2, w * 0.75); bg.addColorStop(0, "#15110b"); bg.addColorStop(1, "#030303"); c.fillStyle = bg; c.fillRect(0, 0, w, hh);
     const quad = (pts, fill, stroke) => { c.beginPath(); pts.forEach((q, i) => (i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]))); c.closePath(); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.stroke(); } };
+    // floor: polished dark tiles, a fine grid and the orange rim
+    quad([p(-6, 0, -6), p(6, 0, -6), p(6, 0, 6), p(-6, 0, 6)], "#0a0907");
+    c.strokeStyle = "rgba(255,153,31,.06)"; for (let i = -6; i <= 6; i += 0.5) { let a = p(i, 0, -6), b = p(i, 0, 6); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); a = p(-6, 0, i); b = p(6, 0, i); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    c.strokeStyle = "rgba(255,153,31,.5)"; c.lineWidth = 2; c.beginPath(); [[-6, -6], [6, -6], [6, 6], [-6, 6], [-6, -6]].forEach(([x, z], i) => { const q = p(x, 0, z); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.stroke(); c.lineWidth = 1;
+    // back walls: a video wall (left) and an LED ticker ribbon (right)
+    const back = p(-6, 0, -6)[2] < p(6, 0, 6)[2];
+    if (back) {
+      quad([p(-6, 0, -6), p(-6, 0, 6), p(-6, 2.9, 6), p(-6, 2.9, -6)], "#0b0a09", "#2a2016");
+      quad([p(-6, 0, -6), p(6, 0, -6), p(6, 2.9, -6), p(-6, 2.9, -6)], "#0d0b09", "#2a2016");
+      onPlane(c, p(-6, 2.7, 5.4), p(-6, 2.7, -5.4), p(-6, 0.35, 5.4), 1100, 300, (g) => drawWall(g, 1100, 300, t));
+      // ticker ribbon: every holding with its P&L, scrolling
+      const items = []; for (const b of D.bots.filter((x) => x.group === "main")) for (const q of b.positions) if (Number.isFinite(q.pnl)) items.push(q);
+      onPlane(c, p(-5.6, 2.75, -6), p(5.6, 2.75, -6), p(-5.6, 2.35, -6), 1400, 56, (g) => {
+        g.fillStyle = "#050505"; g.fillRect(0, 0, 1400, 56); g.strokeStyle = "rgba(255,153,31,.5)"; g.strokeRect(1, 1, 1398, 54); g.font = "600 26px monospace";
+        if (!items.length) { g.fillStyle = "#4a4a4a"; g.fillText("NO OPEN POSITIONS", 20, 38); return; }
+        const segs = items.map((q) => [q.sym + " ", (q.pnl >= 0 ? "▲ +" : "▼ −") + "$" + Math.abs(q.pnl).toFixed(0) + "    ", q.pnl >= 0 ? UPC : DNC]);
+        const width = segs.reduce((s, x) => s + g.measureText(x[0] + x[1]).width, 0); let x = 20 - ((t * 60) % Math.max(width, 1));
+        g.save(); g.beginPath(); g.rect(4, 2, 1392, 52); g.clip();
+        while (x < 1400) { for (const [a2, b2, col] of segs) { g.fillStyle = "#f2f2f2"; g.fillText(a2, x, 38); x += g.measureText(a2).width; g.fillStyle = col; g.fillText(b2, x, 38); x += g.measureText(b2).width; } if (width <= 0) break; }
+        g.restore();
+      });
+      // a second, smaller panel on the right wall: the Coach's latest flag and the desk mode
+      onPlane(c, p(-5.6, 2.2, -6), p(5.6, 2.2, -6), p(-5.6, 1.15, -6), 1400, 190, (g) => {
+        g.fillStyle = "#07090b"; g.fillRect(0, 0, 1400, 190); g.strokeStyle = "#2a2016"; g.strokeRect(1, 1, 1398, 188);
+        g.fillStyle = OR; g.font = "600 22px monospace"; g.fillText("COACH · TO FIX", 20, 36);
+        g.font = "20px monospace"; g.fillStyle = "#d8d8d8"; const f = (D.coach && D.coach.flags) || [];
+        (f.length ? f.slice(0, 4) : [D.coach ? "Nothing urgent." : "Reviewing…"]).forEach((x, i) => g.fillText("• " + String(x).slice(0, 110), 20, 72 + i * 30));
+      });
+    }
+    const A = agents(); room.hits = [];
+    // spotlights under each desk, tinted by that bot's result
+    for (const a of A) { const q = p(a.x, 0, a.z + 0.3), r = Math.min(w / 17.5, hh / 15) * 2.4, tone = a.b ? (a.b.ret >= 0 ? "61,220,132" : "255,95,95") : "255,153,31";
+      const gr = c.createRadialGradient(q[0], q[1], 2, q[0], q[1], r); gr.addColorStop(0, `rgba(${tone},.16)`); gr.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = gr; c.beginPath(); c.ellipse(q[0], q[1], r, r * 0.5, 0, 0, Math.PI * 2); c.fill(); }
+    // data flowing from the spider to every desk
+    const s0 = A[0];
+    for (const [n, a] of A.slice(1).entries()) { const p1 = p(s0.x, 0.05, s0.z), p2 = p(a.x, 0.05, a.z); c.setLineDash([3, 6]); c.lineDashOffset = -t * 18; c.strokeStyle = "rgba(255,153,31,.3)"; c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.stroke(); c.setLineDash([]);
+      for (let k2 = 0; k2 < 2; k2++) { const f = (t * 0.35 + n * 0.17 + k2 * 0.5) % 1, X = p1[0] + (p2[0] - p1[0]) * f, Y = p1[1] + (p2[1] - p1[1]) * f; c.fillStyle = "rgba(255,153,31,.9)"; c.beginPath(); c.arc(X, Y, 2.2, 0, Math.PI * 2); c.fill(); c.fillStyle = "rgba(255,153,31,.18)"; c.beginPath(); c.arc(X, Y, 6, 0, Math.PI * 2); c.fill(); } }
     A.slice().sort((a, b) => p(a.x, 0, a.z)[2] - p(b.x, 0, b.z)[2]).forEach((a) => {
-      const sel = false, dx = 1.2, dz = 0.6, top = 0.75, on = a.busy || sel;
-      quad([p(a.x - dx, 0, a.z + dz), p(a.x + dx, 0, a.z + dz), p(a.x + dx, top, a.z + dz), p(a.x - dx, top, a.z + dz)], "#0e0e0e", "#262626");
+      const dx = 1.3, dz = 0.65, top = 0.75, on = a.busy, sc = screens(a);
+      // desk: body, side, glass top with an orange edge light
+      quad([p(a.x - dx, 0, a.z + dz), p(a.x + dx, 0, a.z + dz), p(a.x + dx, top, a.z + dz), p(a.x - dx, top, a.z + dz)], "#101010", "#2a2a2a");
       quad([p(a.x + dx, 0, a.z - dz), p(a.x + dx, 0, a.z + dz), p(a.x + dx, top, a.z + dz), p(a.x + dx, top, a.z - dz)], "#0b0b0b", "#222");
-      const topPts = [[-dx, -dz], [dx, -dz], [dx, dz], [-dx, dz]].map(([x, z]) => p(a.x + x, top, a.z + z)); quad(topPts, "#161616", on ? OR : "#333");
-      for (const m of [-0.75, 0, 0.75]) {
-        const mw = 0.32, y0 = top + 0.12, y1 = top + 0.85, z = a.z - dz + 0.05;
-        quad([p(a.x + m - mw, y0, z), p(a.x + m + mw, y0, z), p(a.x + m + mw, y1, z), p(a.x + m - mw, y1, z)], on ? "rgba(255,153,31,.14)" : "rgba(255,255,255,.04)", "#3a3a3a");
-        c.strokeStyle = on ? OR : "#5a5a5a"; c.beginPath(); for (let i = 0; i <= 12; i++) { const u = i / 12, q = p(a.x + m - mw + u * mw * 2, y0 + 0.15 + 0.45 * (0.5 + 0.4 * Math.sin(i * 1.3 + t * (a.busy ? 2 : 0.4) + m * 4)), z); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); } c.stroke();
-      }
-      const bob = a.busy ? Math.sin(t * 3 + a.x) * 0.04 : 0, head = p(a.x, 1.25 + bob, a.z + dz + 0.55), body = p(a.x, 0.78 + bob, a.z + dz + 0.55), r = Math.min(w / 17, hh / 12.5) * 0.27;
-      c.fillStyle = "#bdbdbd"; c.beginPath(); c.ellipse(body[0], body[1], r * 1.05, r * 1.25, 0, 0, Math.PI * 2); c.fill();
+      const topPts = [[-dx, -dz], [dx, -dz], [dx, dz], [-dx, dz]].map(([x, z]) => p(a.x + x, top, a.z + z)); quad(topPts, "#181818", on ? OR : "#3a3a3a");
+      // name plate on the desk front: name and result
+      onPlane(c, p(a.x - dx + 0.12, top - 0.08, a.z + dz), p(a.x + dx - 0.12, top - 0.08, a.z + dz), p(a.x - dx + 0.12, top - 0.42, a.z + dz), 260, 40, (g) => {
+        g.fillStyle = "#050505"; g.fillRect(0, 0, 260, 40); g.strokeStyle = on ? "rgba(255,153,31,.6)" : "#2a2a2a"; g.strokeRect(0.5, 0.5, 259, 39);
+        g.font = "600 15px monospace"; g.fillStyle = on ? OR : "#bdbdbd"; g.fillText(a.name.slice(0, 16), 8, 26);
+        if (a.b) { g.textAlign = "right"; g.fillStyle = a.b.ret >= 0 ? UPC : DNC; g.fillText(pct(a.b.ret, 1), 252, 26); g.textAlign = "left"; } });
+      // keyboard
+      quad([p(a.x - 0.45, top + 0.01, a.z + 0.05), p(a.x + 0.45, top + 0.01, a.z + 0.05), p(a.x + 0.45, top + 0.01, a.z + 0.35), p(a.x - 0.45, top + 0.01, a.z + 0.35)], "#222", "#333");
+      // three monitors on stands, slightly angled, each showing real data
+      [-0.86, 0, 0.86].forEach((m, i) => {
+        const mw = 0.4, y0 = top + 0.18, y1 = top + 1.0, ang = m * 0.18, z = a.z - dz + 0.12 + Math.abs(m) * 0.12;
+        const L = [a.x + m - mw, z + ang * mw], R = [a.x + m + mw, z - ang * mw];
+        quad([p(a.x + m - 0.04, top, a.z - dz + 0.25), p(a.x + m + 0.04, top, a.z - dz + 0.25), p(a.x + m + 0.04, y0, z), p(a.x + m - 0.04, y0, z)], "#1a1a1a");
+        quad([p(L[0], y0 - 0.02, L[1] - 0.02), p(R[0], y0 - 0.02, R[1] - 0.02), p(R[0], y1 + 0.02, R[1] - 0.02), p(L[0], y1 + 0.02, L[1] - 0.02)], "#111", on ? "rgba(255,153,31,.4)" : "#2c2c2c");
+        if (sc[i]) onPlane(c, p(L[0], y1, L[1]), p(R[0], y1, R[1]), p(L[0], y0, L[1]), 200, 150, (g) => drawScreen(g, sc[i], 200, 150, on, t + i));
+      });
+      // the agent in a chair, facing the screens
+      const bob = a.busy ? Math.sin(t * 3 + a.x) * 0.04 : 0, sx = a.x, sz = a.z + dz + 0.6, r = Math.min(w / 17.5, hh / 15) * 0.26;
+      quad([p(sx - 0.35, 0.55, sz + 0.3), p(sx + 0.35, 0.55, sz + 0.3), p(sx + 0.35, 1.45, sz + 0.38), p(sx - 0.35, 1.45, sz + 0.38)], "#151515", "#2a2a2a"); // chair back
+      const head = p(sx, 1.3 + bob, sz), body = p(sx, 0.85 + bob, sz);
+      c.fillStyle = "#2b2b2b"; c.beginPath(); c.ellipse(body[0], body[1], r * 1.15, r * 1.3, 0, 0, Math.PI * 2); c.fill(); // jacket
+      c.fillStyle = "#d9d9d9"; c.beginPath(); c.moveTo(body[0] - r * 0.25, body[1] - r * 1.1); c.lineTo(body[0] + r * 0.25, body[1] - r * 1.1); c.lineTo(body[0], body[1] - r * 0.2); c.closePath(); c.fill(); // shirt
+      c.fillStyle = on ? OR : "#666"; c.fillRect(body[0] - r * 0.08, body[1] - r * 0.95, r * 0.16, r * 0.9); // tie
       c.fillStyle = "#e8e8e8"; c.beginPath(); c.arc(head[0], head[1], r, 0, Math.PI * 2); c.fill();
-      c.strokeStyle = on ? OR : "#7a7a7a"; c.lineWidth = 3; c.beginPath(); c.arc(head[0], head[1], r * 1.1, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); c.lineWidth = 1;
-      if (a.busy) { c.strokeStyle = "rgba(255,153,31,.5)"; c.beginPath(); c.arc(head[0], head[1], r * (1.6 + (t % 1)), 0, Math.PI * 2); c.stroke(); }
-      const lp = p(a.x, 0, a.z + dz + 0.55); lp[1] = head[1] - r * 2.4; /* name floats above the agent's head */ c.textAlign = "center"; c.font = "600 11px monospace"; c.fillStyle = sel ? "#fff" : a.busy ? OR : "#8a8a8a"; c.fillText(a.name, lp[0], lp[1]);
+      c.strokeStyle = on ? OR : "#7a7a7a"; c.lineWidth = 3; c.beginPath(); c.arc(head[0], head[1], r * 1.1, Math.PI * 1.05, Math.PI * 1.95); c.stroke(); c.lineWidth = 1; // headset
+      c.fillStyle = on ? OR : "#7a7a7a"; c.beginPath(); c.arc(head[0] - r * 1.05, head[1], r * 0.22, 0, Math.PI * 2); c.fill();
+      if (a.busy) { c.strokeStyle = "rgba(255,153,31,.45)"; c.beginPath(); c.arc(head[0], head[1], r * (1.6 + (t % 1)), 0, Math.PI * 2); c.stroke(); }
+      // label above everything
+      const lp = [head[0], head[1] - r * 2.6]; c.textAlign = "center"; c.font = "600 11px monospace"; c.fillStyle = a.busy ? OR : "#9a9a9a"; c.fillText(a.name, lp[0], lp[1]);
       c.font = "11px sans-serif"; c.fillStyle = "#bdbdbd"; c.fillText(String(a.now).slice(0, 48), lp[0], lp[1] + 14); c.textAlign = "left";
       const xs = [...topPts.map((q) => q[0]), head[0]], ys = [...topPts.map((q) => q[1]), head[1] + r * 2, lp[1] - 12];
-      room.hits.push({ id: a.id, x0: Math.min(...xs) - 12, x1: Math.max(...xs) + 12, y0: Math.min(...ys) - 50, y1: Math.max(...ys) });
+      room.hits.push({ id: a.id, x0: Math.min(...xs) - 12, x1: Math.max(...xs) + 12, y0: Math.min(...ys) - 60, y1: Math.max(...ys) });
     });
   }
   const rc = $("room");

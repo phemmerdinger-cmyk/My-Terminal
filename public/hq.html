@@ -93,13 +93,14 @@ pre.code{background:#080808;border:1px solid var(--line);border-left:2px solid v
 .pager{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px}.pager button{background:none;border:1px solid var(--line2);border-radius:4px;padding:6px 12px;font:11px var(--mono);color:var(--muted);cursor:pointer}
 .pager i{width:16px;height:3px;border-radius:2px;background:var(--line2)}.pager i.on{background:var(--orange)}
 .rulelist{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}.rulelist button{background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--muted)}.rulelist button.on{color:var(--text);border-color:var(--orange)}
-.room{position:relative}.room>canvas{width:100%;height:620px;display:block;border-radius:6px;cursor:grab}
+.room{position:relative}.room>canvas{width:100%;height:700px;display:block;border-radius:6px;cursor:grab}
 .agentcard{position:absolute;top:24px;right:24px;width:340px;max-height:580px;overflow:auto;background:rgba(10,10,10,.95);border:1px solid var(--line2);border-radius:6px;padding:14px}
 .agentcard h4{margin:0;font:600 13px var(--mono);letter-spacing:.12em;border-left:2px solid var(--orange);padding-left:8px}.agentcard .role{font-size:11.5px;color:var(--dim);margin:2px 0 6px 10px}
 .agentcard small{display:block;font:500 9.5px var(--mono);letter-spacing:.16em;color:var(--dim);margin-top:12px}.agentcard p{margin:4px 0 0;font-size:13px;line-height:1.45}.agentcard .now{font-size:16px;font-weight:500}
 .agentcard .state{float:right;font:500 10px var(--mono);border:1px solid var(--orange);color:var(--orange);border-radius:3px;padding:2px 6px}.agentcard .state.idle{border-color:var(--line2);color:var(--dim)}
 .agentcard canvas{width:100%;height:120px;margin-top:8px;background:#080808;border:1px solid var(--line);border-radius:4px;display:block}
 .agentcard .back{width:100%;margin-top:12px;background:var(--panel2);border:1px solid var(--line2);border-radius:4px;padding:7px;cursor:pointer;font:11px var(--mono);color:var(--muted)}
+.roomhud{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-bottom:10px}.roomhud>div{background:#0a0a0a;padding:8px 10px}.roomhud small{display:block;font:500 9.5px var(--mono);letter-spacing:.12em;color:var(--dim)}.roomhud b{font:500 15px var(--mono);color:var(--text,#e8e8e8);font-variant-numeric:tabular-nums}.roomhud b.or{color:var(--orange)}@media(max-width:900px){.roomhud{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .roomhint{font:10.5px var(--mono);color:var(--dim);padding:0 14px 10px}
 .kinds{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.kinds button{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line2);border-radius:5px;padding:7px 12px;cursor:pointer;color:var(--muted);font-size:12.5px}
 .kinds button b{font:500 13px var(--mono);color:var(--text)}.kinds button.on{border-color:var(--orange);color:var(--text);background:#140e05}
@@ -200,7 +201,7 @@ body.home main{padding:0}
     </section>
     <section class="view" id="v-strategies"><div class="split"><div class="card slist" id="slist"></div><div id="sdetail"></div></div></section>
     <section class="view" id="v-rules"><div class="card"><div class="ch">Your check <em>· rule by rule: what the bots really do</em><span class="r" id="ruleN"></span></div><div class="cb" id="rule"></div></div></section>
-    <section class="view" id="v-room"><div class="card"><div class="ch">Inside the globe <em>· every agent at its desk · click a desk for its research</em><span class="r">from the bots' latest scans</span></div><div class="cb room"><canvas id="room"></canvas><div class="agentcard" id="agent" hidden></div></div>
+    <section class="view" id="v-room"><div class="card"><div class="ch">Inside the globe <em>· every agent at its desk · click a desk for its research</em><span class="r">from the bots' latest scans</span></div><div class="cb room"><div class="roomhud" id="roomHud"></div><canvas id="room"></canvas><div class="agentcard" id="agent" hidden></div></div>
       <div class="roomhint">drag: turn the room · click a desk: open that agent's research and numbers</div></div></section>
     <section class="view" id="v-paper"><div class="card"><div class="ch">Paper &amp; live <em>· every open position · live trading: none (paper money only)</em></div><div class="cb" id="paper"></div></div></section>
     <section class="view" id="v-decisions"><div class="card"><div class="ch">Decisions <em>· made automatically: toughness gates, pre-buy vetoes, defense mode</em></div><div class="cb" id="declog"></div></div></section>
