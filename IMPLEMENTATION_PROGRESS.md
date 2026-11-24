@@ -219,6 +219,10 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Actions Buy / Sell / Short / Cover. Each short sets aside 2× its value in cash (proceeds + the same again), so shorts can't exceed the account; modeled 3%/yr borrow fee charged daily; automatic buy-back if a short rises 50% above entry. Dividends owed and hard-to-borrow fees aren't modeled (stated on the page).
 - The trade ticket now sits inside the scoreboard, directly under the four trader cards and the you-vs-S&P result; it shows what you hold in the typed ticker and your free cash. Holdings table has a Long/Short column.
 
+### My Trader: broker-style ticket (2026-11-24)
+- Modeled on Schwab's All-in-One Trade Ticket and Robinhood's review flow: symbol → market data appears beside the ticket (quote, day and 52-week ranges, volume, bid/ask, market cap, P/E, EPS, dividend, beta, analysts and target, next earnings, short interest, growth/margin, company summary, link to full research), actions that match what you hold (Buy / Sell short; Sell / Sell all / Buy more; Buy to cover / Cover all / Short more), live "Estimated cost/proceeds", then Review order → Place order.
+- `public/order-preview-core.js` (tests/order-preview-core.test.js) computes the estimate with the same rules as my-trader-core.js. Holdings rows have Sell / Buy to cover buttons that fill the ticket.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
