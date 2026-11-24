@@ -16,7 +16,7 @@
     // THE WEB research spider (owner only; the public demo has no access to its data)
     web: Object.freeze(["/web.js", "/web-env.js", "/web-control.js"]),
     // Bots × spider teamwork: Morning brief pop-up and the Research "Why" card (owner / private desk only)
-    team: Object.freeze(["/teamwork.js"]),
+    team: Object.freeze(["/coach-core.js", "/teamwork.js"]),
   });
 
   // Which group a tab needs before it can show anything, or null when the page has it already.

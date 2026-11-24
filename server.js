@@ -2312,6 +2312,40 @@ async function briefView() {
   return TEAM.buildBrief({ day: t.day, now, since, findings, plans, earningsToday: today, earningsHeld, heldSignals, desk,
     defense: sig.defense || null, riskOff: !!sig.riskOff, regime: QT.regimeState || null, vetoes: AP_CHECKS.filter((c) => c.verdict === "veto" && c.t >= since) });
 }
+
+// ---- Coach: the seventh agent. Never trades; reviews the other bots with rules + real prices (public/coach-core.js).
+// Chart reads on everything held or top-ranked, a journal review of each bot's last 20 closed trades, and a hypothetical −20% market.
+const COACH = require("./public/coach-core.js");
+let coachCache = { t: 0, v: null, p: null };
+async function coachBuild() {
+  if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
+  const holdings = [
+    ...Object.entries(AP.positions).map(([sym, p]) => ({ bot: "Swing bot", sym, value: p.shares * (apPx[sym] || p.cost) })),
+    ...Object.entries(DT.positions).map(([sym, p]) => ({ bot: "Day trader", sym, value: (p.dir === "short" ? -1 : 1) * p.shares * (dtPx[sym] || p.entry || 0) })),
+    ...Object.entries(QT.positions).map(([sym, p]) => ({ bot: "Quant", sym, value: p.shares * (qtPx[sym] || p.cost) })),
+  ].filter((x) => x.value);
+  const candidates = [...apLastList.by.values()].slice(0, 6).map((x) => x.sym);
+  const syms = [...new Set([...holdings.map((x) => x.sym), ...candidates])].filter((s) => !/^\^/.test(s)).slice(0, 30);
+  const closes = {}, failed = [];
+  for (const s of ["SPY", ...syms]) {
+    try { const hh = await history(s, "1y"); const c = hh.candles.map((k) => k.close); if (c.length) closes[s] = c; else failed.push(s); } catch { failed.push(s); }
+  }
+  const role = (s) => (holdings.some((x) => x.sym === s) ? "held by " + [...new Set(holdings.filter((x) => x.sym === s).map((x) => x.bot))].join(", ") : "swing candidate");
+  const charts = syms.map((s) => (closes[s] ? { ...COACH.chartRead(closes[s], { sym: s }), role: role(s) } : { sym: s, ok: false, role: role(s), why: "Price history unavailable." }));
+  const journals = [["Swing bot", AP.trades], ["Day trader", DT.trades], ["Quant", QT.trades]].map(([bot, L]) => ({ bot, ...COACH.journal(L || []) }));
+  const stress = COACH.stress(holdings, closes);
+  const flags = [];
+  for (const j of journals) if (j.ok && j.rules.length) flags.push(`${j.bot}: ${j.rules[0]}`);
+  if (stress.ok) { if (stress.pairs.length) flags.push(`${stress.pairs[0].a} and ${stress.pairs[0].b} move together (${stress.pairs[0].corr}); a selloff hits both.`); for (const b of stress.bots) for (const o of b.over) flags.push(`${b.bot}: ${o.sym} is ${o.weight}% of its book.`); }
+  for (const c of charts) if (c.ok && c.signal === "Sell" && /held/.test(c.role)) flags.push(`${c.sym} (${c.role}) reads Sell on the chart.`);
+  return { at: Date.now(), charts, journals, stress, flags: flags.slice(0, 8), unavailable: failed,
+    note: "The Coach never trades. Rule-based reviews of paper trades and real daily prices; the −20% test is hypothetical." };
+}
+async function coachView() {
+  if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) return coachCache.v;
+  if (!coachCache.p) coachCache.p = coachBuild().then((v) => { coachCache = { t: Date.now(), v, p: null }; return v; }, (e) => { coachCache.p = null; throw e; });
+  return coachCache.p;
+}
 async function apTick() {
   if (apBusy) return; apBusy = true;
   try {
@@ -4414,6 +4448,7 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView(isOwner(req) || (DEPLOY.mode === "public" && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token))));
       if (u.pathname === "/api/why" && req.method === "GET") { const w = await whyView(u.searchParams.get("symbol")); return send(res, w.error ? 400 : 200, w); }
+      if (u.pathname === "/api/coach" && req.method === "GET") { try { return send(res, 200, await coachView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());
       if (u.pathname === "/api/quanttrader" && req.method === "GET") return send(res, 200, await qtView());
