@@ -207,6 +207,9 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Market Desk Research → Why (bots): a "Chart read" card at the top (coach-core in the lazy `team` group, adjusted closes via MD.hist).
 - Tests updated for the owner's removal of the public demo (sign-in only; integrity/article routes are owner-only) and a spider retry test that depended on today's date.
 
+### Bot HQ trading floor (2026-11-24)
+- Agent room redrawn as a trading floor: a status strip (paper equity, since start, open positions, fills, regime, risk desk, Coach flags, spider), a video wall with every main bot's return curve and a scrolling holdings board, an LED ticker of holdings with P&L, the Coach's to-fix list on the wall, three angled monitors per desk with each agent's real data (equity, positions P&L, vs S&P 500; spider findings; lab returns; risk gauges; Coach counts), name plates with returns, chairs and headsets, data packets from the spider. Screens with no data say NO DATA.
+
 ## Next
 - **Phase 2 — Investor DNA**: new `dna` desk section + profiles; form page (probably under Portfolio group); wire into Home (limits, benchmark, sector interests → briefing reasons), news-intel For-you weights, Spider `/api/web/context` priorities. Suggested-preference approvals (never auto-apply).
 - Then 3 (thesis tracking on top of Spider memory), 4 (analyst: deterministic mode first), 5 (extend Quant Lab tournament), 6 (extend `/api/web/graph`), 7 (workspaces + extend `#cmd` palette), 8, 9, 10 (extend Studio alerts), 11 (purge leftover orange e.g. Ask Claude FAB `--claude`), 12–13.
