@@ -1868,7 +1868,7 @@ function pcState() {
 const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
 if (DEPLOY.runJobs) setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
-const BOTDIAG = { market: {}, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
+const BOTDIAG = { market: {}, my: { errors: [] }, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
@@ -2340,6 +2340,50 @@ async function coachBuild() {
   for (const c of charts) if (c.ok && c.signal === "Sell" && /held/.test(c.role)) flags.push(`${c.sym} (${c.role}) reads Sell on the chart.`);
   return { at: Date.now(), charts, journals, stress, flags: flags.slice(0, 8), unavailable: failed,
     note: "The Coach never trades. Rule-based reviews of paper trades and real daily prices; the −20% test is hypothetical." };
+}
+// ---- My Trader: the owner's own $30,000 paper account, traded by hand (my-trader-core.js). Lives on the bot server.
+const MYT = require("./my-trader-core.js");
+let mtStoreV = null; const mtStoreGet = () => (mtStoreV = mtStoreV || paperStore("my-trader-v1", { url: UP_URL, token: UP_TOKEN }));
+const mtStore = { get: (k) => mtStoreGet().get(k), set: (k, v) => mtStoreGet().set(k, v), get durable() { return mtStoreGet().durable; } };
+let MT = null, mtLoading = null, mtQ = Promise.resolve();
+async function mtLoad() { if (MT) return MT; if (!mtLoading) mtLoading = mtStore.get("book").then((v) => (MT = v && v.v === 1 ? v : MYT.fresh()), (e) => { mtLoading = null; throw e; }); return mtLoading; }
+const mtLocked = (fn) => { const p = mtQ.then(fn, fn); mtQ = p.catch(() => {}); return p; }; // one change at a time
+async function mtMark(st, quotes) {
+  const px = {}; for (const s of Object.keys(st.positions)) if (quotes[s] && quotes[s].price > 0) px[s] = quotes[s].price;
+  const v = MYT.value(st, px), spx = quotes["^GSPC"] && quotes["^GSPC"].price > 0 ? quotes["^GSPC"].price : null;
+  MYT.mark(st, { day: etParts().day, value: v.value, spx }); return { ...v, px, spx };
+}
+async function mtTick() {
+  return mtLocked(async () => {
+    const st = await mtLoad(); if (!st.firstTrade && !st.pending.length) return;
+    const m = await apMarketOpen(), syms = [...new Set([...Object.keys(st.positions), ...st.pending.map((o) => o.sym)])];
+    const q = (await getQuotes([...syms, "^GSPC"])).quotes;
+    const done = MYT.work(st, q, { now: Date.now(), open: m.open });
+    await mtMark(st, q);
+    if (done.length || m.open || !st.lastSaved || Date.now() - st.lastSaved > 30 * 60e3) { st.lastSaved = Date.now(); await mtStore.set("book", st); }
+  });
+}
+if (DEPLOY.runJobs) setTimeout(() => { mtTick().catch((e) => diagErr("my", e)); setInterval(() => mtTick().catch((e) => diagErr("my", e)), 60e3); }, process.env.AP_TEST ? 4000 : 50_000);
+async function mtView() {
+  const st = await mtLoad(), syms = Object.keys(st.positions);
+  let q = {}; try { q = (await getQuotes([...syms, "^GSPC"])).quotes; } catch {}
+  const v = MYT.value(st, Object.fromEntries(syms.filter((s) => q[s] && q[s].price > 0).map((s) => [s, q[s].price])));
+  const m = await apMarketOpen().catch(() => ({ open: false }));
+  const positions = syms.map((s) => { const p = st.positions[s], px = q[s] && q[s].price > 0 ? q[s].price : null, val = p.shares * (px ?? p.cost);
+    return { sym: s, shares: p.shares, cost: +p.cost.toFixed(4), price: px, value: +val.toFixed(2), pnl: px == null ? null : +((px - p.cost) * p.shares).toFixed(2), pnlPct: px == null ? null : px / p.cost - 1, dayPct: q[s] ? q[s].changePct ?? null : null, weight: v.value > 0 ? val / v.value : null, at: p.at, priced: px != null }; })
+    .sort((a, b) => b.value - a.value);
+  return { startValue: st.start, value: v.value, cash: st.cash, positions, pending: st.pending, trades: st.trades.slice(0, 300), equity: st.equity, intraday: st.intraday, spx0: st.spx0,
+    spxNow: q["^GSPC"] && q["^GSPC"].price > 0 ? q["^GSPC"].price : null, firstTrade: st.firstTrade, marketOpen: !!m.open, unpriced: v.missing, stats: MYT.stats(st),
+    rules: { cost: MYT.COST, start: MYT.START, maxQuoteAge: MYT.MAX_QUOTE_AGE }, durable: mtStore.durable };
+}
+async function mtOrder(body) {
+  return mtLocked(async () => {
+    const st = await mtLoad(), sym = String(body && body.sym || "").trim().toUpperCase(), m = await apMarketOpen();
+    let fq = null; if (m.open && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym)) { try { const q = await quote(sym); fq = { price: q.price, marketTime: q.marketTime }; } catch {} }
+    const r = MYT.place(st, body || {}, { now: Date.now(), open: m.open, quote: fq });
+    if (r.ok) { if (r.filled) { try { await mtMark(st, (await getQuotes([...Object.keys(st.positions), "^GSPC"])).quotes); } catch {} } await mtStore.set("book", st); LB.t = 0; }
+    return r;
+  });
 }
 async function coachView() {
   if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) return coachCache.v;
@@ -3481,6 +3525,7 @@ const TRADERS = {
   swing: { name: "Swing Trader", role: "Swing trader", focus: "Multi-day trends, breakouts and earnings catalysts (2–30 days)" },
   quant: { name: "Quant Trader", role: "Quantitative economist", focus: "Market regime, factor ranking and risk-parity allocation across ETFs and mega-caps" },
   day: { name: "Day Trader", role: "Intraday trader", focus: "Confirmed momentum and ETF VWAP reversals, with a ten-minute maximum hold" },
+  me: { name: "My Trader", role: "Human (Peter)", focus: "Hand-picked trades, same $30,000 start and the same modeled costs as the bots", human: true },
 };
 let LB = { t: 0, v: null };
 async function leaderboard() {
@@ -3499,6 +3544,13 @@ async function leaderboard() {
     day: { value: live.day.value, start: DT_START, spx0: DT.spx0, eq: DT.equity, run: DT.run, since: DT.firstTrade, strategy: DT.strategy, trades: T.n || 0, costs: T.costs || 0, agg: T, exposure: live.day.value > 0 ? dBook.gross / live.day.value : null,
       latest: DT.trades[0] ? `${DT.trades[0].side} ${DT.trades[0].sym}: ${(DT.trades[0].why || "").slice(0, 140)}` : "No trades yet in this run", thesis: DT.day ? `${DT.day.reversalSignals || 0} confirmed ETF reversals today${DT.day.halted ? " · daily loss limit hit" : ""}` : null },
   };
+  try { // the owner's own account joins once it has made a trade
+    const st = await mtLoad();
+    if (st.firstTrade) { const syms = Object.keys(st.positions); let q = {}; try { q = (await getQuotes(syms)).quotes; } catch {}
+      const v = MYT.value(st, Object.fromEntries(syms.filter((x) => q[x] && q[x].price > 0).map((x) => [x, q[x].price]))).value, ms = MYT.stats(st);
+      bots.me = { value: v, start: st.start, spx0: st.spx0, eq: st.equity, run: 1, since: st.firstTrade, strategy: null, trades: ms.fills, costs: ms.costs, pnls: st.trades.filter((t) => t.side === "SELL" && t.pnl != null).map((t) => t.pnl),
+        exposure: v > 0 ? 1 - st.cash / v : null, latest: st.trades[0] ? `${st.trades[0].side} ${st.trades[0].sym}${st.trades[0].note ? ": " + st.trades[0].note.slice(0, 140) : ""}` : "No trades yet", thesis: null }; }
+  } catch {}
   const out = { t: Date.now(), today, spxNow, limits: COMP.LIMITS, periods: COMP.PERIODS.map(([k, label]) => ({ k, label })), boards: {}, traders: {} };
   for (const [k, b] of Object.entries(bots)) {
     const s = series(b.eq, b.value), life = COMP.windowStats(s, { start: b.start, today, days: null, spx0: b.spx0 });
@@ -3510,7 +3562,8 @@ async function leaderboard() {
   for (const [pk, , days] of COMP.PERIODS) {
     out.boards[pk] = COMP.rank(Object.keys(bots).map((k) => ({ key: k, lifeDrawdown: out.traders[k].lifeDrawdown, stats: COMP.windowStats(series(bots[k].eq, bots[k].value), { start: bots[k].start, today, days, spx0: bots[k].spx0 }) })));
   }
-  out.summary = { day: COMP.combine(out.boards.day), life: COMP.combine(out.boards.life) }; // hero: all three AI traders vs the S&P
+  const ai = (b) => b.filter((r) => r.key !== "me"); // the hero compares the three bots only; you're ranked beside them
+  out.summary = { day: COMP.combine(ai(out.boards.day)), life: COMP.combine(ai(out.boards.life)) };
   LB = { t: Date.now(), v: out }; return out;
 }
 function botsLive() {
@@ -4448,6 +4501,9 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/autopilot" && req.method === "GET") return send(res, 200, await apView(isOwner(req) || (DEPLOY.mode === "public" && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token))));
       if (u.pathname === "/api/why" && req.method === "GET") { const w = await whyView(u.searchParams.get("symbol")); return send(res, w.error ? 400 : 200, w); }
+      if (u.pathname === "/api/mytrader" && req.method === "GET") { try { return send(res, 200, await mtView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      if (u.pathname === "/api/mytrader/order" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); if (!b) return send(res, 400, { error: "Bad order." }); try { const r = await mtOrder(b); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      if (u.pathname === "/api/mytrader/cancel" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); try { const ok = await mtLocked(async () => { const st = await mtLoad(); const did = MYT.cancel(st, String(b && b.id || "")); if (did) await mtStore.set("book", st); return did; }); return send(res, ok ? 200 : 404, ok ? { ok: true } : { error: "No waiting order with that id." }); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/coach" && req.method === "GET") { try { return send(res, 200, await coachView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());

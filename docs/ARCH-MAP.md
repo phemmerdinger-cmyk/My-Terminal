@@ -20,6 +20,7 @@
 ## Client (`public/`)
 | File | Role |
 |---|---|
+| `my-trader-core.js` / `public/my-trader.js` | My Trader: the owner's hand-traded $30,000 paper account (server `mtView`/`mtOrder`/`mtTick`, `/api/mytrader*`), shown on Bots vs S&P 500 and ranked on the leaderboard |
 | `coach-core.js` | Coach agent rules: chart read, trade-journal review, −20% stress + hedge. Server `/api/coach` (coachView in server.js); Bot HQ Coach desk; Research → Why chart-read card (teamwork.js) |
 | `hq.html` / `hq.js` / `hq-core.js` | Bot HQ, a separate site: desk port 3001 or `MODE=hq` service (`handleHq` in server.js); overview, every bot in depth, agent room, spider, risk & costs |
 | `teamwork.js` | Morning brief pop-up (once a day + ☀ top-bar button) + Research "Why (bots)" card; lazy group `team` |

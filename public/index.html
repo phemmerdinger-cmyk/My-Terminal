@@ -738,6 +738,7 @@ tr[data-scropen],tr[data-dbopen]{cursor:pointer}
 .np-tot b{color:var(--text);font-weight:600;margin-right:4px}
 @media (max-width:600px){.np-wrap{padding-left:12px}.notepad>summary,.np-empty,.np-tot{padding-left:14px}.notepad{background:color-mix(in srgb,#f5d76e 5%,var(--panel))}}
 .bot-sw{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:4px 0 14px}
+.bot-sw:has(>:nth-child(4)){grid-template-columns:repeat(4,1fr)}@media (max-width:1100px){.bot-sw:has(>:nth-child(4)){grid-template-columns:repeat(2,1fr)}}
 @media (max-width:760px){.bot-sw{grid-template-columns:1fr}}
 .qt-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:0 0 14px}.qt-tiles.sm{grid-template-columns:repeat(auto-fill,minmax(110px,1fr));margin:10px 0 0}
 .qt-t{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}.qt-t span{font:10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}.qt-t b{font:600 15px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qt-t em{font-style:normal;font:10.5px var(--mono);color:var(--dim)}
@@ -1717,6 +1718,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <script defer src="/desk-risk-panel.js?v=2"></script>
       <div id="strategyLabPanel" class="bt-card" hidden></div>
       <script defer src="/strategy-lab-panel.js?v=3"></script>
+      <script defer src="/my-trader.js?v=1"></script>
       <div class="ap-tri">
         <div class="apx" id="apBox"><div class="ap-empty"><span class="spin"></span> Loading the experiment…</div></div>
         <aside class="ap-hold" id="apNote"></aside>
@@ -1724,7 +1726,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
       <div class="apx" id="apMore"></div>
       <section class="ap-sigs" id="apPc" hidden></section>
       <section class="ap-sigs" id="apSig" hidden></section>
-      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000, race the S&amp;P 500. The <b>swing bot</b> holds stocks for days, the <b>quant trader</b> rebalances daily, and the <b>day trader</b> looks for confirmed intraday reversals in liquid ETFs.</p>
+      <p class="ap-lede ap-about">Three paper-money trading bots, each starting with $30,000, race the S&amp;P 500, and you can race them with your own $30,000 paper account (<b>My Trader</b>). The <b>swing bot</b> holds stocks for days, the <b>quant trader</b> rebalances daily, and the <b>day trader</b> looks for confirmed intraday reversals in liquid ETFs.</p>
     </section>
 
     <section id="tab-macro" class="pad fx" hidden>
@@ -3447,7 +3449,7 @@ function apBothData(range){
   const sw=BOTS.d.swing, dy=BOTS.d.day; if(!sw&&!dy) return null;
   const ref=[sw,dy].find(b=>b&&b.spx0), spx0=ref&&ref.spx0;
   const pts=(b,k)=>!b?[]:range==="today"?(b.intraday||[]).map(p=>({t:p.t,v:p.v,spx:p.spx})):(b.equity||[]).map(p=>({t:Date.parse(p.d+"T21:00:00Z"),v:p.v,spx:p.spx}));
-  const A=pts(sw), B=pts(dy), key=t=>range==="today"?Math.round(t/300e3)*300e3:t, T=[...new Set([...A,...B].map(p=>key(p.t)))].sort((a,b)=>a-b);
+  const A=pts(sw), B=pts(dy), key=t=>range==="today"?Math.round(t/300e3)*300e3:t, mp=BOTS.d.me&&BOTS.d.me.firstTrade?(range==="today"?(BOTS.d.me.intraday||[]).map(p=>({t:p.t})):(BOTS.d.me.equity||[]).map(p=>({t:Date.parse(p.d+"T21:00:00Z")}))):[], T=[...new Set([...A,...B,...mp].map(p=>key(p.t)))].sort((a,b)=>a-b);
   if(T.length<2) return null;
   const walk=(arr,start)=>{ const m=new Map(arr.map(p=>[key(p.t),p])); let last=null; return T.map(t=>{ const p=m.get(t); if(p) last=p; return last?last.v/start-1:null; }); };
   const spxAt=(()=>{ const m=new Map([...A,...B].filter(p=>p.spx).map(p=>[key(p.t),p.spx])); let last=null; return T.map(t=>{ if(m.has(t)) last=m.get(t); return last&&spx0?last/spx0-1:null; }); })();
@@ -3455,6 +3457,7 @@ function apBothData(range){
   const series=[{n:"S&P 500",c:BOTH_C.spx,v:spxAt,w:2,dash:true}];
   if(sw) series.push({n:"🤖 Swing bot",c:BOTH_C.swing,v:walk(A,sw.startValue),w:2.6,area:true,up:"#21c37a",down:"#ff6b6b",ao:.14});
   if(dy) series.push({n:"⚡ Day trader",c:BOTH_C.day,v:walk(B,dy.startValue),w:2.6,area:true,up:"#21c37a",down:"#ff6b6b",ao:.14});
+  const me=BOTS.d.me; if(me&&me.firstTrade){ const C=(range==="today"?(me.intraday||[]).map(p=>({t:p.t,v:p.v})):(me.equity||[]).map(p=>({t:Date.parse(p.d+"T21:00:00Z"),v:p.v}))); if(C.length) series.push({n:"🧑 You",c:"#f2f2f2",v:walk(C,me.startValue),w:2.2}); }
   return {lab,series};
 }
 function apBoth(){
@@ -3462,7 +3465,7 @@ function apBoth(){
   const seg=`<div class="apseg" data-seg="both">${[["today","Today"],["all","All days"]].map(([v,l])=>`<button type="button" data-v="${v}" class="${v===APV.both?"on":""}">${l}</button>`).join("")}</div>`;
   const chart=D&&D.series.some(s=>s.v.filter(x=>x!=null).length>=2)?apSvgChart("apBothC",D.lab,D.series,{zero:true,fmt:pc,h:260}).replace('<div class="apc" id="apBothC">','<div class="apc" id="apBothC" data-zero="1">'):`<div class="ap-empty" style="padding:30px 10px">${APV.both==="today"?"Fills in once both bots have traded for a few minutes today.":"Needs a couple of trading days — try “Today”."}</div>`;
   APV.bothD=D&&{...D,fmt:pc};
-  return `<div class="bt-card ap-perf" id="apBothCard"><div class="ap-perf-h"><h4 style="margin:0">Both bots vs. the S&amp;P 500 <em>return since each run started · green above zero, red below</em></h4><div class="ap-ctl">${seg}</div></div><div id="apBothWrap">${chart}</div></div>`;
+  return `<div class="bt-card ap-perf" id="apBothCard"><div class="ap-perf-h"><h4 style="margin:0">${BOTS.d.me&&BOTS.d.me.firstTrade?"The bots and you":"Both bots"} vs. the S&amp;P 500 <em>return since each run started · green above zero, red below</em></h4><div class="ap-ctl">${seg}</div></div><div id="apBothWrap">${chart}</div></div>`;
 }
 function apWireBoth(){
   const card=$("apBothCard"); if(!card) return;
@@ -3639,7 +3642,8 @@ function botSwitch(){
   const sw=BOTS.d.swing, dy=BOTS.d.day, spx=d=>d&&d.spx0&&d.spxNow?d.spxNow/d.spx0-1:null;
   const card=(k,icon,name,sub,d)=>{const r=botRet(d),s=spx(d),started=d&&d.trades&&d.trades.some(t=>/^(BUY|SHORT)$/.test(t.side));
     return `<button type="button" data-bot="${k}" class="${BOTS.sel===k?"on":""}"><span>${icon} ${name}</span><b data-lv="swr" class="${started?cls(r):""}">${started?pct(r*100):"—"}</b><small>${sub}${started&&s!=null?` · S&amp;P ${pct(s*100)}`:started?"":" · starts at the bell"}</small></button>`;};
-  $("apSwitch").innerHTML=card("swing","🤖","Swing Trader",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day Trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · ETF VWAP reversals`,dy)+card("quant","📐","Quant Trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant);
+  $("apSwitch").innerHTML=card("swing","🤖","Swing Trader",`<span data-lv="sw">${sw?$m(sw.value):"$30,000"}</span> · holds for days`,sw)+card("day","⚡","Day Trader",`<span data-lv="sw">${dy?$m(dy.value):"$30,000"}</span> · ETF VWAP reversals`,dy)+card("quant","📐","Quant Trader",`<span>${BOTS.d.quant?$m(BOTS.d.quant.value):"$30,000"}</span> · systematic, rebalances daily`,BOTS.d.quant)+(window.__VISITOR?"":(()=>{const me=BOTS.d.me,r=me?me.value/me.startValue-1:null,s=me&&me.spx0&&me.spxNow?me.spxNow/me.spx0-1:null,st=!!(me&&me.firstTrade);
+    return `<button type="button" data-bot="me" class="${BOTS.sel==="me"?"on":""}"><span>🧑 My Trader</span><b class="${st?cls(r):""}">${st?pct(r*100):"—"}</b><small>${me?$m(me.value):"$30,000"} · you pick the trades${st&&s!=null?` · S&amp;P ${pct(s*100)}`:st?"":" · starts with your first trade"}</small></button>`;})());
   liveApply(false);
 }
 function dtRender(d){
@@ -3762,17 +3766,19 @@ async function apBackup(kind,d){
 }
 async function apLoadView(){
   if(!$("apBox")) return;
-  const [sw,dy,qq]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader"),api("/api/quanttrader")]);
+  const [sw,dy,qq,me]=await Promise.allSettled([api("/api/autopilot"),api("/api/daytrader"),api("/api/quanttrader"),window.__VISITOR?Promise.reject(0):api("/api/mytrader")]);
   if(qq.status==="fulfilled") BOTS.d.quant=qq.value;
+  if(me.status==="fulfilled") BOTS.d.me=me.value;
   if(sw.status==="fulfilled"){ BOTS.d.swing=sw.value; if(await apBackup("swing",sw.value)) return apLoadView(); }
   if(dy.status==="fulfilled"){ BOTS.d.day=dy.value; if(await apBackup("day",dy.value)) return apLoadView(); }
   if(!BOTS.spx5&&[BOTS.d.swing,BOTS.d.day].some(x=>x&&!(x.trades||[]).some(t=>/^(BUY|SHORT)$/.test(t.side)))){ try{ BOTS.spx5=(await api("/api/history?symbol=%5EGSPC&range=5d&interval=15m")).candles; }catch{} }
   botSwitch(); botNotepad();
   const d=BOTS.d[BOTS.sel];
   if(!d){ $("apBox").innerHTML=`<div class="ap-empty">Couldn't load this bot right now. <button class="btn ghost" onclick="apLoadView()">Retry</button></div>`; return; }
-  if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d);
+  if(BOTS.sel==="me"){ const a=document.activeElement; if(window.mtRender&&!(a&&a.closest&&a.closest("#mtForm"))) mtRender(d); else if(!window.mtRender) $("apBox").innerHTML='<div class="ap-empty"><span class="spin"></span> Loading…</div>'; }
+  else if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d);
 }
-$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d); } else apLoadView(); };
+$("apSwitch").onclick=e=>{const b=e.target.closest("[data-bot]"); if(!b) return; BOTS.sel=b.dataset.bot; try{localStorage.setItem("md_bot",BOTS.sel);}catch{} botSwitch(); botNotepad(); const d=BOTS.d[BOTS.sel]; if(d){ if(BOTS.sel==="me"){ if(window.mtRender) mtRender(d); } else if(BOTS.sel==="day") dtRender(d); else if(BOTS.sel==="quant") qtRender(d); else apRender(d); } else apLoadView(); };
 setInterval(()=>{ if(S.tab==="aitrade"&&!document.hidden) apLoadView(); },60_000);
 /* ---------- live money: a tiny snapshot every ~2.5 s, numbers updated in place (no re-render, no layout shift) ---------- */
 var LIVE={d:null,fail:0,timer:null,hist:{swing:[],day:[]},shown:{}};
