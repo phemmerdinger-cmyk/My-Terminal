@@ -2506,8 +2506,8 @@ async function gemini(opts) {
   const r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(GEM_STATE.model)}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(20_000) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { if (r.status === 404) GEM_STATE.modelAt = 0; const e = new Error(GEM.errorFor(r.status, j)); e.status = r.status; GEM_STATE.lastError = e.message; throw e; }
-  GEM_STATE.lastError = null;
-  return GEM.textOf(j);
+  try { const t = GEM.textOf(j); GEM_STATE.lastError = null; return t; }
+  catch (e) { GEM_STATE.lastError = e.message; throw e; }
 }
 const geminiInfo = () => ({ on: !!GEMINI_KEY, model: GEM_STATE.model, usedToday: GEM_STATE.day === new Date().toISOString().slice(0, 10) ? GEM_STATE.used : 0, cap: GEM_STATE.cap, lastError: GEM_STATE.lastError });
 let OWNER = CO.fresh();
@@ -2538,10 +2538,11 @@ async function coachChat(text) {
   await ownerReady;
   let p = null, via = "rules", note = "";
   if (GEMINI_KEY) {
-    try { p = GEM.toParse(JSON.parse(await gemini({ system: GEM.COACH_SYSTEM, text, schema: GEM.COACH_SCHEMA, maxTokens: 300 }))); via = "gemini"; }
-    catch (e) { note = e.code === "cap" || e.status ? `(${e.message})\n` : ""; p = null; }
+    try { p = GEM.toParse(GEM.jsonOf(await gemini({ system: GEM.COACH_SYSTEM, text, schema: GEM.COACH_SCHEMA, maxTokens: 300 }))); via = "gemini"; }
+    catch (e) { GEM_STATE.lastError = e.message; note = e.code === "cap" || e.status ? `(${e.message})\n` : ""; p = null; }
   }
   if (!p || p.intent === "unknown") { const r = CO.parse(text); if (r.intent !== "unknown" || !p) { p = r; via = "rules"; } }
+  if (p.intent === "unknown" && GEMINI_KEY && !note) p = { intent: "question" }; // "hello", "how are we doing?" → let Gemini answer
   CO.chat(OWNER, "you", text);
   if (p.intent === "question" || p.intent === "chat") {
     let reply;

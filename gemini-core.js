@@ -16,10 +16,18 @@ function pickModel(list) {
   return flash[0] || "gemini-flash-latest";
 }
 
+// Newer Gemini models "think" first, and that thinking counts against maxOutputTokens, so the budget is generous
+// (the answer itself is kept short by the instructions, not by this cap).
 function body({ system, text, history = [], schema = null, maxTokens = 700 }) {
   const contents = [...history.slice(-8).map((m) => ({ role: m.who === "you" ? "user" : "model", parts: [{ text: String(m.text).slice(0, 1500) }] })), { role: "user", parts: [{ text: String(text).slice(0, 4000) }] }];
   return { ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}), contents,
-    generationConfig: { temperature: schema ? 0 : 0.4, maxOutputTokens: maxTokens, ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}) } };
+    generationConfig: { temperature: schema ? 0 : 0.4, maxOutputTokens: Math.max(4096, maxTokens), ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}) } };
+}
+function jsonOf(text) {
+  const t = String(text || "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
+  try { return JSON.parse(t); } catch {}
+  const m = t.match(/\{[\s\S]*\}/); if (m) return JSON.parse(m[0]);
+  throw new Error("Gemini's reply wasn't readable JSON");
 }
 function textOf(j) {
   const c = j && j.candidates && j.candidates[0];
@@ -86,4 +94,4 @@ const ANSWER_SYSTEM = "You are the Coach, VP of Finance for the owner's paper-tr
   "say plainly when the data doesn't show something, and never claim a trade happened unless the data shows it. This is not financial advice. " +
   "If the owner seems to want a bot to do something, tell them the exact words to type (e.g. 'swing bot buy NVDA $2,000').";
 
-module.exports = { BASE, pickModel, body, textOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };
+module.exports = { BASE, pickModel, body, textOf, jsonOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };

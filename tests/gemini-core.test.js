@@ -51,3 +51,10 @@ test("if Gemini can't be reached, the Coach chat falls back to the free interpre
     assert.match(r.reply, /Day trader: no short selling/); assert.equal(r.via, "rules"); assert.equal(r.ai.on, true);
   } finally { srv.kill(); }
 });
+
+test("thinking models get room to answer, and JSON is read even when wrapped", () => {
+  assert.ok(G.body({ text: "x", maxTokens: 300 }).generationConfig.maxOutputTokens >= 4096);
+  assert.deepEqual(G.jsonOf('```json\n{"intent":"chat"}\n```'), { intent: "chat" });
+  assert.deepEqual(G.jsonOf('Sure! {"intent":"buy","ticker":"NVDA"}'), { intent: "buy", ticker: "NVDA" });
+  assert.throws(() => G.jsonOf("no json here"), /readable/);
+});
