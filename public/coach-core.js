@@ -87,12 +87,17 @@
     return "other";
   }
   // trades newest first (every bot's ledger). Pairs each close with the open before it in the same symbol.
-  function journal(trades, { n = 20 } = {}) {
+  // Every closed trade, oldest first, paired with the open before it in the same symbol.
+  function closedTrades(trades) {
     const asc = (trades || []).filter((t) => t && t.sym && ok(t.t)).slice().sort((x, y) => x.t - y.t), open = {}, closed = [];
     for (const t of asc) {
       if (isOpen(t)) { if (!open[t.sym]) open[t.sym] = t; }
       else if (isClose(t)) { const o = open[t.sym]; closed.push({ sym: t.sym, t: t.t, pnl: t.pnl, held: o ? (t.t - o.t) / 864e5 : null, setup: t.setup || (o && o.setup) || null, cause: causeOf(t.why), openWhy: o ? o.why || "" : "", why: t.why || "" }); if (!/^Trimmed|partial/i.test(t.why || "")) delete open[t.sym]; }
     }
+    return closed.filter((t) => ok(t.pnl));
+  }
+  function journal(trades, { n = 20 } = {}) {
+    const closed = closedTrades(trades);
     const last = closed.slice(-n).reverse();
     if (last.length < 5) return { ok: false, closed: last.length, why: `Only ${last.length} closed trade${last.length === 1 ? "" : "s"} so far; the review needs at least 5.`, trades: last };
     const w = last.filter((t) => t.pnl > 0), l = last.filter((t) => t.pnl <= 0), gw = w.reduce((s, t) => s + t.pnl, 0), gl = -l.reduce((s, t) => s + t.pnl, 0);
@@ -100,34 +105,34 @@
     const hold = (L) => { const h = L.map((t) => t.held).filter(ok); return h.length ? mean(h) : null; };
     const findings = [];
     // 1. losses bigger than wins
-    if (l.length && w.length && avgL > avgW * 1.2) findings.push({ weight: avgL / avgW, text: `Average loss ($${avgL.toFixed(0)}) is ${(avgL / avgW).toFixed(1)}× the average win ($${avgW.toFixed(0)}).`, rule: `Cut losers sooner: exit any trade down more than about $${Math.round(avgW)} (the size of an average win).` });
+    if (l.length && w.length && avgL > avgW * 1.2) findings.push({ kind: "bigLosses", avgWin: avgW, avgLoss: avgL, weight: avgL / avgW, text: `Average loss ($${avgL.toFixed(0)}) is ${(avgL / avgW).toFixed(1)}× the average win ($${avgW.toFixed(0)}).`, rule: `Cut losers sooner: exit any trade down more than about $${Math.round(avgW)} (the size of an average win).` });
     // 2. holding losers longer than winners
     const hw = hold(w), hl = hold(l);
-    if (hw != null && hl != null && hl > hw * 1.5 && hl - hw >= 0.5) findings.push({ weight: hl / hw, text: `Losers were held ${hl.toFixed(1)} days on average vs ${hw.toFixed(1)} for winners.`, rule: `Don't wait on a losing trade: if it isn't working after ${Math.max(1, Math.round(hw))} day${Math.round(hw) > 1 ? "s" : ""}, close it.` });
+    if (hw != null && hl != null && hl > hw * 1.5 && hl - hw >= 0.5) findings.push({ kind: "holdLosers", holdWin: hw, holdLoss: hl, weight: hl / hw, text: `Losers were held ${hl.toFixed(1)} days on average vs ${hw.toFixed(1)} for winners.`, rule: `Don't wait on a losing trade: if it isn't working after ${Math.max(1, Math.round(hw))} day${Math.round(hw) > 1 ? "s" : ""}, close it.` });
     // 3. one exit reason dominating the losses
     const byCause = {}; l.forEach((t) => { (byCause[t.cause] = byCause[t.cause] || { n: 0, pnl: 0 }); byCause[t.cause].n++; byCause[t.cause].pnl += t.pnl; });
     const topCause = Object.entries(byCause).filter(([k]) => k !== "other").sort((a, b) => b[1].n - a[1].n)[0];
     if (topCause && topCause[1].n >= 3 && topCause[1].n / l.length >= 0.4) {
       const R = { "hit its stop": "Enter closer to support so the stop is tighter, or skip setups that need a wide stop.", "earnings": "Don't hold through earnings unless the trade is already well in profit.", "bad news": "Check the spider's news before buying; skip names with fresh negative headlines.", "market selloff": "When the market is falling, open fewer new trades and keep them smaller.", "trend broke": "Only buy stocks above their 50-day and 200-day averages.", "faded / rebalanced": "Wait for a stronger ranking before buying; marginal picks fade.", "ran out of time": "Take trades only when there is enough time left for the setup to play out." };
-      findings.push({ weight: topCause[1].n, text: `${topCause[1].n} of ${l.length} losses ended the same way: ${topCause[0]} ($${(-topCause[1].pnl).toFixed(0)} lost).`, rule: R[topCause[0]] });
+      findings.push({ kind: "cause", cause: topCause[0], weight: topCause[1].n, text: `${topCause[1].n} of ${l.length} losses ended the same way: ${topCause[0]} ($${(-topCause[1].pnl).toFixed(0)} lost).`, rule: R[topCause[0]] });
     }
     // 4. a setup that keeps losing
     const bySetup = {}; last.forEach((t) => { if (!t.setup) return; const s = (bySetup[t.setup] = bySetup[t.setup] || { n: 0, pnl: 0, wins: 0 }); s.n++; s.pnl += t.pnl; s.wins += t.pnl > 0; });
     const bad = Object.entries(bySetup).filter(([, s]) => s.n >= 3 && s.pnl < 0).sort((a, b) => a[1].pnl - b[1].pnl)[0];
-    if (bad) findings.push({ weight: bad[1].n, text: `The "${bad[0]}" setup lost $${(-bad[1].pnl).toFixed(0)} over ${bad[1].n} trades (${bad[1].wins} wins).`, rule: `Pause or tighten the "${bad[0]}" setup until it shows a profit again.` });
+    if (bad) findings.push({ kind: "setup", setup: bad[0], weight: bad[1].n, text: `The "${bad[0]}" setup lost $${(-bad[1].pnl).toFixed(0)} over ${bad[1].n} trades (${bad[1].wins} wins).`, rule: `Pause or tighten the "${bad[0]}" setup until it shows a profit again.` });
     // 5. the same stock losing again and again
     const bySym = {}; l.forEach((t) => { bySym[t.sym] = (bySym[t.sym] || 0) + 1; });
     const rep = Object.entries(bySym).filter(([, k]) => k >= 3).sort((a, b) => b[1] - a[1])[0];
-    if (rep) findings.push({ weight: rep[1], text: `${rep[0]} lost ${rep[1]} times in these trades.`, rule: `After two losses in the same stock, stay out of it for at least two weeks.` });
+    if (rep) findings.push({ kind: "repeatSym", sym: rep[0], weight: rep[1], text: `${rep[0]} lost ${rep[1]} times in these trades.`, rule: `After two losses in the same stock, stay out of it for at least two weeks.` });
     // 6. losing streak
     let streak = 0, worst = 0; last.slice().reverse().forEach((t) => { streak = t.pnl <= 0 ? streak + 1 : 0; worst = Math.max(worst, streak); });
-    if (worst >= 4) findings.push({ weight: worst / 2, text: `Had a run of ${worst} losses in a row.`, rule: `After 3 losses in a row, halve the trade size until the next win.` });
+    if (worst >= 4) findings.push({ kind: "streak", streak: worst, weight: worst / 2, text: `Had a run of ${worst} losses in a row.`, rule: `After 3 losses in a row, halve the trade size until the next win.` });
     findings.sort((a, b) => b.weight - a.weight);
     const best = Object.entries(bySetup).filter(([, s]) => s.n >= 3 && s.pnl > 0).sort((a, b) => b[1].pnl - a[1].pnl)[0];
     return { ok: true, closed: last.length, wins: w.length, losses: l.length, winRate: w.length / last.length,
       profitFactor: gl > 0 ? Math.round(gw / gl * 100) / 100 : null, net: r2(gw - gl), avgWin: r2(avgW), avgLoss: r2(avgL), holdWin: r2(hw), holdLoss: r2(hl),
       best: best ? { setup: best[0], pnl: r2(best[1].pnl), n: best[1].n } : null,
-      mistakes: findings.map((f) => f.text), rules: findings.slice(0, 3).map((f) => f.rule),
+      mistakes: findings.map((f) => f.text), rules: findings.slice(0, 3).map((f) => f.rule), findings,
       enough: findings.length >= 3 ? null : findings.length ? `Only ${findings.length} clear problem${findings.length > 1 ? "s" : ""} in these trades, so fewer than 3 rules.` : "No recurring mistake stands out in these trades.",
       trades: last.slice(0, n).map((t) => ({ sym: t.sym, t: t.t, pnl: r2(t.pnl), held: t.held == null ? null : Math.round(t.held * 10) / 10, setup: t.setup, cause: t.cause })) };
   }
@@ -168,5 +173,5 @@
       trims, note: `Hypothetical: each holding's 1-year beta to SPY times a ${drop * 100}% market drop. Real crashes can be worse; correlations jump in selloffs.` };
   }
 
-  return { sma, ema, rsi, levels, trend, chartRead, journal, causeOf, dailyRets, beta, corr, stress };
+  return { sma, ema, rsi, levels, trend, chartRead, journal, closedTrades, causeOf, dailyRets, beta, corr, stress };
 });

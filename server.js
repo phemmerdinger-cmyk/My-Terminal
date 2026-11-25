@@ -1868,7 +1868,7 @@ function pcState() {
 const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
 if (DEPLOY.runJobs) setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
-const BOTDIAG = { market: {}, my: { errors: [] }, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
+const BOTDIAG = { market: {}, my: { errors: [] }, coach: { errors: [] }, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
@@ -2120,7 +2120,7 @@ function apPace(trades, t, now = Date.now()) {
 }
 // Turns scores into trades on `st` (the real account, or a copy when planning overnight).
 function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
-  const by = Object.fromEntries(sc.list.map((x) => [x.sym, x])), now = Date.now();
+  const by = Object.fromEntries(sc.list.map((x) => [x.sym, x])), now = Date.now(), CE = CT.effective(CTS, "swing", now); // Coach-tuned settings
   const cool = (s) => st.recent && st.recent[s] && now - st.recent[s] < AP_HOLD_MIN;
   const val = () => st.cash + Object.entries(st.positions).reduce((s, [k, p]) => s + p.shares * (by[k] ? by[k].px : p.cost), 0);
   const fmtE = (e) => e.kind === "beat" ? `earnings beat by ${(e.surprise * 100).toFixed(0)}%` : `earnings missed by ${(-e.surprise * 100).toFixed(0)}%`;
@@ -2134,6 +2134,8 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.news <= -2.5) apTrade(st, "SELL", sym, p.shares, x.px, `Bad news: “${(x.headlines[0] || "").slice(0, 120)}”`);
     else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
+    else if (CE.lossCap != null && x.px <= p.cost * (1 - CE.lossCap)) apTrade(st, "SELL", sym, p.shares, x.px, `Coach loss cap: ${((1 - x.px / p.cost) * 100).toFixed(1)}% below cost (cap ${Math.round(CE.lossCap * 100)}%)`);
+    else if (CE.loserDays != null && x.px < p.cost && now - (p.at || now) > CE.loserDays * 864e5) apTrade(st, "SELL", sym, p.shares, x.px, `Coach time limit: still losing after ${CE.loserDays} days`);
     else if (x.rank > (risk ? 25 : 35) && !cool(sym) && !x.stale && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the ranking at the opening re-score, after ${Math.floor((now - p.at) / 864e5)} days held`);
   }
   // 80% risk profile: fully invested normally; still cuts back when the whole market breaks down
@@ -2159,8 +2161,8 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   }
   if (sc.stress) return;
   const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
-  const ok = (x, sl) => x.sleeve === sl && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
-    (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
+  const ok = (x, sl) => x.sleeve === sl && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && !CE.avoid.has(x.sym) && x.px >= 5 && x.news > CE.newsFloor && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+    (sl === "risk" ? (CE.requireTrend ? x.px > x.m50 && x.px > x.m200 : x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat")) : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
     if (x.earn && x.earn.kind === "beat") bits.push(`${opening ? "reported overnight: " : ""}${fmtE(x.earn)}`);
@@ -2189,7 +2191,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (held(sl).length >= SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const amt = Math.min(target, st.cash - 5); if (amt < 50) break;
+      const amt = Math.min(target * CE.sizeMult, st.cash - 5); if (amt < 50) break;
       apTrade(st, "BUY", x.sym, amt / PAPER.paperFill("BUY", x.px, AP_COST), x.px, why(x), x.name, sl);
     }
   }
@@ -2317,6 +2319,31 @@ async function briefView() {
 // Chart reads on everything held or top-ranked, a journal review of each bot's last 20 closed trades, and a hypothetical −20% market.
 const COACH = require("./public/coach-core.js");
 let coachCache = { t: 0, v: null, p: null };
+// Coach tuner (public/coach-tuner-core.js): turns the journal findings into small, bounded setting changes on the swing bot and
+// day trader, checks each change against the trades that follow and undoes it if they did worse. Every change is logged.
+const CT = require("./public/coach-tuner-core.js");
+let ctStoreV = null; const ctStore = () => (ctStoreV = ctStoreV || paperStore("coach-tuner-v1", { url: UP_URL, token: UP_TOKEN }));
+let CTS = null, ctLoading = null;
+async function ctLoad() { if (CTS) return CTS; if (!ctLoading) ctLoading = ctStore().get("state").then((v) => (CTS = v && v.v === 1 ? v : CT.fresh()), (e) => { ctLoading = null; throw e; }); return ctLoading; }
+const CT_BOTS = [["swing", "Swing bot", () => AP.trades, () => AP, () => AP_START], ["day", "Day trader", () => DT.trades, () => DT, () => DT_START], ["quant", "Quant", () => QT.trades, () => QT, () => QTC.QT_START]];
+function ctVsSpx(B, start) { const last = B && B.equity && B.equity[B.equity.length - 1], spx = last && (last.spx ?? last.s); return B && B.spx0 && spx && last.v ? last.v / start - spx / B.spx0 : null; }
+async function ctTick() {
+  if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
+  const st = await ctLoad(), now = Date.now(); let n = 0;
+  for (const [bot, , trades] of CT_BOTS) { const L = trades() || [], j = COACH.journal(L); n += CT.plan(st, bot, { closed: COACH.closedTrades(L), findings: j.ok ? j.findings : [], now }).length; }
+  if (n || !st.saved) { st.saved = now; await ctStore().set("state", st); }
+}
+if (DEPLOY.runJobs) setTimeout(() => { ctTick().catch((e) => diagErr("coach", e)); setInterval(() => ctTick().catch((e) => diagErr("coach", e)), 15 * 60e3); }, process.env.AP_TEST ? 6000 : 90_000);
+function ctView() {
+  const st = CTS || CT.fresh(), now = Date.now();
+  const bots = CT_BOTS.map(([bot, name, trades, B, start]) => {
+    const L = trades() || [], j = COACH.journal(L), e = CT.effective(st, bot, now);
+    return { bot, name, canChange: CT.CAN[bot], status: CT.status(COACH.closedTrades(L), ctVsSpx(B(), start())), cantFix: j.ok ? CT.cantFix(st, bot, j.findings) : [],
+      settings: { lossCap: e.lossCap, loserDays: e.loserDays, requireTrend: e.requireTrend, newsFloor: e.newsFloor, sizeMult: e.sizeMult, avoid: [...e.avoid], paused: [...e.paused] } };
+  });
+  return { log: (st.log || []).slice(0, 60), bots, loaded: !!CTS, limits: CT.LIMITS, rules: CT.RULES,
+    note: "The Coach changes only the settings listed for each bot, inside fixed limits, at most one lasting change per bot per week. Each lasting change is checked after the next 10 closed trades and undone if they did worse. It never touches the risk desk, drawdown lock, costs or bust level, and never places trades itself." };
+}
 async function coachBuild() {
   if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
   const holdings = [
@@ -2335,11 +2362,10 @@ async function coachBuild() {
   const journals = [["Swing bot", AP.trades], ["Day trader", DT.trades], ["Quant", QT.trades]].map(([bot, L]) => ({ bot, ...COACH.journal(L || []) }));
   const stress = COACH.stress(holdings, closes);
   const flags = [];
-  for (const j of journals) if (j.ok && j.rules.length) flags.push(`${j.bot}: ${j.rules[0]}`);
   if (stress.ok) { if (stress.pairs.length) flags.push(`${stress.pairs[0].a} and ${stress.pairs[0].b} move together (${stress.pairs[0].corr}); a selloff hits both.`); for (const b of stress.bots) for (const o of b.over) flags.push(`${b.bot}: ${o.sym} is ${o.weight}% of its book.`); }
   for (const c of charts) if (c.ok && c.signal === "Sell" && /held/.test(c.role)) flags.push(`${c.sym} (${c.role}) reads Sell on the chart.`);
   return { at: Date.now(), charts, journals, stress, flags: flags.slice(0, 8), unavailable: failed,
-    note: "The Coach never trades. Rule-based reviews of paper trades and real daily prices; the −20% test is hypothetical." };
+    note: "Rule-based reviews of paper trades and real daily prices; the −20% test is hypothetical. The Coach doesn't place trades; the fixes it makes on its own are listed under Coach's changes." };
 }
 // ---- My Trader: the owner's own $30,000 paper account, traded by hand (my-trader-core.js). Lives on the bot server.
 const MYT = require("./my-trader-core.js");
@@ -2391,9 +2417,14 @@ async function mtOrder(body) {
   });
 }
 async function coachView() {
-  if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) return coachCache.v;
-  if (!coachCache.p) coachCache.p = coachBuild().then((v) => { coachCache = { t: Date.now(), v, p: null }; return v; }, (e) => { coachCache.p = null; throw e; });
-  return coachCache.p;
+  let v;
+  if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) v = coachCache.v;
+  else { if (!coachCache.p) coachCache.p = coachBuild().then((x) => { coachCache = { t: Date.now(), v: x, p: null }; return x; }, (e) => { coachCache.p = null; throw e; }); v = await coachCache.p; }
+  try { await ctLoad(); } catch {}
+  const tuner = ctView();
+  // flags = what's still open: problems the Coach can't fix by itself, plus portfolio and chart warnings (its own fixes are in tuner.log)
+  const open = tuner.bots.flatMap((b) => b.cantFix.slice(0, 1).map((c) => `${b.name}: ${c.text} (${c.why})`));
+  return { ...v, tuner, flags: [...open, ...v.flags].slice(0, 8) };
 }
 async function apTick() {
   if (apBusy) return; apBusy = true;
@@ -2822,6 +2853,8 @@ function dtPilotRoom() {
 function dtOpen(sym, forecast, bar, observedAt) {
   const { idea } = forecast, fill = DP.openPullback(forecast, bar, { now: observedAt, maxLagSec: DT_PARAMS.maxBarLagSec });
   if (!fill || DT.positions[sym] || dtHalted()) return;
+  const CE = CT.effective(CTS, "day"); // Coach-tuned: stocks and setups on a break, trade size
+  if (CE.avoid.has(sym) || CE.paused.has(DT_KIND[idea.kind])) { BOTDIAG.day.coach = `${sym} ${DT_KIND[idea.kind] || idea.kind}: skipped (Coach break)`; return; }
   const eq = dtEquity(), px = fill.entry;
   if (eq <= 0) return;
   const want = DTC.size(eq, px, fill.stop, DT_PARAMS.riskPct * (idea.sizeX ?? 1), DT_POS_X * eq);
@@ -2829,7 +2862,7 @@ function dtOpen(sym, forecast, bar, observedAt) {
   const riskPerShare = Math.abs(px - fill.stop) + px * (2 * DT_COST + (idea.dir === "short" ? DT_FEE_SHORT : 0));
   const plannedRisk = forecast.approval.shares * forecast.approval.riskPerShare;
   const limited = DTB.guard(want, px, idea.dir, dtBook(), eq, { grossCap: DT_LEV, netCap: idea.stressed ? DT_NET / 2 : DT_NET });
-  const request = Math.floor(Math.min(limited, forecast.approval.shares, plannedRisk / riskPerShare));
+  const request = Math.floor(Math.min(limited, forecast.approval.shares, plannedRisk / riskPerShare) * CE.sizeMult);
   if (request < 1) return;
   const ticket = deskRisk.reserve({ bot: "day", sym, sign: forecast.side, shares: request, price: px, riskPerShare,
     integer: true, pilotRoom: dtPilotRoom() });

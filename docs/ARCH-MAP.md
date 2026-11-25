@@ -22,6 +22,7 @@
 |---|---|
 | `my-trader-core.js` / `public/my-trader.js` | My Trader: the owner's hand-traded $30,000 paper account (server `mtView`/`mtOrder`/`mtTick`, `/api/mytrader*`), shown on Bots vs S&P 500 and ranked on the leaderboard |
 | `coach-core.js` | Coach agent rules: chart read, trade-journal review, −20% stress + hedge. Server `/api/coach` (coachView in server.js); Bot HQ Coach desk; Research → Why chart-read card (teamwork.js) |
+| `coach-tuner-core.js` | Coach self-tuning: journal findings → bounded setting changes on the swing bot (loss cap, loser time limit, trend filter, news filter, size, stock breaks) and day trader (size, stock and setup breaks); review after 10 trades and undo if worse; success bar. Server `ctTick` every 15 min, state `coach-tuner-v1`; hooks in `apDecide` and `dtOpen`; Bot HQ "Coach's changes" card |
 | `hq.html` / `hq.js` / `hq-core.js` | Bot HQ, a separate site: desk port 3001 or `MODE=hq` service (`handleHq` in server.js); overview, every bot in depth, agent room, spider, risk & costs |
 | `teamwork.js` | Morning brief pop-up (once a day + ☀ top-bar button) + Research "Why (bots)" card; lazy group `team` |
 | `lazy-core.js` | `MDLazyCore.GROUPS` (quant / studio / web / team script lists) + `createLoader`; `window.MDLazy` in index.html loads a group when `setTab` opens a tool |
