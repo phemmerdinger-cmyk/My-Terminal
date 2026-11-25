@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Swing bot v4: thesis tracker + volatility sizing (2026-11-24)
+- **Thesis tracker** (`thesis-core.js`, idea from the equity-research plugin): each buy stores the reasons that were true (3-month momentum, good news, analysts positive, 10-K grade A/B, ratios beat peers, spider research positive; needs ≥2). Each re-score checks them with the same inputs; when ≥2 and ≥half are clearly gone (wide hysteresis bands; missing data never counts as gone), it sells at the opening re-score after the 2-day minimum hold. Sells read "Thesis broken: bought for …; now …", rule "Thesis rule", post-mortem cause "thesis". The spider-off twin leaves the spider pillar out.
+- **Volatility sizing** (`RISK.volSize`, idea from the pyvar plugin): within each sleeve a new slot = equal slot × clamp(median sleeve volatility ÷ stock volatility, 2/3, 1.5). Trims and defense cuts use each holding's own `size`. The buy reason says how it was sized.
+- Strategy version 3 → 4, so the current swing run is archived and a new $30,000 run starts (registry rule). Positions in `/api/autopilot` now carry `thesis` (labels) and `size`. Two new Rulebook cards in Bot HQ; the toughness card mentions the walk-forward. Tests: `tests/thesis-core.test.js`.
+
 ### Toughness test: walk-forward + downside risk (2026-11-24)
 - New sixth check for the pullback and sector-rotation lab bots (`robustness-core.walkForward`): the period after warm-up is split into 5 parts; for parts 2–5 the setting (20% lower / as is / 20% higher) that did best on all earlier prices is picked and scored only on the unseen part. Passes when the chained out-of-sample result is positive and at least half the windows are up. It counts like any other check (one miss = borderline, two = fail and new buys pause). The Quant trader's replay doesn't run it yet.
 - The "made money" check now also shows Sortino (only down days count as risk) and Calmar (yearly return ÷ worst drawdown). Shown only, not a gate.

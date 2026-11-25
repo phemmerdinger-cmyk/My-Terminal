@@ -69,5 +69,18 @@
   // as if every minute had been watched.
   const gapMinutes = (lastT, nextT) => (lastT > 0 && nextT > lastT ? Math.round((nextT - lastT) / 60) : 0);
 
-  return { isMarketSwan, staleQuote, netEdge, dailyLossHit, expectancy, expectancyOf, rankExitAllowed, versionChanged, gapMinutes, SWAN };
+  // ---- risk-parity sizing (idea from the pyvar-portfolio-analytics plugin) --------------------------------------
+  // A calmer stock gets a bigger slot and a wilder one a smaller slot, so each holding carries about the same risk.
+  // ref = the typical (median) volatility of the stocks it competes with. Capped so no slot is under 2/3 or over 1.5×
+  // an equal slot. Unknown volatility → equal slot (1).
+  function volSize(vol, ref, { min = 2 / 3, max = 1.5 } = {}) {
+    if (!(vol > 0) || !(ref > 0)) return 1;
+    return Math.round(Math.min(max, Math.max(min, ref / vol)) * 1000) / 1000;
+  }
+  function median(xs) {
+    const v = xs.filter((x) => x > 0).sort((a, b) => a - b); if (!v.length) return null;
+    return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+  }
+
+  return { isMarketSwan, staleQuote, netEdge, dailyLossHit, expectancy, expectancyOf, rankExitAllowed, versionChanged, gapMinutes, volSize, median, SWAN };
 });

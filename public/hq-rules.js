@@ -33,8 +33,14 @@
     { id: "stops", tags: ["Risk", "Swing bot"], title: "Stops", src: "server.js · apStops",
       plain: "High-risk picks get room to swing (15% stop, 20% trailing); safe picks are cut sooner (8% stop, 10% trailing).",
       code: "stop = max(cost * (1 - sl), peak * (1 - trail))\nsl, trail = risky ? .15, .20 : .08, .10", pic: "stops" },
+    { id: "thesis", tags: ["Swing bot"], title: "Thesis tracker", src: "thesis-core.js",
+      plain: "Each buy writes down why it was bought (momentum, good news, analysts, 10-K grade, ratios, spider research). When at least two of those reasons, and at least half, are clearly gone, it sells.",
+      code: "thesis = reasons true at the buy (needs >= 2)\nsell   = gone >= 2 && gone >= half && held >= 2 days", pic: "check" },
+    { id: "size", tags: ["Risk", "Swing bot"], title: "Volatility sizing", src: "risk-core.js · volSize",
+      plain: "Calmer stocks get bigger slots and wilder ones smaller slots, so each holding carries about the same risk. Never under 2/3 or over 1.5 times an equal slot.",
+      code: "size = clamp(medianVol(sleeve) / vol, 0.67, 1.5)\nslot = equalSlot * size", pic: "stops" },
     { id: "tough", tags: ["Toughness test"], title: "Toughness test", src: "robustness-core.js",
-      plain: "Replay the rules on past prices: must make money after costs, in the later 40%, with settings ±20%, with double costs, and in 1,000 bad-luck reshuffles. Fail = new buys pause by themselves.",
-      code: "pass = profit && later > 0 && settings±20% > 0\n    && 2xCosts > 0 && p05 > -15% && dd95 < 30%", pic: "fan" },
+      plain: "Replay the rules on past prices: must make money after costs, in the later 40%, with settings ±20%, with double costs, in 1,000 bad-luck reshuffles, and in a walk-forward (settings picked on earlier prices, judged on later ones). Fail = new buys pause by themselves.",
+      code: "pass = profit && later > 0 && settings±20% > 0\n    && 2xCosts > 0 && p05 > -15% && dd95 < 30%\n    && walkForward > 0 (half the windows up)", pic: "fan" },
   ]);
 })(typeof self !== "undefined" ? self : this);

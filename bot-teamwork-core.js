@@ -80,6 +80,7 @@
   }
   function lossCause(sellWhy, ctx = {}) {
     const w = String(sellWhy || "");
+    if (/^Thesis broken/.test(w)) return { cause: "thesis", label: "The reasons it was bought were gone" };
     if (/earnings/i.test(w)) return { cause: "earnings", label: "Earnings report went against it" };
     if (/^Bad news|Spider veto/i.test(w)) return { cause: "bad-news", label: "Company-specific bad news" };
     if (/Defense mode|black-swan|VIX|S&P 500 down/i.test(w) || (ctx.spxDay != null && ctx.spxDay <= -1.5)) return { cause: "market", label: "Market-wide selloff" };

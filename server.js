@@ -1640,11 +1640,12 @@ const BOT_RESET_ID = "2026-11-17-paper-execution-30k";
 // the same way. Archives live in Upstash lists (pft:archive:v1:<bot>) when configured, plus a local file.
 const RISK = require("./risk-core.js");
 const TEAM = require("./bot-teamwork-core.js");
+const THESIS = require("./thesis-core.js");
 const STRATS = {
-  swing: { id: "sarah-swing", version: 3, trader: "Swing Trader", since: "2026-11-17",
+  swing: { id: "sarah-swing", version: 4, trader: "Swing Trader", since: "2026-11-17",
     hypothesis: "Multi-day momentum + catalysts (earnings beats, news, analyst ratings, 10-K health) in S&P names above their 50/200-day averages earn more than the S&P after costs over 2–30 trading days.",
-    changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "Trade only on fresh post-decision prices, with 7.5 bps of modeled costs", "Zweig put/call exposure tilt", "v3: financial-ratio indicator (Fin 370 units 6–9: profitability/DuPont, leverage, efficiency/CCC, valuation) vs peers and prior year, weight 0.08 — a fixed prior, not yet fitted"],
-    params: { ratioWeight: 0.08, slots: 10, riskSlots: 8, slipPerSide: 0.00075, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 3 } },
+    changes: ["Market-crash headlines must be about the whole market (single-stock 'X stock tumbles 21%' no longer triggers defense mode)", "Rank-based sells and swaps only at the opening re-score and only after ≥2 days held", "Trade only on fresh post-decision prices, with 7.5 bps of modeled costs", "Zweig put/call exposure tilt", "v3: financial-ratio indicator (Fin 370 units 6–9: profitability/DuPont, leverage, efficiency/CCC, valuation) vs peers and prior year, weight 0.08 — a fixed prior, not yet fitted", "v4: thesis tracker — each buy records its reasons (momentum, news, analysts, 10-K grade, ratios, spider research); sells when at least 2 and at least half of them are clearly gone (after the 2-day minimum hold, at the opening re-score)", "v4: volatility sizing — within each sleeve a slot is sized by the sleeve's median volatility ÷ the stock's volatility (2/3× to 1.5× an equal slot); trims and defense cuts use each holding's own size"],
+    params: { ratioWeight: 0.08, sizeMin: 2 / 3, sizeMax: 1.5, slots: 10, riskSlots: 8, slipPerSide: 0.00075, stops: { risk: [0.15, 0.2], safe: [0.08, 0.1] }, rankHoldDays: 2, staleMin: 3 } },
   day: { id: "alex-intraday", version: 5, trader: "Day Trader", since: "2026-11-19",
     hypothesis: "Confirmed ETF reversals and strong forecasts with aligned intraday momentum can earn more than modeled costs.",
     changes: ["Keep confirmed ETF reversals toward session VWAP", "Add momentum entries when a cost-qualified forecast agrees with the last one and five minutes", "Require target room of at least twice modeled round-trip costs and recheck at the exact later opening print", "Use fixed stop and target brackets, a ten-minute max hold, and the capped Day paper allocation under desk loss controls"],
@@ -1872,19 +1873,19 @@ const BOTDIAG = { market: {}, my: { errors: [] }, swing: { errors: [] }, quant: 
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
-const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Failed the 10-K health/.test(why) ? "Health rule" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
-function apTrade(st, side, sym, shares, price, why, name, sleeve, execution) {
+const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Thesis broken/.test(why) ? "Thesis rule" : /^Failed the 10-K health/.test(why) ? "Health rule" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
+function apTrade(st, side, sym, shares, price, why, name, sleeve, execution, extra) {
   const px = PAPER.paperFill(side, price, AP_COST);
   const position = st.positions[sym];
   shares = Math.min(shares, side === "BUY" ? Math.max(0, st.cash - 5) / px : position?.shares || 0);
   if (!(shares > 0) || !Number.isFinite(px) || px <= 0) return;
   const amt = shares * px;
-  if (st.intents) st.intents.push({ side, sym, shares, referencePrice: price, why, name, sleeve });
+  if (st.intents) st.intents.push({ side, sym, shares, referencePrice: price, why, name, sleeve, ...(extra ? { extra } : {}) });
   const p = st.positions[sym]; let pnl = null, pnlPct = null;
   if (side === "BUY") {
     st.cash -= amt;
     if (p) { p.cost = (p.cost * p.shares + amt) / (p.shares + shares); p.shares += shares; p.peak = Math.max(p.peak, px); }
-    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym, sleeve: sleeve || "risk" };
+    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym, sleeve: sleeve || "risk", ...(extra && extra.thesis ? { thesis: extra.thesis } : {}), ...(extra && extra.size ? { size: extra.size } : {}) };
   } else {
     if (!p) return;
     st.cash += amt;
@@ -2135,6 +2136,11 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
     else if (x.rank > (risk ? 25 : 35) && !cool(sym) && !x.stale && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the ranking at the opening re-score, after ${Math.floor((now - p.at) / 864e5)} days held`);
+    else if (p.thesis && !cool(sym) && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) {
+      // the spider-off twin can't see spider research, so that pillar is left out of its check
+      const th = THESIS.check(sc.spiderOff ? { ...p.thesis, pillars: p.thesis.pillars.filter((k) => k !== "spider") } : p.thesis, x);
+      if (th.broken) apTrade(st, "SELL", sym, p.shares, x.px, th.reason);
+    }
   }
   // 80% risk profile: fully invested normally; still cuts back when the whole market breaks down
   // Zweig put/call (contrarian): stays more invested when the crowd is loaded with puts, keeps some cash when it's loaded with calls
@@ -2153,9 +2159,10 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   const normalTarget = (val() * PCC.exposureTilt(sc.riskOff ? 0.8 : 0.99, sc.putcall, { stress: false, riskOff: sc.riskOff }).exposure) / AP_SLOTS;
   for (const [sym, p] of Object.entries(st.positions)) {
     const x = by[sym]; if (!x || x.stale) continue; const v = p.shares * x.px, risk = slv(sym) === "risk";
-    if (sc.stress && risk) { if (v > target * 1.1) apTrade(st, "SELL", sym, (v - target) / x.px, x.px, `Defense mode — high-risk holdings trimmed first: ${sc.stress}`); continue; }
-    const tgt = sc.stress ? normalTarget : target;
-    if (v > tgt * 1.6) apTrade(st, "SELL", sym, (v - tgt) / x.px, x.px, pcT.note && !sc.stress ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : "Trimmed back to an equal slot after a big run-up");
+    const k = p.size || 1; // volatility sizing: each holding's own slot size
+    if (sc.stress && risk) { if (v > target * k * 1.1) apTrade(st, "SELL", sym, (v - target * k) / x.px, x.px, `Defense mode — high-risk holdings trimmed first: ${sc.stress}`); continue; }
+    const tgt = (sc.stress ? normalTarget : target) * k;
+    if (v > tgt * 1.6) apTrade(st, "SELL", sym, (v - tgt) / x.px, x.px, pcT.note && !sc.stress ? `Trimmed — ${pcT.note}` : sc.riskOff ? "Trimmed — S&P 500 is below its 200-day average, so the bot keeps 20% cash" : (k === 1 ? "Trimmed back to an equal slot after a big run-up" : "Trimmed back to its volatility-sized slot after a big run-up"));
   }
   if (sc.stress) return;
   const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
@@ -2175,6 +2182,9 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     if (sc.putcall && sc.putcall.signal === "BUY") bits.push("Zweig put/call buy signal (crowd heavy in puts — contrarian bullish)");
     return `Ranked #${x.rank}: ` + bits.join(", ");
   };
+  // volatility sizing: the sleeve's median volatility is the reference for an equal-risk slot
+  const refVol = { risk: RISK.median(sc.list.filter((x) => x.sleeve === "risk").map((x) => x.vol)), safe: RISK.median(sc.list.filter((x) => x.sleeve === "safe").map((x) => x.vol)) };
+  const sizeOf = (x) => RISK.volSize(x.vol, refVol[x.sleeve], { min: STRATS.swing.params.sizeMin, max: STRATS.swing.params.sizeMax });
   for (const sl of ["risk", "safe"]) {
     // 3) swaps inside the sleeve: a much stronger name replaces the weakest holding (held at least an hour)
     for (const x of sc.list) {
@@ -2189,8 +2199,9 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (held(sl).length >= SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const amt = Math.min(target, st.cash - 5); if (amt < 50) break;
-      apTrade(st, "BUY", x.sym, amt / PAPER.paperFill("BUY", x.px, AP_COST), x.px, why(x), x.name, sl);
+      const size = sizeOf(x), amt = Math.min(target * size, st.cash - 5); if (amt < 50) break;
+      const thesis = THESIS.atBuy(sc.spiderOff ? { ...x, spider: null } : x, now);
+      apTrade(st, "BUY", x.sym, amt / PAPER.paperFill("BUY", x.px, AP_COST), x.px, why(x) + (size !== 1 ? `; sized ${size.toFixed(2)}× an equal slot for its volatility` : ""), x.name, sl, undefined, { size, ...(thesis ? { thesis } : {}) });
     }
   }
 }
@@ -2442,7 +2453,7 @@ async function apTick() {
           }
           apPx[order.sym] = quote.price;
           apTrade(next, order.side, order.sym, shares, quote.price, order.why, order.name, order.sleeve,
-            { decisionAt: pending.at, decisionPrice: order.referencePrice, marketTime: quote.marketTime });
+            { decisionAt: pending.at, decisionPrice: order.referencePrice, marketTime: quote.marketTime }, order.extra);
         }
         const remaining = pending.orders.filter((o) => !executable.includes(o));
         next.pending = remaining.length ? { ...pending, orders: remaining } : null;
@@ -2507,7 +2518,7 @@ async function apView(priv = false) {
   if (!apLoaded) await apLoad();
   const syms = Object.keys(AP.positions);
   const q = (await getQuotes([...syms, "^GSPC"])).quotes;
-  const positions = syms.map((s) => { const p = AP.positions[s], x = q[s] || {}; const price = x.price || p.cost; return { sym: s, name: p.name, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, pnlPct: (price / p.cost - 1) * 100, dayPct: x.changePct || 0, at: p.at, peak: p.peak, sleeve: p.sleeve || "risk", stop: Math.max(p.cost * (1 - apStops(p)[0]), Math.max(p.peak || p.cost, price) * (1 - apStops(p)[1])) }; }).sort((a, b) => b.value - a.value);
+  const positions = syms.map((s) => { const p = AP.positions[s], x = q[s] || {}; const price = x.price || p.cost; return { sym: s, name: p.name, shares: p.shares, cost: p.cost, price, value: p.shares * price, pnl: (price - p.cost) * p.shares, pnlPct: (price / p.cost - 1) * 100, dayPct: x.changePct || 0, at: p.at, peak: p.peak, sleeve: p.sleeve || "risk", thesis: p.thesis ? p.thesis.labels : null, size: p.size || 1, stop: Math.max(p.cost * (1 - apStops(p)[0]), Math.max(p.peak || p.cost, price) * (1 - apStops(p)[1])) }; }).sort((a, b) => b.value - a.value);
   const value = AP.cash + positions.reduce((s, p) => s + p.value, 0);
   const t = etParts(), wk = !(t.wd === "Sat" || t.wd === "Sun"), open = wk && t.min >= 570 && t.min < 960;
   const mode = open ? "Trading live — stops checked every minute, full re-score every 10 minutes" : "Market closed — reading news and earnings overnight, ready for the opening bell";

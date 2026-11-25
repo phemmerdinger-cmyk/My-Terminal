@@ -77,6 +77,7 @@
   const isOpen = (t) => t.side === "BUY" || t.side === "SHORT";
   function causeOf(why) {
     const w = String(why || "");
+    if (/^Thesis broken/.test(w)) return "thesis broken";
     if (/earnings/i.test(w)) return "earnings";
     if (/^Bad news|Spider veto|bad news/i.test(w)) return "bad news";
     if (/Defense mode|black-swan|VIX|S&P 500 down|risk-off/i.test(w)) return "market selloff";
