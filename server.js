@@ -2499,17 +2499,24 @@ async function gemini(opts) {
   const day = new Date().toISOString().slice(0, 10); if (GEM_STATE.day !== day) Object.assign(GEM_STATE, { day, used: 0 });
   if (GEM_STATE.used >= GEM_STATE.cap) throw Object.assign(new Error(`Daily AI cap reached (${GEM_STATE.cap} messages); it resets at midnight UTC.`), { code: "cap" });
   if (!GEM_STATE.model || (!process.env.GEMINI_MODEL && Date.now() - GEM_STATE.modelAt > 24 * 3600e3)) {
-    try { const r = await fetch(`${GEM.BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": GEMINI_KEY }, signal: AbortSignal.timeout(10_000) }); if (r.ok) { GEM_STATE.model = GEM.pickModel(await r.json()); GEM_STATE.modelAt = Date.now(); } } catch {}
+    try { const r = await fetch(`${GEM.BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": GEMINI_KEY }, signal: AbortSignal.timeout(10_000) }); if (r.ok) { const L = await r.json(); GEM_STATE.model = GEM.pickModel(L); GEM_STATE.backups = GEM.backupModels(L, GEM_STATE.model); GEM_STATE.modelAt = Date.now(); } } catch {}
     GEM_STATE.model = GEM_STATE.model || "gemini-flash-latest";
   }
   GEM_STATE.used++;
-  const r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(GEM_STATE.model)}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(20_000) });
-  const j = await r.json().catch(() => ({}));
+  // free models get "high demand" 503s at busy times: fall through to a backup model instead of giving up
+  const tryModels = [GEM_STATE.model, ...(GEM_STATE.backups || ["gemini-flash-latest"]).filter((m) => m !== GEM_STATE.model)].slice(0, 3);
+  let r, j;
+  for (let i = 0; i < tryModels.length; i++) {
+    r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(tryModels[i])}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(25_000) }).catch((e) => ({ ok: false, status: 503, json: async () => ({ error: { message: String(e.message || e) } }) }));
+    j = await r.json().catch(() => ({}));
+    if (r.ok || !GEM.retryable(r.status)) { if (r.ok) GEM_STATE.lastModel = tryModels[i]; break; }
+    if (i < tryModels.length - 1) await new Promise((ok) => setTimeout(ok, 600));
+  }
   if (!r.ok) { if (r.status === 404) GEM_STATE.modelAt = 0; const e = new Error(GEM.errorFor(r.status, j)); e.status = r.status; GEM_STATE.lastError = e.message; throw e; }
   try { const t = GEM.textOf(j); GEM_STATE.lastError = null; return t; }
   catch (e) { GEM_STATE.lastError = e.message; throw e; }
 }
-const geminiInfo = () => ({ on: !!GEMINI_KEY, model: GEM_STATE.model, usedToday: GEM_STATE.day === new Date().toISOString().slice(0, 10) ? GEM_STATE.used : 0, cap: GEM_STATE.cap, lastError: GEM_STATE.lastError });
+const geminiInfo = () => ({ on: !!GEMINI_KEY, model: GEM_STATE.model, backups: GEM_STATE.backups || [], lastModel: GEM_STATE.lastModel || null, usedToday: GEM_STATE.day === new Date().toISOString().slice(0, 10) ? GEM_STATE.used : 0, cap: GEM_STATE.cap, lastError: GEM_STATE.lastError });
 let OWNER = CO.fresh();
 const ownerReady = (async () => { try { const v = await coachPlanStore().get("orders"); if (v && Array.isArray(v.directives)) OWNER = { ...CO.fresh(), ...v }; } catch {} })();
 const ownerSave = () => coachPlanStore().set("orders", OWNER).catch(() => {});

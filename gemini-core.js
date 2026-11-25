@@ -8,6 +8,15 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 // Model names change often (3.5 / 3.6 / 3.7 Flash…), so ask the API which ones this key can use and pick the newest
 // plain "Flash" text model. Falls back to Google's moving alias.
+// Backups to try when the first model is overloaded (503) or rate-limited: older flash models, then flash-lite.
+function backupModels(list, first) {
+  const ms = ((list && list.models) || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m) => String(m.name || "").replace(/^models\//, ""));
+  const v = (n) => parseFloat(n.split("-")[1]) || 0;
+  const plain = ms.filter((n) => /^gemini-[\d.]+-flash$/.test(n)).sort((a, b) => v(b) - v(a));
+  const lite = ms.filter((n) => /^gemini-[\d.]+-flash-lite$/.test(n)).sort((a, b) => v(b) - v(a));
+  return [...new Set([...plain, ...lite, "gemini-flash-latest"])].filter((n) => n !== first).slice(0, 3);
+}
+const retryable = (status) => status === 429 || status === 500 || status === 503 || status === 504;
 function pickModel(list) {
   const ms = ((list && list.models) || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent")).map((m) => String(m.name || "").replace(/^models\//, ""));
   const plain = ms.filter((n) => /^gemini-[\d.]+-flash$/.test(n)).sort((a, b) => parseFloat(b.split("-")[1]) - parseFloat(a.split("-")[1]));
@@ -94,4 +103,4 @@ const ANSWER_SYSTEM = "You are the Coach, VP of Finance for the owner's paper-tr
   "say plainly when the data doesn't show something, and never claim a trade happened unless the data shows it. This is not financial advice. " +
   "If the owner seems to want a bot to do something, tell them the exact words to type (e.g. 'swing bot buy NVDA $2,000').";
 
-module.exports = { BASE, pickModel, body, textOf, jsonOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };
+module.exports = { BASE, pickModel, backupModels, retryable, body, textOf, jsonOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };

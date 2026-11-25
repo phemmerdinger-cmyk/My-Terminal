@@ -58,3 +58,10 @@ test("thinking models get room to answer, and JSON is read even when wrapped", (
   assert.deepEqual(G.jsonOf('Sure! {"intent":"buy","ticker":"NVDA"}'), { intent: "buy", ticker: "NVDA" });
   assert.throws(() => G.jsonOf("no json here"), /readable/);
 });
+
+test("backup models for busy times: older flash, then flash-lite, never the first pick", () => {
+  const L = { models: ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.8-flash-image", "text-embedding-004"].map((n) => ({ name: "models/" + n, supportedGenerationMethods: ["generateContent"] })) };
+  const first = G.pickModel(L); assert.equal(first, "gemini-3.8-flash");
+  assert.deepEqual(G.backupModels(L, first), ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]);
+  assert.ok(G.retryable(503) && G.retryable(429) && !G.retryable(400) && !G.retryable(403));
+});
