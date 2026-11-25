@@ -11,6 +11,9 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      # Free AI for the Coach chat and Research Assistant: a Google AI Studio key (no card). Keep billing off.
+      - key: GEMINI_API_KEY
+        sync: false
       # Optional two-server setup (README → "Two-server setup"): set MODE=public and DESK_TOKEN here.
       - key: MODE
         sync: false

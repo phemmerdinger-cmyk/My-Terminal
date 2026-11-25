@@ -67,13 +67,13 @@
   }
   // ---- chat with the Coach (VP of Finance): plain-English instructions the bots obey (coach-orders-core.js on the server)
   D.chat = { messages: [], instructions: [], busy: false, err: null };
-  async function loadChat() { try { const j = await get("/api/coach/chat"); D.chat.messages = j.messages || []; D.chat.instructions = j.instructions || []; D.chat.err = null; } catch (e) { D.chat.err = e.message; } if (D.view === "bot" && D.botId === "coach") paintChat(); }
+  async function loadChat() { try { const j = await get("/api/coach/chat"); D.chat.messages = j.messages || []; D.chat.instructions = j.instructions || []; D.chat.ai = j.ai || null; D.chat.err = null; } catch (e) { D.chat.err = e.message; } if (D.view === "bot" && D.botId === "coach") paintChat(); }
   async function sendChat(text) {
     D.chat.busy = true; D.chat.messages = [...D.chat.messages, { t: Date.now(), who: "you", text }]; paintChat();
     try {
       const r = await fetch("/api/coach/chat", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
-      D.chat.messages = j.messages || D.chat.messages; D.chat.instructions = j.instructions || []; D.chat.err = null;
+      D.chat.messages = j.messages || D.chat.messages; D.chat.instructions = j.instructions || []; D.chat.ai = j.ai || D.chat.ai; D.chat.err = null;
     } catch (e) { D.chat.err = e.message; }
     D.chat.busy = false; paintChat(); const i = $("chatIn"); if (i) i.focus();
   }
@@ -85,7 +85,7 @@
       <form id="chatForm" class="chatform"><input id="chatIn" autocomplete="off" maxlength="300" placeholder="e.g. tell swing trader to buy nvda" ${c.busy ? "disabled" : ""}><button ${c.busy ? "disabled" : ""}>Send</button></form>
       <div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:12px">YOUR STANDING INSTRUCTIONS</div>
       ${c.instructions.length ? c.instructions.map((x) => `<div class="row"><span><b class="or">#${x.id}</b> ${h(x.text)}${x.status === "queued" ? ' <span class="tag warn">order sent</span>' : ""}</span></div>`).join("") : '<div class="note">None. The bots follow their own rules and the Coach\'s fixes.</div>'}
-      <div class="note">Paper money only. Your instructions outrank the Coach's fixes; stops still protect anything you ask a bot to buy. The interpreter is free and rule-based (no AI model), so if it misreads something it says so: check its reply.</div></div></div>`;
+      <div class="note">${c.ai && c.ai.on ? `Understands plain English and answers questions with Google Gemini (free tier${c.ai.model ? ", " + h(c.ai.model) : ""}) · ${c.ai.usedToday || 0} of ${c.ai.cap} messages today${c.ai.lastError ? ` · last problem: ${h(c.ai.lastError)}` : ""}. Every instruction it reads still goes through the Coach's rules, and it repeats back what it understood.` : "Basic mode: a free rule-based interpreter that follows instructions but can't answer open questions. Add a free GEMINI_API_KEY on Render to let it understand any phrasing and answer questions."} Paper money only. Your instructions outrank the Coach's fixes; stops still protect anything you ask a bot to buy.</div></div></div>`;
   }
   function paintChat() {
     const box = $("chatBox"); if (!box) return; box.innerHTML = chatHtml();

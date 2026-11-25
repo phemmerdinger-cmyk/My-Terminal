@@ -1172,7 +1172,9 @@ async function askWithActions(apiKey, prompt) {
 }
 
 // Free-form question, with the viewer's watchlist / portfolio as context
-async function ask(apiKey, body) {
+// Same prompt as ask(), answered by free Gemini in plain text
+async function askGemini(body) { return ask(null, body, true); }
+async function ask(apiKey, body, viaGemini = false) {
   const question = String(body.question || "").slice(0, 1000);
   if (!question.trim()) throw new Error("Ask a question first");
   const holdings = (Array.isArray(body.holdings) ? body.holdings : []).slice(0, 40)
@@ -1189,6 +1191,10 @@ async function ask(apiKey, body) {
   const today = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", dateStyle: "full" });
   const ctx = String(body.context || "").slice(0, 6000);
   const prompt = `Today is ${today}.\n\n${ctx ? "WHAT I'M LOOKING AT ON MY DASHBOARD RIGHT NOW\n" + ctx + "\n\n" : ""}MARKET\n${idx.map(qline).join("\n")}\n\nWATCHED / HELD STOCKS\n${syms.map(qline).join("\n")}\n\nMY PORTFOLIO\n${port}\n\n${SPIDER ? (() => { const c = SPIDER.promptContext(syms); return c ? "SPIDER RESEARCH (THE WEB)\n" + c + "\n\n" : ""; })() : ""}LATEST HEADLINES\n${news.items.slice(0, 40).map((i) => `- [${SOURCES[i.source].name}] ${i.title}`).join("\n")}\n\nMY QUESTION\n${question}`;
+  if (viaGemini) {
+    const answer = await gemini({ system: "You are a sharp, balanced investing assistant inside one person's personal stock dashboard. Use the data provided plus general market knowledge, cite specific numbers and headlines, and be honest about uncertainty. This is an opinion, not financial advice. Write a short plain-text reply (no markdown headings, '- ' bullets are fine, under 220 words).", text: prompt, maxTokens: 900 });
+    return { answer, action: null, actions: [], model: `Gemini (${GEM_STATE.model}, free tier)`, generated: Date.now() };
+  }
   return { ...(await askWithActions(apiKey, prompt)), model: MODEL, generated: Date.now() };
 }
 
@@ -2482,6 +2488,28 @@ const coachPlanStore = () => (coachPlanStoreV = coachPlanStoreV || paperStore("c
 // The owner's chat with the Coach (coach-orders-core.js): plain-English instructions become standing orders the bots
 // obey, and they outrank the Coach's own fixes. Free rule-based interpreter, no AI model. Saved with the Coach's plan.
 const CO = require("./coach-orders-core.js");
+// Google Gemini, free tier (GEMINI_API_KEY from Google AI Studio, no card). Used to read the owner's plain English in the
+// Coach chat and to answer questions, and by the Research Assistant when no Claude key is set. A daily cap keeps it well
+// inside the free quota; with billing off on the Google project it cannot cost anything.
+const GEM = require("./gemini-core.js");
+const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
+const GEM_STATE = { model: process.env.GEMINI_MODEL || null, modelAt: 0, day: "", used: 0, cap: Math.max(1, +process.env.GEMINI_DAILY_CAP || 300), lastError: null };
+async function gemini(opts) {
+  if (!GEMINI_KEY) throw Object.assign(new Error("no Gemini key"), { code: "no_key" });
+  const day = new Date().toISOString().slice(0, 10); if (GEM_STATE.day !== day) Object.assign(GEM_STATE, { day, used: 0 });
+  if (GEM_STATE.used >= GEM_STATE.cap) throw Object.assign(new Error(`Daily AI cap reached (${GEM_STATE.cap} messages); it resets at midnight UTC.`), { code: "cap" });
+  if (!GEM_STATE.model || (!process.env.GEMINI_MODEL && Date.now() - GEM_STATE.modelAt > 24 * 3600e3)) {
+    try { const r = await fetch(`${GEM.BASE}/models?pageSize=200`, { headers: { "x-goog-api-key": GEMINI_KEY }, signal: AbortSignal.timeout(10_000) }); if (r.ok) { GEM_STATE.model = GEM.pickModel(await r.json()); GEM_STATE.modelAt = Date.now(); } } catch {}
+    GEM_STATE.model = GEM_STATE.model || "gemini-flash-latest";
+  }
+  GEM_STATE.used++;
+  const r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(GEM_STATE.model)}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(20_000) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { if (r.status === 404) GEM_STATE.modelAt = 0; const e = new Error(GEM.errorFor(r.status, j)); e.status = r.status; GEM_STATE.lastError = e.message; throw e; }
+  GEM_STATE.lastError = null;
+  return GEM.textOf(j);
+}
+const geminiInfo = () => ({ on: !!GEMINI_KEY, model: GEM_STATE.model, usedToday: GEM_STATE.day === new Date().toISOString().slice(0, 10) ? GEM_STATE.used : 0, cap: GEM_STATE.cap, lastError: GEM_STATE.lastError });
 let OWNER = CO.fresh();
 const ownerReady = (async () => { try { const v = await coachPlanStore().get("orders"); if (v && Array.isArray(v.directives)) OWNER = { ...CO.fresh(), ...v }; } catch {} })();
 const ownerSave = () => coachPlanStore().set("orders", OWNER).catch(() => {});
@@ -2495,14 +2523,38 @@ async function ownerResolve(p) {
   }
   return { ok: false };
 }
+function botsBrief() {
+  const L = [], f = (n) => (Number.isFinite(n) ? n.toFixed(2) : "n/a");
+  try { const v = AP.cash + Object.entries(AP.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
+    L.push(`SWING BOT: value $${f(v)} (started $${AP_START}), cash $${f(AP.cash)}. Holdings: ${Object.entries(AP.positions).map(([k, p]) => `${k} ${f(p.shares)} sh @ ${f(p.cost)} now ${f(apPx[k])}${p.owner ? " (owner)" : ""}`).join("; ") || "none"}. Last trades: ${(AP.trades || []).slice(0, 6).map((t) => `${t.side} ${t.sym} @${t.price}${t.pnl != null ? ` P&L ${t.pnl}` : ""} — ${String(t.why || "").slice(0, 80)}`).join(" | ") || "none"}`); } catch {}
+  try { L.push(`DAY TRADER: open ${Object.keys(DT.positions || {}).join(", ") || "none"}. Last trades: ${(DT.trades || []).slice(0, 6).map((t) => `${t.side} ${t.sym}${t.pnl != null ? ` P&L ${t.pnl}` : ""} (${t.setup || ""})`).join(" | ") || "none"}`); } catch {}
+  try { const d = (QT.decisions || [])[0]; L.push(`QUANT: holdings ${Object.entries(QT.positions || {}).map(([k, p]) => `${k} ${f(p.shares)} sh`).join(", ") || "none"}. Regime ${d ? d.regime : "n/a"}.`); } catch {}
+  try { const k = coachCache.v; if (k) { L.push(`COACH: ${k.headline || ""}. Fixes: ${(k.fixed || []).map((x) => `${x.fix} (${x.why})`).join("; ") || "none"}. Left alone: ${(k.noted || []).map((x) => `${x.bot}: ${x.finding} -> ${x.why}`).join("; ") || "none"}.`);
+    for (const j of k.journals || []) if (j.ok) L.push(`${j.bot} journal: ${j.closed} closed, win rate ${Math.round(j.winRate * 100)}%, net $${j.net}, mistakes: ${(j.mistakes || []).join(" ")}`); } } catch {}
+  L.push(`OWNER INSTRUCTIONS: ${CO.live(OWNER, Date.now()).map((d) => `#${d.id} ${CO.describe(d)}`).join("; ") || "none"}`);
+  return L.join("\n").slice(0, 7000);
+}
 async function coachChat(text) {
   await ownerReady;
-  const p = CO.parse(text), res = ["buy", "sell", "avoid", "allow"].includes(p.intent) ? await ownerResolve(p) : {};
+  let p = null, via = "rules", note = "";
+  if (GEMINI_KEY) {
+    try { p = GEM.toParse(JSON.parse(await gemini({ system: GEM.COACH_SYSTEM, text, schema: GEM.COACH_SCHEMA, maxTokens: 300 }))); via = "gemini"; }
+    catch (e) { note = e.code === "cap" || e.status ? `(${e.message})\n` : ""; p = null; }
+  }
+  if (!p || p.intent === "unknown") { const r = CO.parse(text); if (r.intent !== "unknown" || !p) { p = r; via = "rules"; } }
   CO.chat(OWNER, "you", text);
-  const reply = CO.apply(OWNER, p, res);
+  if (p.intent === "question" || p.intent === "chat") {
+    let reply;
+    try { reply = await gemini({ system: GEM.ANSWER_SYSTEM, text: `DATA (paper bots, right now)\n${botsBrief()}\n\nOWNER: ${text}`, history: OWNER.chat.slice(-7, -1), maxTokens: 500 }); }
+    catch (e) { reply = `${e.message} Meanwhile I can still follow instructions. ${CO.HELP}`; }
+    CO.chat(OWNER, "coach", reply); await ownerSave();
+    return { reply, via: "gemini", messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })), ai: geminiInfo() };
+  }
+  const res = ["buy", "sell", "avoid", "allow"].includes(p.intent) ? await ownerResolve(p) : {};
+  const reply = note + CO.apply(OWNER, p, res);
   CO.chat(OWNER, "coach", reply);
   await ownerSave();
-  return { reply, messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })) };
+  return { reply, via, messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })), ai: geminiInfo() };
 }
 const coachPlanReady = (async () => { try { const v = await coachPlanStore().get("plan"); if (v && v.at) COACH_PLAN = v; } catch {} })();
 async function coachBuild() {
@@ -4750,8 +4802,12 @@ async function handle(req, res) {
       if (u.pathname === "/api/mytrader" && req.method === "GET") { try { return send(res, 200, await mtView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/mytrader/order" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); if (!b) return send(res, 400, { error: "Bad order." }); try { const r = await mtOrder(b); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/mytrader/cancel" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); try { const ok = await mtLocked(async () => { const st = await mtLoad(); const did = MYT.cancel(st, String(b && b.id || "")); if (did) await mtStore.set("book", st); return did; }); return send(res, ok ? 200 : 404, ok ? { ok: true } : { error: "No waiting order with that id." }); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      if (u.pathname === "/api/ai/ask" && req.method === "POST") { // free Gemini only (Claude never runs on the public server)
+        if (!GEMINI_KEY) return send(res, 401, { error: "no_key" });
+        try { return send(res, 200, await askGemini(await readBody(req))); } catch (e) { return send(res, e.code === "cap" ? 429 : 502, { error: String(e.message || e) }); }
+      }
       if (u.pathname === "/api/coach/chat") {
-        if (req.method === "GET") { await ownerReady; return send(res, 200, { messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })) }); }
+        if (req.method === "GET") { await ownerReady; return send(res, 200, { messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })), ai: geminiInfo() }); }
         if (req.method === "POST") { let b = null; try { b = await readBody(req, 4000); } catch {} const text = String((b && b.text) || "").trim(); if (!text) return send(res, 400, { error: "Type an instruction." });
           try { return send(res, 200, await coachChat(text)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       }
@@ -4810,6 +4866,12 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/ask" && req.method === "POST") {
         const key = process.env.ANTHROPIC_API_KEY;
+        // no Claude key here and no Gemini key on this laptop: the free Gemini key lives on the bot server, so ask it there
+        if (!key && !GEMINI_KEY && DEPLOY.mode === "local" && DEPLOY.remoteReady) return proxyToPublic(req, res, { pathname: "/api/ai/ask", search: "" });
+        if (!key && GEMINI_KEY) { // free Gemini answers (no portfolio-building actions; those need Claude's tool calls)
+          if (!ipAllowed(req)) return send(res, 429, { error: "Hourly AI limit reached. Try again a bit later." });
+          try { return send(res, 200, await askGemini(await readBody(req))); } catch (e) { return send(res, e.code === "cap" ? 429 : 502, { error: String(e.message || e) }); }
+        }
         if (!key) return send(res, 401, { error: "no_key" });
         { const g = claudeGate(req, req.headers["x-claude-pass"]); if (g) return send(res, ...g); }
         if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached (safety cap to protect your credits). Try again a bit later." });

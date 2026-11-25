@@ -2933,7 +2933,7 @@ async function runPredict(s,fresh){
     const p=await api("/api/predict?symbol="+encodeURIComponent(s)+(fresh?"&fresh=1":""),{});
     S.preds[s]=p; dbSave(p); refreshUsage();
   }catch(e){
-    S.preds[s]={error:e.code==="no_key"?"No API key is set up yet.":"Couldn't get a prediction: "+e.message};
+    S.preds[s]={error:e.code==="no_key"?"No AI key is set up yet. Add a free GEMINI_API_KEY (Google AI Studio, no card) on Render.":"Couldn't get a prediction: "+e.message};
   }
   if(S.tab==="predict") renderPredict();
 }
@@ -2944,14 +2944,14 @@ $("predForm").onsubmit=e=>{ e.preventDefault(); const raw=$("predInput").value.t
 /* free-text questions typed into the predictor: answered by Claude with the server key */
 async function predAsk(q){
   const box=$("predAns"); box.hidden=false; $("predBtn").disabled=true;
-  box.innerHTML=`<div class="pa-q">✦ ${esc(q)}</div><div class="pa-a"><span class="spin"></span>Claude is reading prices, headlines, your watchlist and portfolio…</div>`;
+  box.innerHTML=`<div class="pa-q">✦ ${esc(q)}</div><div class="pa-a"><span class="spin"></span>Reading prices, headlines, your watchlist and portfolio…</div>`;
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,watchlist:S.wl,holdings:S.port})});
     const acts=j.actions||(j.action?[j.action]:[]); let did=""; for(const a of acts){ const m=await applyAction(a); did+=(did?"\n":"")+m; }
     box.querySelector(".pa-a").textContent=j.answer+(did?"\n\n"+did:"");
     if(did.includes("✓")){ const b=document.createElement("button"); b.className="btn"; b.style.marginTop="10px"; b.dataset.gotab="portfolio"; b.textContent="Open portfolio →"; box.appendChild(b); }
     const st=document.createElement("div"); st.className="pa-st"; st.textContent=`${j.model||"Claude"} · ${new Date(j.generated||Date.now()).toLocaleTimeString("en-US",{timeZone:"America/New_York",hour:"numeric",minute:"2-digit"})} ET · AI opinion, not financial advice`; box.appendChild(st);
-  }catch(e){ box.querySelector(".pa-a").innerHTML=`<span class="bad">${esc(e.code==="no_key"?"No API key is set up yet.":"Couldn't get an answer: "+e.message)}</span>`; }
+  }catch(e){ box.querySelector(".pa-a").innerHTML=`<span class="bad">${esc(e.code==="no_key"?"No AI key is set up yet. Add a free GEMINI_API_KEY (Google AI Studio, no card) on Render.":"Couldn't get an answer: "+e.message)}</span>`; }
   $("predBtn").disabled=false;
 }
 
