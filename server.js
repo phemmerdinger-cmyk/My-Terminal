@@ -623,9 +623,12 @@ async function history(sym, range = "6mo", interval, ext = false) {
   if (interval && HIST_IVS.has(interval) && HIST_RANGES.has(range)) { r = range; iv = interval === "1h" ? "60m" : interval; }
   // ext: charts the owner looks at also get pre-market and after-hours candles (Robinhood-style); bots keep regular-session data
   const pp = (range && range.startsWith("intraday")) || (ext && /m$/.test(iv) && (r === "1d" || r === "5d"));
-  return cached(`h:${sym}:${r}:${iv}${pp ? ":pp" : ""}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
+  // the owner's 1D chart = the last 24 hours (yesterday's session, after-hours and this morning's pre-market), not just
+  // "today so far": fetch 5 days of the same bars and keep the last 24 h
+  const last24 = ext && pp && r === "1d"; if (last24) r = "5d";
+  return cached(`h:${sym}:${r}:${iv}${pp ? ":pp" : ""}${last24 ? ":24h" : ""}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
     const qs = `${encodeURIComponent(sym)}?range=${r}&interval=${iv}${pp ? "&includePrePost=true" : ""}`;
-    const key = `${sym}:${r}:${iv}${pp ? ":pp" : ""}`;
+    const key = `${sym}:${r}:${iv}${pp ? ":pp" : ""}${last24 ? ":24h" : ""}`;
     // Yahoo throttles bursts of clicks: try both hosts with a short pause, and fall back to the last good copy
     let res = null, lastErr;
     for (const [i, host] of ["query1", "query2", "query1"].entries()) {
@@ -651,7 +654,8 @@ async function history(sym, range = "6mo", interval, ext = false) {
     // with extended hours: mark candles outside the 9:30–4:00 regular session (US stocks/ETFs) so charts can shade them
     if (pp && res.meta.currentTradingPeriod && res.meta.currentTradingPeriod.pre && /^America\/New_York$/.test(res.meta.exchangeTimezoneName || "America/New_York"))
       for (const c of candles) { const m = etParts(new Date(c.time * 1000)).min; if (m < 570 || m >= 960) c.ext = m < 570 ? "pre" : "post"; }
-    const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles, ...(pp ? { extended: true } : {}) };
+    if (last24 && candles.length) { const from = Math.floor(Date.now() / 1000) - 86400; const keep = candles.filter((c) => c.time >= from); candles.splice(0, candles.length, ...(keep.length ? keep : candles.slice(-390))); }
+    const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: last24 ? "24h" : r, interval: iv, candles, ...(pp ? { extended: true } : {}) };
     HIST_LAST.set(key, out); if (HIST_LAST.size > 400) HIST_LAST.delete(HIST_LAST.keys().next().value);
     return out;
   });

@@ -2042,7 +2042,7 @@ const MK = {
   mkFunds:[["VFIAX","Vanguard 500 Index Admiral"],["FXAIX","Fidelity 500 Index"],["VTSAX","Vanguard Total Stock Mkt"],["VTIAX","Vanguard Total Intl Stock"],["VBTLX","Vanguard Total Bond Mkt"],["AGTHX","American Funds Growth Fund"],["FCNTX","Fidelity Contrafund"],["VWELX","Vanguard Wellington"],["TRBCX","T. Rowe Price Blue Chip"],["SWPPX","Schwab S&P 500 Index"]],
   mkFut:[["ES=F","S&P 500 futures"],["NQ=F","Nasdaq futures"],["YM=F","Dow futures"],["CL=F","Crude oil"],["NG=F","Natural gas"],["GC=F","Gold"],["SI=F","Silver"],["HG=F","Copper"],["EURUSD=X","EUR/USD"],["JPY=X","USD/JPY"],["DX-Y.NYB","US Dollar Index"]],
 };
-const RANGES = [["1d","1D"],["5d","5D"],["1mo","1M"],["6mo","6M"],["ytd","YTD"],["1y","1Y"],["5y","5Y"]];
+const RANGES = [["1d","1D"],/* 1D = the last 24 hours incl. pre-market and after-hours */["5d","5D"],["1mo","1M"],["6mo","6M"],["ytd","YTD"],["1y","1Y"],["5y","5Y"]];
 
 const store = {
   get(k,d){if(window.__VISITOR) return d; try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},
@@ -2814,6 +2814,12 @@ function chartMessage(message){
   $("chartStats").innerHTML="";
   $("chart").innerHTML=`<div class="empty">${message}</div>`;
 }
+/* Chart axis in New York time (lightweight-charts labels the axis in UTC by default, so 9:33 AM ET read "14:33").
+   tickMarkType: 0 year, 1 month, 2 day, 3 time, 4 time with seconds */
+const ET_TICK=(()=>{ const f=o=>new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",...o});
+  const y=f({year:"numeric"}), m=f({month:"short"}), d=f({month:"short",day:"numeric"}), hm=f({hour:"numeric",minute:"2-digit"});
+  return (t,type)=>{ const ms=(typeof t==="number"?t:Date.UTC(t.year,t.month-1,t.day))*(typeof t==="number"?1000:1), x=new Date(ms);
+    return type===0?y.format(x):type===1?m.format(x):type===2?d.format(x):hm.format(x); }; })();
 function ensureChart(){
   if(chart||!window.LightweightCharts) return !!chart;
   const el=$("chart"); el.innerHTML=""; // clear any "No chart data" message so the new chart gets the full box
@@ -2821,7 +2827,7 @@ function ensureChart(){
     autoSize:true,
     layout:{background:{type:"solid",color:"#12151a"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},
     grid:{vertLines:{color:"#1c2129"},horzLines:{color:"#1c2129"}},
-    rightPriceScale:{borderColor:"#2d3540"},timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false},
+    rightPriceScale:{borderColor:"#2d3540"},timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false,tickMarkFormatter:ET_TICK},
     crosshair:{mode:0},localization:{timeFormatter:t=>new Date(t*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})},
   });
   return true;
@@ -2856,11 +2862,12 @@ async function loadChart(){
       mainSeries.setData(c.map(x=>x.ext?{time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,color:x.close>=x.open?"rgba(33,195,122,.45)":"rgba(255,77,94,.45)",wickColor:x.close>=x.open?"rgba(33,195,122,.45)":"rgba(255,77,94,.45)"}:{time:x.time,open:x.open,high:x.high,low:x.low,close:x.close}));
     }else{
       // 1D baseline = yesterday's close. Before today's open the quote's price IS yesterday's close (prevClose is the day before).
-      const q=S.quotes[s], preOpen=q&&q.regularSession&&Date.now()<q.regularSession.start&&q.price>0, base=range==="1d"&&q?(preOpen?q.price:q.prevClose||c[0].open):c[0].open;
+      const q=S.quotes[s], preOpen=q&&q.regularSession&&Date.now()<q.regularSession.start&&q.price>0,
+        base=range==="1d"&&q?(q.extSession==="pre"?q.lastClose:preOpen?q.price:q.prevClose||c[0].open):c[0].open;
       mainSeries=chart.addBaselineSeries(baselineOpts(base));
       mainSeries.setData(c.map(x=>({time:x.time,value:x.close})));
     }
-    volSeries=chart.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
+    volSeries=chart.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"},lastValueVisible:false,priceLineVisible:false}); // no stray "0" tag on the price axis
     volSeries.priceScale().applyOptions({scaleMargins:{top:.82,bottom:0}});
     volSeries.setData(c.map(x=>({time:x.time,value:x.volume,color:x.ext?"rgba(255,153,31,.25)":x.close>=x.open?"rgba(33,195,122,.35)":"rgba(255,77,94,.35)"})));
     if(h.extended&&c.some(x=>x.ext)) $("chartTitle").insertAdjacentHTML("beforeend",`<div class="xh" style="margin-top:2px">Includes pre-market &amp; after-hours · faded candles / orange volume = outside 9:30–4:00 ET</div>`);
@@ -4782,7 +4789,7 @@ function pfcEnsure(){
   pfc=LightweightCharts.createChart($("pfChart"),{autoSize:true,
     layout:{background:{type:"solid",color:"transparent"},textColor:"#8b95a3",fontFamily:"IBM Plex Mono, monospace"},
     grid:{vertLines:{color:"#1c2129"},horzLines:{color:"#1c2129"}},rightPriceScale:{borderColor:"#2d3540"},
-    timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false},crosshair:{mode:0},
+    timeScale:{borderColor:"#2d3540",timeVisible:true,secondsVisible:false,tickMarkFormatter:ET_TICK},crosshair:{mode:0},
     localization:{priceFormatter:v=>"$"+fmt(v),timeFormatter:t=>new Date(t*1000).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})}});
   return true;
 }
