@@ -2507,7 +2507,7 @@ async function gemini(opts) {
   const tryModels = [GEM_STATE.model, ...(GEM_STATE.backups || ["gemini-flash-latest"]).filter((m) => m !== GEM_STATE.model)].slice(0, 3);
   let r, j;
   for (let i = 0; i < tryModels.length; i++) {
-    r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(tryModels[i])}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(25_000) }).catch((e) => ({ ok: false, status: 503, json: async () => ({ error: { message: String(e.message || e) } }) }));
+    r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(tryModels[i])}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(20_000) }).catch((e) => ({ ok: false, status: 503, json: async () => ({ error: { message: String(e.message || e) } }) }));
     j = await r.json().catch(() => ({}));
     if (r.ok || !GEM.retryable(r.status)) { if (r.ok) GEM_STATE.lastModel = tryModels[i]; break; }
     if (i < tryModels.length - 1) await new Promise((ok) => setTimeout(ok, 600));
@@ -4633,7 +4633,7 @@ async function proxyToPublic(req, res, u) {
   try {
     const body = req.method === "GET" || req.method === "HEAD" ? undefined : await readRaw(req);
     const r = await fetch(DEPLOY.publicUrl + u.pathname + u.search, {
-      method: req.method, body, redirect: "manual", signal: AbortSignal.timeout(20_000),
+      method: req.method, body, redirect: "manual", signal: AbortSignal.timeout(/^\/api\/(coach\/chat|ai\/ask|web\/ask)$/.test(u.pathname) ? 75_000 : 20_000), // AI answers can take a while when Gemini is busy
       headers: { "x-desk-token": DEPLOY.token, "content-type": req.headers["content-type"] || "application/json", "accept-encoding": "identity" },
     });
     const extra = {}; const cd = r.headers.get("content-disposition"); if (cd) extra["Content-Disposition"] = cd;
