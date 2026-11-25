@@ -2210,7 +2210,8 @@ $("subtabsM").onclick=e=>{const b=e.target.closest("[data-tab]"); if(b) setTab(b
 /* ---------- data loading ---------- */
 function mergeQuotes(incoming){
   const quotes={...S.quotes};
-  for(const [s,quote] of Object.entries(incoming||{})) quotes[s]=MDQuoteStream.mergeQuote(quotes[s],quote);
+  const pv=window.MDInstruments&&MDInstruments.premarketView; // before the open: pre-market price is the main number everywhere
+  for(const [s,quote] of Object.entries(incoming||{})){ const m=MDQuoteStream.mergeQuote(quotes[s],quote); quotes[s]=pv?pv(m):m; }
   S.quotes=quotes;
 }
 async function loadQuotes(){
@@ -2277,7 +2278,7 @@ function renderNotif(){ $("notifBtn").classList.toggle("on",S.notif); $("notifBt
 function renderTape(){
   const parts=[...INDEXES.map(([s,n])=>[s,n]),...S.wl.map(s=>[s,s])].map(([s,n])=>{
     const q=S.quotes[s]; if(!q||q.error) return "";
-    return `<span class="tk" data-s="${esc(s)}"><span class="s">${esc(n)}</span><span>${s==="^TNX"?fmt(q.price,3):fmt(q.price)}</span><span class="${cls(q.change)}">${pct(q.changePct)}</span>${(()=>{const e=extOf(q); return e&&e.changePct!=null?`<span class="${cls(e.change)}" title="${esc(e.label)} ${fmt(e.price)}">${e.short==="Pre"?"pre":"ah"} ${pct(e.changePct)}</span>`:"";})()}</span>`;
+    return `<span class="tk" data-s="${esc(s)}"><span class="s">${esc(n)}</span><span>${s==="^TNX"?fmt(q.price,3):fmt(q.price)}</span><span class="${cls(q.change)}">${pct(q.changePct)}</span>${q.extSession==="pre"?'<span class="xh" title="pre-market price">pre</span>':""}${(()=>{const e=extOf(q); return e&&e.changePct!=null?`<span class="${cls(e.change)}" title="${esc(e.label)} ${fmt(e.price)}">${e.short==="Pre"?"pre":"ah"} ${pct(e.changePct)}</span>`:"";})()}</span>`;
   }).join("");
   put("tape",parts+parts);
 }
@@ -2604,7 +2605,7 @@ const COLS=[
   ["price","Last",q=>fmt(q.price,q.symbol==="^TNX"?3:2)],
   ["change","Chg",q=>`<span class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change):"—"}</span>`],
   ["changePct","% Chg",q=>`<span class="${cls(q.changePct)}">${pct(q.changePct)}</span>`],
-  ["ext","Pre / after hrs",q=>{ const e=extOf(q); return e?`<span title="${esc(e.label)} · ${esc(fmtExtendedTime(e.marketTime))}">${fmt(e.price,q.symbol==="^TNX"?3:2)} <span class="${cls(e.change)}">${e.changePct==null?"":pct(e.changePct)}</span></span>`:'<span style="color:var(--dim)">—</span>'; }],
+  ["ext","Pre / after hrs",q=>{ if(q.extSession==="pre") return `<span class="xh" title="The Last and % Chg columns show the pre-market price">pre-market ↑</span>`; const e=extOf(q); return e?`<span title="${esc(e.label)} · ${esc(fmtExtendedTime(e.marketTime))}">${fmt(e.price,q.symbol==="^TNX"?3:2)} <span class="${cls(e.change)}">${e.changePct==null?"":pct(e.changePct)}</span></span>`:'<span style="color:var(--dim)">—</span>'; }],
   ["day","Day range",q=>rangeBar(q.dayLow,q.dayHigh,q.price)],
   ["r52","52-week range",q=>rangeBar(q.low52,q.high52,q.price)],
   ["volume","Volume",q=>big(q.volume)],
@@ -2614,7 +2615,7 @@ const COLS=[
 function perfCell(s,k){ const v=S.perf[s]?.[k]; return v==null?'<span style="color:var(--dim)">…</span>':`<span class="${cls(v)}">${pct(v)}</span>`; }
 function sortVal(q,k){ if(["w1","m1","m3","ytd","y1"].includes(k)) return S.perf[q.symbol]?.[k]??-1e9;
   if(k==="r52") return q.high52&&q.low52?(q.price-q.low52)/(q.high52-q.low52):-1; if(k==="day") return q.dayHigh&&q.dayLow?(q.price-q.dayLow)/(q.dayHigh-q.dayLow):-1;
-  if(k==="ext"){ const e=extOf(q); return e&&e.changePct!=null?e.changePct:-1e9; }
+  if(k==="ext"){ if(q.extSession==="pre") return q.changePct??-1e9; const e=extOf(q); return e&&e.changePct!=null?e.changePct:-1e9; }
   const v=q[k]; return typeof v==="string"?v:v??-1e9; }
 function table(el,syms,sortable,extra){
   const rows=syms.map(s=>S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:{symbol:s,name:S.quotes[s]?"No quote":"Loading…"});
@@ -2649,7 +2650,7 @@ function renderPortfolio(){
   const tot=Math.round((val-cost)*100)/100+0, totPct=cost?tot/cost*100:0, dayPct=val-day?day/(val-day)*100:0;
   $("kpis").innerHTML=[
     ["Portfolio value",`$${fmt(val)}`,""],
-    ["Today",`<span class="${cls(day)}">${day>=0?"+":"−"}$${fmt(Math.abs(day))}</span>`,`<small class="${cls(day)}">${pct(dayPct)}</small>`],
+    ["Today",`<span class="${cls(day)}">${day>=0?"+":"−"}$${fmt(Math.abs(day))}</span>`,`<small class="${cls(day)}">${pct(dayPct)}</small>${rows.some(r=>r.q&&r.q.extSession==="pre")?'<small class="xh"> · pre-market</small>':""}`],
     ["Total gain / loss",`<span class="${cls(tot)}">${tot>=0?"+":"−"}$${fmt(Math.abs(tot))}</span>`,`<small class="${cls(tot)}">${pct(totPct)}</small>`],
     ["Amount invested",`$${fmt(cost)}`,`<small style="color:var(--dim)">${S.port.length} holding${S.port.length===1?"":"s"}</small>`],
   ].map(([k,v,s])=>`<div class="kpi"><span>${k}</span><b>${v}</b>${s}</div>`).join("");
@@ -4094,7 +4095,7 @@ function renderResearchHead(){
   const price=listing?q?.price:q?.price??p.regularMarketPrice, ch=listing?q?.change:q?.change??p.regularMarketChange,
     chp=listing?q?.changePct:q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
   const name=listing?.name||p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||(listing?"EQUITY":"");
-  const extended=[["Pre-market",q?.preMarket],["After-hours",q?.postMarket]].filter(([,session])=>session).map(([label,session])=>
+  const extended=q?.extSession==="pre"?`<div class="rs-ext">Pre-market price · last trade ${fmtExtendedTime(q.marketTime)} · yesterday's close ${fmtP(s,q.lastClose)}${q.lastCloseChangePct!=null?` <span class="${cls(q.lastCloseChange)}">${pct(q.lastCloseChangePct)}</span>`:""}</div>`:[["Pre-market",q?.preMarket],["After-hours",q?.postMarket]].filter(([,session])=>session).map(([label,session])=>
     `<div class="rs-ext">${label} ${fmtP(s,session.price)} ${session.changePct==null?"":`<span class="${cls(session.change)}">${pct(session.changePct)}</span>`} · ${fmtExtendedTime(session.marketTime)}</div>`).join("");
   const inWl=S.wl.includes(s), I0=instOf(s), ri=S.rq.inst&&S.rq.inst.instrument&&S.rq.inst.instrument.symbol===s?S.rq.inst.instrument:I0;
   const st=window.MDInstruments?MDInstruments.marketStatus(ri,Date.now(),q?.periods):null;
@@ -4117,10 +4118,12 @@ function renderResearchHead(){
 /* Pre-market / after-hours (Robinhood-style). Stocks & ETFs only: futures, crypto and FX trade around the clock, so their
    main price already moves. Before the open → latest pre-market print; after the close → latest after-hours print;
    during the regular session → nothing extra. Prices come from Yahoo's extended-hours candles; never estimated. */
-function extOf(q,now=Date.now()){ return window.MDInstruments?MDInstruments.extendedNow(q,now):null; }
-function extChip(s,q,inline=false){ const e=extOf(q); if(!e) return "";
+function extOf(q,now=Date.now()){ return window.MDInstruments?MDInstruments.extendedNowView(q,now):null; }
+function extChip(s,q,inline=false){
+  if(q&&q.extSession==="pre") return `<${inline?"span":"div"} class="xh" title="Pre-market price (last trade ${esc(fmtExtendedTime(q.marketTime))}). Change is from yesterday's close.">Pre-market · close ${fmtP(s,q.lastClose)}</${inline?"span":"div"}>`;
+  const e=extOf(q); if(!e) return "";
   return `<${inline?"span":"div"} class="xh" title="${esc(e.label)} · ${esc(fmtExtendedTime(e.marketTime))}">${e.short} ${fmtP(s,e.price)}${e.changePct==null?"":` <span class="${cls(e.change)}">${pct(e.changePct)}</span>`}</${inline?"span":"div"}>`; }
-const extTxt=(q)=>{ const e=extOf(q); return e?` · ${e.label} ${fmt(e.price)}${e.changePct==null?"":" ("+pct(e.changePct)+")"}`:""; };
+const extTxt=(q)=>{ if(q&&q.extSession==="pre") return ` (pre-market price; yesterday's close ${fmt(q.lastClose)})`; const e=extOf(q); return e?` · ${e.label} ${fmt(e.price)}${e.changePct==null?"":" ("+pct(e.changePct)+")"}`:""; };
 function fmtExtendedTime(timestamp,seconds=false){
   return new Date(timestamp).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:seconds?"2-digit":undefined,timeZoneName:"short"});
 }

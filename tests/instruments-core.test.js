@@ -114,3 +114,18 @@ test("extended-hours line: pre-market before the open, after-hours after the clo
   assert.equal(I.extendedNow({ error: true }, T(8)), null);
   assert.equal(I.extendedNow({ preMarket: { price: 0 } }, T(8)), null);
 });
+
+test("before the open the pre-market trade becomes the main price, measured from yesterday's close", () => {
+  const T = (h, m = 0) => Date.UTC(2026, 10, 25, h + 5, m);
+  const q = { symbol: "NVDA", price: 155.38, change: 4, changePct: 2.6, prevClose: 151.38, regularSession: { start: T(9, 30), end: T(16) },
+    preMarket: { price: 146.41, change: -8.97, changePct: -5.77, marketTime: T(8, 30) } };
+  const v = I.premarketView(q, T(8, 40));
+  assert.equal(v.price, 146.41); assert.equal(v.prevClose, 155.38); assert.equal(v.extSession, "pre");
+  assert.equal(+v.change.toFixed(2), -8.97); assert.equal(+v.changePct.toFixed(2), -5.77);
+  assert.equal(v.lastClose, 155.38); assert.equal(v.lastCloseChangePct, 2.6);
+  assert.equal(I.premarketView(v, T(8, 40)), v); // idempotent
+  assert.equal(I.extendedNowView(v, T(8, 40)), null); // no duplicate "Pre" line
+  assert.equal(I.premarketView(q, T(9, 31)), q); // market open: regular numbers
+  assert.equal(I.premarketView({ ...q, preMarket: null }, T(8, 40)).price, 155.38); // no pre-market trade: unchanged
+  assert.equal(I.premarketView({ price: 60000 }, T(8, 40)).price, 60000); // crypto/futures: untouched
+});

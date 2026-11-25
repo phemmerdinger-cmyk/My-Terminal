@@ -272,6 +272,19 @@
     if (rs && rs.start < rs.end) return t < rs.start ? pre : t >= rs.end ? post : null;
     return [pre, post].filter(Boolean).sort((a, b) => b.marketTime - a.marketTime)[0] || null;
   }
-  return { extendedNow, CLASSES, BADGE, YIELDS, FUT, HOURS, normalize, assetClassOf, displaySymbolOf, futureSpec, futureRoot, parseOption, forexPair, cryptoPair,
+  // Before today's open, show stocks the way they'll open (Robinhood-style): the main price becomes the latest real
+  // pre-market trade and "today's change" is measured from yesterday's close. Yesterday's close and its day change are
+  // kept as lastClose / lastCloseChange(Pct). No pre-market trade → the quote is returned unchanged. Idempotent.
+  function premarketView(q, now) {
+    if (!q || q.error || q.extSession) return q;
+    const rs = q.regularSession, t = now == null ? Date.now() : now, pre = q.preMarket;
+    if (!rs || !(rs.start < rs.end) || t >= rs.start) return q;
+    if (!pre || !(pre.price > 0) || !(q.price > 0) || !(pre.marketTime > 0) || pre.marketTime > t) return q;
+    const close = q.price, change = pre.price - close;
+    return Object.assign({}, q, { price: pre.price, change, changePct: (change / close) * 100, prevClose: close, marketTime: pre.marketTime,
+      extSession: "pre", lastClose: close, lastCloseChange: q.change, lastCloseChangePct: q.changePct });
+  }
+  function extendedNowView(q, now) { return q && q.extSession === "pre" ? null : extendedNow(q, now); } // the main number already is pre-market
+  return { extendedNow, premarketView, extendedNowView, CLASSES, BADGE, YIELDS, FUT, HOURS, normalize, assetClassOf, displaySymbolOf, futureSpec, futureRoot, parseOption, forexPair, cryptoPair,
     decimals, tickSizeOf, formatPrice, providerFor, marketStatus, roundToTick, multiplierOf, pnl };
 });
