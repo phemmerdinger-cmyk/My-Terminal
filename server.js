@@ -2318,7 +2318,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   }
   if (sc.stress) return;
   const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
-  const ok = (x, sl) => x.sleeve === sl && !CO.paused(OWNER, "swing") && !CO.blocked(OWNER, "swing", x.sym) && !CA.blocked(COACH_PLAN, "swing", x.sym) && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const ok = (x, sl) => x.sleeve === sl && !pmGuard(x.sym) && !CO.paused(OWNER, "swing") && !CO.blocked(OWNER, "swing", x.sym) && !CA.blocked(COACH_PLAN, "swing", x.sym) && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
@@ -2535,6 +2535,7 @@ function botsBrief() {
   try { const v = AP.cash + Object.entries(AP.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
     L.push(`SWING BOT: value $${f(v)} (started $${AP_START}), cash $${f(AP.cash)}. Holdings: ${Object.entries(AP.positions).map(([k, p]) => `${k} ${f(p.shares)} sh @ ${f(p.cost)} now ${f(apPx[k])}${p.owner ? " (owner)" : ""}`).join("; ") || "none"}. Last trades: ${(AP.trades || []).slice(0, 6).map((t) => `${t.side} ${t.sym} @${t.price}${t.pnl != null ? ` P&L ${t.pnl}` : ""} — ${String(t.why || "").slice(0, 80)}`).join(" | ") || "none"}`); } catch {}
   try { L.push(`DAY TRADER: open ${Object.keys(DT.positions || {}).join(", ") || "none"}. Last trades: ${(DT.trades || []).slice(0, 6).map((t) => `${t.side} ${t.sym}${t.pnl != null ? ` P&L ${t.pnl}` : ""} (${t.setup || ""})`).join(" | ") || "none"}`); } catch {}
+  try { if (PM) L.push("PRE-MARKET DESK: " + PMC.summary(PM, PM_ALERTS).replace(/\n/g, " | ")); } catch {}
   try { const d = (QT.decisions || [])[0]; L.push(`QUANT: holdings ${Object.entries(QT.positions || {}).map(([k, p]) => `${k} ${f(p.shares)} sh`).join(", ") || "none"}. Regime ${d ? d.regime : "n/a"}.`); } catch {}
   try { const k = coachCache.v; if (k) { L.push(`COACH: ${k.headline || ""}. Fixes: ${(k.fixed || []).map((x) => `${x.fix} (${x.why})`).join("; ") || "none"}. Left alone: ${(k.noted || []).map((x) => `${x.bot}: ${x.finding} -> ${x.why}`).join("; ") || "none"}.`);
     for (const j of k.journals || []) if (j.ok) L.push(`${j.bot} journal: ${j.closed} closed, win rate ${Math.round(j.winRate * 100)}%, net $${j.net}, mistakes: ${(j.mistakes || []).join(" ")}`); } } catch {}
@@ -3220,7 +3221,7 @@ async function dtTick() {
     }
     dtHalted();
     if (!DT.tally) DT.tally = dtTally();
-    const uni = m.open ? (Date.now() < dtThrottleUntil ? DT_UNIVERSE.slice(0, 50) : DT_UNIVERSE) : [];
+    const uni = m.open ? (Date.now() < dtThrottleUntil ? PMC.prioritize(DT_UNIVERSE, PM, t).slice(0, 50) : PMC.prioritize(DT_UNIVERSE, PM, t)) : []; // Pre-Market Desk: gappers first
     const syms = [...new Set([...Object.keys(DT.positions), ...Object.keys(DT.entries), ...(m.open ? DP.PULLBACK.universe : []), ...uni, ...Object.keys(DT.pend), ...volumeSymbols])];
     BOTDIAG.day.scans++; BOTDIAG.day.lastOpenTick = Date.now(); BOTDIAG.day.universe = uni.length;
     let fails = 0;
@@ -3424,6 +3425,48 @@ async function dtRestore(doc) {
   } finally { dtBusy = false; }
 }
 if (DEPLOY.runJobs) setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
+
+// ---------------------------------------------------------------- Pre-Market Desk (6:00–9:30 AM and 4–5 PM ET)
+// Reads real extended-hours prints for every bot's holdings, the day trader's universe and the swing bot's plan, then
+// gives the bots: gap alerts on holdings, an opening guard (swing doesn't chase big gaps for 30 min) and the day
+// trader's scan order (big gappers first). Nothing is estimated; no print means "no pre-market trades yet".
+const PMC = require("./premarket-core.js");
+let PM = null, PM_ALERTS = [], pmBusy = false;
+function pmHoldings() {
+  const out = [];
+  try { for (const [sym, p] of Object.entries(AP.positions || {})) { const [sl, tr] = apStops(p); out.push({ bot: "Swing", sym, shares: p.shares, cost: p.cost, stop: Math.max(p.cost * (1 - sl), (p.peak || p.cost) * (1 - tr)) }); } } catch {}
+  try { for (const [sym, p] of Object.entries(DT.positions || {})) out.push({ bot: "Day", sym, shares: (p.dir < 0 ? -1 : 1) * Math.abs(p.shares || 0), cost: p.entry ?? p.cost ?? null, stop: p.dir < 0 ? null : (p.stop ?? null) }); } catch {}
+  try { for (const [sym, p] of Object.entries(QT.positions || {})) out.push({ bot: "Quant", sym, shares: p.shares, cost: p.cost ?? null, stop: null }); } catch {}
+  return out.filter((h) => INST.assetClassOf(h.sym) === "equity" || INST.assetClassOf(h.sym) === "etf");
+}
+async function pmTick(force = false) {
+  if (pmBusy) return; pmBusy = true;
+  try {
+    const t = etParts(), ph = PMC.phase({ ...t, holiday: NYSE_HOLIDAYS.has(t.day) });
+    if (ph === "off" && !force) return;
+    const plan = ((AP.plan && AP.plan.orders) || []).map((o) => o.sym);
+    const held = pmHoldings();
+    const syms = [...new Set([...held.map((h) => h.sym), ...plan, ...DT_UNIVERSE])].filter((x) => TICKER_RE.test(x));
+    const { quotes } = await getQuotes(syms);
+    const rep = PMC.scan(quotes, syms, { now: Date.now(), phase: ph === "off" ? "pre" : ph });
+    rep.day = t.day;
+    PM = rep; PM_ALERTS = PMC.holdingAlerts(rep, held);
+    if (AP.plan && Array.isArray(AP.plan.orders)) { // tag the swing bot's opening plan with what pre-market says
+      const by = Object.fromEntries(rep.rows.map((r) => [r.sym, r]));
+      for (const o of AP.plan.orders) { const r = by[o.sym]; o.pre = r && r.status === "live" ? { price: r.price, gapPct: r.gapPct } : null; }
+    }
+  } catch (e) { BOTDIAG.premarket = { at: Date.now(), error: String(e.message || e) }; }
+  finally { pmBusy = false; }
+}
+const pmGuard = (sym) => { try { return PMC.openingGuard(PM, sym, etParts()); } catch { return ""; } };
+function pmView() {
+  const t = etParts();
+  return { phase: PMC.phase({ ...t, holiday: NYSE_HOLIDAYS.has(t.day) }), report: PM ? { ...PM, rows: undefined } : null, alerts: PM_ALERTS,
+    guarded: PM && PM.day === t.day ? [...PM.up, ...PM.down].filter((r) => Math.abs(r.gapPct) >= PMC.CFG.bigGapPct).map((r) => r.sym) : [],
+    rules: { window: "6:00–9:30 AM and 4:00–5:00 PM ET, weekdays", guardMin: PMC.CFG.guardMin, bigGapPct: PMC.CFG.bigGapPct, freshMin: PMC.CFG.freshMin },
+    summary: PMC.summary(PM, PM_ALERTS) };
+}
+if (DEPLOY.runJobs) setTimeout(() => { pmTick(); setInterval(pmTick, 5 * 60e3).unref(); }, 90_000);
 
 // ---------------------------------------------------------------- Quant Trader (third paper bot): systematic, uses the Quant Lab's math
 // Once per trading day after the close (and once right away when the account is new) it reads the regime, ranks the
@@ -4822,6 +4865,7 @@ async function handle(req, res) {
         if (req.method === "POST") { let b = null; try { b = await readBody(req, 4000); } catch {} const text = String((b && b.text) || "").trim(); if (!text) return send(res, 400, { error: "Type an instruction." });
           try { return send(res, 200, await coachChat(text)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       }
+      if (u.pathname === "/api/premarket" && req.method === "GET") { if (u.searchParams.get("run") === "1" && !PM) await pmTick(true); return send(res, 200, pmView()); }
       if (u.pathname === "/api/coach" && req.method === "GET") { try { return send(res, 200, await coachView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());

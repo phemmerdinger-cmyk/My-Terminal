@@ -284,3 +284,9 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Fix: pre-market change is now measured from yesterday's close (before the open, Yahoo's chartPreviousClose is the close *before* that, which made e.g. NVDA show −10.9% instead of −5.3%).
 - `MDInstruments.extendedNow(q, now)` (tested): before the open → latest pre-market print, after the close → latest after-hours print, in session → nothing. Stocks/ETFs only; futures, crypto and FX already quote around the clock.
 - Shown in: watchlist cards, ticker tape, quote tables (new sortable "Pre / after hrs" column), chart title, mini charts, Markets tables, portfolio (value and $ move at the extended price), Claude Predictor cards, head-to-head, Cmd+K, My Trader, the news reader, Ask Claude context. Research page already had it.
+
+### Pre-Market Desk agent (2026-11-25)
+- `premarket-core.js` (tested) + runner in server.js: every 5 min from 6:00–9:30 AM and 4:00–5:00 PM ET on trading days it reads real extended-hours prints for every bot holding, the swing bot's opening plan and the day trader's universe.
+- What the bots do with it: holding alerts (under stop / 5%+ gap, with $ impact); swing bot skips NEW buys in 5%+ gappers for the first 30 min after the open; day trader scans the biggest gappers first; swing plan orders are tagged with their pre-market price; the Coach chat (Gemini) sees the pre-market summary.
+- `/api/premarket` (owner-only; proxied from the laptop and Bot HQ). Bot HQ → Coach page shows the Pre-Market Desk card.
+- No paper fills happen in extended hours (thin quotes, wide spreads); fills stay in the regular session.

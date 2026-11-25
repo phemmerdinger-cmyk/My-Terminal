@@ -92,6 +92,20 @@
     const log = $("chatLog"); if (log) log.scrollTop = log.scrollHeight;
     const f = $("chatForm"); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = $("chatIn").value.trim(); if (v && !D.chat.busy) sendChat(v); };
   }
+  async function loadPm() { try { D.pm = await get("/api/premarket?run=1"); D.pmErr = null; } catch (e) { D.pmErr = e.message; } const b = $("pmBox"); if (b) b.innerHTML = pmHtml(); }
+  // Pre-Market Desk: real pre-market / after-hours prints and what the bots do with them
+  function pmHtml() {
+    const p = D.pm; if (!p) return `<div class="card" style="margin-top:12px"><div class="ch">Pre-Market Desk</div><div class="cb">${D.pmErr ? `<div class="err">${h(D.pmErr)}</div>` : '<div class="empty">Loading…</div>'}</div></div>`;
+    const r = p.report, ph = { pre: "PRE-MARKET · LIVE", after: "AFTER-HOURS · LIVE", off: "OFF · next run 6:00 AM ET" }[p.phase] || p.phase;
+    const pct = (x) => `<span class="mono ${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : ""}${x.toFixed(2)}%</span>`;
+    const list = (a) => a.length ? a.slice(0, 10).map((x) => `<div class="row"><span>${h(x.sym)} <span class="dim">${h(x.name || "")}</span></span><span class="mono">$${x.price.toFixed(2)} ${pct(x.gapPct)}</span></div>`).join("") : '<div class="note">None at ±2% or more.</div>';
+    return `<div class="card" style="margin-top:12px"><div class="ch">Pre-Market Desk <em>· ${h(ph)}${r ? ` · scanned ${h(when(r.t))} · ${r.live} with live prints` : ""}</em></div><div class="cb">
+      ${p.alerts.length ? `<div class="dim mono" style="font-size:10px;letter-spacing:.14em">BOT HOLDINGS MOVING</div>${p.alerts.map((a) => `<div class="row" style="display:block"><span class="tag ${a.kind === "gapUp" ? "ok" : "bad"}">${a.kind === "stop" ? "Under stop" : a.kind === "gapUp" ? "Gap up" : "Gap down"}</span> ${h(a.text)}</div>`).join("")}` : r ? '<div class="note">No bot holding is moving 5%+ or sitting under its stop.</div>' : ""}
+      ${r ? `<div class="grid g2" style="margin-top:8px"><div><div class="dim mono" style="font-size:10px;letter-spacing:.14em">GAPPING UP</div>${list(r.up)}</div><div><div class="dim mono" style="font-size:10px;letter-spacing:.14em">GAPPING DOWN</div>${list(r.down)}</div></div>` : '<div class="empty">No scan yet today.</div>'}
+      ${p.guarded.length ? `<div class="note">Swing bot won't open new positions in ${p.guarded.map(h).join(", ")} until ${p.rules.guardMin} min after the open (gap of ${p.rules.bigGapPct}%+).</div>` : ""}
+      <div class="note">Runs ${h(p.rules.window)} every 5 minutes. Gaps are real extended-hours trades vs yesterday's close; prints older than ${p.rules.freshMin} min are ignored. The day trader scans the biggest gappers first at the open. Paper money only.</div>
+    </div></div>`;
+  }
   async function loadCoach() { try { D.coach = await get("/api/coach"); D.coachErr = null; } catch (e) { D.coachErr = e.message; } if (D.view === "bot" && D.botId === "coach") botPage(); }
   async function loadSpider() { try { D.spider = await get("/api/web/status"); } catch { D.spider = null; } render(true); }
   const finds = () => ((D.raw.finds && D.raw.finds.items) || []);
@@ -355,7 +369,8 @@
       ${c.plan.stop != null || c.plan.target != null ? `<div class="note">Stop under support ${c.plan.stop != null ? "$" + c.plan.stop.toFixed(2) : "—"} · target at resistance ${c.plan.target != null ? "$" + c.plan.target.toFixed(2) : "—"}${c.plan.rewardRisk != null ? ` · reward/risk ${c.plan.rewardRisk}` : ""}</div>` : ""}
       ${c.points.map((p) => `<div class="note"><span class="${p.n > 0 ? "up" : p.n < 0 ? "down" : "or"}">${p.n > 0 ? "▲" : p.n < 0 ? "▼" : "●"}</span> ${h(p.text)}</div>`).join("")}</details>` : `<div class="row"><span><b style="font-weight:500">${h(c.sym)}</b> <span class="dim">${h(c.role)}</span></span><span class="dim">${h(c.why)}</span></div>`).join("") || '<div class="empty">Nothing held or ranked yet.</div>'}<div class="note">Rule-based read of daily closes: moving averages, RSI, 3-month momentum, support/resistance. Not advice.</div></div></div>`;
     setTimeout(() => { paintChat(); loadChat(); }, 0);
-    return `<div id="chatBox">${chatHtml()}</div>` + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
+    setTimeout(loadPm, 0);
+    return `<div id="chatBox">${chatHtml()}</div><div id="pmBox">${pmHtml()}</div>` + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
   }
 
   // ---------------------------------------------------------------- LAB
