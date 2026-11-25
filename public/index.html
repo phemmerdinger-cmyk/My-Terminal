@@ -306,6 +306,14 @@ h2.h{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:upper
 .cmd-list div{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:7px;cursor:pointer;font-size:14px}
 .cmd-list div.on{background:var(--panel2)}
 .cmd-list div span{color:var(--dim);font-size:12px}
+/* multi-asset: class badges, market status, options chain */
+.abadge{display:inline-block;font:600 10px/1 var(--mono,monospace);letter-spacing:.06em;padding:3px 5px;margin-right:6px;border:1px solid var(--line);border-radius:4px;color:var(--orange,#ff991f);background:var(--panel2)}
+.mstat{display:inline-block;margin-left:8px;font:600 10.5px/1 var(--mono,monospace);letter-spacing:.06em;padding:4px 6px;border-radius:4px;border:1px solid var(--line);color:var(--dim);vertical-align:middle}
+.mstat.open,.mstat.live{color:var(--up);border-color:currentColor}.mstat.pre,.mstat.after{color:var(--orange,#ff991f);border-color:currentColor}
+.opt-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px;font-size:13px}.opt-bar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.opt-tbl{width:100%;border-collapse:collapse;font:12.5px var(--mono,monospace)}.opt-tbl th,.opt-tbl td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line)}.opt-tbl th{color:var(--dim);font-weight:500}
+.opt-tbl tbody tr{cursor:pointer}.opt-tbl tbody tr:hover{background:var(--panel2)}.opt-tbl tr.itm{background:rgba(255,153,31,.06)}
+.inst-panel{margin-bottom:14px}
 
 /* suggestions dropdown */
 .sugg{position:fixed;z-index:40;background:var(--panel);border:1px solid var(--line2);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.45);padding:4px;max-height:360px;overflow-y:auto}
@@ -1499,7 +1507,7 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
 <body>
 <header>
   <div class="brand"><i></i><span class="b1">MARKET</span><span>DESK</span></div>
-  <button class="cmd-btn" id="cmdBtn" title="Search any stock">⌕ <span class="lbl">Search stocks, ETFs, funds, crypto…</span><kbd>⌘K</kbd></button>
+  <button class="cmd-btn" id="cmdBtn" title="Search any stock">⌕ <span class="lbl">Search stocks, ETFs, futures, FX, crypto, indexes…</span><kbd>⌘K</kbd></button>
   <div class="cl-wrap">
     <button type="button" class="cl-sw" id="clSwitch" title="Turn Claude on or off. Claude features need your password so visitors can't spend your credits."><span class="cl-k"><i></i></span><b>Claude</b><em id="clState">Off</em><span class="cl-bud" id="clBud" hidden></span></button>
     <form class="cl-pop" id="clPop" hidden autocomplete="off">
@@ -1971,11 +1979,12 @@ html.viewonly .no-vo,html.viewonly #hCostToggle,html.viewonly .del,html.viewonly
   <div class="ac-chips" id="acChips"></div>
   <div class="ask-box ac-input"><textarea id="acInput" rows="2" placeholder="Ask anything, or say “build me a portfolio”…"></textarea><button class="ask-send" id="acSend" aria-label="Send">↑</button></div>
 </div>
-<div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Search any stock, ETF, fund, crypto…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
+<div class="cmd" id="cmd" hidden><div class="cmd-box"><input id="cmdInput" placeholder="Any ticker or name: AAPL, ES=F, EURUSD=X, BTC-USD, ^TNX, Toyota…" autocomplete="off" spellcheck="false"><div class="cmd-list" id="cmdList"></div></div></div>
 
 <script src="/portfolio-preview-core.js"></script>
 <script src="/lazy-core.js"></script>
 <script src="/quote-stream-core.js"></script>
+<script src="/instruments-core.js"></script>
 <script>
 const SRC = {
   yahoo:{name:"Yahoo Finance",short:"Yahoo",c:"var(--yahoo)"},
@@ -2094,6 +2103,13 @@ function liveHTML(...ids){ for(const id of ids){ const el=$(id); if(!el||el.__li
   Object.defineProperty(el,"innerHTML",{configurable:true,get(){ return NATIVE_HTML.get.call(this); },set(v){ put(this,String(v)); }}); } }
 const esc = (s)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt = (n,d=2)=>n==null||isNaN(n)?"—":Number(n).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+/* multi-asset: one description per symbol (public/instruments-core.js) → asset-aware price formatting and badges */
+const INSTC={};
+function instOf(s){ const q=S.quotes&&S.quotes[s], k=s+"|"+(q&&q.instrumentType||""); if(INSTC[k]) return INSTC[k];
+  return INSTC[k]=window.MDInstruments?MDInstruments.normalize({symbol:s,quoteType:q&&q.instrumentType,name:q&&q.name,exchDisp:q&&q.exchange,currency:q&&q.currency}):{symbol:s,displaySymbol:s}; }
+const fmtP=(s,n)=>window.MDInstruments?MDInstruments.formatPrice(instOf(s),n):fmt(n);
+const fmtChg=(s,n,ref)=>n==null||isNaN(n)?"—":(n>=0?"+":"")+fmt(n,window.MDInstruments?MDInstruments.decimals(instOf(s),ref??n):2);
+const badgeHtml=(r)=>r&&r.badge?`<b class="abadge" title="${esc(r.assetClass||"")}">${esc(r.badge)}</b>`:"";
 const pct = (n)=>n==null||isNaN(n)?"—":(n>=0?"+":"")+Number(n).toFixed(2)+"%";
 const cls = (n)=>n>0?"up":n<0?"down":"";
 const big = (n)=>n==null?"—":n>=1e9?(n/1e9).toFixed(2)+"B":n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(n);
@@ -2269,9 +2285,9 @@ function renderWL(prev={}){
     const fl=p&&q.price!=null&&p.price!=null&&q.price!==p.price?(q.price>p.price?"flash-up":"flash-down"):"";
     const n=countFor(s);
     return `<li data-s="${esc(s)}" class="${S.sel===s?"sel":""} ${fl}">
-      <div><div class="sym">${esc(s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.status==="awaiting-market-print"?"Awaiting market quote":q.error?"No quote":q.name||"…")}</div></div>
+      <div><div class="sym" title="${esc(s)}">${esc(instOf(s).displaySymbol||s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.status==="awaiting-market-print"?"Awaiting market quote":q.error?"No quote":q.name||"…")}</div></div>
       ${spark(q.spark,64,22,q.prevClose)}
-      <div><div class="px">${fmt(q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
+      <div><div class="px">${fmtP(s,q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
       <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
   }).join(""));
 }
@@ -4027,7 +4043,7 @@ function renderMarkets(){
 
 /* ---------- RESEARCH: Yahoo-style quote pages ---------- */
 S.rq={sym:null,sub:"summary",sum:null,err:null,fin:{},finStmt:"income",finFreq:"annual",hist:null,range:"1y"};
-function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,news:null,sub:"summary",range:window.MARKET_LISTINGS?.[s]?"1d":S.rq.range}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
+function openQuote(s){ s=normSym(s); if(S.rq.sym!==s){ S.rq={...S.rq,sym:s,sum:null,err:null,fin:{},hist:null,news:null,inst:null,opt:null,sub:"summary",range:window.MARKET_LISTINGS?.[s]?"1d":S.rq.range}; loadResearch(); } setTab("research"); window.scrollTo({top:0}); }
 const money=(n,d=2)=>{ if(n==null||isNaN(n)) return "—"; const a=Math.abs(n), sg=n<0?"-":"";
   return a>=1e12?sg+(a/1e12).toFixed(d)+"T":a>=1e9?sg+(a/1e9).toFixed(d)+"B":a>=1e6?sg+(a/1e6).toFixed(d)+"M":a>=1e3?sg+(a/1e3).toFixed(d)+"K":sg+a.toFixed(d); };
 const fp=(x,d=2)=>x==null||isNaN(x)?"—":(x*100).toFixed(d)+"%";
@@ -4038,6 +4054,7 @@ async function loadResearch(){
   const s=S.rq.sym; if(!s) return;
   renderResearch();
   if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{mergeQuotes(j.quotes); if(S.rq.sym===s) renderResearchHead();}).catch(()=>{});
+  api("/api/instrument?symbol="+encodeURIComponent(s)).then(j=>{ if(S.rq.sym!==s) return; S.rq.inst=j; if(j.quote&&!S.quotes[s]) mergeQuotes({[s]:j.quote}); if(S.tab==="research"){ renderResearchHead(); if(S.rq.sub==="summary") renderResearchBody(); } }).catch(()=>{});
   try{ const j=await api("/api/summary?symbol="+encodeURIComponent(s)); if(S.rq.sym!==s) return; S.rq.sum=j; }
   catch(e){ if(S.rq.sym!==s) return; S.rq.err=e.message; }
   if(S.tab==="research") renderResearch();
@@ -4070,13 +4087,16 @@ function renderResearchHead(){
     chp=listing?q?.changePct:q?.changePct??(p.regularMarketChangePercent!=null?p.regularMarketChangePercent*100:null);
   const name=listing?.name||p.longName||p.shortName||q?.name||s, type=d.quoteType?.quoteType||p.quoteType||(listing?"EQUITY":"");
   const extended=[["Pre-market",q?.preMarket],["After-hours",q?.postMarket]].filter(([,session])=>session).map(([label,session])=>
-    `<div class="rs-ext">${label} ${fmt(session.price)} ${session.changePct==null?"":`<span class="${cls(session.change)}">${pct(session.changePct)}</span>`} · ${fmtExtendedTime(session.marketTime)}</div>`).join("");
-  const inWl=S.wl.includes(s);
+    `<div class="rs-ext">${label} ${fmtP(s,session.price)} ${session.changePct==null?"":`<span class="${cls(session.change)}">${pct(session.changePct)}</span>`} · ${fmtExtendedTime(session.marketTime)}</div>`).join("");
+  const inWl=S.wl.includes(s), I0=instOf(s), ri=S.rq.inst&&S.rq.inst.instrument&&S.rq.inst.instrument.symbol===s?S.rq.inst.instrument:I0;
+  const st=window.MDInstruments?MDInstruments.marketStatus(ri,Date.now(),q?.periods):null;
+  const srcNote=q?.provider&&q.provider!=="yahoo"?` · source: ${esc({coinbase:"Coinbase",["binance.us"]:"Binance.US",frankfurter:"Frankfurter (reference rate)",fred:"FRED"}[q.provider]||q.provider)}`:"";
   $("rsHead").innerHTML=`<div class="rs-head"><div>
-      <div class="rs-name">${esc(name)}<small>${esc(s)}</small>${type?`<span class="badge">${esc(type.replace("MUTUALFUND","Mutual fund").replace("CRYPTOCURRENCY","Crypto").replace("EQUITY","Stock"))}</span>`:""}</div>
+      <div class="rs-name">${esc(name)}<small>${esc(s)}</small>${ri.badge?`<span class="badge">${esc(ri.badge)}${ri.subtype?" · "+esc(ri.subtype):""}</span>`:type?`<span class="badge">${esc(type.replace("MUTUALFUND","Mutual fund").replace("CRYPTOCURRENCY","Crypto").replace("EQUITY","Stock"))}</span>`:""}${st&&st.code!=="UNKNOWN"?`<span class="mstat ${esc(st.code.toLowerCase())}">${esc(st.label)}</span>`:""}</div>
       <div class="rs-meta">${esc(listing?.exchange||p.exchangeName||q?.exchange||"")}${p.currency||q?.currency?" · "+esc(p.currency||q?.currency):""}${!listing&&p.marketState?" · "+esc(p.marketState.toLowerCase().replace("regular","market open").replace("closed","market closed").replace(/^post.*/,"after hours").replace(/^pre.*/,"pre-market")):""}</div>
-      <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmt(price)}${ch!=null?`<span class="chg ${cls(ch)}">${(ch>=0?"+":"")+fmt(ch)} (${pct(chp)})</span>`:""}</div>
-      ${q?.marketTime>0?`<div class="rs-ext">${q.streamed?"Last trade":"Quote as of"} ${fmtExtendedTime(q.marketTime,true)}</div>`:""}
+      <div class="rs-px">${listing&&price==null?"Awaiting market quote":fmtP(s,price)}${ch!=null?`<span class="chg ${cls(ch)}">${fmtChg(s,ch,price)} (${pct(chp)})${q?.changeBasis==="24h"?" 24h":""}</span>`:""}</div>
+      ${q?.marketTime>0?`<div class="rs-ext">${q.streamed?"Last trade":"Quote as of"} ${fmtExtendedTime(q.marketTime,true)}${q.delayMin>0?` · delayed ${q.delayMin} min`:""}${srcNote}</div>`:""}
+      ${q?.note?`<div class="rs-ext">${esc(q.note)}</div>`:""}
       ${extended}
     </div><div class="rs-actions">
       <button class="btn ${inWl?"ghost":""}" data-rs-wl="${esc(s)}">${inWl?"✓ In watchlist":"+ Watchlist"}</button>
@@ -4092,9 +4112,9 @@ function fmtExtendedTime(timestamp,seconds=false){
 function rqSubs(){
   const t=rqType();
   if(S.rq.sum&&S.rq.sum.limited){ const d=S.rq.sum; return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],...(d.recommendationTrend||d.earningsHistory?[["analysis","Analysis"]]:[]),...(d.insiderTransactions?[["holders","Holders"]]:[]),...(d.assetProfile?[["profile","Profile"]]:[]),["news","News"]]; }
-  if(t==="ETF"||t==="MUTUALFUND") return [["summary","Summary"],["holdings","Holdings"],["performance","Performance"],["profile","Profile"],["news","News"],...(VIEW||t!=="ETF"?[]:[["why","Why (bots)"]])];
+  if(t==="ETF"||t==="MUTUALFUND") return [["summary","Summary"],["holdings","Holdings"],...(t==="ETF"?[["options","Options"]]:[]),["performance","Performance"],["profile","Profile"],["news","News"],...(VIEW||t!=="ETF"?[]:[["why","Why (bots)"]])];
   if(t==="CRYPTOCURRENCY"||t==="INDEX"||t==="FUTURE"||t==="CURRENCY") return [["summary","Summary"],["news","News"]];
-  return [["summary","Summary"],["statistics","Statistics"],["financials","Financials"],["analysis","Analysis"],["holders","Holders"],["profile","Profile"],["news","News"],...(VIEW?[]:[["why","Why (bots)"]])];
+  return [["summary","Summary"],["statistics","Statistics"],["options","Options"],["financials","Financials"],["analysis","Analysis"],["holders","Holders"],["profile","Profile"],["news","News"],...(VIEW?[]:[["why","Why (bots)"]])];
 }
 function renderResearchNav(){
   const subs=rqSubs(); if(!subs.some(x=>x[0]===S.rq.sub)&&S.rq.sub!=="compare") S.rq.sub="summary";
@@ -4107,6 +4127,42 @@ function rsChart(){
   const c=h&&h.length?h.map(x=>x.close):null; const chg=c?(c[c.length-1]-c[0])/c[0]*100:null;
   return `<div class="rs-chart"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div class="seg">${rs.map(([k,l])=>`<button data-rs-range="${k}" class="${S.rq.range===k?"on":""}">${l}</button>`).join("")}</div>${chg!=null?`<span class="num ${cls(chg)}">${pct(chg)} over period</span>`:""}</div>
     ${c?spark(c,"100%",220,c[0]):h?'<div class="empty">No chart data.</div>':'<div class="skeleton" style="height:220px;margin:0"></div>'}</div>`;
+}
+// Asset-aware details: contract specs for futures, 24h volume for crypto, strike/expiry/IV for options, valuation for
+// stocks, the central-bank reference rate for FX. Every number comes from /api/instrument; missing ones show "—".
+function instPanel(s){
+  const j=S.rq.inst; if(!j||!j.instrument||j.instrument.symbol!==s) return "";
+  const I=j.instrument, d=j.details||{}, sp=d.spec||I.spec, usd=(n)=>n==null?"—":"$"+num(n,2);
+  const tick=I.tickSize?(window.MDInstruments?MDInstruments.formatPrice({...I,spec:null},I.tickSize,{d:Math.max(2,MDInstruments.decimals(I,I.tickSize))}):I.tickSize):"—";
+  const src=(j.sources||[]).map(x=>({yahoo:"Yahoo Finance",coinbase:"Coinbase",["binance.us"]:"Binance.US",frankfurter:"Frankfurter",fred:"FRED"}[x]||x)).join(", ")||"—";
+  const base=[["Asset class",esc(I.badge+(I.subtype?" · "+I.subtype:""))],["Exchange",esc(I.exchange||"—")],["Currency",esc(I.currency||"—")],["Tick size",sp&&sp.priceFormat==="32nds"?`1/${Math.round(1/sp.tickSize)} point`:esc(String(tick))],
+    ["Market status",esc(j.status?.label||"—")],["Trading hours",esc(I.marketHours?.label||"—")],["Data",esc(src)+(j.delayMin>0?` · delayed ${j.delayMin} min`:"")+(j.stream?` · live stream: ${esc(j.stream==="coinbase"?"Coinbase (free)":j.stream)}`:"")]];
+  let extra=[], title="Instrument";
+  if(I.assetClass==="future"){ title="Contract";
+    extra=sp?[["Contract",esc(sp.name)],["Tick value",usd(sp.tickValue)+" per contract"],["Point value",usd(sp.multiplier)+" per 1.00"],["Contract months",esc(sp.months)],["Front-month expiry",esc(d.expiry||"not provided by the free feed")],["Open interest",num(d.openInterest,0)],["Specs source",esc(sp.source)]]
+      :[["Contract specs","Not in the built-in table — check the exchange's contract page"],["Front-month expiry",esc(d.expiry||"—")]]; }
+  else if(I.assetClass==="crypto"){ extra=[["24h volume",d.volume24h!=null?num(d.volume24h,2)+" "+esc(I.symbol.split("-")[0]):"—"],["24h volume (quote)",d.volume24hQuote!=null?money(d.volume24hQuote):"—"],["24h range",d.low24h!=null?`${fmtP(s,d.low24h)} – ${fmtP(s,d.high24h)}`:"—"],["30-day volume",num(d.volume30d,0)],["Coinbase",esc(d.coinbase||"listed")]]; }
+  else if(I.assetClass==="option"){ title="Option contract"; extra=[["Underlying",`<a href="#" data-quote="${esc(d.underlying||"")}">${esc(d.underlying||"—")}</a> ${d.underlyingPrice!=null?fmt(d.underlyingPrice):""}`],["Type",esc(d.right||"—")],["Strike",fmt(d.strike)],["Expiry",esc(d.expiry||"—")],["Bid / Ask",d.bid!=null?`${fmt(d.bid)} / ${fmt(d.ask)}`:"—"],["Last",fmt(d.last)],["Implied volatility",d.iv!=null?fp(d.iv):"—"],["Open interest",num(d.openInterest,0)],["Multiplier","100 shares"]]; }
+  else if(I.assetClass==="forex"){ extra=[["Pair",esc((d.base||"")+" / "+(d.quoteCurrency||""))],["Central-bank reference rate",d.referenceRate!=null?fmtP(s,d.referenceRate):"—"],["About that rate",esc(d.referenceNote||"—")]]; }
+  else if(I.assetClass==="equity"||I.assetClass==="etf"){ extra=[["Market cap",money(d.marketCap)],["P/E (TTM)",num(d.trailingPE)],["Forward P/E",num(d.forwardPE)],["Dividend yield",fp(d.dividendYield)],["Beta",num(d.beta)],["Avg. volume",num(d.avgVolume,0)]]; }
+  if(d.fredClose!=null) extra.push(["FRED close",`${num(d.fredClose,3)}% on ${esc(d.fredDate)} (${esc(d.fredSeries)})`]);
+  return `<div class="rs-sec inst-panel"><h2 class="h">${title}</h2>${kv([...base,...extra])}</div>`;
+}
+async function loadOptions(s,exp){
+  S.rq.opt={loading:true,exp};
+  try{ const j=await api(`/api/options?symbol=${encodeURIComponent(s)}${exp?"&date="+exp:""}`); if(S.rq.sym!==s) return; S.rq.opt=j; }
+  catch(e){ if(S.rq.sym!==s) return; S.rq.opt={error:e.message}; }
+  if(S.rq.sub==="options") renderResearchBody();
+}
+function optionsHtml(s){
+  const o=S.rq.opt; if(!o||(!o.calls&&!o.error&&!o.loading)){ loadOptions(s); return '<div class="fx-empty"><span class="spin"></span> Loading the options chain…</div>'; }
+  if(o.loading) return '<div class="fx-empty"><span class="spin"></span> Loading the options chain…</div>';
+  if(o.error) return `<div class="rs-err">Options chain unavailable: ${esc(o.error)}</div>`;
+  const px=o.underlyingPrice, strikes=[...new Set([...o.calls,...o.puts].map(x=>x.strike))].sort((a,b)=>a-b);
+  const mid=px!=null?strikes.reduce((bi,k,i)=>Math.abs(k-px)<Math.abs(strikes[bi]-px)?i:bi,0):Math.floor(strikes.length/2), keep=new Set(strikes.slice(Math.max(0,mid-12),mid+13));
+  const tbl=(rows,label)=>`<div><h2 class="h">${label}</h2><table class="opt-tbl"><thead><tr><th>Strike</th><th>Last</th><th>Bid</th><th>Ask</th><th>IV</th><th>Open int.</th><th>Vol.</th></tr></thead><tbody>${rows.filter(r=>keep.has(r.strike)).map(r=>`<tr class="${r.itm?"itm":""}" data-quote="${esc(r.contract)}" title="${esc(r.contract)}"><td>${fmt(r.strike)}</td><td>${fmt(r.last)}</td><td>${fmt(r.bid)}</td><td>${fmt(r.ask)}</td><td>${r.iv!=null?fp(r.iv,1):"—"}</td><td>${num(r.openInterest,0)}</td><td>${num(r.volume,0)}</td></tr>`).join("")||'<tr><td colspan="7">No contracts</td></tr>'}</tbody></table></div>`;
+  return `<div class="opt-bar">Expiry <select id="optExp">${o.expirations.map(x=>`<option ${x===o.expiry?"selected":""}>${esc(x)}</option>`).join("")}</select> <span class="dim">Underlying ${fmt(px)} · 25 strikes around the price · in-the-money rows shaded · click a contract for its page · 1 contract = 100 shares · source: Yahoo Finance</span></div>
+    <div class="rs-cols">${tbl(o.calls,"Calls")}${tbl(o.puts,"Puts")}</div>`;
 }
 function renderResearchBody(){
   const s=S.rq.sym, d=S.rq.sum, sub=S.rq.sub, el=$("rsBody");
@@ -4123,7 +4179,8 @@ function renderResearchBody(){
   if(sub==="why"){ if(window.MDTeam) MDTeam.why(el,s); else { el.innerHTML='<div class="fx-empty"><span class="spin"></span> Loading…</div>'; MDLazy.load("team").catch(e=>{ el.innerHTML=`<div class="fx-empty">${esc(e.message)}</div>`; }); } return; }
   if(sub==="news"){ const items=(S.news?.items||[]).filter(i=>i.tickers.includes(s)); const list=items.length?items:(S.rq.news||[]);
     el.innerHTML=list.length?`<ul class="feed" style="border:1px solid var(--line);border-radius:8px">${list.slice(0,60).map(i=>`<li class="item"><div class="t">${i.time?etTime(i.time):""}<small>${ago(i.time)}</small></div><div><div class="meta"><span class="src" style="background:${SRC[i.source].c}">${SRC[i.source].short}</span>${i.mood>0?'<span class="mood p">▲ Positive</span>':i.mood<0?'<span class="mood n">▼ Negative</span>':""}</div><h3><a href="${esc(i.link)}" target="_blank" rel="noopener">${esc(i.title)}</a></h3>${i.summary?`<p>${esc(i.summary)}</p>`:""}</div></li>`).join("")}</ul>`:'<div class="rs-err"><span class="spin"></span>Looking for headlines…</div>'; return; }
-  if(!d){ el.innerHTML=S.rq.err?`<div class="rs-err">Couldn't load research data for <b>${esc(s)}</b>.<br><span style="font-size:12px">${esc(S.rq.err)}</span><br>Check the symbol, or try again in a minute.</div>`:`<div class="skeleton"></div><div class="skeleton"></div>`; return; }
+  if(sub==="options"){ el.innerHTML=optionsHtml(s); const sel=$("optExp"); if(sel) sel.onchange=()=>loadOptions(s,sel.value); return; }
+  if(!d){ el.innerHTML=instPanel(s)+(S.rq.err?`<div class="rs-err">Couldn't load research data for <b>${esc(s)}</b>.<br><span style="font-size:12px">${esc(S.rq.err)}</span><br>Check the symbol, or try again in a minute.</div>`:`<div class="skeleton"></div><div class="skeleton"></div>`); return; }
   const sd=d.summaryDetail||{}, ks=d.defaultKeyStatistics||{}, fd=d.financialData||{}, p=d.price||{}, t=rqType(), ce=d.calendarEvents||{};
   if(sub==="summary"){
     let rows;
@@ -4140,7 +4197,7 @@ function renderResearchBody(){
         ["Market cap",money(sd.marketCap??p.marketCap)],["Beta (5Y monthly)",num(sd.beta)],["PE ratio (TTM)",num(sd.trailingPE)],["EPS (TTM)",num(ks.trailingEps)],["Earnings date",Array.isArray(ed)&&ed.length?ed.map(dt).join(" – "):"—"],["Forward dividend & yield",div],["Ex-dividend date",dt(sd.exDividendDate??ce.exDividendDate)],["1y target est.",fmt(fd.targetMeanPrice)]];
     }
     const prof=d.assetProfile||d.summaryProfile||{};
-    el.innerHTML=(d.limited?`<div class="disc" style="margin:0 0 12px;color:var(--amber)">${d.assetProfile?("Yahoo Finance is limiting this server right now, so company data comes from Finnhub and descriptions from Wikipedia. Institutional holders"+(d.financialData&&d.financialData.targetMeanPrice?"":" and analyst price targets")+" are hidden until Yahoo is available again."):"Yahoo Finance isn't sharing full company details with this server right now, so some sections are hidden. Prices, charts, financial statements and news still work."} This usually fixes itself later.</div>`:"")+`<div class="rs-cols"><div class="rs-sec">${kv(rows)}</div><div>
+    el.innerHTML=instPanel(s)+(d.limited?`<div class="disc" style="margin:0 0 12px;color:var(--amber)">${d.assetProfile?("Yahoo Finance is limiting this server right now, so company data comes from Finnhub and descriptions from Wikipedia. Institutional holders"+(d.financialData&&d.financialData.targetMeanPrice?"":" and analyst price targets")+" are hidden until Yahoo is available again."):"Yahoo Finance isn't sharing full company details with this server right now, so some sections are hidden. Prices, charts, financial statements and news still work."} This usually fixes itself later.</div>`:"")+`<div class="rs-cols"><div class="rs-sec">${kv(rows)}</div><div>
       ${prof.longBusinessSummary?`<h2 class="h">About</h2><div class="prose" style="font-size:13px;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;overflow:hidden">${esc(prof.longBusinessSummary)}</div><a href="#" data-rs-sub="profile" style="font-size:12px;color:var(--amber)">More about ${esc(s)} →</a>`:""}
       ${fd.recommendationKey&&fd.recommendationKey!=="none"?`<h2 class="h" style="margin-top:18px">Analyst view</h2><div style="font-size:14px">Consensus: <b style="text-transform:capitalize;color:var(--amber)">${esc(fd.recommendationKey.replace("_"," "))}</b> · ${num(fd.numberOfAnalystOpinions,0)} analysts · target ${fmt(fd.targetMeanPrice)}</div>`:""}
     </div></div>`;
@@ -4481,12 +4538,15 @@ $("acChips").onclick=e=>{ const c=e.target.closest("[data-acq]"); if(c) acSend(c
 
 /* ---------- COMMAND BAR ---------- */
 let cmdSel=0, cmdItems=[];
+// Picking a search result loads it everywhere at once: the quote header and chart (research page) and the watchlist.
+function pickInstrument(sym){ const s=normSym(sym); if(!S.wl.includes(s)&&S.wl.length<25){ S.wl.push(s); store.set("wl",S.wl); renderWL(); loadQuotes(); } openQuote(s); }
 function openCmd(){ $("cmd").hidden=false; $("cmdInput").value=""; cmdResults=[]; buildCmd(); $("cmdInput").focus(); }
 function closeCmd(){ $("cmd").hidden=true; }
 function buildCmd(){
   const raw=$("cmdInput").value.trim(), v=normSym(raw); const items=[];
-  const valid=/^[A-Z0-9.\-^=]{1,12}$/.test(v);
-  (cmdResults||[]).forEach(r=>{ const q=S.quotes[r.symbol]; items.push([`${r.symbol} · ${r.name}${q&&!q.error?"   "+fmt(q.price)+" "+pct(q.changePct):""}`,r.typeDisp||"",()=>openQuote(r.symbol),r]); });
+  const valid=/^[A-Z0-9.\-^=]{1,21}$/.test(v);
+  (cmdResults||[]).forEach(r0=>{ const r=r0.badge||!window.MDInstruments?r0:{...MDInstruments.normalize({symbol:r0.symbol,quoteType:r0.type,name:r0.name,exchDisp:r0.exchange}),...r0}; const q=S.quotes[r.symbol];
+    items.push([`${r.displaySymbol&&r.displaySymbol!==r.symbol?r.displaySymbol+" ("+r.symbol+")":r.symbol} · ${r.name}${q&&!q.error?"   "+fmtP(r.symbol,q.price)+" "+pct(q.changePct):""}`,r.typeDisp||"",()=>pickInstrument(r.symbol),r]); });
   const exact=cmdResults.length&&cmdResults[0].symbol===v;
   if(valid&&!cmdResults.length) items.push([`Open ${v} research page`,"Research",()=>openQuote(v)]);
   if(valid&&exact){
@@ -4499,7 +4559,7 @@ function buildCmd(){
   cmdItems=items; cmdSel=0; drawCmd();
 }
 function drawCmd(){ const msg=/^new\s+listings?$/i.test($("cmdInput").value.trim())?"No newly detected listings are available yet.":"Type a company name or ticker, like Apple or VFIAX";
-  $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${esc(x[1])}${x[3].exchange?" · "+esc(x[3].exchange):""}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||`<div style="color:var(--muted)">${msg}</div>`; }
+  $("cmdList").innerHTML=cmdItems.map((x,i)=>`<div class="${i===cmdSel?"on":""}" data-cmd="${i}">${esc(x[0])}${x[3]?`<span class="ty">${badgeHtml(x[3])}${x[3].exchange?" "+esc(x[3].exchange):x[3].badge?"":esc(x[1])}</span>`:`<span>${esc(x[1])}</span>`}</div>`).join("")||`<div style="color:var(--muted)">${msg}</div>`; }
 $("cmdBtn").onclick=openCmd;
 let cmdResults=[], cmdTimer=0, cmdQ="";
 function mergeResults(local,remote,n=12){ const seen=new Set(), out=[]; for(const r of [...local.slice(0,6),...remote,...local.slice(6)]){ if(!seen.has(r.symbol)){ seen.add(r.symbol); out.push(r); } } return out.slice(0,n); }

@@ -122,3 +122,35 @@ test("borrow fee is charged once per day on open shorts", () => {
   assert.equal(M.borrow(st, { day: "2026-11-25", px: { SPY: 500 } }), 0, "not twice in one day");
   assert.ok(Math.abs(st.cash - (cash - fee)) < 0.01);
 });
+
+test("multi-asset: futures trade in whole contracts with the multiplier, prices on the tick", () => {
+  const st = M.fresh(1000), now = 10_000, q = { price: 5000.1, marketTime: now - 1000 };
+  assert.equal(M.place(st, { side: "BUY", sym: "ES=F", shares: 0.5 }, { now, open: true, quote: q }).ok, false, "no fractional contracts");
+  assert.equal(M.place(st, { side: "BUY", sym: "ES=F", amount: 1000 }, { now, open: true, quote: q }).ok, false, "one ES contract is ~$250,000 cash-backed");
+  const st2 = M.fresh(1000); st2.cash = st2.start = 1_000_000;
+  const r = M.place(st2, { side: "BUY", sym: "ES=F", shares: 2 }, { now, open: true, quote: q });
+  assert.ok(r.filled); assert.equal(r.trade.mult, 50);
+  assert.equal(r.trade.price % 0.25, 0, "fill on a quarter-point tick");
+  assert.ok(Math.abs(r.trade.amount - 2 * 50 * r.trade.price) < 0.01);
+  const v = M.value(st2, { "ES=F": r.trade.price + 10 });
+  assert.ok(Math.abs(v.value - (1_000_000 + 2 * 50 * 10)) < 0.01, "10 points × $50 × 2 contracts = $1,000");
+  const s = M.place(st2, { side: "SELL", sym: "ES=F", all: true }, { now: now + 5000, open: true, quote: { price: r.trade.price + 10, marketTime: now + 4000 } });
+  assert.equal(s.trade.pnl, (s.trade.price - r.trade.price) * 2 * 50, "P&L = fill-to-fill points × $50 × 2 contracts (costs are inside the fill prices)");
+});
+
+test("multi-asset: indexes can't be traded; each market keeps its own hours", () => {
+  const st = M.fresh(1000);
+  assert.match(M.place(st, { side: "BUY", sym: "^GSPC", shares: 1 }).error, /index/);
+  const now = 10_000, crypto = { price: 60000, marketTime: now - 500 };
+  const r = M.place(st, { side: "BUY", sym: "BTC-USD", amount: 600 }, { now, open: (sym) => sym === "BTC-USD", quote: crypto });
+  assert.ok(r.filled, "crypto fills while stocks are closed");
+  const p = M.place(st, { side: "BUY", sym: "AAPL", shares: 1 }, { now, open: (sym) => sym === "BTC-USD", quote: { price: 190, marketTime: now - 500 } });
+  assert.equal(p.filled, false);
+  assert.equal(M.work(st, { AAPL: { price: 190, marketTime: now + 100 } }, { now: now + 1000, open: () => false }).length, 0, "stock order waits for its own open");
+});
+
+test("multi-asset: a delayed feed (Yahoo futures ~10 min) still counts as fresh for its delay", () => {
+  const now = 1_000_000;
+  assert.equal(M.usable({ price: 1, marketTime: now - 11 * 60_000 }, now), false);
+  assert.equal(M.usable({ price: 1, marketTime: now - 11 * 60_000, delayMin: 10 }, now), true);
+});

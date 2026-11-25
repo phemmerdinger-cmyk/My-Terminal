@@ -65,7 +65,7 @@
   const cnt = (n) => (!Number.isFinite(n) ? "—" : n >= 1e9 ? (n / 1e9).toFixed(2) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(0) + "K" : String(n));
   const num = (n, d = 2) => (Number.isFinite(n) ? n.toFixed(d) : "—"), fpc = (n, d = 1) => (Number.isFinite(n) ? (n * 100).toFixed(d) + "%" : "—");
   async function lookup(sym, force) {
-    if (!sym || !/^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym)) return;
+    if (!sym || !/^[A-Z0-9^][A-Z0-9.\-=]{0,20}$/.test(sym)) return;
     const have = MT.info[sym]; if (have && !force && Date.now() - have.at < 20_000) return;
     MT.info[sym] = { ...(have || {}), at: Date.now(), loading: !have };
     const [q, sm] = await Promise.allSettled([api("/api/quotes?symbols=" + encodeURIComponent(sym)).then((j) => j.quotes && j.quotes[sym]), have && have.d ? Promise.resolve(have.d) : api("/api/summary?symbol=" + encodeURIComponent(sym))]);
@@ -95,13 +95,18 @@
       ${about ? `<div class="mt-about">${esc(about.length > 320 ? about.slice(0, 320).replace(/\s\S*$/, "") + "…" : about)} <a href="#research/${encodeURIComponent(sym)}">Full research →</a></div>` : `<div class="mt-about"><a href="#research/${encodeURIComponent(sym)}">Full research →</a></div>`}</div>`;
   }
   // the order estimate (Schwab: "Estimated Cost"), shared by the ticket and the review screen
+  // multi-asset: futures and options are priced per contract (price × multiplier), FX and crypto in units
+  const instM = (sym) => (window.MDInstruments ? MDInstruments.normalize({ symbol: sym, quoteType: ((MT.info[sym] || {}).q || {}).instrumentType }) : { assetClass: "equity" });
+  const multM = (sym) => (window.MDInstruments ? MDInstruments.multiplierOf(instM(sym)) : 1);
+  const unitWord = (sym) => { const c = instM(sym).assetClass; return c === "future" || c === "option" ? "Contracts" : c === "crypto" || c === "forex" ? "Units" : "Shares"; };
   function estimate(d) {
-    const sym = symOf(), x = MT.info[sym], q = (x && x.q) || {}, p = posOf(d, sym);
-    return MDOrderPreview.preview({ side: MT.side, mode: MT.mode, qty: +MT.vals.qty }, q.price, { buyingPower: d.buyingPower ?? d.cash, value: d.value }, p ? { dir: p.dir, shares: p.shares, cost: p.cost } : null, d.rules);
+    const sym = symOf(), x = MT.info[sym], q = (x && x.q) || {}, p = posOf(d, sym), m = multM(sym);
+    return MDOrderPreview.preview({ side: MT.side, mode: MT.mode, qty: +MT.vals.qty }, Number.isFinite(q.price) ? q.price * m : q.price, { buyingPower: d.buyingPower ?? d.cash, value: d.value }, p ? { dir: p.dir, shares: p.shares, cost: p.cost * m } : null, d.rules);
   }
   const row = (l, v, c = "") => `<div class="mt-row ${c}"><span>${l}</span><b>${v}</b></div>`;
   function estRows(d, pv) {
-    let r = row("Shares", sh(pv.shares)) + row("Last price", usd(pv.price)) + row(`Est. fill price (incl. ${(d.rules.cost * 100).toFixed(3).replace(/0+$/, "")}% trading cost)`, usd(pv.fill));
+    const sym = symOf(), m = multM(sym);
+    let r = row(unitWord(sym), sh(pv.shares)) + (m !== 1 ? row("Contract multiplier", `× ${m.toLocaleString("en-US")} (fully cash-backed, whole contracts)`) : "") + row(m !== 1 ? "Value per contract" : "Last price", usd(pv.price)) + row(`Est. fill price (incl. ${(d.rules.cost * 100).toFixed(3).replace(/0+$/, "")}% trading cost)`, usd(pv.fill));
     if (pv.side === "BUY") r += row("Estimated cost", usd(pv.amount), "big") + row("Free cash after", usd(pv.freeAfter, 0)) + row("Share of your account", Math.round(pv.weight * 100) + "%");
     if (pv.side === "SHORT") r += row("Estimated proceeds", usd(pv.amount), "big") + row("Cash set aside to back it", usd(pv.setAside, 0)) + row("Borrow fee (modeled)", `${usd(pv.borrowDay)}/day · ${usd(pv.borrowMonth)}/mo`) + row("Automatic buy-back at", usd(pv.autoCover)) + row("Free cash after", usd(pv.freeAfter, 0));
     if (pv.side === "SELL") r += row("Estimated proceeds", usd(pv.amount), "big") + row("Gain / loss vs your cost", `<span class="${cls(pv.pnl)}">${sgn(pv.pnl)} (${pct(pv.pnlPct * 100)})</span>`);

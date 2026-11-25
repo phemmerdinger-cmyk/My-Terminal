@@ -22,6 +22,12 @@ const INTEG = require("./data/integrity.js");
 const HEALTH = createHealth();
 const PUBLIC = path.join(__dirname, "public");
 const FINNHUB = process.env.FINNHUB_API_KEY;
+// Free multi-asset data layer: one schema for every instrument (public/instruments-core.js) and keyless sources
+// behind a request gate (market-data-core.js), so bursts of clicks or many visitors can't get this server throttled.
+const MDC = require("./market-data-core.js");
+const INST = require("./public/instruments-core.js");
+const YGATE = MDC.createGate({ concurrency: 4, minGapMs: 100 }); // ≈10 Yahoo requests a second at most, shared by pages and bots
+const YAHOO_HOST = /^https:\/\/[a-z0-9.]*finance\.yahoo\.com\//;
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
@@ -110,13 +116,16 @@ setInterval(() => {
 }, 10 * 60e3).unref();
 
 async function get(url, accept = "*/*") {
-  const res = await fetch(url, {
-    headers: { "User-Agent": UA, Accept: accept, "Accept-Language": "en-US,en;q=0.9" },
-    redirect: "follow",
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  return res.text();
+  const go = async () => {
+    const res = await fetch(url, {
+      headers: { "User-Agent": UA, Accept: accept, "Accept-Language": "en-US,en;q=0.9" },
+      redirect: "follow",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) { const e = new Error(`HTTP ${res.status} for ${url}`); e.status = res.status; throw e; }
+    return res.text();
+  };
+  return YAHOO_HOST.test(url) ? YGATE.run(go) : go();
 }
 get = HEALTH.track(get, (url) => url);
 
@@ -212,7 +221,7 @@ async function loadSource(srcKey, urls, ticker) {
   return { ok, items: items.map((i) => cleanItem(i, srcKey, ticker)).filter(Boolean) };
 }
 
-const TICKER_RE = /^[A-Z0-9.\-^=]{1,12}$/;
+const TICKER_RE = /^[A-Z0-9.\-^=]{1,21}$/; // up to 21 for option contracts (AAPL260109C00190000)
 
 // ---------------------------------------------------------------- news archive (older headlines)
 // RSS feeds only hold the latest stories, so older news comes from Google News
@@ -515,8 +524,32 @@ const { getExtendedQuotes } = require("./market-session-core.js");
 function firstTradingDay(sym, meta) {
   return Number.isFinite(meta.firstTradeDate) && meta.firstTradeDate > 0 ? etParts(new Date(meta.firstTradeDate * 1000)).day : null;
 }
+// Quotes for every asset class. Yahoo first (stocks, ETFs, global equities, indexes, futures, FX, crypto); when it
+// fails, keyless fallbacks by class: crypto → Coinbase, then Binance.US; FX → Frankfurter reference rate;
+// Treasury yields → FRED. Fallback quotes say which source they came from and whether they're reference values.
 async function quote(sym) {
-  return cached("q:" + sym, 15_000, async () => {
+  return cached("q:" + sym, INST.assetClassOf(sym) === "crypto" ? MDC.TTL.cryptoQuote : 15_000, async () => {
+    try { return await yahooQuote(sym); }
+    catch (e) { const fb = await quoteFallback(sym).catch(() => null); if (fb) return fb; throw e; }
+  });
+}
+async function quoteFallback(sym) {
+  const cls = INST.assetClassOf(sym);
+  if (cls === "crypto") {
+    try {
+      const [t, st] = await Promise.all([get(`https://api.exchange.coinbase.com/products/${encodeURIComponent(sym)}/ticker`, "application/json"), get(`https://api.exchange.coinbase.com/products/${encodeURIComponent(sym)}/stats`, "application/json")]);
+      return MDC.coinbaseQuote(sym, JSON.parse(t), JSON.parse(st));
+    } catch {
+      const b = MDC.binanceUsSymbol(sym); if (!b) return null;
+      return MDC.binanceUsQuote(sym, JSON.parse(await get(`https://api.binance.us/api/v3/ticker/24hr?symbol=${b}`, "application/json")));
+    }
+  }
+  if (cls === "forex") { const pair = INST.forexPair(sym); if (!pair) return null; return MDC.frankfurterQuote(sym, JSON.parse(await cached(`fx:${pair.join("")}`, MDC.TTL.fx, () => get(MDC.frankfurterUrl(pair[0], pair[1]), "application/json")))); }
+  if (MDC.FRED_FOR[sym]) return MDC.fredQuote(sym, await cached(`fred:${MDC.FRED_FOR[sym]}`, MDC.TTL.fred, () => get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${MDC.FRED_FOR[sym]}`, "text/csv")));
+  return null;
+}
+async function yahooQuote(sym) {
+  {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=1d&interval=5m&includePrePost=true`;
     const j = JSON.parse(await get(url, "application/json"));
     const r = j.chart && j.chart.result && j.chart.result[0];
@@ -559,8 +592,11 @@ async function quote(sym) {
       high52: debut ? null : m.fiftyTwoWeekHigh,
       low52: debut ? null : m.fiftyTwoWeekLow,
       spark: debut && firstPrint < 0 ? [] : closes.length > 60 ? closes.filter((_, i) => i % Math.ceil(closes.length / 60) === 0) : closes,
+      // multi-asset fields: the provider's instrument type, its own session times and any exchange delay
+      instrumentType: m.instrumentType || null, exchangeTimezone: m.exchangeTimezoneName || null, periods: MDC.tradingPeriods(m),
+      delayMin: Number.isFinite(m.exchangeDataDelayedBy) && m.exchangeDataDelayedBy > 0 ? m.exchangeDataDelayedBy : 0, provider: "yahoo",
     };
-  });
+  }
 }
 
 async function getQuotes(symbols) {
@@ -861,7 +897,7 @@ try{var r=await fetch("/api/login",{method:"POST",headers:{"content-type":"appli
 if(!r.ok)throw new Error(j.error||"Wrong password.");try{localStorage.setItem("ownerMode","1")}catch(x){}var n=new URLSearchParams(location.search).get("next")||"/";location.replace(/^\\/(?!\\/)/.test(n)?n:"/");}
 catch(x){e.textContent=x.message;b.disabled=false;document.getElementById("p").select();}};</script></body></html>`;
 // API routes anyone may use (the demo needs public market data); everything else is owner-only
-const PUBLIC_API = new Set(["/api/article", "/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
+const PUBLIC_API = new Set(["/api/article", "/api/news", "/api/bestbuys", "/api/trending", "/api/preview", "/api/smart", "/api/quotes", "/api/sp500", "/api/history", "/api/search", "/api/instrument", "/api/options", "/api/summary", "/api/financials", "/api/movers", "/api/earnings", "/api/stream", "/api/health", "/api/login"]);
 const isPublicApi = (u, req) => PUBLIC_API.has(u.pathname) || ((u.pathname === "/api/autopilot" || u.pathname === "/api/daytrader" || u.pathname === "/api/quanttrader") && req.method === "GET") || u.pathname.startsWith("/api/pub/");
 // ---------------------------------------------------------------- abuse protection
 // Per-visitor request budget for the API (keeps outbound traffic low so the free plan is never suspended)
@@ -1222,7 +1258,7 @@ async function yget(url) {
   for (let i = 0; i < 2; i++) {
     const a = await yahooAuth(i > 0);
     const u = url + (url.includes("?") ? "&" : "?") + "crumb=" + encodeURIComponent(a.crumb);
-    const res = await fetch(u, { headers: { "User-Agent": UA, Cookie: a.cookie, Accept: "application/json" }, signal: AbortSignal.timeout(12000) });
+    const res = await YGATE.run(async () => { const r = await fetch(u, { headers: { "User-Agent": UA, Cookie: a.cookie, Accept: "application/json" }, signal: AbortSignal.timeout(12000) }); if (r.status === 429) { const e = new Error("HTTP 429 from Yahoo"); e.status = 429; throw e; } return r; });
     const body = await res.json().catch(() => ({}));
     if (res.status === 401 || res.status === 403) { last = new Error("Yahoo refused the request"); continue; }
     if (!res.ok) { const e = new Error((body.quoteSummary && body.quoteSummary.error && body.quoteSummary.error.description) || `Yahoo error ${res.status}`); e.status = res.status; throw e; }
@@ -1249,9 +1285,7 @@ function yahooSearch(q) {
   return cached("s:" + q.toLowerCase(), 10 * 60_000, async () => {
     const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=12&newsCount=0&listsCount=0&enableFuzzyQuery=true`;
     const j = JSON.parse(await get(url, "application/json"));
-    return (j.quotes || []).filter((x) => x.symbol).map((x) => ({
-      symbol: x.symbol, name: x.shortname || x.longname || x.symbol, type: x.quoteType || "", typeDisp: x.typeDisp || x.quoteType || "", exchange: x.exchDisp || x.exchange || "",
-    }));
+    return MDC.searchRows(j.quotes);
   });
 }
 
@@ -1261,23 +1295,88 @@ const listingResult = (entry, recent = false) => ({
   exchange: entry.exchange,
 });
 
+const normEntry = (entry) => (entry.assetClass ? entry : { ...INST.normalize({ symbol: entry.symbol, quoteType: entry.type, name: entry.name, exchDisp: entry.exchange }), ...entry });
 async function search(q) {
   const refreshing = listingCatalog.refresh();
   if (/^new\s+listings?$/i.test(q)) {
     if (!listingCatalog.ready()) await Promise.race([refreshing, new Promise((resolve) => setTimeout(resolve, 1500))]);
-    return listingCatalog.recent().map((entry) => listingResult(entry, true));
+    return listingCatalog.recent().map((entry) => normEntry(listingResult(entry, true)));
   }
   const normalized = q.toUpperCase().replace(".", "-");
   const exact = () => listingCatalog.search(q).filter((entry) => entry.providerSymbol === normalized).map((entry) => listingResult(entry));
   const known = exact();
-  if (known.length) return known;
+  if (known.length) return known.map(normEntry);
   let yahoo = [];
   try { yahoo = await yahooSearch(q); } catch {}
   if (!yahoo.length && !listingCatalog.ready()) await Promise.race([refreshing, new Promise((resolve) => setTimeout(resolve, 1200))]);
   const results = [...exact(), ...yahoo, ...listingCatalog.search(q).map((entry) => listingResult(entry))];
   const unique = new Map();
-  for (const entry of results) if (!unique.has(entry.symbol)) unique.set(entry.symbol, entry);
+  for (const entry of results) if (!unique.has(entry.symbol)) unique.set(entry.symbol, normEntry(entry));
   return [...unique.values()].slice(0, 12);
+}
+
+// ---------------------------------------------------------------- one instrument, any asset class (/api/instrument)
+// The normalised instrument + live quote + market status + the details that matter for its class: market cap and P/E
+// for stocks, contract specs for futures, 24h volume for crypto, strike/expiry/IV for options, the reference rate for FX.
+// Every value comes from a keyless source and says which one; a missing value is shown as unavailable, never guessed.
+async function instrumentMeta(sym) {
+  return cached("im:" + sym, MDC.TTL.instrument, async () => {
+    let hit = null; try { hit = (await yahooSearch(sym)).find((r) => r.symbol === sym) || null; } catch {}
+    return hit ? { symbol: sym, quoteType: hit.type, name: hit.name, exchDisp: hit.exchange } : { symbol: sym };
+  });
+}
+async function coinbaseProductMap() {
+  return cached("cb:products", MDC.TTL.coinbaseProducts, async () => MDC.coinbaseProducts(JSON.parse(await get("https://api.exchange.coinbase.com/products", "application/json"))));
+}
+async function optionChain(sym, date) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? Math.floor(Date.parse(date + "T00:00:00Z") / 1000) : null;
+  return cached(`opt:${sym}:${d || ""}`, MDC.TTL.options, async () => MDC.optionChain(await yget(`https://query2.finance.yahoo.com/v7/finance/options/${encodeURIComponent(sym)}${d ? `?date=${d}` : ""}`)));
+}
+async function instrumentView(sym) {
+  const meta = await instrumentMeta(sym);
+  let q = null, qErr = null; try { q = await quote(sym); } catch (e) { qErr = String(e.message || e); }
+  const inst = INST.normalize({ ...meta, quoteType: meta.quoteType || (q && q.instrumentType), name: meta.name || (q && q.name), exchDisp: meta.exchDisp || (q && q.exchange), currency: q && q.currency, price: q && q.price });
+  const details = {}, sources = [q ? q.provider || "yahoo" : null].filter(Boolean);
+  const take = async (label, fn) => { try { await fn(); } catch (e) { details[label + "Error"] = "unavailable"; } };
+  if (inst.assetClass === "equity" || inst.assetClass === "etf") await take("stats", async () => {
+    const r = await cached("istats:" + sym, 3600_000, () => yget(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=summaryDetail,defaultKeyStatistics,price`));
+    const x = unwrap(r.quoteSummary.result[0]), sd = x.summaryDetail || {}, ks = x.defaultKeyStatistics || {};
+    Object.assign(details, { marketCap: sd.marketCap ?? (x.price && x.price.marketCap) ?? null, trailingPE: sd.trailingPE ?? null, forwardPE: sd.forwardPE ?? ks.forwardPE ?? null,
+      dividendYield: sd.dividendYield ?? sd.yield ?? null, beta: sd.beta ?? ks.beta ?? null, avgVolume: sd.averageVolume ?? null, high52: sd.fiftyTwoWeekHigh ?? null, low52: sd.fiftyTwoWeekLow ?? null });
+  });
+  if (inst.assetClass === "crypto") await take("crypto", async () => {
+    const products = await coinbaseProductMap().catch(() => ({})), p = products[sym];
+    if (p && p.quoteIncrement) { inst.quoteIncrement = p.quoteIncrement; inst.tickSize = p.quoteIncrement; }
+    if (!p) { details.coinbase = "not listed on Coinbase"; return; }
+    const st = JSON.parse(await cached("cbstats:" + sym, MDC.TTL.cryptoQuote, () => get(`https://api.exchange.coinbase.com/products/${encodeURIComponent(sym)}/stats`, "application/json")));
+    Object.assign(details, { volume24h: +st.volume || null, volume24hQuote: +st.volume && +st.last ? +st.volume * +st.last : null, high24h: +st.high || null, low24h: +st.low || null, open24h: +st.open || null, volume30d: +st.volume_30day || null });
+    sources.push("coinbase");
+  });
+  if (inst.assetClass === "future") await take("contract", async () => {
+    details.spec = inst.spec || null;
+    const r = await cached("ifut:" + sym, 3600_000, () => yget(`https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=summaryDetail,price`));
+    const x = unwrap(r.quoteSummary.result[0]), sd = x.summaryDetail || {}, pr = x.price || {};
+    const exp = sd.expireDate ?? pr.expireDate; details.expiry = exp ? new Date((typeof exp === "number" ? exp : Date.parse(exp) / 1000) * 1000).toISOString().slice(0, 10) : null;
+    details.openInterest = sd.openInterest ?? null; details.underlying = pr.underlyingSymbol || null;
+  });
+  if (inst.assetClass === "option" && inst.option) await take("contract", async () => {
+    const chain = await optionChain(inst.option.underlying, inst.option.expiry), list = inst.option.right === "call" ? chain.calls : chain.puts;
+    const c = list.find((x) => x.contract === sym) || null;
+    Object.assign(details, { underlying: inst.option.underlying, underlyingPrice: chain.underlyingPrice, strike: inst.option.strike, expiry: inst.option.expiry, right: inst.option.right, multiplier: 100,
+      ...(c ? { bid: c.bid, ask: c.ask, last: c.last, iv: c.iv, openInterest: c.openInterest, volume: c.volume } : { contract: "not in the provider's chain" }) });
+  });
+  if (inst.assetClass === "forex") await take("reference", async () => {
+    const pair = INST.forexPair(sym); details.base = pair[0]; details.quoteCurrency = pair[1];
+    const ref = MDC.frankfurterQuote(sym, JSON.parse(await cached(`fx:${pair.join("")}`, MDC.TTL.fx, () => get(MDC.frankfurterUrl(pair[0], pair[1]), "application/json"))));
+    details.referenceRate = ref.price; details.referenceNote = ref.note; sources.push("frankfurter");
+  });
+  if (MDC.FRED_FOR[sym]) await take("fred", async () => {
+    const f = MDC.fredLatest(await cached(`fred:${MDC.FRED_FOR[sym]}`, MDC.TTL.fred, () => get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${MDC.FRED_FOR[sym]}`, "text/csv")));
+    details.fredClose = f.value; details.fredDate = f.date; details.fredSeries = MDC.FRED_FOR[sym]; sources.push("fred");
+  });
+  if (q && q.price != null) inst.tickSize = inst.assetClass === "crypto" && inst.quoteIncrement ? inst.quoteIncrement : INST.tickSizeOf(inst, q.price);
+  return { instrument: inst, quote: q, quoteError: qErr, status: INST.marketStatus(inst, Date.now(), q && q.periods), delayMin: (q && q.delayMin) || 0,
+    stream: INST.providerFor(inst).stream, details, sources: [...new Set(sources)] };
 }
 
 const MODULE_SETS = [
@@ -1525,8 +1624,9 @@ function wanted() {
   return want;
 }
 function syncSubs() {
+  cbSync(); // crypto streams from Coinbase's free public feed, with or without a Finnhub key
   if (!live.open) return;
-  const want = wanted();
+  const want = new Set([...wanted()].filter((s) => !(cb.products ? cb.products[s] : isCrypto(s))));
   for (const s of live.subs) if (!want.has(s)) { live.ws.send(JSON.stringify({ type: "unsubscribe", symbol: toFeed(s) })); live.subs.delete(s); }
   for (const s of want) if (!live.subs.has(s)) { live.ws.send(JSON.stringify({ type: "subscribe", symbol: toFeed(s) })); live.subs.add(s); }
 }
@@ -1554,6 +1654,45 @@ function connectFinnhub() {
   ws.onerror = () => {};
 }
 connectFinnhub();
+// ---- Coinbase Exchange public WebSocket (no key, no account): real-time crypto 24/7. Coinbase product ids are the same
+// as Yahoo's crypto symbols (BTC-USD), so ticks land in the same live-price map the pages already read. It connects only
+// while a page is streaming a crypto symbol Coinbase lists, and reconnects with a growing pause if dropped.
+const cb = { ws: null, open: false, subs: new Set(), retry: 1000, products: null, loading: null };
+function cbWanted() {
+  const want = new Set();
+  if (!cb.products) return want;
+  for (const c of live.clients) { if (c.focus && cb.products[c.focus]) want.add(c.focus); for (const x of c.syms) if (cb.products[x] && want.size < 50) want.add(x); }
+  return want;
+}
+function cbSync() {
+  if (typeof WebSocket === "undefined") return;
+  const anyCrypto = [...live.clients].some((c) => [...c.syms].some(isCrypto));
+  if (anyCrypto && !cb.products && !cb.loading) cb.loading = coinbaseProductMap().then((p) => { cb.products = p; }).catch(() => {}).finally(() => { cb.loading = null; cbSync(); });
+  const want = cbWanted();
+  if (want.size && !cb.ws) return connectCoinbase();
+  if (!cb.open) return;
+  const add = [...want].filter((x) => !cb.subs.has(x)), drop = [...cb.subs].filter((x) => !want.has(x));
+  if (drop.length) { cb.ws.send(JSON.stringify({ type: "unsubscribe", product_ids: drop, channels: ["ticker"] })); drop.forEach((x) => cb.subs.delete(x)); }
+  if (add.length) { cb.ws.send(JSON.stringify({ type: "subscribe", product_ids: add, channels: ["ticker"] })); add.forEach((x) => cb.subs.add(x)); }
+}
+function connectCoinbase() {
+  if (typeof WebSocket === "undefined" || cb.ws) return;
+  const ws = new WebSocket("wss://ws-feed.exchange.coinbase.com");
+  cb.ws = ws;
+  ws.onopen = () => { cb.open = true; cb.retry = 1000; cb.subs.clear(); cbSync(); };
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    const t = MDC.coinbaseTick(m); if (!t) return;
+    const prev = live.last.get(t.sym);
+    if (!prev || t.t >= prev.t) { live.last.set(t.sym, { p: t.p, t: t.t }); live.dirty.add(t.sym); }
+  };
+  ws.onclose = () => {
+    cb.open = false; cb.ws = null; cb.subs.clear();
+    if (cbWanted().size) setTimeout(() => cbSync(), cb.retry);
+    cb.retry = Math.min(cb.retry * 2, 60_000);
+  };
+  ws.onerror = () => {};
+}
 // Push batched updates to browsers ~2x per second
 setInterval(() => {
   if (!live.dirty.size) return;
@@ -1584,7 +1723,7 @@ function openStream(res, syms, focus, release) {
   live.clients.add(client);
   const snap = {};
   for (const s of client.syms) if (live.last.has(s)) snap[s] = live.last.get(s);
-  res.write(`event: hello\ndata: ${JSON.stringify({ streaming: live.open })}\n\n`);
+  res.write(`event: hello\ndata: ${JSON.stringify({ streaming: live.open || cb.open, crypto: cb.open })}\n\n`);
   if (Object.keys(snap).length) res.write(`data: ${JSON.stringify(snap)}\n\n`);
   syncSubs();
   res.once("close", () => { live.clients.delete(client); syncSubs(); if (release) release(); });
@@ -2364,12 +2503,23 @@ async function mtMark(st, quotes) {
   const v = MYT.value(st, px), spx = quotes["^GSPC"] && quotes["^GSPC"].price > 0 ? quotes["^GSPC"].price : null;
   MYT.mark(st, { day: etParts().day, value: v.value, spx }); return { ...v, px, spx };
 }
+// Each instrument trades in its own session: US stocks/ETFs/options use the exchange-calendar check the bots use;
+// crypto is 24/7; futures, FX and foreign stocks use their own hours (the provider's session times when it has them).
+function mtOpenFn(m, quotes = {}) {
+  return (sym) => {
+    const q = quotes[sym], inst = INST.normalize({ symbol: sym, quoteType: q && q.instrumentType, exchDisp: q && q.exchange, currency: q && q.currency });
+    const usSession = inst.marketHours.session === "us_equity" || inst.marketHours.session === "us_option";
+    if (usSession) return !!m.open;
+    const c = INST.marketStatus(inst, Date.now(), q && q.periods).code;
+    return c === "OPEN" || c === "LIVE";
+  };
+}
 async function mtTick() {
   return mtLocked(async () => {
     const st = await mtLoad(); if (!st.firstTrade && !st.pending.length) return;
     const m = await apMarketOpen(), syms = [...new Set([...Object.keys(st.positions), ...st.pending.map((o) => o.sym)])];
     const q = (await getQuotes([...syms, "^GSPC"])).quotes;
-    const done = MYT.work(st, q, { now: Date.now(), open: m.open });
+    const done = MYT.work(st, q, { now: Date.now(), open: mtOpenFn(m, q) });
     const fee = MYT.borrow(st, { day: etParts().day, px: Object.fromEntries(Object.keys(st.positions).filter((x) => q[x] && q[x].price > 0).map((x) => [x, q[x].price])) });
     await mtMark(st, q);
     if (done.length || fee || m.open || !st.lastSaved || Date.now() - st.lastSaved > 30 * 60e3) { st.lastSaved = Date.now(); await mtStore.set("book", st); }
@@ -2382,9 +2532,9 @@ async function mtView() {
   const v = MYT.value(st, Object.fromEntries(syms.filter((s) => q[s] && q[s].price > 0).map((s) => [s, q[s].price])));
   const m = await apMarketOpen().catch(() => ({ open: false }));
   const pxMap = {};
-  const positions = syms.map((s) => { const p = st.positions[s], short = p.dir === "short", px = q[s] && q[s].price > 0 ? q[s].price : null, val = p.shares * (px ?? p.cost);
+  const positions = syms.map((s) => { const p = st.positions[s], short = p.dir === "short", px = q[s] && q[s].price > 0 ? q[s].price : null, mult = MYT.multOf(p), val = p.shares * mult * (px ?? p.cost);
     if (px != null) pxMap[s] = px;
-    return { sym: s, dir: short ? "short" : "long", shares: p.shares, cost: +p.cost.toFixed(4), price: px, value: +val.toFixed(2), pnl: px == null ? null : +((short ? p.cost - px : px - p.cost) * p.shares).toFixed(2), pnlPct: px == null ? null : short ? 1 - px / p.cost : px / p.cost - 1,
+    return { sym: s, dir: short ? "short" : "long", shares: p.shares, cost: +p.cost.toFixed(4), price: px, value: +val.toFixed(2), pnl: px == null ? null : +((short ? p.cost - px : px - p.cost) * p.shares * mult).toFixed(2), mult, assetClass: INST.assetClassOf(s, q[s] && q[s].instrumentType), pnlPct: px == null ? null : short ? 1 - px / p.cost : px / p.cost - 1,
       dayPct: q[s] ? q[s].changePct ?? null : null, weight: v.value > 0 ? val / v.value : null, at: p.at, priced: px != null, autoCoverAt: short ? +(p.cost * (1 + MYT.SHORT_STOP)).toFixed(2) : null }; })
     .sort((a, b) => b.value - a.value);
   return { startValue: st.start, value: v.value, cash: st.cash, positions, pending: st.pending, trades: st.trades.slice(0, 300), equity: st.equity, intraday: st.intraday, spx0: st.spx0,
@@ -2395,8 +2545,8 @@ async function mtView() {
 async function mtOrder(body) {
   return mtLocked(async () => {
     const st = await mtLoad(), sym = String(body && body.sym || "").trim().toUpperCase(), m = await apMarketOpen();
-    let fq = null; if (m.open && /^[A-Z][A-Z0-9.\-]{0,9}$/.test(sym)) { try { const q = await quote(sym); fq = { price: q.price, marketTime: q.marketTime }; } catch {} }
-    const r = MYT.place(st, body || {}, { now: Date.now(), open: m.open, quote: fq });
+    let fq = null, qs = {}; if (TICKER_RE.test(sym)) { try { const q = await quote(sym); qs[sym] = q; fq = { price: q.price, marketTime: q.marketTime, delayMin: q.delayMin || 0 }; } catch {} }
+    const r = MYT.place(st, body || {}, { now: Date.now(), open: mtOpenFn(m, qs), quote: fq });
     if (r.ok) { if (r.filled) { try { await mtMark(st, (await getQuotes([...Object.keys(st.positions), "^GSPC"])).quotes); } catch {} } await mtStore.set("book", st); LB.t = 0; }
     return r;
   });
@@ -4581,6 +4731,14 @@ async function handle(req, res) {
         try { return send(res, 200, await ask(key, await readBody(req))); }
         catch (e) { return send(res, e.code === "daily_limit" ? 429 : 502, { error: String(e.message || e) }); }
       }
+      if (u.pathname === "/api/instrument") {
+        const sym = parseList(u.searchParams.get("symbol"), 1)[0]; if (!sym) return send(res, 400, { error: "symbol required" });
+        try { return send(res, 200, await instrumentView(sym)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
+      if (u.pathname === "/api/options") {
+        const sym = parseList(u.searchParams.get("symbol"), 1)[0]; if (!sym) return send(res, 400, { error: "symbol required" });
+        try { return send(res, 200, await optionChain(sym, String(u.searchParams.get("date") || ""))); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
+      }
       if (u.pathname === "/api/search") {
         const q = String(u.searchParams.get("q") || "").trim().slice(0, 40);
         if (!q) return send(res, 200, { results: [] });
@@ -4601,7 +4759,7 @@ async function handle(req, res) {
         try { return send(res, 200, await earningsCalendar(parseList(u.searchParams.get("symbols"), 40))); } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
       if (u.pathname === "/api/stream") {
-        if (!FINNHUB || typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" });
+        if (typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" }); // crypto streams without a key
         const focus = owner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
         const release = streamSlot(req, owner);
         if (!release) return send(res, 429, { error: "Too many open live-price connections.", code: "stream_busy" }, "application/json", { "Retry-After": "30" });
@@ -4623,7 +4781,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: !!FINNHUB && typeof WebSocket !== "undefined", streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: typeof WebSocket !== "undefined", stocksStreaming: !!FINNHUB, feeds: { yahoo: YGATE.stats(), coinbase: cb.open }, streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // The dashboard is owner-only.
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
