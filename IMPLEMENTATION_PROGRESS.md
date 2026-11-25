@@ -3,6 +3,14 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Coach fixes the bots by itself (2026-11-24)
+- `public/coach-tuner-core.js` (UMD, tests/coach-tuner-core.test.js) turns the Coach's journal findings into small setting changes and notes each one. Rules, not AI: $0, no API calls.
+- Swing bot settings it can change: loss cap per holding (starts −12%, steps ×0.8, floor −5%), close a loser after N days (2–10), buy only above both the 50- and 200-day, skip buys with any negative news, trade size (down to 50%), 14-day break from a stock that keeps losing. Day trader: trade size, 14-day break from a stock, 14-day pause of a losing setup. Quant: none (its settings come from the weekly replay test); its findings are shown as "can't fix by itself".
+- Guards: nothing before 10 closed trades; at most one lasting change per bot per week; each lasting change is judged after the next 10 closed trades against the 20 before it and undone if average P&L per trade got worse (and not tried again); half size after a current losing streak of 3+ lasts until the next win; breaks and pauses expire on their own. Never touches the risk desk, drawdown lock, costs, bust level or Strategy Lab gating; never places trades.
+- "Successful" bar shown per bot: 40 closed trades, profit after costs, profit factor ≥ 1.3, ahead of the S&P 500 since the run began. The Coach keeps working after a bot meets it.
+- Server: `ctTick` every 15 minutes on the bot server, state in `coach-tuner-v1` (Upstash when configured); hooks in `apDecide` (sells, buy filter, size; also the spider-off twin) and `dtOpen` (skip, size). `/api/coach` adds `tuner` (log, settings, status, can't-fix) and its flags now list only what's still open.
+- Bot HQ Coach page: "Coach's changes" log (changed / kept / reverted / expired with the reason), per-bot progress and current settings, then "Still open". `coach-core.journal` findings now carry a `kind`; `closedTrades` is exported.
+
 ### Bots vs S&P 500 — easier to read for a personal trader (2026-11-24)
 - Page order: scoreboard → the race chart and holdings → under the hood → test runs. Risk desk, Strategy Lab, day-volume panel, put/call gauge and market signals moved into a collapsed "Advanced" section; a "What the terms on this page mean" glossary sits under it.
 - No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline between the two big numbers just says "Ahead of the S&P" / "Behind the S&P" and by how many dollars. Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).

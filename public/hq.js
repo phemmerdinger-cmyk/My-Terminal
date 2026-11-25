@@ -300,7 +300,7 @@
     const k = D.coach;
     if (!k) return `<div class="card" style="margin-top:12px"><div class="cb">${D.coachErr ? `<div class="err">The Coach is unavailable: ${h(D.coachErr)}</div>` : '<div class="empty">Reading charts and trade logs… the first review takes about a minute.</div>'}</div></div>`;
     const sig = (x) => `<span class="tag ${x === "Buy" ? "ok" : x === "Sell" ? "bad" : "warn"}">${h(x)}</span>`;
-    const flags = `<div class="card" style="margin-top:12px"><div class="ch">To fix <em>· reviewed ${h(when(k.at))}</em></div><div class="cb">${k.flags.map((f) => `<div class="row"><span>${h(f)}</span></div>`).join("") || '<div class="empty">Nothing urgent.</div>'}<div class="note">${h(k.note)}</div></div></div>`;
+    const flags = `<div class="card" style="margin-top:12px"><div class="ch">Still open <em>· things the Coach can't fix by itself · reviewed ${h(when(k.at))}</em></div><div class="cb">${k.flags.map((f) => `<div class="row"><span>${h(f)}</span></div>`).join("") || '<div class="empty">Nothing open right now.</div>'}<div class="note">${h(k.note)}</div></div></div>`;
     const jr = k.journals.map((j) => `<div class="card"><div class="ch">${h(j.bot)} · trade journal <em>· last ${j.closed || 0} closed</em></div><div class="cb">${j.ok ? `
       <div class="row"><span>Win rate</span><span class="mono">${(j.winRate * 100).toFixed(0)}% (${j.wins}W / ${j.losses}L)</span></div>
       <div class="row"><span>Profit factor</span><span class="mono">${j.profitFactor == null ? "no losses" : j.profitFactor.toFixed(2)}</span></div>
@@ -323,7 +323,35 @@
       <div class="note">Support ${c.support ? "$" + c.support.price.toFixed(2) + ` (${c.support.touches} touches)` : "none found"} · resistance ${c.resistance ? "$" + c.resistance.price.toFixed(2) + ` (${c.resistance.touches} touches)` : "none found"} · 50-day $${c.sma50 ?? "—"} · 200-day ${c.sma200 != null ? "$" + c.sma200 : "—"}</div>
       ${c.plan.stop != null || c.plan.target != null ? `<div class="note">Stop under support ${c.plan.stop != null ? "$" + c.plan.stop.toFixed(2) : "—"} · target at resistance ${c.plan.target != null ? "$" + c.plan.target.toFixed(2) : "—"}${c.plan.rewardRisk != null ? ` · reward/risk ${c.plan.rewardRisk}` : ""}</div>` : ""}
       ${c.points.map((p) => `<div class="note"><span class="${p.n > 0 ? "up" : p.n < 0 ? "down" : "or"}">${p.n > 0 ? "▲" : p.n < 0 ? "▼" : "●"}</span> ${h(p.text)}</div>`).join("")}</details>` : `<div class="row"><span><b style="font-weight:500">${h(c.sym)}</b> <span class="dim">${h(c.role)}</span></span><span class="dim">${h(c.why)}</span></div>`).join("") || '<div class="empty">Nothing held or ranked yet.</div>'}<div class="note">Rule-based read of daily closes: moving averages, RSI, 3-month momentum, support/resistance. Not advice.</div></div></div>`;
-    return flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
+    return tunerCard(k.tuner) + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
+  }
+
+  // The Coach's own changes to the bots (coach-tuner-core.js on the bot server): progress, current settings, change log.
+  function tunerCard(t) {
+    if (!t) return "";
+    const pct = (x) => Math.round(x * 100) + "%";
+    const setting = (b) => {
+      const s = b.settings, can = new Set(b.canChange), out = [];
+      if (can.has("lossCap")) out.push(["Loss cap per holding", s.lossCap == null ? "bot's own stops" : "−" + pct(s.lossCap)]);
+      if (can.has("loserDays")) out.push(["Close a loser after", s.loserDays == null ? "no limit" : s.loserDays + " days"]);
+      if (can.has("requireTrend")) out.push(["Buy only above 50- and 200-day", s.requireTrend ? "on" : "off"]);
+      if (can.has("newsFloor")) out.push(["Skip buys with", s.newsFloor >= -0.5 ? "any negative news" : "very negative news"]);
+      if (can.has("sizeMult")) out.push(["Trade size", pct(s.sizeMult)]);
+      if (can.has("avoid")) out.push(["Stocks on a break", s.avoid.length ? s.avoid.join(", ") : "none"]);
+      if (can.has("pause")) out.push(["Setups paused", s.paused.length ? s.paused.join(", ") : "none"]);
+      return out;
+    };
+    const tag = (a) => `<span class="tag ${a === "reverted" ? "bad" : a === "kept" ? "ok" : a === "expired" ? "warn" : "ok"}">${h(a === "changed" ? "changed" : a)}</span>`;
+    const bots = t.bots.map((b) => `<div class="card"><div class="ch">${h(b.name)} <em>· ${h(b.status.text)}</em></div><div class="cb">
+      ${b.status.checks.map((c) => `<div class="row"><span>${c.pass ? '<span class="tag ok">✓</span>' : '<span class="tag warn">·</span>'}${h(c.label)}</span><span class="mono">${h(c.value)}</span></div>`).join("")}
+      <div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:10px">SETTINGS THE COACH CONTROLS</div>
+      ${setting(b).map(([l, v]) => `<div class="row"><span>${h(l)}</span><span class="mono">${h(v)}</span></div>`).join("") || '<div class="note">None. The quant trader\'s settings are set by its weekly replay test.</div>'}
+      ${b.cantFix.length ? `<div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:10px">CAN'T FIX BY ITSELF</div>${b.cantFix.map((c) => `<div class="note">• ${h(c.text)} <span class="dim">(${h(c.why)})</span></div>`).join("")}` : ""}</div></div>`).join("");
+    const names = Object.fromEntries(t.bots.map((b) => [b.bot, b.name]));
+    const log = t.log.length ? t.log.map((e) => `<div class="row"><span>${tag(e.action)}<b style="font-weight:500">${h(names[e.bot] || e.bot)}</b>: ${h(e.what)}<div class="note" style="margin:2px 0 0">${h(e.why)}</div></span><span class="mono dim">${h(when(e.t))}</span></div>`).join("")
+      : '<div class="empty">No changes yet. The Coach acts once a bot has 10 closed trades and a clear recurring mistake.</div>';
+    return `<div class="card" style="margin-top:12px"><div class="ch">Coach's changes <em>· it adjusts the bots by itself and notes each change here</em></div><div class="cb">${log}<div class="note">${h(t.note)}</div></div></div>
+      <div class="grid g3" style="margin-top:12px">${bots}</div>`;
   }
 
   // ---------------------------------------------------------------- LAB
@@ -480,8 +508,8 @@
   }
   function coachAgent() {
     const k = D.coach, held = k ? k.charts.filter((c) => c.ok && /held/.test(c.role)) : [];
-    return { id: "coach", name: "COACH", role: "reviewer · chart reads, trade journals, −20% stress test", x: 0, z: -5, busy: !k && !D.coachErr,
-      now: k ? `${k.flags.length} thing${k.flags.length === 1 ? "" : "s"} to fix · ${held.filter((c) => c.signal === "Sell").length} held stock${held.filter((c) => c.signal === "Sell").length === 1 ? "" : "s"} read Sell` : D.coachErr ? "Offline" : "Reviewing the other bots…",
+    return { id: "coach", name: "COACH", role: "coach · fixes the bots by itself, reviews journals, chart reads, −20% stress test", x: 0, z: -5, busy: !k && !D.coachErr,
+      now: k ? (() => { const wk = Date.now() - 7 * 864e5, n = k.tuner ? k.tuner.log.filter((e) => e.t > wk && e.action !== "kept").length : 0; return `${n} change${n === 1 ? "" : "s"} to the bots this week · ${held.filter((c) => c.signal === "Sell").length} held stock${held.filter((c) => c.signal === "Sell").length === 1 ? "" : "s"} read Sell`; })() : D.coachErr ? "Offline" : "Reviewing the other bots…",
       why: "Never trades. Checks the other bots' work with fixed rules and real prices.", found: k && k.flags[0] ? k.flags[0] : "—", next: "Re-checks every 2 hours." };
   }
   const room = { hits: [], drag: null };
