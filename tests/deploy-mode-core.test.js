@@ -88,3 +88,14 @@ test("Bot HQ is never served by the public demo server", () => {
   assert.equal(DM3.pageRedirect("public", "/hq"), "/demo");
   assert.equal(DM3.pageRedirect("local", "/hq"), null);
 });
+
+test("bot hours: awake Mon–Fri 6 AM – 5 PM New York, asleep otherwise (EST and EDT)", () => {
+  const DMX = require("../deploy-mode-core.js"), at = (iso) => DMX.awakeWindow(Date.parse(iso));
+  assert.equal(at("2026-11-24T10:59:00Z"), false, "Tue 5:59 AM EST");
+  assert.equal(at("2026-11-24T11:00:00Z"), true, "Tue 6:00 AM EST");
+  assert.equal(at("2026-11-24T21:59:00Z"), true, "Tue 4:59 PM EST");
+  assert.equal(at("2026-11-24T22:00:00Z"), false, "Tue 5:00 PM EST");
+  assert.equal(at("2026-07-14T10:00:00Z"), true, "Tue 6:00 AM EDT");
+  assert.equal(at("2026-07-14T21:00:00Z"), false, "Tue 5:00 PM EDT");
+  assert.equal(at("2026-11-28T15:00:00Z"), false, "Saturday");
+});

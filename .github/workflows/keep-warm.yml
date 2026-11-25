@@ -1,16 +1,26 @@
-# Render's free plan puts the site to sleep after ~15 minutes with no visitors,
-# so the next visitor waits while it wakes up. This pings the health check every
-# 10 minutes during the day (Eastern time) so the site is ready when someone opens it.
+# Bot hours: Mon–Fri 6:00 AM – 5:00 PM New York time.
+# Render's free plan puts the site to sleep after ~15 minutes with no visitors. Once awake, the server keeps itself
+# awake until 5 PM by visiting its own address every 9 minutes (server.js, DM.awakeWindow). This workflow is the alarm
+# clock that wakes it in the morning (and again if it ever falls asleep during bot hours). GitHub runs scheduled jobs
+# late and less often than asked under load, so it tries every 10 minutes; any one success is enough.
+# Free: GitHub Actions minutes are free for public repositories. ~240 of Render's 750 free hours a month.
 name: Keep site awake
 
 on:
   schedule:
-    - cron: "*/10 11-23,0-3 * * *" # every 10 minutes, about 7 AM to 11 PM Eastern
+    - cron: "*/10 10-21 * * 1-5" # UTC; covers 6 AM – 5 PM New York in both EST and EDT (the step checks the exact time)
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping the site
-        run: curl -fsS --max-time 60 https://my-terminal-28tq.onrender.com/api/health || true
+      - name: Wake the site during bot hours
+        run: |
+          d=$(TZ=America/New_York date +%u)
+          hm=$(TZ=America/New_York date +%H%M)
+          if [ "$d" -le 5 ] && [ $((10#$hm)) -ge 600 ] && [ $((10#$hm)) -lt 1700 ]; then
+            curl -fsS --max-time 90 https://my-terminal-28tq.onrender.com/api/health || true
+          else
+            echo "Outside bot hours (New York $hm, day $d): letting the site sleep."
+          fi

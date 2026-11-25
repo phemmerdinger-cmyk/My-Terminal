@@ -2567,6 +2567,13 @@ async function mtTick() {
     if (done.length || fee || m.open || !st.lastSaved || Date.now() - st.lastSaved > 30 * 60e3) { st.lastSaved = Date.now(); await mtStore.set("book", st); }
   });
 }
+// Keep the bots awake Mon–Fri 6 AM – 5 PM ET on Render's free plan: while awake, the server visits its own public
+// address every 9 minutes (Render sleeps a free service after 15 minutes without inbound traffic). After 5 PM it
+// stops and the service sleeps. The GitHub "Keep site awake" workflow wakes it in the morning.
+if (DEPLOY.runJobs && process.env.RENDER_EXTERNAL_URL && !process.env.AP_TEST) {
+  const selfUrl = String(process.env.RENDER_EXTERNAL_URL).replace(/\/+$/, "") + "/api/health";
+  setInterval(() => { if (DM.awakeWindow()) fetch(selfUrl, { signal: AbortSignal.timeout(20_000) }).catch(() => {}); }, 9 * 60_000).unref();
+}
 if (DEPLOY.runJobs) setTimeout(() => { mtTick().catch((e) => diagErr("my", e)); setInterval(() => mtTick().catch((e) => diagErr("my", e)), 60e3); }, process.env.AP_TEST ? 4000 : 50_000);
 async function mtView() {
   const st = await mtLoad(), syms = Object.keys(st.positions);

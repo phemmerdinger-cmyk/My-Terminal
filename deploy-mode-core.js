@@ -110,4 +110,13 @@ function hqPage(pathname, owner) {
   return null;
 }
 
-module.exports = { HQ_API, hqAccess, hqPage, MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute, clientIp };
+// Bot hours on the free host: Mon–Fri 6:00 AM – 5:00 PM New York time the server keeps itself awake (Render's free plan
+// sleeps after 15 minutes without visitors). ~11 h × ~22 weekdays ≈ 240 of the 750 free hours a month.
+const AWAKE = { from: 6 * 60, to: 17 * 60 };
+const etClock = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+function awakeWindow(now = Date.now()) {
+  const p = Object.fromEntries(etClock.formatToParts(new Date(now)).map((x) => [x.type, x.value]));
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(p.weekday), min = (+p.hour % 24) * 60 + +p.minute;
+  return wd >= 1 && wd <= 5 && min >= AWAKE.from && min < AWAKE.to;
+}
+module.exports = { AWAKE, awakeWindow, HQ_API, hqAccess, hqPage, MODES, MIN_TOKEN, parseMode, tokenOk, access, pageRedirect, isRemoteRoute, clientIp };
