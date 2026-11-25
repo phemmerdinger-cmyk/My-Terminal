@@ -46,7 +46,7 @@ const SOURCES = [
   ["Larry Connors · RSI(2)", "Buy above the 200-day average when the 2-period RSI drops under 10; exit on a close above the 5-day average. The lab adds an 8% stop and a 7-session limit.", "https://chartschool.stockcharts.com/table-of-contents/trading-strategies-and-models/trading-strategies/rsi-2"],
   ["Mebane Faber", "Faber's tactical allocation paper uses long moving averages to step out of falling assets. The sector bot holds the 3 strongest sector funds only while each is above its 200-day average.", "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=962461"],
   ["Bernard and Thomas", "They document prices drifting after earnings surprises. The lab requires a 5% EPS beat confirmed by a 2% up day and holds up to 40 sessions.", "https://www.jstor.org/stable/2491062"],
-  ["Cohen, Malloy and Pomorski", "They find predictive power in opportunistic, not routine, insider trades. The spider's Form 4 findings don't separate the two, so the lab requires two or more different insiders buying on the open market.", "https://www.nber.org/papers/w16454"],
+  ["Cohen, Malloy and Pomorski", "They find predictive power in opportunistic, not routine, insider trades. The spider leaves out pre-set 10b5-1 plan trades and amended repeats, but doesn't otherwise tell routine from opportunistic buying, so the lab requires two or more different insiders buying on the open market.", "https://www.nber.org/papers/w16454"],
 ].map(([title, summary, url]) => ({ title, summary, url }));
 
 function quarterlyComparison(facts, sessionDay, observedAt) {

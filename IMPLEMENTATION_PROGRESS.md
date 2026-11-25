@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Insider data checks for the bots (2026-11-24)
+- `insider-core.js` (tests/insider-core.test.js) now builds the spider's Form 4 signal, which feeds the insider-buying lab bot, the swing bot's research score and pre-buy check. Applied lessons from insider-data pitfalls: only open-market P/S trades count (grants, exercises, tax withholding don't); 10b5-1 plan trades are left out of both buys and sells (before, only plan sales were); amended filings (4/A) repeating a trade count once (before, twice); a price far from the window's other prices is flagged and its dollars left out of totals (share counts kept); the 90-day window is on the trade date.
+- `insiderScan(sym, { window: 90 })` reads every Form 4 back to the window (up to 60) instead of the 30 most recent from 12 months, and reports whether it got there. A partial scan is named in the finding's headline and lowers its confidence. The 10-K crawler's own insider view is unchanged.
+- Findings show traded vs filed dates and say when a filed price looks wrong.
+
 ### Bots vs S&P 500 — easier to read for a personal trader (2026-11-24)
 - Page order: scoreboard → the race chart and holdings → under the hood → test runs. Risk desk, Strategy Lab, day-volume panel, put/call gauge and market signals moved into a collapsed "Advanced" section; a "What the terms on this page mean" glossary sits under it.
 - No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline between the two big numbers just says "Ahead of the S&P" / "Behind the S&P" and by how many dollars. Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).

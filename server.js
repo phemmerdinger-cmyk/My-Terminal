@@ -3810,12 +3810,17 @@ async function filingDoc(sym) {
 // 1) Insider scanner — the company's Form 4 filings from the last 12 months (who traded, buy or sell, size, price,
 //    10b5-1 plan or not). Form 4 XML is structured, so this is exact. Up to 30 filings, cached 6 hours.
 // value of a Form 4 field: <tag><value>x</value>…</tag> (footnote references can sit beside the value) or <tag>x</tag>
+const INSC = require("./insider-core.js");
 const xv = (x, tag) => { const m = x.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, "i")); if (!m) return null; const v = m[1].match(/<value>\s*([^<]*?)\s*<\/value>/i); return (v ? v[1] : m[1].replace(/<[^>]+>/g, "")).trim(); };
-async function insiderScan(symIn) {
+// opt.window (days): read every Form 4 back to that window (insider-core.pickFilings, up to 60) for the spider's signal;
+// without it, the 10-K crawler's view: the last 12 months, up to 30 most recent.
+async function insiderScan(symIn, opt = {}) {
   const id = await secCik(symIn); if (!id) return { symbol: String(symIn).toUpperCase(), available: false, reason: "Not an SEC filer." };
-  return cached("sec:ins:" + id.sym, 6 * 3600e3, async () => {
-    const r = (await secSubs(id.cik)).filings.recent, since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10), picks = [];
-    for (let i = 0; i < r.form.length && picks.length < 30; i++) if ((r.form[i] === "4" || r.form[i] === "4/A") && r.filingDate[i] >= since) picks.push(i);
+  return cached("sec:ins:" + id.sym + (opt.window ? ":w" + opt.window : ""), 6 * 3600e3, async () => {
+    const r = (await secSubs(id.cik)).filings.recent, since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    let picks = [], complete = null;
+    if (opt.window) ({ picks, complete } = INSC.pickFilings(r, { days: opt.window }));
+    else for (let i = 0; i < r.form.length && picks.length < 30; i++) if ((r.form[i] === "4" || r.form[i] === "4/A") && r.filingDate[i] >= since) picks.push(i);
     const filings = [];
     for (const i of picks) {
       const url = edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i].replace(/^xsl[^/]+\//, ""));
@@ -3833,7 +3838,8 @@ async function insiderScan(symIn) {
         filings.push({ filed: r.filingDate[i], accession: r.accessionNumber[i], url: edgarUrl(id.cik, r.accessionNumber[i], r.primaryDocument[i]), owner: (xv(owner, "rptOwnerName") || "").replace(/\s+/g, " "), role: role.join(", ") || "Other", officer: /chief|ceo|cfo|coo|president|officer|chair|evp|svp|vice president|general counsel|treasurer|controller/i.test(role.join(" ")), tx });
       } catch (e) { /* skip one unreadable filing */ }
     }
-    return { symbol: id.sym, available: true, name: id.name, cik: id.cik, since, filings, source: "SEC EDGAR Form 4 filings (last 12 months, up to 30 most recent)" };
+    return { symbol: id.sym, available: true, name: id.name, cik: id.cik, since, filings, complete, read: filings.length, picked: picks.length,
+      source: opt.window ? `SEC EDGAR Form 4 filings (every filing back ${opt.window} days, up to 60)` : "SEC EDGAR Form 4 filings (last 12 months, up to 30 most recent)" };
   });
 }
 // 2) Earnings release auditor — the latest 8-K under Item 2.02 (results) and its press-release exhibit (EX-99.1):
@@ -4170,7 +4176,7 @@ const SPIDER = process.env.SPIDER_OFF || !DEPLOY.runJobs ? null : createSpider({
   macro: () => macroData(),
   filings: (syms) => latestFilings(syms),
   release: (sym) => earningsRelease(sym),
-  insiders: (sym) => insiderScan(sym),
+  insiders: (sym) => insiderScan(sym, { window: 90 }),
   fundamentals: (sym) => secFundamentals(sym),
   health: (y, p) => FINS.health(y, p),
   analyst: (sym) => { const r = BB.ratings[String(sym).replace("-", ".")]; return r && r.n >= BB_MIN_N ? { adj: bbAdj(r), n: r.n } : null; },

@@ -21,6 +21,7 @@
 "use strict";
 const { createStore } = require("./store");
 const { buildBriefing } = require("./briefing");
+const INS = require("../insider-core.js");
 
 const DAY = 864e5, HOUR = 3600e3, MIN = 60e3;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -846,18 +847,18 @@ function createSpider(deps) {
       const s = c.sym; c.phase("fetch", `Reading ${s}'s Form 4 filings from EDGAR (up to 30)`);
       const R = await deps.insiders(s);
       if (!R || !R.available) return { summary: (R && R.reason) || "No insider data" };
-      c.phase("analyze", "Separating open-market buys and sells from plan sales and grants");
-      const since = now() - 90 * DAY, tx = [];
-      for (const f of R.filings || []) for (const t of f.tx || []) if (Date.parse(t.date) >= since && (t.code === "P" || t.code === "S")) tx.push({ ...t, owner: f.owner, role: f.role, officer: f.officer, url: f.url });
-      const buys = tx.filter((t) => t.code === "P"), sells = tx.filter((t) => t.code === "S" && !t.plan10b51);
-      const bv = buys.reduce((a, t) => a + t.value, 0), sv = sells.reduce((a, t) => a + t.value, 0), buyers = uniq(buys.map((t) => t.owner));
-      if (!buys.length && sv < 5e6) return { summary: `${tx.length} open-market trades in 90 days — nothing notable` };
+      c.phase("analyze", "Separating open-market buys and sells from grants, exercises, 10b5-1 plans and amended repeats");
+      // insider-core: open-market (P/S) only, 10b5-1 plan trades out, 4/A repeats once, implausible prices out of the dollar totals
+      const S = INS.summarize(R.filings || [], { now: now(), days: 90, complete: R.complete !== false && R.read === R.picked });
+      const tx = [...S.buys, ...S.sells], buys = S.buys, sells = S.sells, bv = S.buyValue, sv = S.sellValue, buyers = S.buyers;
+      if (S.notes.length) c.phase("analyze", S.notes.join(" "));
+      if (!buys.length && sv < 5e6) return { summary: `${tx.length} discretionary open-market trades in 90 days — nothing notable${S.notes.length ? ". " + S.notes.join(" ") : ""}` };
       const cluster = buyers.length >= 2;
-      c.discover({ key: `ins:${s}:${(R.filings[0] || {}).accession || et().day}`, cat: "insider", tickers: [s], headline: buys.length ? `${s}: ${buyers.length} insider${buyers.length > 1 ? "s" : ""} bought ${money(bv)} on the open market (90 days)` : `${s}: insiders sold ${money(sv)} outside pre-set plans (90 days)`,
-        summary: `${buys.length ? `Buyers: ${buyers.slice(0, 3).join(", ")}. ` : ""}${sells.length ? `Discretionary sales ${money(sv)} by ${uniq(sells.map((t) => t.owner)).slice(0, 3).join(", ")}.` : ""}`,
-        facts: [...buys.slice(0, 3), ...sells.slice(0, 2)].map((t) => ({ text: `${t.owner} (${t.role}) ${t.code === "P" ? "bought" : "sold"} ${Math.round(t.shares).toLocaleString()} shares at $${t.price.toFixed(2)} on ${t.date}`, src: "SEC Form 4", at: Date.parse(t.date) })),
+      c.discover({ key: `ins:${s}:${(R.filings[0] || {}).accession || et().day}`, cat: "insider", tickers: [s], headline: buys.length ? `${s}: ${buyers.length} insider${buyers.length > 1 ? "s" : ""} bought ${bv > 0 ? money(bv) : Math.round(S.buyShares).toLocaleString() + " shares"} on the open market (90 days${S.complete ? "" : ", partial scan"})` : `${s}: insiders sold ${money(sv)} outside pre-set plans (90 days${S.complete ? "" : ", partial scan"})`,
+        summary: `${buys.length ? `Buyers: ${buyers.slice(0, 3).join(", ")}. ` : ""}${sells.length ? `Discretionary sales ${money(sv)} by ${uniq(sells.map((t) => t.owner)).slice(0, 3).join(", ")}. ` : ""}${S.notes.join(" ")}`.trim(),
+        facts: [...buys.slice(0, 3), ...sells.slice(0, 2)].map((t) => ({ text: `${t.owner} (${t.role}) ${t.code === "P" ? "bought" : "sold"} ${Math.round(t.shares).toLocaleString()} shares ${t.amountSuspect ? "(the filed price looks wrong, so no dollar value)" : `at $${t.price.toFixed(2)}`} on ${t.date} (traded; filed ${t.filed})`, src: "SEC Form 4", at: Date.parse(t.date) })),
         interp: { text: buys.length ? (cluster ? "Several insiders buying with their own money is one of the more informative insider signals." : "A single open-market purchase is a mildly positive signal.") : "Discretionary selling has many motives (taxes, diversification); it is a weak signal on its own.", kind: "interpretation" },
-        mag: buys.length ? (cluster ? 0.8 : 0.5) : 0.4, tone: buys.length ? (cluster ? 2 : 1) : -1, conf: 0.8, sources: [{ name: "SEC EDGAR Form 4", url: (buys[0] || sells[0] || {}).url, at: now() }],
+        mag: buys.length ? (cluster ? 0.8 : 0.5) : 0.4, tone: buys.length ? (cluster ? 2 : 1) : -1, conf: S.complete ? 0.8 : 0.6, sources: [{ name: "SEC EDGAR Form 4", url: (buys[0] || sells[0] || {}).url, at: now() }],
         links: [{ label: "Insider trades", go: `#filings/${s}/insiders` }], hyp: buys.length && cluster && SP.has(s) ? { sym: s, dir: 1, days: 14, claim: `With an insider buying cluster, ${s} should beat the S&P 500 over the next two weeks.` } : null });
       return { summary: `${buys.length} buys, ${sells.length} discretionary sells` };
     },
