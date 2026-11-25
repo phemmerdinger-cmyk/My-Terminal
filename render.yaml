@@ -19,5 +19,9 @@ services:
         sync: false
       - key: DESK_TOKEN
         sync: false
+      # With MODE=public, setting SITE_PASSWORD turns on the owner site: the full desk at / and Bot HQ at /hq,
+      # behind this password, so everything works with the laptop off. Leave it unset for a bots-only server.
+      - key: SITE_PASSWORD
+        sync: false
       - key: NODE_VERSION
         value: "22"

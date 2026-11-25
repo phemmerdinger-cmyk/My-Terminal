@@ -290,3 +290,7 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - What the bots do with it: holding alerts (under stop / 5%+ gap, with $ impact); swing bot skips NEW buys in 5%+ gappers for the first 30 min after the open; day trader scans the biggest gappers first; swing plan orders are tagged with their pre-market price; the Coach chat (Gemini) sees the pre-market summary.
 - `/api/premarket` (owner-only; proxied from the laptop and Bot HQ). Bot HQ → Coach page shows the Pre-Market Desk card.
 - No paper fills happen in extended hours (thin quotes, wide spreads); fills stay in the regular session.
+
+### Owner site on Render (2026-11-25)
+- `MODE=public` + `SITE_PASSWORD` = owner site (`DEPLOY.ownerSite`): the full desk at `/` and Bot HQ at `/hq` behind the password (scrypt cookie, 8 tries / 15 min lockout), so the website works with the laptop off. The laptop desk keeps working through DESK_TOKEN. Without SITE_PASSWORD the public server is unchanged (bots-only, 404 everywhere else). Tested in deploy-mode-core and by a local smoke run.
+- Free-plan note: awake 6 AM–5 PM ET weekdays (self-ping); outside that the first visit wakes it in about a minute.

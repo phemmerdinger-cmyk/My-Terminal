@@ -5274,7 +5274,7 @@ renderNotif(); renderToolbar(); renderWL();
 /* ---------- start-up: Claude budget, live prices, first page, refresh timers ---------- */
 function budgetPoll(){ api("/api/health").then(j=>{ S.claudeBudget=j.claudeBudget||null; S.claudeOn=!!(j.serverKey&&j.claudeDailyLimit); const b=S.claudeBudget, el=$("clBud"); if(el&&b){ el.hidden=false; el.textContent="$"+b.left.toFixed(2)+" left"; el.className="cl-bud"+(b.left<0.5?" low":b.left<1.5?" mid":""); el.title=`Claude budget: $${b.spent.toFixed(2)} of $${b.budget.toFixed(2)} spent · $${b.today.toFixed(2)} today (cap $${b.dailyCap.toFixed(2)}/day) · ${b.calls} calls`; } if(typeof renderApiBal==="function") renderApiBal(); }).catch(()=>{}); }
 setInterval(()=>{ if(!document.hidden) budgetPoll(); },60e3); setTimeout(budgetPoll,1500);
-api("/api/health").then(j=>{if(!VIEW&&j.hqUrl&&/^(https?:\/\/)/.test(j.hqUrl)){const hb=$("hqBtn");hb.href=j.hqUrl;hb.hidden=false;} S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
+api("/api/health").then(j=>{if(!VIEW&&j.hqUrl&&/^(https?:\/\/|\/hq$)/.test(j.hqUrl)){const hb=$("hqBtn");hb.href=j.hqUrl;hb.hidden=false;} S.serverKey=!!j.serverKey; streamOn=!!j.streaming; startStream(); if(S.tab==="predict") renderPredict();}).catch(()=>{});
 const requestedTab = location.hash.slice(1);
 const initialTab = ({newss:"news",web:"studio-graph",studio:"studio-strategies",home:"data",charts:"research"})[requestedTab] || requestedTab;
 const rqDeep=String(requestedTab||"").match(/^research\/([A-Za-z0-9.^=\-]{1,12})$/);

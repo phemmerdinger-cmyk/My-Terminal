@@ -867,7 +867,7 @@ if (process.env.SITE_PASSWORD) SITE_CHECK = nodeCrypto.createHash("sha256").upda
 const keyOk = (hex) => /^[0-9a-f]{64}$/.test(hex || "") && nodeCrypto.timingSafeEqual(nodeCrypto.createHash("sha256").update(Buffer.from(hex, "hex")).digest(), Buffer.from(SITE_CHECK, "hex"));
 const cookieOf = (req, name) => { const m = String(req.headers.cookie || "").match(new RegExp("(?:^|;\\s*)" + name + "=([^;]+)")); return m ? decodeURIComponent(m[1]) : ""; };
 // local mode: only this computer can connect (127.0.0.1), so everyone here is the owner; public mode: nobody is
-const isOwner = (req) => DEPLOY.mode === "local" || (DEPLOY.mode !== "public" && keyOk(cookieOf(req, "md_owner")));
+const isOwner = (req) => DEPLOY.mode === "local" || ((DEPLOY.mode !== "public" || DEPLOY.ownerSite) && keyOk(cookieOf(req, "md_owner")));
 const loginTries = new Map();
 function siteLogin(req, pw) {
   const ip = DM.clientIp(req.headers, req.socket.remoteAddress);
@@ -4715,7 +4715,11 @@ function handleDashboard(req, res) {
   const pathname = new URL(req.url, "http://x").pathname;
   const noStore = { "Cache-Control": "no-store" };
   if (/^\/demo(?:\/|$)/i.test(pathname)) return send(res, 404, "Not found", "text/plain", noStore);
-  if (DEPLOY.mode === "public") {
+  if (DEPLOY.mode === "public" && DEPLOY.ownerSite) { // owner site: pages + owner API behind the password; the laptop desk still uses DESK_TOKEN
+    if (pathname.startsWith("/api/") && pathname !== "/api/login" && pathname !== "/api/health" && !isOwner(req) &&
+        !(DM.isRemoteRoute(pathname) && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token)))
+      return send(res, 401, { error: "This part of Market Desk is private.", code: "private" }, "application/json", noStore);
+  } else if (DEPLOY.mode === "public") {
     if (pathname === "/api/health" && (req.method === "GET" || req.method === "HEAD")) return send(res, 200, { ok: true }, "application/json", noStore);
     if (!DM.isRemoteRoute(pathname) || !DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token)) return send(res, 404, { error: "Not found" }, "application/json", noStore);
   } else if (DEPLOY.mode === "" && pathname.startsWith("/api/") && pathname !== "/api/login" && pathname !== "/api/health" && !isOwner(req)) {
@@ -4792,7 +4796,7 @@ async function handle(req, res) {
       if (u.pathname.startsWith("/api/")) {
         const owner = isOwner(req), token = DEPLOY.mode === "public" && DM.tokenOk(req.headers["x-desk-token"], DEPLOY.token);
         if (u.pathname !== "/api/stream" && u.pathname !== "/api/health" && rateLimited(req, owner || token)) return send(res, 429, { error: "Too many requests — slow down for a minute." }, "application/json", { "Retry-After": "60" });
-        const act = DM.access({ mode: DEPLOY.mode, path: u.pathname, owner, token, isPublic: isPublicApi(u, req) });
+        const act = DM.access({ mode: DEPLOY.mode, path: u.pathname, owner, token, isPublic: isPublicApi(u, req), ownerSite: DEPLOY.ownerSite });
         if (act === "notfound") return send(res, 404, { error: "Not found" });
         if (act === "deny") return send(res, 401, { error: "This part of Market Desk is private.", code: "private" });
         if (act === "proxy") return proxyToPublic(req, res, u);
@@ -4984,11 +4988,12 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: typeof WebSocket !== "undefined", stocksStreaming: !!FINNHUB, feeds: { yahoo: YGATE.stats(), coinbase: cb.open }, streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : DEPLOY.ownerSite ? "/hq" : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: typeof WebSocket !== "undefined", stocksStreaming: !!FINNHUB, feeds: { yahoo: YGATE.stats(), coinbase: cb.open }, streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // The dashboard is owner-only.
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });
-      { const to = DM.pageRedirect(DEPLOY.mode, u.pathname); if (to) return go(to); }
+      { const to = DM.pageRedirect(DEPLOY.mode, u.pathname, DEPLOY.ownerSite); if (to) return go(to); }
+      if (DEPLOY.ownerSite && u.pathname === "/hq") return owner ? serveFile(req, res, path.join(PUBLIC, "hq.html")) : go("/login"); // Bot HQ on the same site
       if (u.pathname === "/login") return owner ? go("/") : send(res, 200, LOGIN_HTML, "text/html; charset=utf-8");
       if (u.pathname === "/logout") return go("/login", { "Set-Cookie": "md_owner=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax" });
       if (u.pathname === "/sp500.json") return send(res, 200, { ...SP500_META, rows: SP500 }, "application/json", { "Cache-Control": "public, max-age=3600" });

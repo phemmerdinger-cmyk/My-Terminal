@@ -4,6 +4,8 @@
 //   MODE=public — the internet-facing server (Render). Only the demo. No sign-in page, no Claude, and
 //                 owner-only routes do not exist (404). It still runs the paper bots and THE WEB, and it
 //                 answers the owner's bot/data routes only for requests carrying DESK_TOKEN.
+//                 With SITE_PASSWORD set it is also the owner's website ("owner site"): the full desk at / and
+//                 Bot HQ at /hq behind that password, so everything works with the owner's laptop off.
 //   MODE=local  — the owner's desk on their own computer. Listens on 127.0.0.1 only, so no password is
 //                 needed. Does not run the bots (the public server does); their routes and the owner's
 //                 saved data are forwarded to PUBLIC_URL with DESK_TOKEN. It also serves Bot HQ as a separate
@@ -42,6 +44,7 @@ function parseMode(env = {}) {
   }
   return Object.freeze({
     mode, token, publicUrl,
+    ownerSite: mode === "public" && !!String(env.SITE_PASSWORD || "").trim(), // the full site, behind the owner password
     runJobs: mode !== "local" && mode !== "hq", // only one server may trade the paper books and write their state
     host: mode === "local" ? "127.0.0.1" : undefined,
     remoteReady: (mode === "local" || mode === "hq") && !!publicUrl && !!token,
@@ -57,18 +60,21 @@ function tokenOk(header, token) {
 }
 
 // What the server should do with an /api/ request: "serve", "proxy", "deny" (401) or "notfound" (404).
-function access({ mode, path, owner = false, isPublic = false, token = false }) {
+function access({ mode, path, owner = false, isPublic = false, token = false, ownerSite = false }) {
   if (mode === "local") return isRemoteRoute(path) ? "proxy" : "serve";
   if (mode === "public") {
-    if (path === "/api/login") return "notfound"; // there is no sign-in on the public server
+    if (path === "/api/login") return ownerSite ? "serve" : "notfound"; // sign-in exists only when the owner site is on
     if (isPublic) return "serve";
-    return token && isRemoteRoute(path) ? "serve" : "notfound";
+    if (token && isRemoteRoute(path)) return "serve";
+    if (ownerSite) return owner ? "serve" : "deny";
+    return "notfound";
   }
   return owner || isPublic ? "serve" : "deny";
 }
 
 // Where a page request goes in each mode; null = serve normally.
-function pageRedirect(mode, pathname) {
+function pageRedirect(mode, pathname, ownerSite = false) {
+  if (mode === "public" && ownerSite) return pathname === "/hq/" ? "/hq" : null; // owner site: pages behave like the private site
   if (mode === "public") {
     if (pathname === "/ai-vs-sp500") return "/demo#aitrade";
     if (["/", "/index.html", "/login", "/logout", "/hq", "/hq/"].includes(pathname)) return "/demo";

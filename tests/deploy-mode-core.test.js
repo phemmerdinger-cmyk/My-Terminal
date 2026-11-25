@@ -99,3 +99,20 @@ test("bot hours: awake Mon–Fri 6 AM – 5 PM New York, asleep otherwise (EST a
   assert.equal(at("2026-07-14T21:00:00Z"), false, "Tue 5:00 PM EDT");
   assert.equal(at("2026-11-28T15:00:00Z"), false, "Saturday");
 });
+
+test("owner site: a public server with SITE_PASSWORD serves the full desk behind the password, and still takes the desk token", () => {
+  const D = require("../deploy-mode-core.js");
+  assert.equal(D.parseMode({ MODE: "public", SITE_PASSWORD: "pw" }).ownerSite, true);
+  assert.equal(D.parseMode({ MODE: "public" }).ownerSite, false);
+  assert.equal(D.parseMode({ MODE: "local", SITE_PASSWORD: "pw" }).ownerSite, false);
+  const a = (o) => D.access({ mode: "public", ownerSite: true, ...o });
+  assert.equal(a({ path: "/api/login" }), "serve");
+  assert.equal(a({ path: "/api/quotes" }), "deny");
+  assert.equal(a({ path: "/api/quotes", owner: true }), "serve");
+  assert.equal(a({ path: "/api/autopilot", token: true }), "serve");
+  assert.equal(D.access({ mode: "public", path: "/api/login" }), "notfound"); // unchanged without the password
+  assert.equal(D.access({ mode: "public", path: "/api/quotes" }), "notfound");
+  assert.equal(D.pageRedirect("public", "/", true), null);
+  assert.equal(D.pageRedirect("public", "/hq/", true), "/hq");
+  assert.equal(D.pageRedirect("public", "/"), "/demo");
+});
