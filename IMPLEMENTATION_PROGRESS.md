@@ -275,3 +275,7 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 - Without Upstash keys, `/api/desk` lives in Render's temp folder (wiped on redeploy); localStorage copy + Export cover that.
 - Briefing "since last visit" uses the previous session ≥30 min old, per browser profile (synced via desk doc).
 - "Strategy drawdown" and "thesis contradiction" priorities wait for Phases 3/5.
+
+### Gemini in the Coach chat + Research Assistant (2026-11-25)
+- Coach chat: Gemini gets a 4096-token budget (thinking models spend tokens before answering), JSON replies are read even inside code fences, and greetings/questions the rules don't recognise go to Gemini instead of the help text. Parse failures show in `ai.lastError`.
+- Research Assistant (`/api/web/ask`, runs on the public server): when `GEMINI_API_KEY` is set and Claude isn't requested, Gemini writes the answer from the Spider's numbered evidence (cites [n]). With no matching research it answers in plain English but is told not to state prices, figures or news. The UI labels which model wrote the answer. Falls back to the rules answer on any error.

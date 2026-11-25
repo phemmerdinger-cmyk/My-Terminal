@@ -4534,7 +4534,10 @@ async function webRoute(req, res, u) {
       if (!ipAllowed(req)) return send(res, 429, { error: "Hourly Claude limit reached." });
       claudeFn = async (prompt) => { const j = await anthropic(process.env.ANTHROPIC_API_KEY, { model: MODEL, max_tokens: 900, system: "You are a careful financial research assistant. Use only the evidence given. Cite as [n]. Never invent numbers.", messages: [{ role: "user", content: prompt }] }); return (j.content || []).filter((x) => x.type === "text").map((x) => x.text).join(""); };
     }
-    try { return send(res, 200, await SPIDER.ask(String(b.question || "").slice(0, 600), { claude: claudeFn })); }
+    let opts = { claude: claudeFn };
+    if (!claudeFn && GEMINI_KEY) // free Gemini writes the answer from the cited evidence (and handles plain-English questions)
+      opts = { claude: (prompt) => gemini({ system: "You are a careful financial research assistant. Use only the evidence given. Cite as [n]. Never invent numbers.", text: prompt, maxTokens: 900 }), modelName: "gemini", general: true };
+    try { return send(res, 200, { ...(await SPIDER.ask(String(b.question || "").slice(0, 600), opts)), ai: geminiInfo() }); }
     catch (e) { return send(res, 502, { error: String(e.message || e) }); }
   }
   return send(res, 404, { error: "unknown THE WEB endpoint" });

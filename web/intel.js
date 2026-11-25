@@ -86,7 +86,7 @@ function tickersIn(q, SP, tracked) {
   return uniq(out).slice(0, 4);
 }
 
-async function ask({ question, spider, ST, DISC, BIDX, SP, sectorOf, nameOf, held, tracked, now, claude }) {
+async function ask({ question, spider, ST, DISC, BIDX, SP, sectorOf, nameOf, held, tracked, now, claude, modelName = "claude", general = false }) {
   const q = String(question || "").trim().slice(0, 600);
   if (!q) return { answer: "Ask me about the market, your portfolio, a company or a sector.", citations: [], did: [], mode: "rules" };
   const C = [], did = [];
@@ -177,12 +177,17 @@ async function ask({ question, spider, ST, DISC, BIDX, SP, sectorOf, nameOf, hel
   }
 
   let answer = lines.join("\n"), mode = "rules";
-  if (claude && C.length) {
+  if (claude && (C.length || general)) {
     try {
+      if (!C.length) { // no stored research matched (a greeting, a general question): answer in plain English, but no made-up data
+        const txt = await claude(`You are the Spider, the research assistant in a personal market terminal. There is no stored research that matches this question. Answer it helpfully in plain English (greetings, general finance/investing concepts, how to use the research tools). Do NOT state any current prices, percentages, earnings figures, dates of events or news as fact, because you have no live data here; if the question needs them, say the terminal has no stored research on it yet and suggest asking about a specific ticker. Under 150 words, plain text.\n\nQUESTION: ${q}\n\nRULES-BASED NOTE:\n${answer}`);
+        if (txt && txt.trim()) { answer = txt.trim(); mode = modelName; }
+        return { answer, citations: C, did, intent, mode, tickers: syms, t: now };
+      }
       const ev = C.map((c, i) => `[${i + 1}] (${c.cat}, ${new Date(c.u).toISOString().slice(0, 16)}Z, ${c.kind}) ${c.headline} — sources: ${c.sources.map((s) => s.name).join(", ")}`).join("\n");
       const txt = await claude(`You are the Spider, the research agent in a personal market terminal. Answer the user's question using ONLY the numbered evidence below and the rules-based draft. Cite evidence as [n]. If the evidence doesn't answer something, say so. Never invent prices, numbers or events. Under 200 words, plain text with '- ' bullets allowed.\n\nQUESTION: ${q}\n\nEVIDENCE:\n${ev}\n\nRULES-BASED DRAFT:\n${answer}`);
-      if (txt && txt.trim()) { answer = txt.trim(); mode = "claude"; }
-    } catch (e) { did.push("Claude narrative unavailable (" + String(e.message || e).slice(0, 80) + ") — showing the rules-based answer"); }
+      if (txt && txt.trim()) { answer = txt.trim(); mode = modelName; }
+    } catch (e) { did.push((modelName === "gemini" ? "Gemini" : "Claude") + " narrative unavailable (" + String(e.message || e).slice(0, 80) + ") — showing the rules-based answer"); }
   }
   return { answer, citations: C, did, intent, mode, tickers: syms, t: now };
 }

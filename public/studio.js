@@ -320,7 +320,7 @@
     out.textContent="Spider is checking saved research and citations…";
     try{
       const r=await api("/api/web/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:q,useClaude:false})});
-      out.innerHTML = '<div class="mds-answer"><h3>Research Answer <small>rules-based · $0 model cost</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
+      out.innerHTML = '<div class="mds-answer"><h3>Research Answer <small>'+(r.mode==="gemini"?"written by Gemini (free) "+(r.citations&&r.citations.length?"from the cited evidence":"· no stored research matched, so no live data"):r.mode==="claude"?"written by Claude (uses credits)":"rules-based · $0 model cost")+'</small></h3><pre id="mdsAnswerText"></pre><div id="mdsAnswerCites"></div></div>';
       byId("mdsAnswerText").textContent=r.answer || "No sourced answer available.";
       const c=byId("mdsAnswerCites");
       if(r.citations && r.citations.length)c.innerHTML='<h4>Evidence Cited</h4>'+r.citations.slice(0,12).map((d,i)=>`<div class="mds-cite">[${i+1}] ${clean(d.headline || d.title || d.id || "Finding")}${(d.sources||[]).filter((s)=>link(s.url)).slice(0,2).map((s)=>` · <a href="${clean(s.url)}" target="_blank" rel="noopener noreferrer">${clean(s.name)}</a>`).join("")}</div>`).join("");

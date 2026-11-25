@@ -124,3 +124,16 @@ test("hypotheses are graded against the S&P 500 after their window", async () =>
   clock.add(8 * 864e5); await sp.runNow("hypothesis_review");
   assert.ok(["supported", "refuted", "inconclusive"].includes(d.hyp.status)); assert.ok(typeof d.hyp.rel === "number");
 });
+
+test("free Gemini can write the research answer, and handles plain English when no research matches", async () => {
+  const { sp } = await spider(); sp.setContext(PF); await run(sp, 45);
+  const prompts = []; const fake = async (p) => { prompts.push(p); return "model answer [1]"; };
+  const r = await sp.ask("What are the biggest risks facing my investments?", { claude: fake, modelName: "gemini", general: true });
+  assert.equal(r.mode, "gemini"); assert.equal(r.answer, "model answer [1]"); assert.match(prompts[0], /EVIDENCE/);
+  const h = await sp.ask("hello", { claude: fake, modelName: "gemini", general: true });
+  assert.equal(h.mode, "gemini"); assert.equal(h.citations.length, 0); assert.match(prompts[1], /Do NOT state any current prices/);
+  const off = await sp.ask("hello", { claude: fake }); // Claude path is unchanged: no evidence, no model call
+  assert.equal(off.mode, "rules"); assert.equal(prompts.length, 2);
+  const bad = await sp.ask("hello", { claude: async () => { throw new Error("down"); }, modelName: "gemini", general: true });
+  assert.equal(bad.mode, "rules"); assert.ok(bad.did.some((x) => /Gemini/.test(x)));
+});
