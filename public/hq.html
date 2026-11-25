@@ -17,6 +17,10 @@ a{color:var(--orange)}button{font:inherit;color:inherit}
 .brand{letter-spacing:.16em;font-weight:600;margin:0 6px}.brand span{color:var(--dim);margin:0 6px}.brand b{color:var(--muted);font-weight:500}
 .pill{display:flex;align-items:center;gap:6px;border:1px solid var(--line2);border-radius:4px;padding:4px 8px;color:var(--muted);white-space:nowrap}
 .pill i{width:6px;height:6px;border-radius:50%;background:var(--dim)}.pill.on i{background:var(--up);box-shadow:0 0 6px var(--up)}.pill.busy i{background:var(--orange);box-shadow:0 0 6px var(--orange)}
+.chatlog{max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:2px}.chatlog .msg{max-width:85%;padding:8px 10px;border:1px solid var(--line2);border-radius:6px;font-size:13px;line-height:1.45}
+.chatlog .msg small{display:block;font:500 9.5px var(--mono);letter-spacing:.14em;color:var(--dim);margin-bottom:3px}.chatlog .msg.me{align-self:flex-end;border-color:#4a3418;background:#140f08}.chatlog .msg.coach{align-self:flex-start;background:var(--panel2)}
+.chatform{display:flex;gap:8px;margin-top:10px}.chatform input{flex:1;background:var(--panel2);border:1px solid var(--line2);border-radius:5px;color:var(--text);padding:9px 10px;font-size:13px}.chatform input:focus{outline:none;border-color:var(--orange)}
+.chatform button{background:var(--orange);color:#111;border:0;border-radius:5px;padding:0 16px;font-weight:600;cursor:pointer}.chatform button:disabled,.chatform input:disabled{opacity:.5}
 .pill b{color:var(--text);font-weight:500}.budget{width:46px;height:3px;background:var(--line2);border-radius:2px;overflow:hidden}
 .top .sp{flex:1}.stat{display:flex;flex-direction:column;line-height:1.15;margin-left:14px}.stat small{font-size:9px;letter-spacing:.16em;color:var(--dim)}.stat b{font-size:14px;font-weight:500}
 .clock{font-size:18px;font-weight:500;margin-left:16px}.clock small{font-size:10px;color:var(--dim);margin-left:4px}

@@ -2024,7 +2024,7 @@ function apTrade(st, side, sym, shares, price, why, name, sleeve, execution, ext
   if (side === "BUY") {
     st.cash -= amt;
     if (p) { p.cost = (p.cost * p.shares + amt) / (p.shares + shares); p.shares += shares; p.peak = Math.max(p.peak, px); }
-    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym, sleeve: sleeve || "risk", ...(extra && extra.thesis ? { thesis: extra.thesis } : {}), ...(extra && extra.size ? { size: extra.size } : {}) };
+    else st.positions[sym] = { shares, cost: px, at: Date.now(), peak: px, name: name || sym, sleeve: sleeve || "risk", ...(extra && extra.thesis ? { thesis: extra.thesis } : {}), ...(extra && extra.size ? { size: extra.size } : {}), ...(extra && extra.owner ? { owner: true } : {}) };
   } else {
     if (!p) return;
     st.cash += amt;
@@ -2275,6 +2275,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.news <= -2.5) apTrade(st, "SELL", sym, p.shares, x.px, `Bad news: “${(x.headlines[0] || "").slice(0, 120)}”`);
     else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
+    else if (p.owner) continue; // the owner asked for this one: only safety exits (above) and stops apply until they say sell
     else if (x.rank > (risk ? 25 : 35) && !cool(sym) && !x.stale && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the ranking at the opening re-score, after ${Math.floor((now - p.at) / 864e5)} days held`);
     else if ((ce = CA.swingExit(COACH_PLAN, p, { sym, price: x.px, bookValue: val(), now, done: st.coachDone || {} }))) {
       apTrade(st, "SELL", sym, p.shares * ce.sell, x.px, ce.reason);
@@ -2303,6 +2304,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   const normalTarget = (val() * PCC.exposureTilt(sc.riskOff ? 0.8 : 0.99, sc.putcall, { stress: false, riskOff: sc.riskOff }).exposure) / AP_SLOTS;
   for (const [sym, p] of Object.entries(st.positions)) {
     const x = by[sym]; if (!x || x.stale) continue; const v = p.shares * x.px, risk = slv(sym) === "risk";
+    if (p.owner && !sc.stress) continue; // a position the owner asked for keeps its size (defense mode still applies)
     const k = p.size || 1; // volatility sizing: each holding's own slot size
     if (sc.stress && risk) { if (v > target * k * 1.1) apTrade(st, "SELL", sym, (v - target * k) / x.px, x.px, `Defense mode — high-risk holdings trimmed first: ${sc.stress}`); continue; }
     const tgt = (sc.stress ? normalTarget : target) * k;
@@ -2310,7 +2312,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   }
   if (sc.stress) return;
   const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
-  const ok = (x, sl) => x.sleeve === sl && !CA.blocked(COACH_PLAN, "swing", x.sym) && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const ok = (x, sl) => x.sleeve === sl && !CO.paused(OWNER, "swing") && !CO.blocked(OWNER, "swing", x.sym) && !CA.blocked(COACH_PLAN, "swing", x.sym) && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
@@ -2334,7 +2336,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (pace.swaps <= 0 || held(sl).length < SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const weakest = held(sl).filter((s) => by[s] && !by[s].stale && !cool(s) && RISK.rankExitAllowed(now - (st.positions[s].at || now), opening, STRATS.swing.params.rankHoldDays)).sort((a, b) => by[a].score - by[b].score)[0];
+      const weakest = held(sl).filter((s) => by[s] && !by[s].stale && !cool(s) && !st.positions[s].owner && RISK.rankExitAllowed(now - (st.positions[s].at || now), opening, STRATS.swing.params.rankHoldDays)).sort((a, b) => by[a].score - by[b].score)[0];
       if (!weakest || x.score < by[weakest].score + pace.gap) break;
       apTrade(st, "SELL", weakest, st.positions[weakest].shares, by[weakest].px, `Swapped out for ${x.sym}, which scores higher (#${by[weakest].rank} vs #${x.rank})`);
       pace.swaps--;
@@ -2343,7 +2345,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (held(sl).length >= SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const size = sizeOf(x), amt = Math.min(target * size * CA.sizeFactor(COACH_PLAN, "swing"), st.cash - 5); if (amt < 50) break; // Coach: half size during a losing run
+      const size = sizeOf(x), amt = Math.min(target * size * CA.sizeFactor(COACH_PLAN, "swing") * CO.sizeFactor(OWNER, "swing"), CO.maxTrade(OWNER, "swing"), st.cash - 5); if (amt < 50) break; // Coach: half size during a losing run; owner size/caps
       const thesis = THESIS.atBuy(sc.spiderOff ? { ...x, spider: null } : x, now);
       apTrade(st, "BUY", x.sym, amt / PAPER.paperFill("BUY", x.px, AP_COST), x.px, why(x) + (size !== 1 ? `; sized ${size.toFixed(2)}× an equal slot for its volatility` : ""), x.name, sl, undefined, { size, ...(thesis ? { thesis } : {}) });
     }
@@ -2477,6 +2479,31 @@ let coachCache = { t: 0, v: null, p: null };
 const CA = require("./coach-actions-core.js");
 let COACH_PLAN = null, coachPlanStoreV = null;
 const coachPlanStore = () => (coachPlanStoreV = coachPlanStoreV || paperStore("coach-actions-v1", { url: UP_URL, token: UP_TOKEN }));
+// The owner's chat with the Coach (coach-orders-core.js): plain-English instructions become standing orders the bots
+// obey, and they outrank the Coach's own fixes. Free rule-based interpreter, no AI model. Saved with the Coach's plan.
+const CO = require("./coach-orders-core.js");
+let OWNER = CO.fresh();
+const ownerReady = (async () => { try { const v = await coachPlanStore().get("orders"); if (v && Array.isArray(v.directives)) OWNER = { ...CO.fresh(), ...v }; } catch {} })();
+const ownerSave = () => coachPlanStore().set("orders", OWNER).catch(() => {});
+async function ownerResolve(p) {
+  for (const c of [p.sym, p.maybeTicker].filter(Boolean)) {
+    if (!TICKER_RE.test(c)) continue;
+    try { const q = await quote(c); if (q && q.price > 0) return { ok: true, sym: c, name: q.name }; } catch {}
+  }
+  if (p.symText) {
+    try { const r = (await search(p.symText)).find((x) => ["equity", "etf", "future", "crypto", "forex"].includes(x.assetClass)); if (r) return { ok: true, sym: r.symbol, name: r.name }; } catch {}
+  }
+  return { ok: false };
+}
+async function coachChat(text) {
+  await ownerReady;
+  const p = CO.parse(text), res = ["buy", "sell", "avoid", "allow"].includes(p.intent) ? await ownerResolve(p) : {};
+  CO.chat(OWNER, "you", text);
+  const reply = CO.apply(OWNER, p, res);
+  CO.chat(OWNER, "coach", reply);
+  await ownerSave();
+  return { reply, messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })) };
+}
 const coachPlanReady = (async () => { try { const v = await coachPlanStore().get("plan"); if (v && v.at) COACH_PLAN = v; } catch {} })();
 async function coachBuild() {
   if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
@@ -2572,6 +2599,28 @@ async function coachView() {
   if (!coachCache.p) coachCache.p = coachBuild().then((v) => { coachCache = { t: Date.now(), v, p: null }; return v; }, (e) => { coachCache.p = null; throw e; });
   return coachCache.p;
 }
+async function apOwnerOrders(draft) {
+  let changed = false;
+  const value = AP.cash + Object.entries(AP.positions).reduce((a, [k, p]) => a + p.shares * (apPx[k] || p.cost), 0);
+  for (const d of CO.sells(OWNER, "swing")) {
+    const p = draft.positions[d.sym];
+    if (!p) { if (!AP.positions[d.sym]) { d.status = "done"; d.ended = Date.now(); changed = true; } continue; }
+    let q = null; try { q = await quote(d.sym); } catch {}
+    if (!PAPER.usableQuote(q, Date.now())) continue;
+    apTrade(draft, "SELL", d.sym, p.shares, q.price, `Owner instruction #${d.id}: sell ${d.sym}`); d.status = "queued"; changed = true;
+  }
+  for (const d of CO.buys(OWNER, "swing")) {
+    if (AP.positions[d.sym] && AP.positions[d.sym].owner) { d.status = "done"; d.ended = Date.now(); changed = true; continue; }
+    if (draft.positions[d.sym]) { draft.positions[d.sym].owner = true; if (AP.positions[d.sym]) { AP.positions[d.sym].owner = true; d.status = "done"; d.ended = Date.now(); changed = true; } continue; }
+    let q = null; try { q = await quote(d.sym); } catch {}
+    if (!PAPER.usableQuote(q, Date.now())) continue;
+    const amt = Math.min(CO.buyAmount(d, { price: q.price, accountValue: value, slot: value / AP_SLOTS }), draft.cash - 5);
+    if (!(amt >= 50)) { d.note = "Not enough cash for this buy"; continue; }
+    apTrade(draft, "BUY", d.sym, amt / PAPER.paperFill("BUY", q.price, AP_COST), q.price, `Owner instruction #${d.id}: buy ${d.sym}`, q.name, "risk", undefined, { owner: true });
+    d.status = "queued"; changed = true;
+  }
+  if (changed) await ownerSave();
+}
 async function apTick() {
   if (apBusy) return; apBusy = true;
   try {
@@ -2639,6 +2688,8 @@ async function apTick() {
       if (x.price <= stop) apTrade(draft, "SELL", s, p.shares, x.price, x.price <= p.cost * (1 - sl) ? `Stop-loss: down ${sl * 100}% from where it was bought` : `Trailing stop: fell ${tr * 100}% from its high`);
     }
     try { await apTwinStops(q); } catch (e) { diagErr("swing", e); }
+    // owner instructions from the Coach chat: buys and sells at the next fresh price (they outrank the bot's own rules)
+    try { await ownerReady; await apOwnerOrders(draft); } catch (e) { diagErr("swing", e); }
     // full re-score every 10 minutes (and right at the opening bell)
     const opening = AP.lastRebalance !== m.t.day;
     if (opening || now - apLastScore >= 10 * 60e3) {
@@ -3199,12 +3250,13 @@ async function dtTick() {
       const ranked = setups.sort((a, b) => b.idea.netTargetBps - a.idea.netTargetBps).slice(0, 6);
       await deskRisk.prepare(ranked.map(({ sym }) => sym));
       for (const { sym, last, idea, kind } of ranked) {
+        if (CO.paused(OWNER, "day") || CO.blocked(OWNER, "day", sym) || (idea.side < 0 && CO.noShorts(OWNER, "day"))) { DT.day.ownerSkipped = (DT.day.ownerSkipped || 0) + 1; continue; }
         if (CA.setupPaused(COACH_PLAN, "day", DT_KIND[idea.kind] || DT_KIND[kind] || kind) || CA.blocked(COACH_PLAN, "day", sym)) { DT.day.coachSkipped = (DT.day.coachSkipped || 0) + 1; continue; }
         const decisionAt = Date.now(), side = idea.side;
         const fillAt = DTC.paperEntryMinute(last, decisionAt, close, DT_PARAMS.maxBarLagSec, DT_HOLD);
         if (fillAt == null) continue;
         const riskPerShare = idea.stopDistance + last.c * (2 * DT_COST + (side < 0 ? DT_FEE_SHORT : 0));
-        const shares = Math.floor(DTC.size(dtEquity(), last.c, idea.stop, DT_PARAMS.riskPct, DT_PILOT.entryGross) * CA.sizeFactor(COACH_PLAN, "day"));
+        const shares = Math.floor(Math.min(DTC.size(dtEquity(), last.c, idea.stop, DT_PARAMS.riskPct, DT_PILOT.entryGross) * CA.sizeFactor(COACH_PLAN, "day") * CO.sizeFactor(OWNER, "day"), CO.maxTrade(OWNER, "day") / last.c));
         const ticket = deskRisk.reserve({ bot: "day", sym, sign: side, shares, price: last.c, riskPerShare,
           integer: true, pilotRoom: dtPilotRoom() });
         if (!ticket.shares) {
@@ -3479,10 +3531,13 @@ async function qtPlan(t, close) {
   let conf = null;
   const D = QTC.decide(A.px, { putcall: pcBrief(), fund: fund.score, fundWeight: STRATS.quant.params.fundWeight,
     regimeLabel: (raw) => (conf = TEAM.confirmRegime(QT.regimeState, raw, t.day, { spiderStress })).label });
+  // owner instructions: an avoided symbol's weight goes to cash (T-bills); a paused Quant keeps what it holds
+  await ownerReady;
+  for (const s of Object.keys(D.w)) if (s !== QTC.QT_CASH && CO.blocked(OWNER, "quant", s)) { D.w[QTC.QT_CASH] = (D.w[QTC.QT_CASH] || 0) + D.w[s]; delete D.w[s]; }
   const prices = Object.fromEntries(Object.entries(series).map(([s, row]) => [s, row.close.at(-1)]));
   if (Object.keys(D.w).some((s) => !(prices[s] > 0))) throw new Error("Final closes unavailable for target allocation");
   const value = qtValue(prices), holdings = Object.fromEntries(Object.entries(QT.positions).map(([s, p]) => [s, p.shares]));
-  const orders = QTC.orders(D.w, holdings, prices, value);
+  const orders = CO.paused(OWNER, "quant") ? [] : QTC.orders(D.w, holdings, prices, value);
   const executeDay = QTC.nextTradingDay(t.day, NYSE_HOLIDAYS);
   if (etParts().day >= executeDay) throw new Error("Decision missed its overnight planning window");
   const why = `${D.regime}${D.rawRegime !== D.regime ? ` (raw signal ${D.rawRegime}, not yet confirmed)` : ""} · ${Math.round(D.split * 100)}% equity sleeve${D.pcTilt ? ` (Zweig put/call ${D.pcTilt > 0 ? "+" : "−"}${Math.round(Math.abs(D.pcTilt) * 100)}%)` : ""} · vol ${(D.vol * 100).toFixed(1)}%`;
@@ -4687,6 +4742,11 @@ async function handle(req, res) {
       if (u.pathname === "/api/mytrader" && req.method === "GET") { try { return send(res, 200, await mtView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/mytrader/order" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); if (!b) return send(res, 400, { error: "Bad order." }); try { const r = await mtOrder(b); return send(res, r.ok ? 200 : 400, r); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/mytrader/cancel" && req.method === "POST") { const b = await readBody(req, 4000).catch(() => null); try { const ok = await mtLocked(async () => { const st = await mtLoad(); const did = MYT.cancel(st, String(b && b.id || "")); if (did) await mtStore.set("book", st); return did; }); return send(res, ok ? 200 : 404, ok ? { ok: true } : { error: "No waiting order with that id." }); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      if (u.pathname === "/api/coach/chat") {
+        if (req.method === "GET") { await ownerReady; return send(res, 200, { messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })) }); }
+        if (req.method === "POST") { let b = null; try { b = await readBody(req, 4000); } catch {} const text = String((b && b.text) || "").trim(); if (!text) return send(res, 400, { error: "Type an instruction." });
+          try { return send(res, 200, await coachChat(text)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      }
       if (u.pathname === "/api/coach" && req.method === "GET") { try { return send(res, 200, await coachView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
       if (u.pathname === "/api/brief" && req.method === "GET") return send(res, 200, { ...(await briefView()), since: undefined });
       if (u.pathname === "/api/daytrader" && req.method === "GET") return send(res, 200, await dtView());

@@ -20,7 +20,7 @@ const MIN_TOKEN = 32;
 // THE WEB, system health (reports on the bots), device sync and the owner's desk store.
 const REMOTE_EXACT = new Set([
   "/api/autopilot", "/api/autopilot/restore", "/api/daytrader", "/api/daytrader/restore",
-  "/api/quanttrader", "/api/quanttrader/run", "/api/why", "/api/brief", "/api/coach", "/api/mytrader", "/api/mytrader/order", "/api/mytrader/cancel", "/api/desk-risk", "/api/desk-risk/review",
+  "/api/quanttrader", "/api/quanttrader/run", "/api/why", "/api/brief", "/api/coach", "/api/coach/chat", "/api/mytrader", "/api/mytrader/order", "/api/mytrader/cancel", "/api/desk-risk", "/api/desk-risk/review",
   "/api/strategy-lab", "/api/strategy-lab/borrow", "/api/day-volume", "/api/system/health",
   "/api/pub/botslive", "/api/pub/archive", "/api/pub/leaderboard", "/api/pub/putcall", "/api/pub/strategies",
   "/api/sync", "/api/desk",
@@ -90,12 +90,14 @@ function clientIp(headers = {}, remote = "") {
 
 // ---- Bot HQ, the separate control-room site (MODE=hq, or the desk's second port)
 // Read-only bot and spider routes the control room uses; everything else on that site doesn't exist.
-const HQ_API = new Set(["/api/autopilot", "/api/daytrader", "/api/quanttrader", "/api/strategy-lab", "/api/desk-risk", "/api/brief", "/api/coach",
+const HQ_API = new Set(["/api/autopilot", "/api/daytrader", "/api/quanttrader", "/api/strategy-lab", "/api/desk-risk", "/api/brief", "/api/coach", "/api/coach/chat",
   "/api/web/status", "/api/web/signals", "/api/web/discoveries", "/api/system/health"]);
+const HQ_WRITE = new Set(["/api/coach/chat"]);
 const HQ_FILES = new Set(["/hq.js", "/hq-core.js", "/hq-rules.js", "/hq-favicon.svg"]);
 function hqAccess({ path, method = "GET", owner = false, remote = true }) {
   if (path === "/api/login" || path === "/api/health") return "serve";
-  if (!HQ_API.has(path) || method !== "GET") return "notfound";
+  // read-only, except the owner's chat with the Coach (its one write route)
+  if (!HQ_API.has(path) || (method !== "GET" && !(method === "POST" && HQ_WRITE.has(path)))) return "notfound";
   if (!owner) return "deny";
   return remote ? "proxy" : "serve";
 }

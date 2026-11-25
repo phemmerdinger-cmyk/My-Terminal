@@ -65,6 +65,33 @@
     D.bots = [C.fromMain("swing", D.raw.swing), C.fromMain("day", D.raw.day), C.fromMain("quant", D.raw.quant), ...C.fromLab(D.raw.lab)].filter(Boolean);
     render();
   }
+  // ---- chat with the Coach (VP of Finance): plain-English instructions the bots obey (coach-orders-core.js on the server)
+  D.chat = { messages: [], instructions: [], busy: false, err: null };
+  async function loadChat() { try { const j = await get("/api/coach/chat"); D.chat.messages = j.messages || []; D.chat.instructions = j.instructions || []; D.chat.err = null; } catch (e) { D.chat.err = e.message; } if (D.view === "bot" && D.botId === "coach") paintChat(); }
+  async function sendChat(text) {
+    D.chat.busy = true; D.chat.messages = [...D.chat.messages, { t: Date.now(), who: "you", text }]; paintChat();
+    try {
+      const r = await fetch("/api/coach/chat", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+      D.chat.messages = j.messages || D.chat.messages; D.chat.instructions = j.instructions || []; D.chat.err = null;
+    } catch (e) { D.chat.err = e.message; }
+    D.chat.busy = false; paintChat(); const i = $("chatIn"); if (i) i.focus();
+  }
+  function chatHtml() {
+    const c = D.chat, msgs = c.messages.slice(-30);
+    return `<div class="card" style="margin-top:12px"><div class="ch">Talk to the Coach <em>· tell any bot what to buy, avoid or stop doing</em></div><div class="cb">
+      <div id="chatLog" class="chatlog">${msgs.length ? msgs.map((m) => `<div class="msg ${m.who === "you" ? "me" : "coach"}"><small>${m.who === "you" ? "YOU" : "COACH"} · ${h(when(m.t))}</small><div>${h(m.text).replace(/\n/g, "<br>")}</div></div>`).join("") : '<div class="note">Try: “tell swing trader to buy nvda”, “swing bot invest $2,000 in microsoft”, “never buy TSLA for 2 weeks”, “day trader no shorts”, “pause the quant”, “half size”, “list”.</div>'}${c.busy ? '<div class="msg coach"><small>COACH</small><div>…</div></div>' : ""}</div>
+      ${c.err ? `<div class="err" style="margin-top:6px">${h(c.err)}</div>` : ""}
+      <form id="chatForm" class="chatform"><input id="chatIn" autocomplete="off" maxlength="300" placeholder="e.g. tell swing trader to buy nvda" ${c.busy ? "disabled" : ""}><button ${c.busy ? "disabled" : ""}>Send</button></form>
+      <div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:12px">YOUR STANDING INSTRUCTIONS</div>
+      ${c.instructions.length ? c.instructions.map((x) => `<div class="row"><span><b class="or">#${x.id}</b> ${h(x.text)}${x.status === "queued" ? ' <span class="tag warn">order sent</span>' : ""}</span></div>`).join("") : '<div class="note">None. The bots follow their own rules and the Coach\'s fixes.</div>'}
+      <div class="note">Paper money only. Your instructions outrank the Coach's fixes; stops still protect anything you ask a bot to buy. The interpreter is free and rule-based (no AI model), so if it misreads something it says so: check its reply.</div></div></div>`;
+  }
+  function paintChat() {
+    const box = $("chatBox"); if (!box) return; box.innerHTML = chatHtml();
+    const log = $("chatLog"); if (log) log.scrollTop = log.scrollHeight;
+    const f = $("chatForm"); if (f) f.onsubmit = (e) => { e.preventDefault(); const v = $("chatIn").value.trim(); if (v && !D.chat.busy) sendChat(v); };
+  }
   async function loadCoach() { try { D.coach = await get("/api/coach"); D.coachErr = null; } catch (e) { D.coachErr = e.message; } if (D.view === "bot" && D.botId === "coach") botPage(); }
   async function loadSpider() { try { D.spider = await get("/api/web/status"); } catch { D.spider = null; } render(true); }
   const finds = () => ((D.raw.finds && D.raw.finds.items) || []);
@@ -327,7 +354,8 @@
       <div class="note">Support ${c.support ? "$" + c.support.price.toFixed(2) + ` (${c.support.touches} touches)` : "none found"} · resistance ${c.resistance ? "$" + c.resistance.price.toFixed(2) + ` (${c.resistance.touches} touches)` : "none found"} · 50-day $${c.sma50 ?? "—"} · 200-day ${c.sma200 != null ? "$" + c.sma200 : "—"}</div>
       ${c.plan.stop != null || c.plan.target != null ? `<div class="note">Stop under support ${c.plan.stop != null ? "$" + c.plan.stop.toFixed(2) : "—"} · target at resistance ${c.plan.target != null ? "$" + c.plan.target.toFixed(2) : "—"}${c.plan.rewardRisk != null ? ` · reward/risk ${c.plan.rewardRisk}` : ""}</div>` : ""}
       ${c.points.map((p) => `<div class="note"><span class="${p.n > 0 ? "up" : p.n < 0 ? "down" : "or"}">${p.n > 0 ? "▲" : p.n < 0 ? "▼" : "●"}</span> ${h(p.text)}</div>`).join("")}</details>` : `<div class="row"><span><b style="font-weight:500">${h(c.sym)}</b> <span class="dim">${h(c.role)}</span></span><span class="dim">${h(c.why)}</span></div>`).join("") || '<div class="empty">Nothing held or ranked yet.</div>'}<div class="note">Rule-based read of daily closes: moving averages, RSI, 3-month momentum, support/resistance. Not advice.</div></div></div>`;
-    return flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
+    setTimeout(() => { paintChat(); loadChat(); }, 0);
+    return `<div id="chatBox">${chatHtml()}</div>` + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
   }
 
   // ---------------------------------------------------------------- LAB
