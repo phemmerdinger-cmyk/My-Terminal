@@ -261,6 +261,17 @@
   const multiplierOf = (inst) => (inst && inst.assetClass === "future" && inst.spec ? inst.spec.multiplier : inst && inst.assetClass === "option" ? 100 : 1);
   function pnl(inst, { qty, entry, exit }) { return (exit - entry) * qty * multiplierOf(inst); }
 
-  return { CLASSES, BADGE, YIELDS, FUT, HOURS, normalize, assetClassOf, displaySymbolOf, futureSpec, futureRoot, parseOption, forexPair, cryptoPair,
+  // Robinhood-style extended-hours line: before today's open → the latest pre-market print; after the close → the latest
+  // after-hours print; during the regular session → nothing. Only real prints from the quote; never estimated.
+  function extendedNow(q, now) {
+    if (!q || q.error) return null;
+    const ok = (x) => x && Number.isFinite(x.price) && x.price > 0;
+    const pre = ok(q.preMarket) ? Object.assign({}, q.preMarket, { session: "pre", label: "Pre-market", short: "Pre" }) : null;
+    const post = ok(q.postMarket) ? Object.assign({}, q.postMarket, { session: "post", label: "After-hours", short: "After hrs" }) : null;
+    const rs = q.regularSession, t = now == null ? Date.now() : now;
+    if (rs && rs.start < rs.end) return t < rs.start ? pre : t >= rs.end ? post : null;
+    return [pre, post].filter(Boolean).sort((a, b) => b.marketTime - a.marketTime)[0] || null;
+  }
+  return { extendedNow, CLASSES, BADGE, YIELDS, FUT, HOURS, normalize, assetClassOf, displaySymbolOf, futureSpec, futureRoot, parseOption, forexPair, cryptoPair,
     decimals, tickSizeOf, formatPrice, providerFor, marketStatus, roundToTick, multiplierOf, pnl };
 });

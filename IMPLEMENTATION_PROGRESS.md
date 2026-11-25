@@ -279,3 +279,8 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Gemini in the Coach chat + Research Assistant (2026-11-25)
 - Coach chat: Gemini gets a 4096-token budget (thinking models spend tokens before answering), JSON replies are read even inside code fences, and greetings/questions the rules don't recognise go to Gemini instead of the help text. Parse failures show in `ai.lastError`.
 - Research Assistant (`/api/web/ask`, runs on the public server): when `GEMINI_API_KEY` is set and Claude isn't requested, Gemini writes the answer from the Spider's numbered evidence (cites [n]). With no matching research it answers in plain English but is told not to state prices, figures or news. The UI labels which model wrote the answer. Falls back to the rules answer on any error. When a free model is busy (503/429) the call tries up to two backup flash models first.
+
+### Pre-market / after-hours everywhere (2026-11-25)
+- Fix: pre-market change is now measured from yesterday's close (before the open, Yahoo's chartPreviousClose is the close *before* that, which made e.g. NVDA show −10.9% instead of −5.3%).
+- `MDInstruments.extendedNow(q, now)` (tested): before the open → latest pre-market print, after the close → latest after-hours print, in session → nothing. Stocks/ETFs only; futures, crypto and FX already quote around the clock.
+- Shown in: watchlist cards, ticker tape, quote tables (new sortable "Pre / after hrs" column), chart title, mini charts, Markets tables, portfolio (value and $ move at the extended price), Claude Predictor cards, head-to-head, Cmd+K, My Trader, the news reader, Ask Claude context. Research page already had it.

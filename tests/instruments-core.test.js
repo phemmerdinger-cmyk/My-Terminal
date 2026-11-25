@@ -99,3 +99,18 @@ test("providers: everything routes to keyless sources", () => {
   assert.deepEqual(I.providerFor(I.normalize("EURUSD=X")).fallbacks, ["frankfurter"]);
   assert.deepEqual(I.providerFor(I.normalize("^TNX")).fallbacks, ["fred"]);
 });
+
+test("extended-hours line: pre-market before the open, after-hours after the close, nothing in session", () => {
+  const T = (h, m = 0) => Date.UTC(2026, 10, 25, h + 5, m); // ET → UTC (EST)
+  const q = { price: 100, regularSession: { start: T(9, 30), end: T(16) },
+    preMarket: { price: 98, change: -2, changePct: -2, marketTime: T(8) }, postMarket: null };
+  assert.equal(I.extendedNow(q, T(8, 15)).short, "Pre");
+  assert.equal(I.extendedNow(q, T(8, 15)).price, 98);
+  assert.equal(I.extendedNow(q, T(11)), null);
+  assert.equal(I.extendedNow(q, T(17)), null); // no after-hours print yet: show nothing rather than a stale pre-market
+  const q2 = { ...q, postMarket: { price: 101, change: 1, changePct: 1, marketTime: T(17) } };
+  assert.equal(I.extendedNow(q2, T(17, 5)).label, "After-hours");
+  assert.equal(I.extendedNow({ price: 5 }, T(8)), null); // futures/crypto: no extended fields
+  assert.equal(I.extendedNow({ error: true }, T(8)), null);
+  assert.equal(I.extendedNow({ preMarket: { price: 0 } }, T(8)), null);
+});

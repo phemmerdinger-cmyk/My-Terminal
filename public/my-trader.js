@@ -88,7 +88,7 @@
     ];
     const about = ap.longBusinessSummary ? String(ap.longBusinessSummary) : "";
     return `<div class="mt-card"><h5>${esc(sym)} <em>${q.marketTime ? `price as of ${new Date(q.marketTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}${fresh ? "" : " (not live)"}` : ""}</em></h5>
-      <div class="mt-hd"><b>${esc(name)}</b><span class="px">${px ? usd(px) : "—"}</span>${Number.isFinite(q.changePct) ? `<span class="${cls(q.changePct)}">${q.change >= 0 ? "+" : "−"}${num(Math.abs(q.change))} (${pct(q.changePct)})</span>` : ""}<span class="dim" style="font-size:12px">${esc([q.exchange, ap.sector, ap.industry].filter(Boolean).join(" · "))}</span></div>
+      <div class="mt-hd"><b>${esc(name)}</b><span class="px">${px ? usd(px) : "—"}</span>${Number.isFinite(q.changePct) ? `<span class="${cls(q.changePct)}">${q.change >= 0 ? "+" : "−"}${num(Math.abs(q.change))} (${pct(q.changePct)})</span>` : ""}${typeof extChip === "function" ? extChip(sym, q, true) : ""}<span class="dim" style="font-size:12px">${esc([q.exchange, ap.sector, ap.industry].filter(Boolean).join(" · "))}</span></div>
       <div class="mt-kv">${kv.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join("")}</div>
       ${eDays != null && eDays >= 0 && eDays <= 7 ? `<div class="mt-warn">Earnings in ${eDays} day${eDays === 1 ? "" : "s"}: the price can jump a lot on the report.</div>` : ""}
       ${(MT.side === "SHORT") && ks.shortPercentOfFloat > 0.15 ? `<div class="mt-warn">${fpc(ks.shortPercentOfFloat)} of the shares are already sold short, so a squeeze is more likely and real borrowing would likely cost more than the modeled fee.</div>` : ""}

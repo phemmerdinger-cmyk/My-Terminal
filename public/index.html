@@ -118,6 +118,10 @@ main{min-width:0}
 .wl .sym{font-family:var(--mono);font-weight:600;font-size:13px}
 .wl .nm{font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wl .px{text-align:right;font-family:var(--mono);font-size:13px}
+.xh{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;line-height:1.3}
+.xh span{font-size:11px}
+span.xh{margin-left:6px}
+.wl .xh{text-align:right}
 .wl .ch{font-size:11px;text-align:right}
 .wl .x{position:absolute;right:4px;top:4px;opacity:0;background:none;border:0;color:var(--dim);cursor:pointer;font-size:13px;padding:2px 5px}
 .wl li:hover .x{opacity:1}
@@ -2273,7 +2277,7 @@ function renderNotif(){ $("notifBtn").classList.toggle("on",S.notif); $("notifBt
 function renderTape(){
   const parts=[...INDEXES.map(([s,n])=>[s,n]),...S.wl.map(s=>[s,s])].map(([s,n])=>{
     const q=S.quotes[s]; if(!q||q.error) return "";
-    return `<span class="tk" data-s="${esc(s)}"><span class="s">${esc(n)}</span><span>${s==="^TNX"?fmt(q.price,3):fmt(q.price)}</span><span class="${cls(q.change)}">${pct(q.changePct)}</span></span>`;
+    return `<span class="tk" data-s="${esc(s)}"><span class="s">${esc(n)}</span><span>${s==="^TNX"?fmt(q.price,3):fmt(q.price)}</span><span class="${cls(q.change)}">${pct(q.changePct)}</span>${(()=>{const e=extOf(q); return e&&e.changePct!=null?`<span class="${cls(e.change)}" title="${esc(e.label)} ${fmt(e.price)}">${e.short==="Pre"?"pre":"ah"} ${pct(e.changePct)}</span>`:"";})()}</span>`;
   }).join("");
   put("tape",parts+parts);
 }
@@ -2287,7 +2291,7 @@ function renderWL(prev={}){
     return `<li data-s="${esc(s)}" class="${S.sel===s?"sel":""} ${fl}">
       <div><div class="sym" title="${esc(s)}">${esc(instOf(s).displaySymbol||s)} ${n?`<span class="cnt">${n}</span>`:""}</div><div class="nm">${esc(q.status==="awaiting-market-print"?"Awaiting market quote":q.error?"No quote":q.name||"…")}</div></div>
       ${spark(q.spark,64,22,q.prevClose)}
-      <div><div class="px">${fmtP(s,q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div></div>
+      <div><div class="px">${fmtP(s,q.price)}</div><div class="ch num ${cls(q.change)}">${pct(q.changePct)}</div>${extChip(s,q)}</div>
       <button class="x" data-rm="${esc(s)}" title="Remove">✕</button></li>`;
   }).join(""));
 }
@@ -2600,6 +2604,7 @@ const COLS=[
   ["price","Last",q=>fmt(q.price,q.symbol==="^TNX"?3:2)],
   ["change","Chg",q=>`<span class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change):"—"}</span>`],
   ["changePct","% Chg",q=>`<span class="${cls(q.changePct)}">${pct(q.changePct)}</span>`],
+  ["ext","Pre / after hrs",q=>{ const e=extOf(q); return e?`<span title="${esc(e.label)} · ${esc(fmtExtendedTime(e.marketTime))}">${fmt(e.price,q.symbol==="^TNX"?3:2)} <span class="${cls(e.change)}">${e.changePct==null?"":pct(e.changePct)}</span></span>`:'<span style="color:var(--dim)">—</span>'; }],
   ["day","Day range",q=>rangeBar(q.dayLow,q.dayHigh,q.price)],
   ["r52","52-week range",q=>rangeBar(q.low52,q.high52,q.price)],
   ["volume","Volume",q=>big(q.volume)],
@@ -2609,6 +2614,7 @@ const COLS=[
 function perfCell(s,k){ const v=S.perf[s]?.[k]; return v==null?'<span style="color:var(--dim)">…</span>':`<span class="${cls(v)}">${pct(v)}</span>`; }
 function sortVal(q,k){ if(["w1","m1","m3","ytd","y1"].includes(k)) return S.perf[q.symbol]?.[k]??-1e9;
   if(k==="r52") return q.high52&&q.low52?(q.price-q.low52)/(q.high52-q.low52):-1; if(k==="day") return q.dayHigh&&q.dayLow?(q.price-q.dayLow)/(q.dayHigh-q.dayLow):-1;
+  if(k==="ext"){ const e=extOf(q); return e&&e.changePct!=null?e.changePct:-1e9; }
   const v=q[k]; return typeof v==="string"?v:v??-1e9; }
 function table(el,syms,sortable,extra){
   const rows=syms.map(s=>S.quotes[s]&&!S.quotes[s].error?S.quotes[s]:{symbol:s,name:S.quotes[s]?"No quote":"Loading…"});
@@ -2658,7 +2664,7 @@ function renderPortfolio(){
   if(S.pfc&&S.tab==="portfolio") pfcLoad();
   if(S.pfr&&S.tab==="portfolio") pfRiskLoad();
   $("holdTable").innerHTML=S.port.length?`<thead><tr><th>Symbol</th><th>Invested</th><th>Value now</th><th>Today</th><th>Total gain</th><th>Weight</th><th></th></tr></thead><tbody>${
-    rows.map((r,i)=>{const g=r.v!=null?Math.round((r.v-r.c)*100)/100+0:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}</td>
+    rows.map((r,i)=>{const g=r.v!=null?Math.round((r.v-r.c)*100)/100+0:null; return `<tr data-quote="${esc(r.symbol)}"><td class="sym-cell" title="${num(r.shares,4)} shares bought at $${fmt(r.cost)}">${esc(r.symbol)}</td><td>$${fmt(r.c)}</td><td>${r.v!=null?"$"+fmt(r.v):"—"}${(()=>{const e=extOf(r.q); return e?`<div class="xh" title="${esc(e.label)}: value at the extended-hours price">${e.short} $${fmt(e.price*r.shares)}${e.change!=null?` <span class="${cls(e.change)}">${e.change>=0?"+":"−"}$${fmt(Math.abs(e.change*r.shares))}</span>`:""}</div>`:"";})()}</td>
       <td class="${cls(r.d)}">${r.d!=null?(r.d>=0?"+":"−")+"$"+fmt(Math.abs(r.d)):"—"}</td><td class="${cls(g)}">${g!=null?(g>=0?"+":"−")+"$"+fmt(Math.abs(g))+` (${pct(r.c?g/r.c*100:0)})`:"—"}</td>
       <td>${r.v&&val?(r.v/val*100).toFixed(1)+"%":"—"}</td><td><button class="del" data-delhold="${i}" title="Remove">✕</button></td></tr>`;}).join("")}</tbody>`
     :`<tbody><tr><td style="text-align:left;color:var(--muted);font-family:var(--sans);padding:20px">Add a ticker and how much you invested to start tracking this portfolio.</td></tr></tbody>`;
@@ -2826,7 +2832,7 @@ const baselineOpts=base=>({baseValue:{type:"price",price:base},lineWidth:2,
 function renderChartTitle(){
   const s=S.chartSym, q=S.quotes[s]||{};
   $("chartTitle").innerHTML=`<div class="big-sym">${esc(label(s))} <span style="font-size:13px;color:var(--muted);font-family:var(--sans)">${esc(q.name&&q.name!==s?q.name:"")}</span></div>
-    <div class="big-px">${fmt(q.price,s==="^TNX"?3:2)} <span class="${cls(q.change)}" style="font-size:14px">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change):""} (${pct(q.changePct)})</span></div>`;
+    <div class="big-px">${fmt(q.price,s==="^TNX"?3:2)} <span class="${cls(q.change)}" style="font-size:14px">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change):""} (${pct(q.changePct)})</span>${extChip(s,q,true)}</div>`;
 }
 async function loadChart(){
   const request=++chartRequest, s=S.chartSym, range=S.chartRange; renderChartTitle();
@@ -2875,7 +2881,7 @@ function extLinks(s){ const e=encodeURIComponent(s);
 const miniCache={};
 async function renderMinis(){
   $("minis").innerHTML=S.wl.map(s=>{const q=S.quotes[s]||{}; const h=miniCache[s];
-    return `<div class="mini" data-chart="${esc(s)}"><div class="top"><b>${esc(s)}</b><span>${fmt(q.price)} <span class="${cls(q.changePct)}">${pct(q.changePct)}</span></span></div>
+    return `<div class="mini" data-chart="${esc(s)}"><div class="top"><b>${esc(s)}</b><span>${fmt(q.price)} <span class="${cls(q.changePct)}">${pct(q.changePct)}</span>${extChip(s,q,true)}</span></div>
     ${h?spark(h,"100%",60,h[0]):'<div style="height:60px"></div>'}</div>`;}).join("");
   const need=S.wl.filter(s=>!miniCache[s]);
   if(!need.length) return;
@@ -2907,7 +2913,7 @@ function predCard(s,p){
   const q=S.quotes[s];
   return `<div class="pcard">
     <div class="who"><i></i>Claude's prediction</div>
-    <h3>${esc(title)} ${q&&!q.error?`<span style="font-size:14px;color:var(--muted)">${fmt(q.price)} <span class="${cls(q.changePct)}">${pct(q.changePct)}</span></span>`:""}</h3>
+    <h3>${esc(title)} ${q&&!q.error?`<span style="font-size:14px;color:var(--muted)">${fmt(q.price)} <span class="${cls(q.changePct)}">${pct(q.changePct)}</span>${extChip(s,q,true)}</span>`:""}</h3>
     <div style="display:flex;align-items:center;gap:12px;margin-top:8px"><span class="stance ${esc(p.stance)}">${p.stance==="Bullish"?"▲":p.stance==="Bearish"?"▼":"■"} ${esc(p.stance)}</span><span style="font-size:12px;color:var(--muted)">Confidence ${esc(p.confidence)}%</span>${p.riskLevel?`<span class="risk ${esc(String(p.riskLevel).split(" ")[0])}">${esc(p.riskLevel)} risk</span>`:""}</div>
     <div class="conf"><i style="width:${Math.max(0,Math.min(100,+p.confidence||0))}%"></i></div>
     <div class="call">${esc(p.headline)}</div>
@@ -3981,7 +3987,7 @@ $("h2hForm").onsubmit=async e=>{ e.preventDefault(); if(clNeed(()=>$("h2hForm").
     S.quotes[sym]=q; const sd=d.summaryDetail||{}, fd=d.financialData||{}, ks=d.defaultKeyStatistics||{};
     return {q,d,txt:`${d.price?.longName||q?.name||sym} (${sym}): price ${fmt(q?.price)} (${pct(q?.changePct)} today), 52w ${fmt(sd.fiftyTwoWeekLow??q?.low52)}-${fmt(sd.fiftyTwoWeekHigh??q?.high52)}, mkt cap ${money(sd.marketCap)}, P/E ${num(sd.trailingPE)}, fwd P/E ${num(sd.forwardPE)}, revenue growth ${fp(fd.revenueGrowth)}, profit margin ${fp(fd.profitMargins)}, analysts ${fd.recommendationKey||"n/a"} target ${fmt(fd.targetMeanPrice)}, beta ${num(sd.beta)}, sector ${(d.assetProfile||{}).sector||"n/a"}`}; };
   const [a,b]=await Promise.all([info(A),info(B)]);
-  const card=(sym,x)=>`<div class="pcard"><h3>${esc(sym)} <span style="font-size:14px;color:var(--muted)">${fmt(x.q?.price)} <span class="${cls(x.q?.changePct)}">${pct(x.q?.changePct)}</span></span></h3>${kv([["Market cap",money(x.d.summaryDetail?.marketCap)],["P/E",num(x.d.summaryDetail?.trailingPE)],["Revenue growth",fp(x.d.financialData?.revenueGrowth)],["Profit margin",fp(x.d.financialData?.profitMargins)],["Analysts",esc(x.d.financialData?.recommendationKey||"—")],["52-wk range",`${fmt(x.d.summaryDetail?.fiftyTwoWeekLow??x.q?.low52)} – ${fmt(x.d.summaryDetail?.fiftyTwoWeekHigh??x.q?.high52)}`]])}</div>`;
+  const card=(sym,x)=>`<div class="pcard"><h3>${esc(sym)} <span style="font-size:14px;color:var(--muted)">${fmt(x.q?.price)} <span class="${cls(x.q?.changePct)}">${pct(x.q?.changePct)}</span>${extChip(sym,x.q,true)}</span></h3>${kv([["Market cap",money(x.d.summaryDetail?.marketCap)],["P/E",num(x.d.summaryDetail?.trailingPE)],["Revenue growth",fp(x.d.financialData?.revenueGrowth)],["Profit margin",fp(x.d.financialData?.profitMargins)],["Analysts",esc(x.d.financialData?.recommendationKey||"—")],["52-wk range",`${fmt(x.d.summaryDetail?.fiftyTwoWeekLow??x.q?.low52)} – ${fmt(x.d.summaryDetail?.fiftyTwoWeekHigh??x.q?.high52)}`]])}</div>`;
   try{
     const j=await api("/api/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:`Compare ${A} vs ${B} for an investor. Cover growth, valuation, risk, momentum and the latest news. Say which looks better positioned over the next 2 weeks and the next 6 months. Finish with a final line exactly like "Verdict: <TICKER> — <short reason>".`,watchlist:[A,B],holdings:[],context:"HEAD-TO-HEAD\n"+a.txt+"\n"+b.txt})});
     $("h2hOut").innerHTML=`<div class="h2h">${card(A,a)}${card(B,b)}</div><div class="pcard"><div class="who"><i></i>Claude's head-to-head</div><div class="answer" style="border:0;padding-top:6px">${esc(j.answer)}</div><div class="stamp">${esc(j.model)} · AI opinion, not financial advice</div></div>`;
@@ -4037,7 +4043,7 @@ function renderMarkets(){
   for(const [id,list] of Object.entries(MK)){
     const yld=id==="mkBonds";
     put(id,`<thead><tr><th>Symbol</th><th>Name</th><th>${yld?"Yield %":"Last"}</th><th>Chg</th><th>% Chg</th><th>52-wk range</th></tr></thead><tbody>${list.map(([s,n])=>{const q=S.quotes[s]||{};
-      return `<tr data-quote="${esc(s)}"><td class="sym-cell">${esc(s.replace("-USD",""))}</td><td class="name">${esc(n)}</td><td>${fmt(q.price,yld?3:2)}</td><td class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change,yld?3:2):"—"}</td><td class="${cls(q.changePct)}">${pct(q.changePct)}</td><td>${rangeBar(q.low52,q.high52,q.price)}</td></tr>`;}).join("")}</tbody>`);
+      return `<tr data-quote="${esc(s)}"><td class="sym-cell">${esc(s.replace("-USD",""))}</td><td class="name">${esc(n)}</td><td>${fmt(q.price,yld?3:2)}</td><td class="${cls(q.change)}">${q.change!=null?(q.change>=0?"+":"")+fmt(q.change,yld?3:2):"—"}</td><td class="${cls(q.changePct)}">${pct(q.changePct)}${extChip(s,q)}</td><td>${rangeBar(q.low52,q.high52,q.price)}</td></tr>`;}).join("")}</tbody>`);
   }
 }
 
@@ -4106,6 +4112,13 @@ function renderResearchHead(){
       <button class="btn claude" data-rs-pred="${esc(s)}">✦ Claude's prediction</button>
     </div></div>`;
 }
+/* Pre-market / after-hours (Robinhood-style). Stocks & ETFs only: futures, crypto and FX trade around the clock, so their
+   main price already moves. Before the open → latest pre-market print; after the close → latest after-hours print;
+   during the regular session → nothing extra. Prices come from Yahoo's extended-hours candles; never estimated. */
+function extOf(q,now=Date.now()){ return window.MDInstruments?MDInstruments.extendedNow(q,now):null; }
+function extChip(s,q,inline=false){ const e=extOf(q); if(!e) return "";
+  return `<${inline?"span":"div"} class="xh" title="${esc(e.label)} · ${esc(fmtExtendedTime(e.marketTime))}">${e.short} ${fmtP(s,e.price)}${e.changePct==null?"":` <span class="${cls(e.change)}">${pct(e.changePct)}</span>`}</${inline?"span":"div"}>`; }
+const extTxt=(q)=>{ const e=extOf(q); return e?` · ${e.label} ${fmt(e.price)}${e.changePct==null?"":" ("+pct(e.changePct)+")"}`:""; };
 function fmtExtendedTime(timestamp,seconds=false){
   return new Date(timestamp).toLocaleString("en-US",{timeZone:"America/New_York",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",second:seconds?"2-digit":undefined,timeZoneName:"short"});
 }
@@ -4472,7 +4485,7 @@ function acContext(){
   } else if(t==="research"&&S.rq.sym){
     const s=S.rq.sym, d=S.rq.sum||{}, q=S.quotes[s]||{}, sd=d.summaryDetail||{}, fd=d.financialData||{}, ks=d.defaultKeyStatistics||{};
     L.push(`Looking at ${d.price?.longName||q.name||s} (${s}), viewing the ${S.rq.sub} section`);
-    L.push(`Price ${fmt(q.price)} (${pct(q.changePct)} today), 52w ${fmt(sd.fiftyTwoWeekLow??q.low52)}-${fmt(sd.fiftyTwoWeekHigh??q.high52)}, market cap ${money(sd.marketCap)}, P/E ${num(sd.trailingPE)}, fwd P/E ${num(sd.forwardPE)}, EPS ${num(ks.trailingEps)}, beta ${num(sd.beta)}`);
+    L.push(`Price ${fmt(q.price)} (${pct(q.changePct)} today)${extTxt(q)}, 52w ${fmt(sd.fiftyTwoWeekLow??q.low52)}-${fmt(sd.fiftyTwoWeekHigh??q.high52)}, market cap ${money(sd.marketCap)}, P/E ${num(sd.trailingPE)}, fwd P/E ${num(sd.forwardPE)}, EPS ${num(ks.trailingEps)}, beta ${num(sd.beta)}`);
     if(fd.recommendationKey) L.push(`Analysts: ${fd.recommendationKey}, target ${fmt(fd.targetMeanPrice)}, revenue growth ${fp(fd.revenueGrowth)}, profit margin ${fp(fd.profitMargins)}`);
     const f=S.rq.fin[S.rq.finFreq]; if(f&&f.periods){ ["TotalRevenue","NetIncome","FreeCashFlow"].forEach(k=>{ const r=[...(f.income||[]),...(f.cash||[])].find(x=>x.key===k); if(r) L.push(`${k} (${f.periods.join(", ")}): ${r.values.map(v=>money(v)).join(", ")}`); }); }
     const nn=(S.news?.items||[]).filter(i=>i.tickers.includes(s)).slice(0,10); nn.forEach(i=>L.push(`- [${SRC[i.source].name}] ${i.title}`));
@@ -4546,7 +4559,7 @@ function buildCmd(){
   const raw=$("cmdInput").value.trim(), v=normSym(raw); const items=[];
   const valid=/^[A-Z0-9.\-^=]{1,21}$/.test(v);
   (cmdResults||[]).forEach(r0=>{ const r=r0.badge||!window.MDInstruments?r0:{...MDInstruments.normalize({symbol:r0.symbol,quoteType:r0.type,name:r0.name,exchDisp:r0.exchange}),...r0}; const q=S.quotes[r.symbol];
-    items.push([`${r.displaySymbol&&r.displaySymbol!==r.symbol?r.displaySymbol+" ("+r.symbol+")":r.symbol} · ${r.name}${q&&!q.error?"   "+fmtP(r.symbol,q.price)+" "+pct(q.changePct):""}`,r.typeDisp||"",()=>pickInstrument(r.symbol),r]); });
+    items.push([`${r.displaySymbol&&r.displaySymbol!==r.symbol?r.displaySymbol+" ("+r.symbol+")":r.symbol} · ${r.name}${q&&!q.error?"   "+fmtP(r.symbol,q.price)+" "+pct(q.changePct)+extTxt(q):""}`,r.typeDisp||"",()=>pickInstrument(r.symbol),r]); });
   const exact=cmdResults.length&&cmdResults[0].symbol===v;
   if(valid&&!cmdResults.length) items.push([`Open ${v} research page`,"Research",()=>openQuote(v)]);
   if(valid&&exact){

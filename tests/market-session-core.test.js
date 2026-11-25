@@ -92,3 +92,9 @@ test("preserves the same exchange date across UTC midnight without crossing the 
   }, { currentTradingPeriod: trading });
   assert.deepEqual(data.postMarket, { price: 135, marketTime: beforeClose * 1000, change: 10, changePct: 8 });
 });
+
+test("pre-market change is measured from yesterday's close while the quote still shows yesterday", () => {
+  // 6:40 AM ET: regularMarketPrice/Time are yesterday's close (125); chartPreviousClose (100) is the day before
+  const pre = get([["11:00", 110, 0]], { now: asMs("11:40") }, { regularMarketTime: asSeconds("21:00", "2026-11-18") });
+  assert.equal(pre.preMarket.price, 110); assert.equal(pre.preMarket.change, -15); assert.equal(pre.preMarket.changePct, -12);
+});

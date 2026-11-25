@@ -57,7 +57,11 @@ function getExtendedQuotes(meta, timestamps, bars, { debut = false, now = Date.n
   const postPrint = post && post.start >= regular.end && asOf >= post.start && dateOf(post.start) === day
     ? priceIn(post, timestamps, bars, asOf) : null;
   const previous = [meta.chartPreviousClose, meta.previousClose].find(positive);
-  if (!postPrint) return { preMarket: asQuote(prePrint, previous), postMarket: null };
+  // Before today's open the quote's "price" is still yesterday's close, and chartPreviousClose is the close before
+  // that, so pre-market moves are measured from yesterday's close (as brokers show them).
+  const lastClose = positive(meta.regularMarketPrice) && timestamp(meta.regularMarketTime) && meta.regularMarketTime < regular.start
+    ? meta.regularMarketPrice : previous;
+  if (!postPrint) return { preMarket: asQuote(prePrint, lastClose), postMarket: null };
 
   const regularPrint = priceIn(regular, timestamps, bars, asOf, true);
   if (debut && !regularPrint) return empty();
@@ -68,7 +72,7 @@ function getExtendedQuotes(meta, timestamps, bars, { debut = false, now = Date.n
   // A lone earlier candle cannot establish the regular close.
   const baseline = quotedClose ? meta.regularMarketPrice :
     regularPrint?.time >= regular.end - barSeconds ? regularPrint.price : null;
-  return { preMarket: asQuote(prePrint, previous), postMarket: asQuote(postPrint, baseline) };
+  return { preMarket: asQuote(prePrint, lastClose), postMarket: asQuote(postPrint, baseline) };
 }
 
 module.exports = { getExtendedQuotes };
