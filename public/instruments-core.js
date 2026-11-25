@@ -140,11 +140,12 @@
   }
   function tickDecimals(t) { const s = String(+(+t).toPrecision(8)); return s.includes("e-") ? +s.split("e-")[1] : s.includes(".") ? s.split(".")[1].length : 0; }
 
+  const pow10 = (d) => +(1 / 10 ** d).toFixed(d); // 0.00001, not 0.000009999999999999999
   function tickSizeOf(inst, price) {
     const cls = inst.assetClass, p = Math.abs(+price);
     if (cls === "future") return inst.spec ? inst.spec.tickSize : null;
-    if (cls === "forex") return 10 ** -decimals(inst, price);
-    if (cls === "crypto") return inst.quoteIncrement || 10 ** -decimals(inst, price);
+    if (cls === "forex") return pow10(decimals(inst, price));
+    if (cls === "crypto") return inst.quoteIncrement || pow10(decimals(inst, price));
     if (inst.subtype === "yield") return 0.001;
     if ((cls === "equity" || cls === "etf") && p > 0 && p < 1) return 0.0001;
     return 0.01;

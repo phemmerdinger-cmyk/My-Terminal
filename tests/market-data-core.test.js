@@ -69,3 +69,21 @@ test("Yahoo session times become PRE / OPEN / AFTER windows", () => {
   assert.deepEqual(p.regular, { start: 2000, end: 3000 });
   assert.equal(M.tradingPeriods({}), null);
 });
+
+test("the live-price stream opens without a Finnhub key (crypto comes from Coinbase)", async () => {
+  const { spawn } = require("node:child_process"), path = require("node:path"), fs = require("node:fs"), os = require("node:os");
+  const port = 39000 + Math.floor(Math.random() * 500), TMP = fs.mkdtempSync(path.join(os.tmpdir(), "md-stream-"));
+  const env = { ...process.env, PORT: String(port), SITE_PASSWORD: "stream-test-pw-123", FINNHUB_API_KEY: "", ANTHROPIC_API_KEY: "", UPSTASH_REDIS_REST_URL: "", UPSTASH_REDIS_REST_TOKEN: "", SPIDER_OFF: "1", AP_TEST: "closed", TMPDIR: TMP };
+  const srv = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], { env, stdio: "ignore" });
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    for (let i = 0; i < 50; i++) { try { await fetch(base + "/api/health"); break; } catch { await new Promise((ok) => setTimeout(ok, 200)); } }
+    const login = await fetch(base + "/api/login", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": "10.9.9.8" }, body: JSON.stringify({ password: "stream-test-pw-123" }) });
+    const cookie = (login.headers.get("set-cookie") || "").split(";")[0];
+    const res = await fetch(base + "/api/stream?symbols=AAPL", { headers: { cookie }, signal: AbortSignal.timeout(4000) });
+    assert.equal(res.status, 200, "no 'owner before initialization' error");
+    assert.match(res.headers.get("content-type"), /event-stream/);
+    const r = res.body.getReader(), first = new TextDecoder().decode((await r.read()).value);
+    assert.match(first, /event: hello/); await r.cancel();
+  } finally { srv.kill(); }
+});

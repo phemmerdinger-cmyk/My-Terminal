@@ -4777,8 +4777,9 @@ async function handle(req, res) {
       }
       if (u.pathname === "/api/stream") {
         if (typeof WebSocket === "undefined") return send(res, 404, { error: "streaming_off" }); // crypto streams without a key
-        const focus = owner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
-        const release = streamSlot(req, owner);
+        const streamOwner = isOwner(req); // (the block's own `owner` is declared further down, so it can't be used here)
+        const focus = streamOwner ? parseList(u.searchParams.get("focus"), 1)[0] : undefined;
+        const release = streamSlot(req, streamOwner);
         if (!release) return send(res, 429, { error: "Too many open live-price connections.", code: "stream_busy" }, "application/json", { "Retry-After": "30" });
         return openStream(res, parseList(u.searchParams.get("symbols"), 60), focus, release);
       }

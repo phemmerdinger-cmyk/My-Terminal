@@ -35,6 +35,8 @@ test("display symbols read like a terminal", () => {
   assert.equal(I.normalize("ES=F").displaySymbol, "ES");
   assert.equal(I.normalize("AAPL250117C00150000").displaySymbol, "AAPL 2025-01-17 150 C");
   assert.equal(I.normalize("^TNX").subtype, "yield");
+  assert.equal(I.normalize("EURUSD=X").tickSize, 0.00001, "no floating-point noise");
+  assert.equal(I.normalize("JPY=X").tickSize, 0.001);
 });
 
 test("futures carry their contract specs; unknown roots don't invent any", () => {
