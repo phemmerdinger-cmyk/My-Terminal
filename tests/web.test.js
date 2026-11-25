@@ -137,3 +137,14 @@ test("free Gemini can write the research answer, and handles plain English when 
   const bad = await sp.ask("hello", { claude: async () => { throw new Error("down"); }, modelName: "gemini", general: true });
   assert.equal(bad.mode, "rules"); assert.ok(bad.did.some((x) => /Gemini/.test(x)));
 });
+
+test("agent hours: off duty the Spider runs no scheduled research, but owner-pressed jobs still run", async () => {
+  let duty = false;
+  const m = makeDeps(); const sp = createSpider({ ...m.deps, workHours: () => duty, store: createStore({ dir: tmp() }) }); await sp.load(); sp.setContext(PF);
+  await run(sp, 20);
+  assert.equal(sp._internal.ST.stats.jobs, 0, "no scheduled jobs off duty");
+  await sp.runNow("portfolio_scan");
+  assert.ok(sp._internal.ST.stats.jobs >= 1, "a job the owner asked for runs any time");
+  duty = true; const before = sp._internal.ST.stats.jobs; await run(sp, 20);
+  assert.ok(sp._internal.ST.stats.jobs > before, "on duty the queue moves again");
+});

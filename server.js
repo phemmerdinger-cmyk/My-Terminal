@@ -85,6 +85,10 @@ const SOURCES = {
 };
 
 // ---------------------------------------------------------------- cache
+// Agent work hours: every background agent (swing, day, quant, Coach reviews, Spider research, strategy lab, risk desk,
+// predictions, Pre-Market Desk, System Doctor) works Mon–Fri 6:00 AM–5:00 PM New York time, on the server, whether or
+// not the owner's computer is on. Owner-pressed actions still run any time. ALWAYS_ON=1 lifts it (tests/dev).
+const onDuty = () => !!process.env.AP_TEST || process.env.ALWAYS_ON === "1" || DM.awakeWindow();
 const cache = new Map(); // url -> {at, data, promise}
 async function cached(key, ttlMs, fn) {
   const hit = cache.get(key);
@@ -766,7 +770,7 @@ function startBestBuys() {
     }
   })().catch(() => { bbJob = null; setTimeout(startBestBuys, 60_000); });
 }
-setInterval(startBestBuys, 30 * 60_000);
+setInterval(() => { if (onDuty()) startBestBuys(); }, 30 * 60_000);
 async function bestBuys() {
   startBestBuys();
   const total = BB.universe.length, rated = Object.values(BB.ratings).filter((r) => Date.now() - r.t < 36 * 3600e3).length;
@@ -2021,7 +2025,7 @@ function pcState() {
   return pcView;
 }
 const pcBrief = () => { const z = pcState(); return z.ok ? { ok: true, score: z.score, ma10: z.ma10, zone: z.zone, signal: z.signal, note: z.note, d: z.d } : { ok: false, why: z.why || z.error }; };
-if (DEPLOY.runJobs) setTimeout(() => { pcRefresh(); setInterval(pcRefresh, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
+if (DEPLOY.runJobs) setTimeout(() => { if (onDuty()) pcRefresh(); setInterval(() => { if (onDuty()) pcRefresh(); }, 30 * 60e3); }, process.env.AP_TEST ? 5000 : 45_000);
 // What each bot last did and why — shown on the page so "why no trades?" has an answer
 const BOTDIAG = { market: {}, my: { errors: [] }, swing: { errors: [] }, quant: {}, day: { errors: [], scans: 0, signals: 0, barsOk: 0, barsFail: 0 } };
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
@@ -2680,7 +2684,7 @@ async function mtOrder(body) {
     return r;
   });
 }
-if (DEPLOY.runJobs && !process.env.AP_TEST) setTimeout(() => { const go = () => { coachCache.t = 0; coachView().catch((e) => diagErr("swing", e)); }; go(); setInterval(go, 2 * 3600e3); }, 3 * 60_000);
+if (DEPLOY.runJobs && !process.env.AP_TEST) setTimeout(() => { const go = () => { if (!onDuty()) return; coachCache.t = 0; coachView().catch((e) => diagErr("swing", e)); }; go(); setInterval(go, 2 * 3600e3); }, 3 * 60_000);
 async function coachView() {
   if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) return coachCache.v;
   if (!coachCache.p) coachCache.p = coachBuild().then((v) => { coachCache = { t: Date.now(), v, p: null }; return v; }, (e) => { coachCache.p = null; throw e; });
@@ -2862,7 +2866,7 @@ function apRestore(doc) {
   AP.trades = AP.trades.slice(0, 1500); AP.equity = (AP.equity || []).slice(-2000); AP.runs = (AP.runs || []).slice(0, 200); apFix();
   apSave(); return { ok: true };
 }
-if (DEPLOY.runJobs) setTimeout(() => { apTick(); setInterval(apTick, process.env.AP_TEST ? 6000 : 60e3); }, process.env.AP_TEST ? 3000 : 60_000);
+if (DEPLOY.runJobs) setTimeout(() => { if (onDuty()) apTick(); setInterval(() => { if (onDuty()) apTick(); }, process.env.AP_TEST ? 6000 : 60e3); }, process.env.AP_TEST ? 3000 : 60_000);
 
 // ---------------------------------------------------------------- AI day trader (paper, intraday, longs + shorts)
 // A forecast from a completed minute can schedule a paper order for a future minute.
@@ -3442,7 +3446,7 @@ async function dtRestore(doc) {
     return { ok: true };
   } finally { dtBusy = false; }
 }
-if (DEPLOY.runJobs) setTimeout(() => { dtTick(); setInterval(dtTick, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
+if (DEPLOY.runJobs) setTimeout(() => { if (onDuty()) dtTick(); setInterval(() => { if (onDuty()) dtTick(); }, process.env.AP_TEST ? 7000 : 60e3); }, process.env.AP_TEST ? 5000 : 75_000);
 
 // ---------------------------------------------------------------- Pre-Market Desk (6:00–9:30 AM and 4–5 PM ET)
 // Reads real extended-hours prints for every bot's holdings, the day trader's universe and the swing bot's plan, then
@@ -3770,8 +3774,8 @@ async function qtView() {
     status: QT.lastError || (QT.pending ? `Paper rebalance queued for the ${QT.pending.executeDay} open` : QT.lastDay ? `Plans after the close for the next open · last decision ${QT.lastDay}` : "Waiting for the first completed trading session") };
 }
 if (DEPLOY.runJobs) setTimeout(() => {
-  qtTick();
-  setInterval(() => { const t = etParts(); if (QT.pending?.fillAt || (t.min >= QT_OPEN_MINUTE && t.min < QT_OPEN_CUTOFF) || t.min % 10 === 0 || process.env.AP_TEST) qtTick(); },
+  if (onDuty()) qtTick();
+  setInterval(() => { const t = etParts(); if (!onDuty()) return; if (QT.pending?.fillAt || (t.min >= QT_OPEN_MINUTE && t.min < QT_OPEN_CUTOFF) || t.min % 10 === 0 || process.env.AP_TEST) qtTick(); },
     process.env.AP_TEST ? 15_000 : 60_000);
 }, process.env.AP_TEST ? 8000 : 90_000);
 
@@ -3824,7 +3828,7 @@ const deskRisk = createDeskRisk({
   ],
 });
 if (!process.env.AP_TEST && DEPLOY.runJobs) setTimeout(() => {
-  deskRisk.prepare(); setInterval(() => { deskRisk.refresh().then(() => deskRisk.prepare()).catch(() => {}); }, 60_000);
+  deskRisk.prepare(); setInterval(() => { if (onDuty()) deskRisk.refresh().then(() => deskRisk.prepare()).catch(() => {}); }, 60_000);
 }, 30_000);
 
 const LAB = require("./strategy-lab.js");
@@ -3917,7 +3921,7 @@ if (!process.env.AP_TEST && DEPLOY.runJobs) setTimeout(() => {
   strategyLab.tick();
   const t = deskClock();
   if (t.trading && t.open) strategyLab.warmDay(t.day).catch(() => {});
-  setInterval(() => strategyLab.tick(), 30_000);
+  setInterval(() => { if (onDuty()) strategyLab.tick(); }, 30_000);
 }, 35_000);
 const blOpenish = () => { const t = etParts(); return !(t.wd === "Sat" || t.wd === "Sun") && t.min >= 9 * 60 + 25 && t.min <= 16 * 60 + 5; };
 async function blRefresh() {
@@ -4575,6 +4579,7 @@ const SPIDER_W = Math.max(0, Math.min(0.15, process.env.SPIDER_TRADER_WEIGHT != 
 const SPIDER = process.env.SPIDER_OFF || !DEPLOY.runJobs ? null : createSpider({ // local mode: THE WEB runs on the public server
   store: createWebStore({ url: UP_URL, token: UP_TOKEN }),
   sp500List: SP500, holidays: NYSE_HOLIDAYS, earlyClose: NYSE_EARLY,
+  workHours: onDuty, // research jobs only in agent work hours; owner-pressed jobs any time
   quotes: (syms) => getQuotes(syms),
   history: (sym, range) => history(sym, range),
   news: (tickers, range) => getNews(tickers, range),
@@ -5070,7 +5075,7 @@ async function handle(req, res) {
           }
         } catch (e) { return send(res, 502, { error: String(e.message || e) }); }
       }
-      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : DEPLOY.ownerSite ? "/hq" : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: typeof WebSocket !== "undefined", stocksStreaming: !!FINNHUB, feeds: { yahoo: YGATE.stats(), coinbase: cb.open }, streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
+      if (u.pathname === "/api/health") return send(res, 200, { ok: true, mode: DEPLOY.mode || "legacy", duty: { on: onDuty(), hours: "Mon–Fri 6:00 AM–5:00 PM ET" }, hqUrl: isOwner(req) ? (DEPLOY.hqPort ? `http://127.0.0.1:${DEPLOY.hqPort}/` : DEPLOY.ownerSite ? "/hq" : process.env.HQ_URL || null) : null, serverKey: !!process.env.ANTHROPIC_API_KEY, claudeUsedToday: claudeUsed(), claudeDailyLimit: DAILY_LIMIT, claudeBudget: budgetView(), durableSync: !!(UP_URL && UP_TOKEN), streaming: typeof WebSocket !== "undefined", stocksStreaming: !!FINNHUB, feeds: { yahoo: YGATE.stats(), coinbase: cb.open }, streamConnected: live.open, streamTradeAt: live.providerTradeAt, web: SPIDER ? { on: true, durable: !!(UP_URL && UP_TOKEN) } : { on: false } });
       // The dashboard is owner-only.
       const owner = isOwner(req);
       const go = (loc, extra = {}) => send(res, 302, "", "text/plain", { Location: loc, ...extra });

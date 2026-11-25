@@ -431,7 +431,9 @@ function createSpider(deps) {
       if (ST.hour.length >= MAX_PER_HOUR) { activity.state = "idle"; activity.note = `hourly research budget reached (${MAX_PER_HOUR} jobs) — resuming shortly`; return; }
       ST.queue.forEach(prioritize);
       ST.queue.sort((a, b) => b.prio.score - a.prio.score || a.created - b.created);
-      const i = ST.queue.findIndex((j) => (j.notBefore || 0) <= now() && (!ST.ctrl.paused || j.manual));
+      const offDuty = deps.workHours && !deps.workHours(); // outside agent hours only jobs the owner asked for run
+      if (offDuty && !ST.queue.some((j) => j.manual)) { activity.state = "idle"; activity.note = "off duty: research runs Mon–Fri 6 AM–5 PM ET"; return; }
+      const i = ST.queue.findIndex((j) => (j.notBefore || 0) <= now() && (!ST.ctrl.paused || j.manual) && (!offDuty || j.manual));
       if (i < 0) return;
       const [j] = ST.queue.splice(i, 1);
       await runJob(j);

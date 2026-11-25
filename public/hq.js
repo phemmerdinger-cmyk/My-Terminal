@@ -134,7 +134,11 @@
     const sp = D.spider, run = sp && sp.running;
     $("pSpider").className = "pill hs " + (run ? "busy" : sp ? "on" : ""); $("pSpider").lastChild.textContent = run ? "SPIDER reads" : sp ? "SPIDER idle" : "SPIDER offline";
     const open = D.raw.swing && D.raw.swing.marketOpen; $("pBots").className = "pill hs " + (open ? "on" : D.bots.length ? "busy" : "");
-    $("pBots").lastChild.textContent = `${D.bots.length} BOTS ${open ? "trading" : "waiting for the open"}`;
+    // every agent works Mon–Fri 6 AM–5 PM New York time (on the server, laptop on or off)
+    const et = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+    const mins = (+et.hour % 24) * 60 + +et.minute, duty = !["Sat", "Sun"].includes(et.weekday) && mins >= 360 && mins < 1020;
+    $("pBots").title = "Agent hours: Mon–Fri 6:00 AM–5:00 PM ET. They run on the server, so your computer can be off.";
+    $("pBots").lastChild.textContent = duty ? `${D.bots.length} BOTS ${open ? "trading" : "on duty · waiting for the open"} · 6 AM–5 PM ET` : `${D.bots.length} BOTS off duty · back 6:00 AM ET (Mon–Fri)`;
     $("sJobs").textContent = fmtN(sp && sp.stats ? sp.stats.total : null);
     const paused = gates().filter((g) => g.status === "fail").length, vetoes = checks().filter((c) => c.verdict === "veto").length;
     $("sDec").textContent = paused + vetoes; $("nDec").textContent = paused + vetoes; $("nRules").textContent = RULES.length;
