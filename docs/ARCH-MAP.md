@@ -22,6 +22,7 @@
 |---|---|
 | `my-trader-core.js` / `public/my-trader.js` | My Trader: the owner's hand-traded $30,000 paper account (server `mtView`/`mtOrder`/`mtTick`, `/api/mytrader*`), shown on Bots vs S&P 500 and ranked on the leaderboard |
 | `coach-core.js` | Coach agent rules: chart read, trade-journal review, −20% stress + hedge. Server `/api/coach` (coachView in server.js); Bot HQ Coach desk; Research → Why chart-read card (teamwork.js) |
+| `insider-core.js` | Form 4 → insider signal: open-market P/S only, 10b5-1 plan trades out, 4/A repeats once, implausible prices out of dollar totals, partial scans reported; `pickFilings` reads every Form 4 back to the window. Used by the spider's `insiders` job (`insiderScan(sym, { window: 90 })` in server.js), which feeds the insider-buying lab bot and the swing bot's pre-buy check |
 | `hq.html` / `hq.js` / `hq-core.js` | Bot HQ, a separate site: desk port 3001 or `MODE=hq` service (`handleHq` in server.js); overview, every bot in depth, agent room, spider, risk & costs |
 | `teamwork.js` | Morning brief pop-up (once a day + ☀ top-bar button) + Research "Why (bots)" card; lazy group `team` |
 | `lazy-core.js` | `MDLazyCore.GROUPS` (quant / studio / web / team script lists) + `createLoader`; `window.MDLazy` in index.html loads a group when `setTab` opens a tool |
