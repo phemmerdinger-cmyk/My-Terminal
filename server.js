@@ -2012,7 +2012,7 @@ const BOTDIAG = { market: {}, my: { errors: [] }, swing: { errors: [] }, quant: 
 const diagErr = (k, e) => { const l = BOTDIAG[k].errors; l.unshift({ t: Date.now(), e: String((e && e.message) || e).slice(0, 160) }); l.length = Math.min(l.length, 5); };
 // latest price and model score per symbol (for "value after trade" and the signal score shown in the trade log)
 const apPx = {}, apScoreOf = {};
-const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Thesis broken/.test(why) ? "Thesis rule" : /^Failed the 10-K health/.test(why) ? "Health rule" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
+const apRule = (side, why) => side === "BUY" ? "Ranking signal" : /^Coach:/.test(why) ? "Coach rule" : /^Thesis broken/.test(why) ? "Thesis rule" : /^Failed the 10-K health/.test(why) ? "Health rule" : /^Stop-loss|^Trailing/.test(why) ? "Stop rule" : /earnings/i.test(why) ? "Earnings rule" : /^Bad news/.test(why) ? "News rule" : /average/.test(why) ? "Trend rule" : /^Fell to/.test(why) ? "Ranking rule" : /^Trimmed|^Defense/.test(why) ? "Risk limit" : /^Swapped/.test(why) ? "Swap rule" : /busted/i.test(why) ? "Bust reset" : "Rule";
 function apTrade(st, side, sym, shares, price, why, name, sleeve, execution, extra) {
   const px = PAPER.paperFill(side, price, AP_COST);
   const position = st.positions[sym];
@@ -2268,6 +2268,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   const held = (sl) => Object.keys(st.positions).filter((s) => slv(s) === sl);
   const SLOTS = { risk: AP_RISK_SLOTS, safe: AP_SLOTS - AP_RISK_SLOTS };
   // 1) sells
+  let ce = null; // a Coach fix (loss cap, time stop, trim, chart sell)
   for (const [sym, p] of Object.entries(st.positions)) {
     const x = by[sym]; if (!x || x.stale) continue; const risk = slv(sym) === "risk";
     if (x.earn && x.earn.kind === "miss") apTrade(st, "SELL", sym, p.shares, x.px, `${opening ? "At the opening bell: " : ""}${fmtE(x.earn)} — sold before it can fall further`);
@@ -2275,6 +2276,10 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     else if (x.health && x.health.grade === "F") apTrade(st, "SELL", sym, p.shares, x.px, `Failed the 10-K health scorecard (grade F${x.health.flags.length ? ": " + x.health.flags.slice(0, 2).join(", ").toLowerCase() : ""})`);
     else if (risk ? x.px < x.m50 && x.px < x.m200 : x.px < x.m200) apTrade(st, "SELL", sym, p.shares, x.px, risk ? "Fell below both its 50- and 200-day averages — momentum is gone" : "Price broke below its 200-day average — trend turned down");
     else if (x.rank > (risk ? 25 : 35) && !cool(sym) && !x.stale && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) apTrade(st, "SELL", sym, p.shares, x.px, `Fell to #${x.rank} in the ranking at the opening re-score, after ${Math.floor((now - p.at) / 864e5)} days held`);
+    else if ((ce = CA.swingExit(COACH_PLAN, p, { sym, price: x.px, bookValue: val(), now, done: st.coachDone || {} }))) {
+      apTrade(st, "SELL", sym, p.shares * ce.sell, x.px, ce.reason);
+      if (ce.once) (st.coachDone = st.coachDone || {})[ce.actionId] = true;
+    }
     else if (p.thesis && !cool(sym) && RISK.rankExitAllowed(now - (p.at || now), opening, STRATS.swing.params.rankHoldDays)) {
       // the spider-off twin can't see spider research, so that pillar is left out of its check
       const th = THESIS.check(sc.spiderOff ? { ...p.thesis, pillars: p.thesis.pillars.filter((k) => k !== "spider") } : p.thesis, x);
@@ -2305,7 +2310,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
   }
   if (sc.stress) return;
   const earnOk = (x) => !x.earnNext || ["none", "ok"].includes(TEAM.earningsAction({ held: false, days: x.earnNext.days, research: sc.spiderOff ? null : x.research }).action);
-  const ok = (x, sl) => x.sleeve === sl && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
+  const ok = (x, sl) => x.sleeve === sl && !CA.blocked(COACH_PLAN, "swing", x.sym) && !(sl === "risk" && sc.pauseRisk) && !(x.check && x.check.verdict === "veto" && !sc.spiderOff) && earnOk(x) && !x.stale && !st.positions[x.sym] && !cool(x.sym) && x.px >= 5 && x.news > -1.5 && !(x.health && x.health.grade === "F") && !(x.earn && (x.earn.kind === "miss" || x.earn.kind === "soon")) &&
     (sl === "risk" ? x.px > x.m50 || x.px > x.m200 || (x.earn && x.earn.kind === "beat") : x.px > x.m200);
   const why = (x) => {
     const bits = [x.sleeve === "risk" ? `high-risk pick (${Math.round(x.vol * 100)}% volatility)` : `safe pick (${Math.round(x.vol * 100)}% volatility)`];
@@ -2338,7 +2343,7 @@ function apDecide(st, sc, opening, pace = { swaps: 1, gap: 0.02 }) {
     for (const x of sc.list) {
       if (held(sl).length >= SLOTS[sl]) break;
       if (!ok(x, sl)) continue;
-      const size = sizeOf(x), amt = Math.min(target * size, st.cash - 5); if (amt < 50) break;
+      const size = sizeOf(x), amt = Math.min(target * size * CA.sizeFactor(COACH_PLAN, "swing"), st.cash - 5); if (amt < 50) break; // Coach: half size during a losing run
       const thesis = THESIS.atBuy(sc.spiderOff ? { ...x, spider: null } : x, now);
       apTrade(st, "BUY", x.sym, amt / PAPER.paperFill("BUY", x.px, AP_COST), x.px, why(x) + (size !== 1 ? `; sized ${size.toFixed(2)}× an equal slot for its volatility` : ""), x.name, sl, undefined, { size, ...(thesis ? { thesis } : {}) });
     }
@@ -2463,10 +2468,16 @@ async function briefView() {
     defense: sig.defense || null, riskOff: !!sig.riskOff, regime: QT.regimeState || null, vetoes: AP_CHECKS.filter((c) => c.verdict === "veto" && c.t >= since) });
 }
 
-// ---- Coach: the seventh agent. Never trades; reviews the other bots with rules + real prices (public/coach-core.js).
+// ---- Coach (VP of Finance): reviews the other bots with rules + real prices (public/coach-core.js), then fixes what they do wrong (coach-actions-core.js).
 // Chart reads on everything held or top-ranked, a journal review of each bot's last 20 closed trades, and a hypothetical −20% market.
 const COACH = require("./public/coach-core.js");
 let coachCache = { t: 0, v: null, p: null };
+// The Coach acts (coach-actions-core.js): each review becomes automatic, bounded fixes on the paper bots, saved so they
+// survive restarts; findings it leaves alone are explained. The bots read COACH_PLAN; the owner sees a report.
+const CA = require("./coach-actions-core.js");
+let COACH_PLAN = null, coachPlanStoreV = null;
+const coachPlanStore = () => (coachPlanStoreV = coachPlanStoreV || paperStore("coach-actions-v1", { url: UP_URL, token: UP_TOKEN }));
+const coachPlanReady = (async () => { try { const v = await coachPlanStore().get("plan"); if (v && v.at) COACH_PLAN = v; } catch {} })();
 async function coachBuild() {
   if (!apLoaded) await apLoad(); if (!dtLoaded) await dtLoad(); if (!qtLoaded) await qtLoad();
   const holdings = [
@@ -2488,8 +2499,12 @@ async function coachBuild() {
   for (const j of journals) if (j.ok && j.rules.length) flags.push(`${j.bot}: ${j.rules[0]}`);
   if (stress.ok) { if (stress.pairs.length) flags.push(`${stress.pairs[0].a} and ${stress.pairs[0].b} move together (${stress.pairs[0].corr}); a selloff hits both.`); for (const b of stress.bots) for (const o of b.over) flags.push(`${b.bot}: ${o.sym} is ${o.weight}% of its book.`); }
   for (const c of charts) if (c.ok && c.signal === "Sell" && /held/.test(c.role)) flags.push(`${c.sym} (${c.role}) reads Sell on the chart.`);
-  return { at: Date.now(), charts, journals, stress, flags: flags.slice(0, 8), unavailable: failed,
-    note: "The Coach never trades. Rule-based reviews of paper trades and real daily prices; the −20% test is hypothetical." };
+  await coachPlanReady;
+  COACH_PLAN = CA.plan({ journals, stress, charts }, { prev: COACH_PLAN });
+  try { await coachPlanStore().set("plan", COACH_PLAN); } catch {}
+  const acts = CA.summary(COACH_PLAN);
+  return { at: Date.now(), charts, journals, stress, findings: flags.slice(0, 8), flags: [], fixed: acts.fixed, noted: acts.noted, headline: acts.headline, unavailable: failed,
+    note: "The Coach applies its fixes to the paper bots by itself (pauses, half size, cooldowns, loss caps, trims) and explains anything it leaves alone. Reviews use real daily prices; the −20% test is hypothetical." };
 }
 // ---- My Trader: the owner's own $30,000 paper account, traded by hand (my-trader-core.js). Lives on the bot server.
 const MYT = require("./my-trader-core.js");
@@ -2551,6 +2566,7 @@ async function mtOrder(body) {
     return r;
   });
 }
+if (DEPLOY.runJobs && !process.env.AP_TEST) setTimeout(() => { const go = () => { coachCache.t = 0; coachView().catch((e) => diagErr("swing", e)); }; go(); setInterval(go, 2 * 3600e3); }, 3 * 60_000);
 async function coachView() {
   if (coachCache.v && Date.now() - coachCache.t < 2 * 3600e3) return coachCache.v;
   if (!coachCache.p) coachCache.p = coachBuild().then((v) => { coachCache = { t: Date.now(), v, p: null }; return v; }, (e) => { coachCache.p = null; throw e; });
@@ -3183,11 +3199,12 @@ async function dtTick() {
       const ranked = setups.sort((a, b) => b.idea.netTargetBps - a.idea.netTargetBps).slice(0, 6);
       await deskRisk.prepare(ranked.map(({ sym }) => sym));
       for (const { sym, last, idea, kind } of ranked) {
+        if (CA.setupPaused(COACH_PLAN, "day", DT_KIND[idea.kind] || DT_KIND[kind] || kind) || CA.blocked(COACH_PLAN, "day", sym)) { DT.day.coachSkipped = (DT.day.coachSkipped || 0) + 1; continue; }
         const decisionAt = Date.now(), side = idea.side;
         const fillAt = DTC.paperEntryMinute(last, decisionAt, close, DT_PARAMS.maxBarLagSec, DT_HOLD);
         if (fillAt == null) continue;
         const riskPerShare = idea.stopDistance + last.c * (2 * DT_COST + (side < 0 ? DT_FEE_SHORT : 0));
-        const shares = DTC.size(dtEquity(), last.c, idea.stop, DT_PARAMS.riskPct, DT_PILOT.entryGross);
+        const shares = Math.floor(DTC.size(dtEquity(), last.c, idea.stop, DT_PARAMS.riskPct, DT_PILOT.entryGross) * CA.sizeFactor(COACH_PLAN, "day"));
         const ticket = deskRisk.reserve({ bot: "day", sym, sign: side, shares, price: last.c, riskPerShare,
           integer: true, pilotRoom: dtPilotRoom() });
         if (!ticket.shares) {

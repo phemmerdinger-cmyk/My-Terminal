@@ -300,7 +300,11 @@
     const k = D.coach;
     if (!k) return `<div class="card" style="margin-top:12px"><div class="cb">${D.coachErr ? `<div class="err">The Coach is unavailable: ${h(D.coachErr)}</div>` : '<div class="empty">Reading charts and trade logs… the first review takes about a minute.</div>'}</div></div>`;
     const sig = (x) => `<span class="tag ${x === "Buy" ? "ok" : x === "Sell" ? "bad" : "warn"}">${h(x)}</span>`;
-    const flags = `<div class="card" style="margin-top:12px"><div class="ch">To fix <em>· reviewed ${h(when(k.at))}</em></div><div class="cb">${k.flags.map((f) => `<div class="row"><span>${h(f)}</span></div>`).join("") || '<div class="empty">Nothing urgent.</div>'}<div class="note">${h(k.note)}</div></div></div>`;
+    // the VP of Finance's report: what it fixed on its own, and what it reviewed and deliberately left alone
+    const fixed = k.fixed || [], noted = k.noted || [], until = (x) => (x.until ? ` · until ${new Date(x.until).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : " · until it's no longer needed");
+    const flags = `<div class="card" style="margin-top:12px"><div class="ch">What I fixed <em>· reviewed ${h(when(k.at))} · ${h(k.headline || "")}</em></div><div class="cb">${fixed.map((x) => `<div class="row" style="display:block"><span><span class="tag ok">FIXED</span> <b>${h(x.fix)}</b> <span class="dim">(${h(x.bot)}${h(until(x))})</span></span><div class="note" style="margin:2px 0 0">Why: ${h(x.why)}</div></div>`).join("") || '<div class="empty">Nothing needed fixing.</div>'}
+      ${noted.length ? `<div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:12px">REVIEWED, LEFT ALONE ON PURPOSE</div>${noted.map((x) => `<div class="row" style="display:block"><span>${h(x.bot)}: ${h(x.finding)}</span><div class="note" style="margin:2px 0 0">${h(x.why)}</div></div>`).join("")}` : ""}
+      <div class="note">${h(k.note)}</div></div></div>`;
     const jr = k.journals.map((j) => `<div class="card"><div class="ch">${h(j.bot)} · trade journal <em>· last ${j.closed || 0} closed</em></div><div class="cb">${j.ok ? `
       <div class="row"><span>Win rate</span><span class="mono">${(j.winRate * 100).toFixed(0)}% (${j.wins}W / ${j.losses}L)</span></div>
       <div class="row"><span>Profit factor</span><span class="mono">${j.profitFactor == null ? "no losses" : j.profitFactor.toFixed(2)}</span></div>
@@ -480,9 +484,9 @@
   }
   function coachAgent() {
     const k = D.coach, held = k ? k.charts.filter((c) => c.ok && /held/.test(c.role)) : [];
-    return { id: "coach", name: "COACH", role: "reviewer · chart reads, trade journals, −20% stress test", x: 0, z: -5, busy: !k && !D.coachErr,
-      now: k ? `${k.flags.length} thing${k.flags.length === 1 ? "" : "s"} to fix · ${held.filter((c) => c.signal === "Sell").length} held stock${held.filter((c) => c.signal === "Sell").length === 1 ? "" : "s"} read Sell` : D.coachErr ? "Offline" : "Reviewing the other bots…",
-      why: "Never trades. Checks the other bots' work with fixed rules and real prices.", found: k && k.flags[0] ? k.flags[0] : "—", next: "Re-checks every 2 hours." };
+    return { id: "coach", name: "COACH", role: "VP of Finance · fixes what the bots do wrong, reports to you", x: 0, z: -5, busy: !k && !D.coachErr,
+      now: k ? `${(k.fixed || []).length} fix${(k.fixed || []).length === 1 ? "" : "es"} in place · ${(k.noted || []).length} reviewed and left alone` : D.coachErr ? "Offline" : "Reviewing the other bots…",
+      why: "VP of Finance: reviews every bot's trades, risk and charts, fixes what they're doing wrong by itself, and reports to you.", found: k && k.fixed && k.fixed[0] ? `Fixed: ${k.fixed[0].fix}` : "Nothing needed fixing.", next: "Re-reviews and re-fixes every 2 hours." };
   }
   const room = { hits: [], drag: null };
   function P(x, y, z, w, hh) { const a = D.rot, X = x * Math.cos(a) - z * Math.sin(a), Z = x * Math.sin(a) + z * Math.cos(a), s = Math.min(w / 17.5, hh / 15); return [w / 2 + (X - Z) * 0.87 * s, hh * 0.57 + (X + Z) * 0.5 * s - y * s, X + Z]; }
@@ -513,7 +517,7 @@
         { title: "DAILY LOSS", kind: "gauge", v: st && pol && pol.hardDaily ? st.dailyLoss / pol.hardDaily : null, sub: st ? money(st.dailyLoss) : "" },
         { title: "DRAWDOWN", kind: "gauge", v: st && pol && pol.peakStop ? st.drawdown / pol.peakStop : null, sub: st ? money(st.drawdown) : "" }]; }
     if (a.id === "coach") { const k = D.coach, st = k && k.stress, ch = k ? k.charts.filter((c) => c.ok) : [];
-      return [{ title: "TO FIX", kind: "big", text: k ? String(k.flags.length) : "—", sub: "FLAGS" },
+      return [{ title: "FIXED", kind: "big", text: k ? String((k.fixed || []).length) : "—", sub: "IN PLACE" },
         { title: "CHART READS", kind: "bars", bars: k ? [{ k: "BUY", v: ch.filter((c) => c.signal === "Buy").length }, { k: "SELL", v: -ch.filter((c) => c.signal === "Sell").length }] : [] },
         { title: "−20% TEST", kind: "big", text: st && st.ok ? money(st.totalHit) : "—", sub: "HYPOTHETICAL" }]; }
     return [];
@@ -569,7 +573,7 @@
     const q = D.raw.quant && D.raw.quant.latest, dk = D.raw.desk, k = D.coach;
     const cell = (l, v, c = "") => `<div><small>${l}</small><b class="${c}">${v}</b></div>`;
     const html = cell("PAPER EQUITY", main.length ? money(tot) : "—") + cell("SINCE START", main.length && st ? pct(tot / st - 1, 2) : "—", cls(tot - st)) + cell("OPEN POSITIONS", String(open)) + cell("FILLS · 24H", String(fills))
-      + cell("REGIME", q ? h(String(q.regime).toUpperCase()) : "—") + cell("RISK DESK", dk ? h(String(dk.mode).toUpperCase()) : "—", dk && dk.mode !== "armed" ? "or" : "") + cell("COACH FLAGS", k ? String(k.flags.length) : "—", k && k.flags.length ? "or" : "")
+      + cell("REGIME", q ? h(String(q.regime).toUpperCase()) : "—") + cell("RISK DESK", dk ? h(String(dk.mode).toUpperCase()) : "—", dk && dk.mode !== "armed" ? "or" : "") + cell("COACH FIXES", k ? String((k.fixed || []).length) : "—", k && (k.fixed || []).length ? "or" : "")
       + cell("SPIDER", D.spider && D.spider.running ? "WORKING" : "IDLE", D.spider && D.spider.running ? "or" : "");
     if (el.innerHTML !== html) el.innerHTML = html;
   }
@@ -602,9 +606,9 @@
       // a second, smaller panel on the right wall: the Coach's latest flag and the desk mode
       onPlane(c, p(-5.6, 2.2, -6), p(5.6, 2.2, -6), p(-5.6, 1.15, -6), 1400, 190, (g) => {
         g.fillStyle = "#07090b"; g.fillRect(0, 0, 1400, 190); g.strokeStyle = "#2a2016"; g.strokeRect(1, 1, 1398, 188);
-        g.fillStyle = OR; g.font = "600 22px monospace"; g.fillText("COACH · TO FIX", 20, 36);
-        g.font = "20px monospace"; g.fillStyle = "#d8d8d8"; const f = (D.coach && D.coach.flags) || [];
-        (f.length ? f.slice(0, 4) : [D.coach ? "Nothing urgent." : "Reviewing…"]).forEach((x, i) => g.fillText("• " + String(x).slice(0, 110), 20, 72 + i * 30));
+        g.fillStyle = OR; g.font = "600 22px monospace"; g.fillText("VP OF FINANCE · FIXED", 20, 36);
+        g.font = "20px monospace"; g.fillStyle = "#d8d8d8"; const f = ((D.coach && D.coach.fixed) || []).map((x) => x.fix);
+        (f.length ? f.slice(0, 4) : [D.coach ? "Nothing needed fixing." : "Reviewing…"]).forEach((x, i) => g.fillText("• " + String(x).slice(0, 110), 20, 72 + i * 30));
       });
     }
     const A = agents(); room.hits = [];
