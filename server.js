@@ -3440,7 +3440,7 @@ if (DEPLOY.runJobs) setTimeout(() => { dtTick(); setInterval(dtTick, process.env
 // gives the bots: gap alerts on holdings, an opening guard (swing doesn't chase big gaps for 30 min) and the day
 // trader's scan order (big gappers first). Nothing is estimated; no print means "no pre-market trades yet".
 const PMC = require("./premarket-core.js");
-let PM = null, PM_ALERTS = [], pmBusy = false;
+let PM = null, PM_ALERTS = [], pmBusy = false, pmLastAt = 0;
 function pmHoldings() {
   const out = [];
   try { for (const [sym, p] of Object.entries(AP.positions || {})) { const [sl, tr] = apStops(p); out.push({ bot: "Swing", sym, shares: p.shares, cost: p.cost, stop: Math.max(p.cost * (1 - sl), (p.peak || p.cost) * (1 - tr)) }); } } catch {}
@@ -3459,7 +3459,7 @@ async function pmTick(force = false) {
     const { quotes } = await getQuotes(syms);
     const rep = PMC.scan(quotes, syms, { now: Date.now(), phase: ph === "off" ? "pre" : ph });
     rep.day = t.day;
-    PM = rep; PM_ALERTS = PMC.holdingAlerts(rep, held);
+    PM = rep; PM_ALERTS = PMC.holdingAlerts(rep, held); pmLastAt = rep.t;
     if (AP.plan && Array.isArray(AP.plan.orders)) { // tag the swing bot's opening plan with what pre-market says
       const by = Object.fromEntries(rep.rows.map((r) => [r.sym, r]));
       for (const o of AP.plan.orders) { const r = by[o.sym]; o.pre = r && r.status === "live" ? { price: r.price, gapPct: r.gapPct } : null; }
@@ -3476,6 +3476,60 @@ function pmView() {
     summary: PMC.summary(PM, PM_ALERTS) };
 }
 if (DEPLOY.runJobs) setTimeout(() => { pmTick(); setInterval(pmTick, 5 * 60e3).unref(); }, 90_000);
+
+// ---------------------------------------------------------------- System Doctor (every 10 min while the site is awake)
+// Checks what the owner would notice (doctor-core.js), heals what is safe to heal on its own, and reports the rest.
+// With GITHUB_TOKEN (fine-grained, Issues: write on this repo only) set, each code-level bug is filed once as a GitHub
+// issue labelled "doctor" for the scheduled fixer. Free: GitHub's API, no paid services.
+const DRC = require("./doctor-core.js");
+const DR = { at: 0, findings: [], heals: [], issues: {}, client: [], filedToday: { day: "", n: 0 }, runs: 0 };
+async function drHeal(x) {
+  const h = DRC.healFor(x); if (!h) return null;
+  try {
+    if (h.action === "clear-quote") cache.delete("q:" + h.sym);
+    else if (h.action === "clear-chart") { for (const k of [...cache.keys()]) if (k.startsWith(`h:${h.sym}:`)) cache.delete(k); }
+    // a loop still inside a tick is only un-stuck after 15 min (fetches time out long before), so two ticks never overlap
+    else if (h.action === "restart-swing") { if (apBusy && Date.now() - (BOTDIAG.swing.lastTick || 0) < 15 * 60e3) return null; apBusy = false; setTimeout(apTick, 0); }
+    else if (h.action === "restart-day") { if (dtBusy && Date.now() - (BOTDIAG.day.lastTick || 0) < 15 * 60e3) return null; dtBusy = false; setTimeout(dtTick, 0); }
+    else if (h.action === "rerun-premarket") { pmBusy = false; await pmTick(true); }
+    else if (h.action === "repick-ai-model") { GEM_STATE.modelAt = 0; GEM_STATE.lastError = null; }
+    const rec = { t: Date.now(), key: x.key, action: h.action, text: x.text };
+    DR.heals.unshift(rec); DR.heals = DR.heals.slice(0, 60); return rec;
+  } catch (e) { return { t: Date.now(), key: x.key, action: h.action, failed: String(e.message || e) }; }
+}
+async function drFile(x) {
+  const token = process.env.GITHUB_TOKEN, repo = process.env.GITHUB_REPO || "phemmerdinger-cmyk/My-Terminal";
+  if (!token || DR.issues[x.key]) return;
+  const day = new Date().toISOString().slice(0, 10); if (DR.filedToday.day !== day) DR.filedToday = { day, n: 0 };
+  if (DR.filedToday.n >= 6) return; // never flood the tracker
+  const H = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "market-desk-doctor", "content-type": "application/json" };
+  try {
+    const open = await (await fetch(`https://api.github.com/repos/${repo}/issues?labels=doctor&state=open&per_page=100`, { headers: H, signal: AbortSignal.timeout(10_000) })).json();
+    const hit = Array.isArray(open) && open.find((i) => String(i.title).startsWith(`[doctor] ${x.key}:`));
+    if (hit) { DR.issues[x.key] = { number: hit.number, url: hit.html_url }; return; }
+    const r = await fetch(`https://api.github.com/repos/${repo}/issues`, { method: "POST", headers: H, body: JSON.stringify(DRC.issueFor(x)), signal: AbortSignal.timeout(10_000) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { DR.issues[x.key] = { number: j.number, url: j.html_url }; DR.filedToday.n++; }
+    else DR.githubError = `GitHub ${r.status}: ${String(j.message || "").slice(0, 120)}`;
+  } catch (e) { DR.githubError = String(e.message || e).slice(0, 160); }
+}
+async function drTick(force = false) {
+  if (!force && !DM.awakeWindow()) return;
+  const now = Date.now(), t = etParts(), ph = DRC.phase({ ...t, holiday: NYSE_HOLIDAYS.has(t.day) }), ctx = { now, phase: ph, awake: DM.awakeWindow(now) };
+  const found = [];
+  try { const { quotes } = await getQuotes(["SPY", "AAPL", "NVDA"]); for (const s of ["SPY", "AAPL", "NVDA"]) found.push(...DRC.checkQuote(s, quotes[s], ctx)); } catch (e) { found.push({ key: "quotes-down", sev: "warn", area: "quotes", fix: "none", text: "Quotes couldn't be fetched: " + String(e.message || e).slice(0, 120), evidence: {} }); }
+  try { found.push(...DRC.checkChart("SPY", await history("SPY", "1d", "1m", true), ctx)); } catch (e) { found.push({ key: "chart-fetch:SPY", sev: "warn", area: "charts", fix: "auto", text: "SPY 1D chart couldn't load: " + String(e.message || e).slice(0, 120), evidence: { sym: "SPY" } }); }
+  found.push(...DRC.checkBots({ swingTick: BOTDIAG.swing.lastTick, dayTick: BOTDIAG.day.lastTick, pmAt: pmLastAt, pmPhaseOn: PMC.phase({ ...t, holiday: NYSE_HOLIDAYS.has(t.day) }) !== "off",
+    errors: { swing: BOTDIAG.swing.errors, day: BOTDIAG.day.errors } }, ctx));
+  found.push(...DRC.checkServer(DR_5XX, ctx), ...DRC.checkClient(DR.client, ctx), ...DRC.checkAi(geminiInfo()));
+  const prev = Object.fromEntries(DR.findings.map((x) => [x.key, x]));
+  DR.findings = found.map((x) => ({ ...x, first: prev[x.key] ? prev[x.key].first : now }));
+  for (const x of DR.findings) { if (x.fix === "auto") x.healed = await drHeal(x); else if (x.fix === "code") await drFile(x); }
+  DR.at = now; DR.runs++;
+}
+const drView = () => ({ at: DR.at, runs: DR.runs, awake: DM.awakeWindow(), findings: DR.findings.map((x) => ({ ...x, issue: DR.issues[x.key] || null })), heals: DR.heals.slice(0, 20),
+  github: { on: !!process.env.GITHUB_TOKEN, error: DR.githubError || null }, schedule: "every 10 min, Mon–Fri 6:00 AM–5:00 PM ET" });
+if (DEPLOY.runJobs) setTimeout(() => { drTick(); setInterval(drTick, 10 * 60e3).unref(); }, 3 * 60_000);
 
 // ---------------------------------------------------------------- Quant Trader (third paper bot): systematic, uses the Quant Lab's math
 // Once per trading day after the close (and once right away when the account is new) it reads the regime, ranks the
@@ -4712,9 +4766,12 @@ function send(res, code, body, type = "application/json", extra = {}) {
   if (!h["Content-Encoding"] && /json|text|javascript|svg|xml/.test(type) && buf.length > 1024 && /\bgzip\b/.test(ae)) {
     buf = zlib.gzipSync(buf, { level: 6 }); h["Content-Encoding"] = "gzip"; h.Vary = "Accept-Encoding";
   }
+  if (code >= 500 && res.req) { try { const pth = new URL(res.req.url, "http://x").pathname; let msg = ""; try { msg = typeof body === "object" && !Buffer.isBuffer(body) ? body.error : String(body).slice(0, 200); } catch {}
+    DR_5XX.push({ t: Date.now(), path: pth, status: code, msg: String(msg || "").slice(0, 300) }); if (DR_5XX.length > 300) DR_5XX.splice(0, 100); } catch {} }
   res.writeHead(code, h);
   res.end(buf);
 }
+const DR_5XX = []; // server errors the System Doctor reviews
 
 process.on("unhandledRejection", (e) => console.error("unhandled:", e && e.message));
 process.on("uncaughtException", (e) => console.error("uncaught:", e && e.message));
@@ -4877,6 +4934,13 @@ async function handle(req, res) {
         if (req.method === "GET") { await ownerReady; return send(res, 200, { messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })), ai: geminiInfo() }); }
         if (req.method === "POST") { let b = null; try { b = await readBody(req, 4000); } catch {} const text = String((b && b.text) || "").trim(); if (!text) return send(res, 400, { error: "Type an instruction." });
           try { return send(res, 200, await coachChat(text)); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }
+      }
+      if (u.pathname === "/api/doctor" && req.method === "GET") { if (u.searchParams.get("run") === "1") await drTick(true); return send(res, 200, drView()); }
+      if (u.pathname === "/api/doctor/report" && req.method === "POST") { // errors from the owner's browser (owner-only; size-capped)
+        let b = null; try { b = await readBody(req, 4000); } catch {} const list = Array.isArray(b && b.reports) ? b.reports.slice(0, 10) : [];
+        for (const r of list) DR.client.push({ t: Date.now(), kind: r.kind === "api" ? "api" : "js", msg: String(r.msg || "").slice(0, 400), where: String(r.where || "").slice(0, 200), page: String(r.page || "").slice(0, 40) });
+        if (DR.client.length > 200) DR.client.splice(0, DR.client.length - 200);
+        return send(res, 200, { ok: true });
       }
       if (u.pathname === "/api/premarket" && req.method === "GET") { if (u.searchParams.get("run") === "1" && !PM) await pmTick(true); return send(res, 200, pmView()); }
       if (u.pathname === "/api/coach" && req.method === "GET") { try { return send(res, 200, await coachView()); } catch (e) { return send(res, 502, { error: String(e.message || e) }); } }

@@ -106,6 +106,18 @@
       <div class="note">Runs ${h(p.rules.window)} every 5 minutes. Gaps are real extended-hours trades vs yesterday's close; prints older than ${p.rules.freshMin} min are ignored. The day trader scans the biggest gappers first at the open. Paper money only.</div>
     </div></div>`;
   }
+  async function loadDr(run) { try { D.dr = await get("/api/doctor" + (run ? "?run=1" : "")); D.drErr = null; } catch (e) { D.drErr = e.message; } const b = $("drBox"); if (b) b.innerHTML = drHtml(); const btn = $("drRun"); if (btn) btn.onclick = () => { btn.disabled = true; btn.textContent = "Checking…"; loadDr(true); }; }
+  // System Doctor: what it checked, what it fixed on its own, and what needs a code change
+  function drHtml() {
+    const d = D.dr; if (!d) return `<div class="card" style="margin-top:12px"><div class="ch">System Doctor</div><div class="cb">${D.drErr ? `<div class="err">${h(D.drErr)}</div>` : '<div class="empty">Loading…</div>'}</div></div>`;
+    const tag = (x) => x.fix === "auto" ? '<span class="tag ok">Fixed itself</span>' : x.fix === "code" ? '<span class="tag bad">Needs code fix</span>' : '<span class="tag warn">Watching</span>';
+    const fs = d.findings.map((x) => `<div class="row" style="display:block">${tag(x)} ${h(x.text)}${x.issue ? ` · <a href="${h(x.issue.url)}" target="_blank" rel="noopener">issue #${x.issue.number}</a>` : ""}${x.healed && x.healed.action ? `<div class="note">Action: ${h(x.healed.action.replace(/-/g, " "))}</div>` : ""}</div>`).join("");
+    return `<div class="card" style="margin-top:12px"><div class="ch">System Doctor <em>· ${d.at ? "last check " + h(when(d.at)) : "no check yet"} · ${h(d.schedule)}</em> <button class="btn" id="drRun" style="float:right;font-size:11px;padding:2px 8px">Check now</button></div><div class="cb">
+      ${d.at ? (fs || '<div class="note">All clear: quotes, pre-market math, the 1D chart, bot loops, server errors and your browser all checked out.</div>') : '<div class="empty">The first check runs a few minutes after the server starts.</div>'}
+      ${d.heals.length ? `<div class="dim mono" style="font-size:10px;letter-spacing:.14em;margin-top:10px">RECENT AUTOMATIC FIXES</div>${d.heals.slice(0, 6).map((x) => `<div class="note">${h(when(x.t))} · ${h(x.action.replace(/-/g, " "))} · ${h(x.text)}</div>`).join("")}` : ""}
+      <div class="note">${d.github.on ? "Code-level bugs are filed as GitHub issues for the scheduled fixer." : "Code-level bugs are listed here. Add a GITHUB_TOKEN on Render to have them filed for the scheduled fixer."}${d.github.error ? " GitHub: " + h(d.github.error) : ""}</div>
+    </div></div>`;
+  }
   async function loadCoach() { try { D.coach = await get("/api/coach"); D.coachErr = null; } catch (e) { D.coachErr = e.message; } if (D.view === "bot" && D.botId === "coach") botPage(); }
   async function loadSpider() { try { D.spider = await get("/api/web/status"); } catch { D.spider = null; } render(true); }
   const finds = () => ((D.raw.finds && D.raw.finds.items) || []);
@@ -369,8 +381,8 @@
       ${c.plan.stop != null || c.plan.target != null ? `<div class="note">Stop under support ${c.plan.stop != null ? "$" + c.plan.stop.toFixed(2) : "—"} · target at resistance ${c.plan.target != null ? "$" + c.plan.target.toFixed(2) : "—"}${c.plan.rewardRisk != null ? ` · reward/risk ${c.plan.rewardRisk}` : ""}</div>` : ""}
       ${c.points.map((p) => `<div class="note"><span class="${p.n > 0 ? "up" : p.n < 0 ? "down" : "or"}">${p.n > 0 ? "▲" : p.n < 0 ? "▼" : "●"}</span> ${h(p.text)}</div>`).join("")}</details>` : `<div class="row"><span><b style="font-weight:500">${h(c.sym)}</b> <span class="dim">${h(c.role)}</span></span><span class="dim">${h(c.why)}</span></div>`).join("") || '<div class="empty">Nothing held or ranked yet.</div>'}<div class="note">Rule-based read of daily closes: moving averages, RSI, 3-month momentum, support/resistance. Not advice.</div></div></div>`;
     setTimeout(() => { paintChat(); loadChat(); }, 0);
-    setTimeout(loadPm, 0);
-    return `<div id="chatBox">${chatHtml()}</div><div id="pmBox">${pmHtml()}</div>` + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
+    setTimeout(loadPm, 0); setTimeout(() => loadDr(false), 0);
+    return `<div id="chatBox">${chatHtml()}</div><div id="pmBox">${pmHtml()}</div><div id="drBox">${drHtml()}</div>` + flags + `<div class="grid g2" style="margin-top:12px">${jr}</div>` + stress + charts;
   }
 
   // ---------------------------------------------------------------- LAB
