@@ -2516,8 +2516,11 @@ async function gemini(opts) {
   const tryModels = [GEM_STATE.model, ...(GEM_STATE.backups || ["gemini-flash-latest"]).filter((m) => m !== GEM_STATE.model)].slice(0, 3);
   let r, j;
   for (let i = 0; i < tryModels.length; i++) {
-    r = await fetch(`${GEM.BASE}/models/${encodeURIComponent(tryModels[i])}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body(opts)), signal: AbortSignal.timeout(20_000) }).catch((e) => ({ ok: false, status: 503, json: async () => ({ error: { message: String(e.message || e) } }) }));
-    j = await r.json().catch(() => ({}));
+    const call = (think) => fetch(`${GEM.BASE}/models/${encodeURIComponent(tryModels[i])}:generateContent`, { method: "POST", headers: { "x-goog-api-key": GEMINI_KEY, "content-type": "application/json" }, body: JSON.stringify(GEM.body({ ...opts, model: tryModels[i], think })), signal: AbortSignal.timeout(20_000) }).catch((e) => ({ ok: false, status: 503, json: async () => ({ error: { message: String(e.message || e) } }) }));
+    const think = !(GEM_STATE.noThink || {})[tryModels[i]];
+    r = await call(think); j = await r.json().catch(() => ({}));
+    if (r.status === 400 && think && /think/i.test(JSON.stringify(j))) { // this model doesn't take the speed setting: remember, ask again without it
+      GEM_STATE.noThink = { ...(GEM_STATE.noThink || {}), [tryModels[i]]: true }; r = await call(false); j = await r.json().catch(() => ({})); }
     if (r.ok || !GEM.retryable(r.status)) { if (r.ok) GEM_STATE.lastModel = tryModels[i]; break; }
     if (i < tryModels.length - 1) await new Promise((ok) => setTimeout(ok, 600));
   }
@@ -2553,18 +2556,24 @@ function botsBrief() {
 }
 async function coachChat(text) {
   await ownerReady;
-  let p = null, via = "rules", note = "";
-  if (GEMINI_KEY) {
-    try { p = GEM.toParse(GEM.jsonOf(await gemini({ system: GEM.COACH_SYSTEM, text, schema: GEM.COACH_SCHEMA, maxTokens: 300 }))); via = "gemini"; }
-    catch (e) { GEM_STATE.lastError = e.message; note = e.code === "cap" || e.status ? `(${e.message})\n` : ""; p = null; }
+  // Speed: clear instructions ("swing bot buy nvda $2k") are understood by the rules instantly. Anything else takes
+  // ONE Gemini call that both reads the instruction and, for questions/small talk, writes the answer.
+  let p = CO.parse(text), via = "rules", note = "", oneReply = "";
+  if (p.intent === "unknown" && GEMINI_KEY) {
+    try {
+      const a = GEM.jsonOf(await gemini({ system: GEM.COACH_ONE_SYSTEM(), text: `DATA (paper bots, right now)\n${botsBrief()}\n\nOWNER: ${text}`, schema: GEM.COACH_SCHEMA, history: OWNER.chat.slice(-6), maxTokens: 700 }));
+      const g = GEM.toParse(a); oneReply = String((a && a.reply) || "").trim();
+      if (g.intent !== "unknown") { p = g; via = "gemini"; } else if (oneReply) { p = { intent: "chat" }; via = "gemini"; }
+    } catch (e) { GEM_STATE.lastError = e.message; note = e.code === "cap" || e.status ? `(${e.message})\n` : ""; }
   }
-  if (!p || p.intent === "unknown") { const r = CO.parse(text); if (r.intent !== "unknown" || !p) { p = r; via = "rules"; } }
-  if (p.intent === "unknown" && GEMINI_KEY && !note) p = { intent: "question" }; // "hello", "how are we doing?" → let Gemini answer
+  if (p.intent === "unknown" && GEMINI_KEY && !note) p = { intent: "question" }; // nothing understood yet: let Gemini answer it
   CO.chat(OWNER, "you", text);
   if (p.intent === "question" || p.intent === "chat") {
-    let reply;
-    try { reply = await gemini({ system: GEM.ANSWER_SYSTEM, text: `DATA (paper bots, right now)\n${botsBrief()}\n\nOWNER: ${text}`, history: OWNER.chat.slice(-7, -1), maxTokens: 500 }); }
-    catch (e) { reply = `${e.message} Meanwhile I can still follow instructions. ${CO.HELP}`; }
+    let reply = oneReply;
+    if (!reply) {
+      try { reply = await gemini({ system: GEM.ANSWER_SYSTEM, text: `DATA (paper bots, right now)\n${botsBrief()}\n\nOWNER: ${text}`, history: OWNER.chat.slice(-7, -1), maxTokens: 500 }); }
+      catch (e) { reply = `${e.message} Meanwhile I can still follow instructions. ${CO.HELP}`; }
+    }
     CO.chat(OWNER, "coach", reply); await ownerSave();
     return { reply, via: "gemini", messages: OWNER.chat.slice(-60), instructions: CO.live(OWNER, Date.now()).map((d) => ({ id: d.id, text: CO.describe(d), status: d.status })), ai: geminiInfo() };
   }

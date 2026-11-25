@@ -27,10 +27,19 @@ function pickModel(list) {
 
 // Newer Gemini models "think" first, and that thinking counts against maxOutputTokens, so the budget is generous
 // (the answer itself is kept short by the instructions, not by this cap).
-function body({ system, text, history = [], schema = null, maxTokens = 700 }) {
+// Speed: answer with little or no "thinking" (it was most of the wait). Gemini 2.5 takes a token budget (0 = off);
+// Gemini 3+ takes a level. Unknown model families get no setting (the API default).
+function thinkingFor(model) {
+  const m = String(model || "");
+  if (/^gemini-2\.5-flash/.test(m)) return { thinkingBudget: 0 };
+  if (/^gemini-([3-9]|\d{2,})/.test(m)) return { thinkingLevel: "low" };
+  return null;
+}
+function body({ system, text, history = [], schema = null, maxTokens = 700, model = null, think = true }) {
   const contents = [...history.slice(-8).map((m) => ({ role: m.who === "you" ? "user" : "model", parts: [{ text: String(m.text).slice(0, 1500) }] })), { role: "user", parts: [{ text: String(text).slice(0, 4000) }] }];
   return { ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}), contents,
-    generationConfig: { temperature: schema ? 0 : 0.4, maxOutputTokens: Math.max(4096, maxTokens), ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}) } };
+    generationConfig: { temperature: schema ? 0 : 0.4, maxOutputTokens: Math.max(4096, maxTokens), ...(schema ? { responseMimeType: "application/json", responseSchema: schema } : {}),
+      ...(think && thinkingFor(model) ? { thinkingConfig: thinkingFor(model) } : {}) } };
 }
 function jsonOf(text) {
   const t = String(text || "").replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
@@ -70,6 +79,7 @@ const COACH_SCHEMA = {
     sizePercent: { type: "NUMBER", description: "For intent size: new trade size as a percent of normal (half = 50, normal = 100)." },
     maxDollars: { type: "NUMBER", description: "For intent maxTrade: the dollar cap per trade." },
     instructionNumber: { type: "NUMBER", description: "For intent cancel: the instruction number." },
+    reply: { type: "STRING", description: "Only for intent question or chat: your full answer to the owner (plain text, no markdown, under 150 words), using ONLY the DATA given. Empty otherwise." },
   },
   required: ["intent"],
 };
@@ -98,9 +108,11 @@ function toParse(a) {
   if (["buy", "sell", "avoid", "allow"].includes(p.intent) && !p.symText) p.intent = "unknown";
   return p;
 }
+// one-call version for speed: classify the message and, for questions/small talk, answer it in the same reply
+const COACH_ONE_SYSTEM = () => COACH_SYSTEM + " If the intent is question or chat, also write 'reply': " + ANSWER_SYSTEM;
 const ANSWER_SYSTEM = "Write plain text only: no markdown, no ** bold, no headings; use '- ' for bullets. " + "You are the Coach, VP of Finance for the owner's paper-trading bots (Swing bot, Day trader, Quant; paper money only). " +
   "Answer the owner's question in plain English using ONLY the data below and general market knowledge. Be specific and short (under 150 words), cite numbers from the data, " +
   "say plainly when the data doesn't show something, and never claim a trade happened unless the data shows it. This is not financial advice. " +
   "If the owner seems to want a bot to do something, tell them the exact words to type (e.g. 'swing bot buy NVDA $2,000').";
 
-module.exports = { BASE, pickModel, backupModels, retryable, body, textOf, jsonOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };
+module.exports = { thinkingFor, COACH_ONE_SYSTEM, BASE, pickModel, backupModels, retryable, body, textOf, jsonOf, errorFor, COACH_SCHEMA, COACH_SYSTEM, ANSWER_SYSTEM, toParse, INTENTS };

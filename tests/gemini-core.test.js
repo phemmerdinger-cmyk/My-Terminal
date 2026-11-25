@@ -65,3 +65,12 @@ test("backup models for busy times: older flash, then flash-lite, never the firs
   assert.deepEqual(G.backupModels(L, first), ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]);
   assert.ok(G.retryable(503) && G.retryable(429) && !G.retryable(400) && !G.retryable(403));
 });
+
+test("speed: little or no thinking per model family, and one call can classify and answer", () => {
+  assert.deepEqual(G.thinkingFor("gemini-2.5-flash"), { thinkingBudget: 0 });
+  assert.deepEqual(G.thinkingFor("gemini-3.8-flash"), { thinkingLevel: "low" });
+  assert.equal(G.thinkingFor("gemini-flash-latest"), null);
+  assert.deepEqual(G.body({ text: "x", model: "gemini-3.6-flash" }).generationConfig.thinkingConfig, { thinkingLevel: "low" });
+  assert.equal(G.body({ text: "x", model: "gemini-3.6-flash", think: false }).generationConfig.thinkingConfig, undefined);
+  assert.ok(G.COACH_SCHEMA.properties.reply); assert.match(G.COACH_ONE_SYSTEM(), /reply/);
+});

@@ -91,6 +91,8 @@
     el.querySelector(".mds-presets").onclick = (e) => { const b = e.target.closest("[data-mspreset]"); if (!b) return; const p = SCENARIOS[+b.dataset.mspreset]; E.market = p[1]; E.tech = p[2]; E.custom = p[3]; renderScenario(); };
     byId("mdsResearchReload").onclick = () => fetchResearch(true);
     byId("mdsAskForm").onsubmit = (e) => { e.preventDefault(); ask(byId("mdsQuestion").value); };
+    // Enter sends (you're done typing); Shift+Enter makes a new line
+    byId("mdsQuestion").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); byId("mdsAskForm").requestSubmit(); } };
     const prompts = ["What are the biggest risks facing my investments?","What has changed about NVDA this month?","What major risks are emerging in the market today?","What is the AI Trader reading from research?"];
     el.querySelector(".mds-ask-suggestions").onclick = (e) => { const b = e.target.closest("[data-msquestion]"); if (!b) return; byId("mdsQuestion").value = prompts[+b.dataset.msquestion]; ask(byId("mdsQuestion").value); };
     for (const [id,k] of [["mdsMove","priceMove"],["mdsImp","importance"]]) byId(id).onchange = (e) => { const v = +e.target.value; opts[k] = k === "priceMove" ? Math.max(1, Math.min(50, v || 5)) : Math.max(30, Math.min(100, v || 75)); preferences(); renderAlerts(); };
