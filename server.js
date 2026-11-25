@@ -618,12 +618,14 @@ const RANGES = {
 // Explicit period + candle length (used by the Trading Sim). Only combinations Yahoo serves are allowed.
 const HIST_RANGES = new Set(["1d", "5d", "1mo", "3mo", "6mo", "ytd", "1y", "2y", "5y", "max"]);
 const HIST_IVS = new Set(["1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d", "1wk", "1mo"]);
-async function history(sym, range = "6mo", interval) {
+async function history(sym, range = "6mo", interval, ext = false) {
   let [r, iv] = RANGES[range] || RANGES["6mo"];
   if (interval && HIST_IVS.has(interval) && HIST_RANGES.has(range)) { r = range; iv = interval === "1h" ? "60m" : interval; }
-  return cached(`h:${sym}:${r}:${iv}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
-    const qs = `${encodeURIComponent(sym)}?range=${r}&interval=${iv}${range && range.startsWith("intraday") ? "&includePrePost=true" : ""}`;
-    const key = `${sym}:${r}:${iv}`;
+  // ext: charts the owner looks at also get pre-market and after-hours candles (Robinhood-style); bots keep regular-session data
+  const pp = (range && range.startsWith("intraday")) || (ext && /m$/.test(iv) && (r === "1d" || r === "5d"));
+  return cached(`h:${sym}:${r}:${iv}${pp ? ":pp" : ""}`, r === "1d" || r === "5d" ? (iv === "1m" ? 15_000 : 30_000) : 10 * 60_000, async () => {
+    const qs = `${encodeURIComponent(sym)}?range=${r}&interval=${iv}${pp ? "&includePrePost=true" : ""}`;
+    const key = `${sym}:${r}:${iv}${pp ? ":pp" : ""}`;
     // Yahoo throttles bursts of clicks: try both hosts with a short pause, and fall back to the last good copy
     let res = null, lastErr;
     for (const [i, host] of ["query1", "query2", "query1"].entries()) {
@@ -646,7 +648,10 @@ async function history(sym, range = "6mo", interval) {
       if (ipo && (!(volume > 0) || ![open, high, low, close].every((price) => Number.isFinite(price) && price > 0))) return;
       candles.push({ time: t, open, high, low, close, volume });
     });
-    const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles };
+    // with extended hours: mark candles outside the 9:30–4:00 regular session (US stocks/ETFs) so charts can shade them
+    if (pp && res.meta.currentTradingPeriod && res.meta.currentTradingPeriod.pre && /^America\/New_York$/.test(res.meta.exchangeTimezoneName || "America/New_York"))
+      for (const c of candles) { const m = etParts(new Date(c.time * 1000)).min; if (m < 570 || m >= 960) c.ext = m < 570 ? "pre" : "post"; }
+    const out = { symbol: res.meta.symbol, name: res.meta.shortName || res.meta.symbol, range: r, interval: iv, candles, ...(pp ? { extended: true } : {}) };
     HIST_LAST.set(key, out); if (HIST_LAST.size > 400) HIST_LAST.delete(HIST_LAST.keys().next().value);
     return out;
   });
@@ -4905,7 +4910,7 @@ async function handle(req, res) {
       if (u.pathname === "/api/history") {
         const [s] = parseList(u.searchParams.get("symbol"), 1);
         if (!s) return send(res, 400, { error: "symbol required" });
-        return send(res, 200, await history(s, u.searchParams.get("range"), u.searchParams.get("interval")));
+        return send(res, 200, await history(s, u.searchParams.get("range"), u.searchParams.get("interval"), u.searchParams.get("ext") === "1"));
       }
       if (u.pathname === "/api/unlock" && req.method === "POST") {
         let pw = ""; try { pw = (await readBody(req)).password; } catch {}

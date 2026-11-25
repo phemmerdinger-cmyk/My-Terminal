@@ -283,6 +283,7 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 ### Pre-market / after-hours everywhere (2026-11-25)
 - Fix: pre-market change is now measured from yesterday's close (before the open, Yahoo's chartPreviousClose is the close *before* that, which made e.g. NVDA show −10.9% instead of −5.3%).
 - `MDInstruments.extendedNow(q, now)` (tested): before the open → latest pre-market print, after the close → latest after-hours print, in session → nothing. Stocks/ETFs only; futures, crypto and FX already quote around the clock.
+- Charts: 1D and 5D (main chart and Research) now include pre-market and after-hours candles (`/api/history?...&ext=1`, faded candles + orange volume outside 9:30–4:00); the 1D baseline before the open is yesterday's close. Bots keep regular-session data.
 - Shown in: watchlist cards, ticker tape, quote tables (new sortable "Pre / after hrs" column), chart title, mini charts, Markets tables, portfolio (value and $ move at the extended price), Claude Predictor cards, head-to-head, Cmd+K, My Trader, the news reader, Ask Claude context. Research page already had it.
 
 ### Pre-Market Desk agent (2026-11-25)

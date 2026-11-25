@@ -2840,7 +2840,7 @@ async function loadChart(){
   document.querySelectorAll("#typeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.type===S.chartType));
   if(!S.quotes[s]) api("/api/quotes?symbols="+encodeURIComponent(s)).then(j=>{mergeQuotes(j.quotes);renderChartTitle();}).catch(()=>{});
   let h;
-  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${range}${range==="1d"?"&interval=1m":""}`;
+  const hurl=`/api/history?symbol=${encodeURIComponent(s)}&range=${range}${range==="1d"?"&interval=1m":""}${range==="1d"||range==="5d"?"&ext=1":""}`; // 1D/5D include pre-market & after-hours
   try{ h=await api(hurl); }
   catch{ if(request===chartRequest){ await new Promise(r=>setTimeout(r,1500)); try{ if(request===chartRequest) h=await api(hurl); }catch{} } }
   if(request!==chartRequest) return;
@@ -2852,15 +2852,17 @@ async function loadChart(){
     const up=c.length&&c[c.length-1].close>=c[0].open;
     if(S.chartType==="candle"){
       mainSeries=chart.addCandlestickSeries({upColor:"#21c37a",downColor:"#ff4d5e",borderVisible:false,wickUpColor:"#21c37a",wickDownColor:"#ff4d5e"});
-      mainSeries.setData(c.map(x=>({time:x.time,open:x.open,high:x.high,low:x.low,close:x.close})));
+      mainSeries.setData(c.map(x=>x.ext?{time:x.time,open:x.open,high:x.high,low:x.low,close:x.close,color:x.close>=x.open?"rgba(33,195,122,.45)":"rgba(255,77,94,.45)",wickColor:x.close>=x.open?"rgba(33,195,122,.45)":"rgba(255,77,94,.45)"}:{time:x.time,open:x.open,high:x.high,low:x.low,close:x.close}));
     }else{
-      const q=S.quotes[s], base=(range==="1d"&&q&&q.prevClose)?q.prevClose:c[0].open;
+      // 1D baseline = yesterday's close. Before today's open the quote's price IS yesterday's close (prevClose is the day before).
+      const q=S.quotes[s], preOpen=q&&q.regularSession&&Date.now()<q.regularSession.start&&q.price>0, base=range==="1d"&&q?(preOpen?q.price:q.prevClose||c[0].open):c[0].open;
       mainSeries=chart.addBaselineSeries(baselineOpts(base));
       mainSeries.setData(c.map(x=>({time:x.time,value:x.close})));
     }
     volSeries=chart.addHistogramSeries({priceScaleId:"",priceFormat:{type:"volume"}});
     volSeries.priceScale().applyOptions({scaleMargins:{top:.82,bottom:0}});
-    volSeries.setData(c.map(x=>({time:x.time,value:x.volume,color:x.close>=x.open?"rgba(33,195,122,.35)":"rgba(255,77,94,.35)"})));
+    volSeries.setData(c.map(x=>({time:x.time,value:x.volume,color:x.ext?"rgba(255,153,31,.25)":x.close>=x.open?"rgba(33,195,122,.35)":"rgba(255,77,94,.35)"})));
+    if(h.extended&&c.some(x=>x.ext)) $("chartTitle").insertAdjacentHTML("beforeend",`<div class="xh" style="margin-top:2px">Includes pre-market &amp; after-hours · faded candles / orange volume = outside 9:30–4:00 ET</div>`);
     chart.timeScale().fitContent();
   }else{
     $("chart").innerHTML=`<div style="padding:12px;height:100%">${spark(c.map(x=>x.close),"100%",400)}</div>`;
@@ -4068,7 +4070,7 @@ async function loadResearch(){
 }
 async function loadResearchChart(){
   const s=S.rq.sym, r=S.rq.range;
-  try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=${r}`); if(S.rq.sym===s&&S.rq.range===r){ S.rq.hist=h.candles; if(S.tab==="research"&&S.rq.sub==="summary") renderResearchBody(); } }catch{ S.rq.hist=[]; }
+  try{ const h=await api(`/api/history?symbol=${encodeURIComponent(s)}&range=${r}${r==="1d"||r==="5d"?"&ext=1":""}`); if(S.rq.sym===s&&S.rq.range===r){ S.rq.hist=h.candles; if(S.tab==="research"&&S.rq.sub==="summary") renderResearchBody(); } }catch{ S.rq.hist=[]; }
 }
 async function loadFin(){
   const s=S.rq.sym, f=S.rq.finFreq; if(S.rq.fin[f]) return;
