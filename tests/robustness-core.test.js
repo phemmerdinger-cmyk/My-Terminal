@@ -70,3 +70,32 @@ test("a paused bot queues no new buys but still exits", () => {
   assert.equal(s.books.pullback.pending.length, 0);
   assert.match(s.lastNotes.pullback, /paused/);
 });
+
+test("walk-forward picks settings on earlier prices and scores them only on later ones", () => {
+  const cal = days(700), b = { SPY: bars(Array(700).fill(100), cal) }, uni = ["A", "B", "C", "D"];
+  uni.forEach((s, i) => { b[s] = bars(dippy(700, i * 3), cal); });
+  const wf = T.walkForward("pullback", b, { universe: uni });
+  assert.equal(wf.of, 4); assert.equal(wf.windows.length, 4);
+  for (let k = 1; k < wf.windows.length; k++) assert.ok(wf.windows[k].from > wf.windows[k - 1].to, "windows don't overlap");
+  assert.ok(wf.windows.every((w) => [0.8, 1, 1.2].includes(w.setting)));
+  assert.ok(wf.total > 0 && wf.won >= 2);
+  const v = T.toughness("pullback", b, { universe: uni });
+  const c = v.checks.find((x) => x.id === "walkforward");
+  assert.ok(c && c.ok, JSON.stringify(c)); assert.equal(v.status, "pass");
+  assert.equal(T.walkForward("pullback", { SPY: bars(Array(250).fill(100), days(250)) }), null, "too short to split");
+});
+
+test("a failed walk-forward counts as a missed check", () => {
+  const ok = { total: 0.01 }, base = { total: 0.05, later: 0.01, trades: 40, tradeList: [] }, mc = { p05: -0.1, dd95: 0.1 };
+  const v = T.verdict(base, { lo: ok, hi: ok, dbl: ok, mc, wf: { total: -0.04, won: 1, of: 4, windows: [] } });
+  assert.equal(v.status, "borderline"); assert.equal(v.checks.at(-1).id, "walkforward");
+  assert.equal(T.verdict(base, { lo: ok, hi: ok, dbl: ok, mc }).checks.length, 5, "no walk-forward, no extra check");
+});
+
+test("Sortino ignores up days; Calmar is yearly return over worst drawdown", () => {
+  const up = Array.from({ length: 60 }, (_, i) => 100 * 1.001 ** i);
+  assert.equal(T.sortino(up), null, "no down days, no downside risk to divide by");
+  const mixed = up.map((v, i) => (i % 5 === 4 ? v * 0.99 : v));
+  assert.ok(T.sortino(mixed) > 0 && T.calmar(mixed) > 0);
+  assert.equal(T.calmar(up.slice(0, 10)), null);
+});

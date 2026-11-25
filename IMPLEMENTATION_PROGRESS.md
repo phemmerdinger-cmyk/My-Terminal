@@ -3,6 +3,11 @@
 Branch: `feat/desk-2.0-phase1` · Spec: the "Market Desk 2.0" directive (13 phases). Naming: the owner rejected "Mission Control" — the landing page is **Home**. Avoid grandiose names for new modules; prefer plain ones.
 
 ## Done
+### Toughness test: walk-forward + downside risk (2026-11-24)
+- New sixth check for the pullback and sector-rotation lab bots (`robustness-core.walkForward`): the period after warm-up is split into 5 parts; for parts 2–5 the setting (20% lower / as is / 20% higher) that did best on all earlier prices is picked and scored only on the unseen part. Passes when the chained out-of-sample result is positive and at least half the windows are up. It counts like any other check (one miss = borderline, two = fail and new buys pause). The Quant trader's replay doesn't run it yet.
+- The "made money" check now also shows Sortino (only down days count as risk) and Calmar (yearly return ÷ worst drawdown). Shown only, not a gate.
+- Ideas borrowed from the QuanterLab and pyvar plugins, built in plain JS with no paid service. Tests in `tests/robustness-core.test.js`.
+
 ### Bots vs S&P 500 — easier to read for a personal trader (2026-11-24)
 - Page order: scoreboard → the race chart and holdings → under the hood → test runs. Risk desk, Strategy Lab, day-volume panel, put/call gauge and market signals moved into a collapsed "Advanced" section; a "What the terms on this page mean" glossary sits under it.
 - No more "AI bot" / "AI leads": each view names its bot (Swing bot, Day trader, Quant trader, You). The headline between the two big numbers just says "Ahead of the S&P" / "Behind the S&P" and by how many dollars. Wording in `public/bots-verdict-core.js` (`leadText`, tested in `tests/bots-verdict-core.test.js`; `summarize` is kept but not shown — the owner removed the summary box).

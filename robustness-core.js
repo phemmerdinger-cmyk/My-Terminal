@@ -18,15 +18,27 @@ function sharpe(eq) {
   const m = r.reduce((a, b) => a + b, 0) / r.length, sd = Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1));
   return sd ? (m / sd) * Math.sqrt(252) : null;
 }
+// Sortino: like Sharpe but only down days count as risk. Calmar: yearly return divided by the worst drawdown.
+function sortino(eq) {
+  const r = eq.slice(1).map((v, i) => v / eq[i] - 1); if (r.length < 20) return null;
+  const m = r.reduce((a, b) => a + b, 0) / r.length, dd = Math.sqrt(r.reduce((a, b) => a + Math.min(0, b) ** 2, 0) / r.length);
+  return dd ? (m / dd) * Math.sqrt(252) : null;
+}
+function calmar(eq) {
+  if (eq.length < 20) return null;
+  const yr = (eq[eq.length - 1] / eq[0]) ** (252 / (eq.length - 1)) - 1, dd = drawdown(eq);
+  return dd ? yr / dd : null;
+}
 
 // Replay one of the stock / sector bots day by day: decide after each close, fill at the next session's open.
-function simulate(bot, barsBySymbol, { rules = X.RULES[bot], cost = COST, universe = [], warmup = 200 } = {}) {
+function simulate(bot, barsBySymbol, { rules = X.RULES[bot], cost = COST, universe = [], warmup = 200, from = 0, to = null } = {}) {
   const cal = (barsBySymbol.SPY || []).map((b) => b.day), idx = {}, byDay = {};
   for (const [sym, bars] of Object.entries(barsBySymbol)) { byDay[sym] = new Map(bars.map((b, i) => [b.day, i])); idx[sym] = bars; }
   const upTo = (day) => { const o = {}; for (const [sym, bars] of Object.entries(idx)) { const i = byDay[sym].get(day); if (i != null) o[sym] = bars.slice(0, i + 1); } return o; };
   let cash = START; const pos = {}, trades = [], equity = [], days = [];
   let pending = [], month = null;
-  for (let i = warmup; i < cal.length; i++) {
+  const end = Math.min(cal.length, to ?? cal.length);
+  for (let i = Math.max(warmup, from); i < end; i++) {
     const day = cal[i];
     // 1) fill yesterday's decisions at today's open (sells first)
     for (const o of pending.sort((a, b) => (a.side === b.side ? 0 : a.side === "SELL" ? -1 : 1))) {
@@ -46,7 +58,7 @@ function simulate(bot, barsBySymbol, { rules = X.RULES[bot], cost = COST, univer
     for (const [s, p] of Object.entries(pos)) { const bi = byDay[s].get(day); if (bi != null) p.mark = idx[s][bi].close; if (p.day < day) p.held++; }
     const value = cash + Object.values(pos).reduce((a, p) => a + p.shares * p.mark, 0);
     equity.push(value); days.push(day);
-    if (i === cal.length - 1) break;
+    if (i === end - 1) break;
     // 3) decide for tomorrow's open with only the bars known today
     const known = upTo(day);
     if (bot === "rotation") {
@@ -80,7 +92,7 @@ function summarize(equity, days, trades) {
   const cut = Math.floor(equity.length * 0.6), later = equity.length > 40 ? equity[equity.length - 1] / equity[cut] - 1 : null;
   const wins = trades.filter((t) => t.pnl > 0).length;
   return { from: days[0] || null, to: days[days.length - 1] || null, sessions: equity.length, total, later, laterFrom: days[cut] || null,
-    sharpe: sharpe(equity), maxDrawdown: drawdown(equity), trades: trades.length, winRate: trades.length ? wins / trades.length : null, tradeList: trades };
+    sharpe: sharpe(equity), sortino: sortino(equity), calmar: calmar(equity), maxDrawdown: drawdown(equity), trades: trades.length, winRate: trades.length ? wins / trades.length : null, tradeList: trades };
 }
 
 // Reshuffle the trades (sampled with replacement) 1,000 times: how bad could the same edge look with worse luck?
@@ -96,28 +108,50 @@ function monteCarlo(trades, { runs = 1000, seed = 7 } = {}) {
   return { runs, p05: q(finals, 0.05), median: q(finals, 0.5), dd95: q(dds, 0.95) };
 }
 
+// Walk-forward: split the period after warm-up into 5 parts. For parts 2-5, pick the setting (20% lower, as is,
+// 20% higher) that did best on everything before that part, then score only that pick on the unseen part.
+// A rule that only works when tuned on the same prices it is judged on fails here.
+function walkForward(bot, barsBySymbol, opts = {}) {
+  const rules = opts.rules || X.RULES[bot], warmup = opts.warmup ?? 200, n = (barsBySymbol.SPY || []).length;
+  const parts = 5, len = Math.floor((n - warmup) / parts);
+  if (!KNOBS[bot] || len < 40) return null;
+  const choices = [0.8, 1, 1.2].map((k) => ({ k, rules: k === 1 ? rules : scale(rules, k, KNOBS[bot]) }));
+  const windows = [];
+  for (let p = 1; p < parts; p++) {
+    const start = warmup + p * len, stop = p === parts - 1 ? n : start + len;
+    let best = null;
+    for (const c of choices) { const r = simulate(bot, barsBySymbol, { ...opts, rules: c.rules, from: warmup, to: start }); if (!best || r.total > best.total) best = { ...c, total: r.total }; }
+    const out = simulate(bot, barsBySymbol, { ...opts, rules: best.rules, from: start, to: stop });
+    windows.push({ from: out.from, to: out.to, setting: best.k, inSample: best.total, outOfSample: out.total, trades: out.trades });
+  }
+  const total = windows.reduce((a, w) => a * (1 + w.outOfSample), 1) - 1, won = windows.filter((w) => w.outOfSample > 0).length;
+  return { windows, total, won, of: windows.length };
+}
+
 // Run every check for one bot and turn it into pass / borderline / fail / too few trades.
 function toughness(bot, barsBySymbol, opts = {}) {
   const base = simulate(bot, barsBySymbol, opts), rules = opts.rules || X.RULES[bot];
   const lo = simulate(bot, barsBySymbol, { ...opts, rules: scale(rules, 0.8, KNOBS[bot]) });
   const hi = simulate(bot, barsBySymbol, { ...opts, rules: scale(rules, 1.2, KNOBS[bot]) });
   const dbl = simulate(bot, barsBySymbol, { ...opts, cost: COST * 2 });
-  return verdict(base, { lo, hi, dbl, mc: monteCarlo(base.tradeList) });
+  return verdict(base, { lo, hi, dbl, mc: monteCarlo(base.tradeList), wf: walkForward(bot, barsBySymbol, opts) });
 }
 
-function verdict(base, { lo, hi, dbl, mc }) {
+function verdict(base, { lo, hi, dbl, mc, wf }) {
   const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)}%`);
   const checks = [
-    { id: "profit", label: "Made money after costs", ok: base.total > 0, value: pct(base.total) },
+    { id: "profit", label: "Made money after costs", ok: base.total > 0, value: pct(base.total) + (base.sortino != null ? ` · Sortino ${base.sortino.toFixed(2)}` : "") + (base.calmar != null ? ` · Calmar ${base.calmar.toFixed(2)}` : "") },
     { id: "later", label: "Still made money in the last 40% of the period", ok: base.later != null && base.later > 0, value: pct(base.later) },
     { id: "settings", label: "Still made money with its settings 20% lower and 20% higher", ok: lo.total > 0 && hi.total > 0, value: `${pct(lo.total)} / ${pct(hi.total)}` },
     { id: "costs", label: "Still made money with trading costs doubled", ok: dbl.total > 0, value: pct(dbl.total) },
     { id: "luck", label: "Bad-luck reshuffles: 1 in 20 ends worse than −15%, and drawdowns stay under 30%", ok: !!mc && mc.p05 > -0.15 && mc.dd95 < 0.3, value: mc ? `${pct(mc.p05)} · drawdown ${pct(-mc.dd95)}` : "—" },
   ];
+  if (wf) checks.push({ id: "walkforward", label: "Walk-forward: settings picked on earlier prices still made money on later, unseen prices (overall, and in at least half the windows)",
+    ok: wf.total > 0 && wf.won * 2 >= wf.of, value: `${pct(wf.total)} · ${wf.won} of ${wf.of} windows up` });
   const failed = checks.filter((c) => !c.ok).length;
   const status = base.trades < MIN_TRADES ? "few-trades" : !checks[0].ok || failed >= 2 ? "fail" : failed === 1 ? "borderline" : "pass";
   const { tradeList, ...summary } = base;
-  return { status, label: { pass: "Passed", borderline: "Borderline", fail: "Failed", "few-trades": "Too few trades to judge" }[status], checks, summary, monteCarlo: mc,
+  return { status, walkForward: wf || null, label: { pass: "Passed", borderline: "Borderline", fail: "Failed", "few-trades": "Too few trades to judge" }[status], checks, summary, monteCarlo: mc,
     gate: status === "fail" ? "New buys paused automatically until a re-test passes (open positions still follow their exit rules)." : "Trading normally.",
     limits: "Replay on past daily prices with today's list of stocks (survivorship bias), next-day opening fills and modeled costs. Hypothetical, not a track record." };
 }
@@ -175,4 +209,4 @@ function quantToughness(decide, px, dates, opts = {}) {
 
 const paused = (result) => !!result && result.status === "fail";
 
-module.exports = { START, COST, MIN_TRADES, KNOBS, simulate, simulateQuant, quantToughness, monteCarlo, toughness, verdict, liveRecord, paused, scale };
+module.exports = { START, COST, MIN_TRADES, KNOBS, simulate, walkForward, sortino, calmar, simulateQuant, quantToughness, monteCarlo, toughness, verdict, liveRecord, paused, scale };
