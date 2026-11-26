@@ -306,3 +306,6 @@ Tests: `tests/home-core.test.js`, `tests/desk.test.js` (incl. privacy: 401 for v
 
 ### Agent work hours (2026-11-25)
 - `onDuty()` in server.js (= `DM.awakeWindow()`, Mon–Fri 6:00 AM–5:00 PM ET; `ALWAYS_ON=1`/AP_TEST lift it) gates every background agent on the server: swing, day, quant ticks, Coach 2-hour review, predictions refresh, strategy lab, risk desk, best-buys, Spider research (`workHours` dep: off duty only owner-pressed jobs run; tested). Pre-Market Desk and System Doctor were already inside these hours. Owner-pressed actions run any time. `/api/health` reports `duty`; Bot HQ's bots pill says on/off duty with the hours.
+
+### Google Cloud hosting option (2026-11-26)
+- Render's free hours ran out on Nov 26 (four services shared 750 h). `deploy/google-cloud.sh` (run in Google Cloud Shell) puts the public server on Google's free e2-micro VM: Node 22 + Caddy HTTPS on `<ip>.sslip.io`, `MODE=public` with secrets typed once into VM metadata, 1 GB swap + `--max-old-space-size=640`, `True-Client-IP` set by Caddy for rate limits/lockouts, and a 5-minute `git pull` timer as auto-deploy. Only one host may run the bots: suspend Render once Google is live, and point the laptop's PUBLIC_URL at the new address.
